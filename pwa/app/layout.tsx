@@ -4,6 +4,7 @@ import "./globals.css";
 import "./mobile-nav-fix.css";
 import "./quran.css";
 import NavEnhancer from "./NavEnhancer";
+import QuranAudioEnhancer from "./QuranAudioEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
         <NavEnhancer />
+        <QuranAudioEnhancer />
       </body>
     </html>
   );
