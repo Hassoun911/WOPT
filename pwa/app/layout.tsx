@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./mobile-nav-fix.css";
 import "./quran.css";
+import "./direction-fixes.css";
 import NavEnhancer from "./NavEnhancer";
 import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
