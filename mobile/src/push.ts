@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
@@ -12,6 +13,11 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
   if (!projectId || !pushApiUrl) return null;
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  let installationId = await AsyncStorage.getItem(STORAGE_KEYS.installationId);
+  if (!installationId) {
+    installationId = Crypto.randomUUID();
+    await AsyncStorage.setItem(STORAGE_KEYS.installationId, installationId);
+  }
   const previous = await AsyncStorage.getItem(STORAGE_KEYS.pushToken);
   if (previous === token) return token;
 
@@ -19,6 +25,7 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      installationId,
       token,
       platform: Platform.OS,
       locale,

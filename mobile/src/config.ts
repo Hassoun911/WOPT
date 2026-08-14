@@ -11,5 +11,6 @@ export const STORAGE_KEYS = {
   alertsEnabled: "wopt:alerts-enabled:v1",
   scheduledNotificationIds: "wopt:scheduled-notifications:v1",
   pushToken: "wopt:push-token:v1",
+  installationId: "wopt:installation-id:v1",
   locale: "wopt:locale:v1"
 } as const;

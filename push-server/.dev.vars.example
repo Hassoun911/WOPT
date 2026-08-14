@@ -1,0 +1,4 @@
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:notifications@example.com
+EXPO_ACCESS_TOKEN=
