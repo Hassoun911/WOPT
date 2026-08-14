@@ -1,0 +1,126 @@
+/* Direction-aware layout corrections for WOPT.
+   Keep physical positioning to a minimum so English/LTR and Arabic/RTL stay aligned. */
+
+/* Home / prayer application */
+.app-shell[dir="rtl"] {
+  text-align: right;
+}
+
+.app-shell[dir="rtl"] .date-column {
+  padding-right: 0;
+  padding-left: 8px;
+}
+
+.app-shell[dir="rtl"] .next-prayer-card::after {
+  right: auto;
+  left: -150px;
+}
+
+.app-shell[dir="rtl"] .verified-date {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.app-shell[dir="rtl"] .daily-heading > p {
+  text-align: start;
+}
+
+.app-shell[dir="rtl"] .month-row,
+.app-shell[dir="rtl"] .setting-card,
+.app-shell[dir="rtl"] .install-card,
+.app-shell[dir="rtl"] .permission-banner,
+.app-shell[dir="rtl"] .sheet-header,
+.app-shell[dir="rtl"] .install-app-summary {
+  text-align: start;
+}
+
+/* Keep times and numeric clock content readable without reversing digit order. */
+.app-shell[dir="rtl"] time,
+.app-shell[dir="rtl"] .live-clock strong,
+.app-shell[dir="rtl"] .countdown-row strong,
+.app-shell[dir="rtl"] .month-row span {
+  unicode-bidi: plaintext;
+}
+
+/* Qur’an reader chrome is currently English; keep its controls stable regardless
+   of the saved home-page language. Qur’an text itself already declares RTL. */
+.quran-app {
+  direction: ltr;
+}
+
+.quran-app .mushaf-text,
+.quran-app .memory-arabic,
+.quran-app [lang="ar"],
+.quran-app [dir="rtl"] {
+  direction: rtl;
+}
+
+@media (max-width: 820px) {
+  .app-shell[dir="rtl"] .date-column {
+    padding: 0;
+  }
+
+  /* In RTL the status chip belongs at the right/start edge and the day arrows
+     at the opposite edge. This prevents the overlap visible on small screens. */
+  .app-shell[dir="rtl"] .date-nav {
+    right: auto;
+    left: 0;
+  }
+
+  .app-shell[dir="rtl"] .sync-pill {
+    margin-right: 0;
+    margin-left: auto;
+  }
+
+  .app-shell[dir="rtl"] .notice-card {
+    padding-right: 20px;
+    padding-left: 13px;
+  }
+
+  /* The hidden Month slot is the second item from the inline start. In RTL that
+     slot is physically 50%-75% from the left, so move the Qur’an overlay there. */
+  html[dir="rtl"] .quran-tab-overlay {
+    left: 50%;
+    right: auto;
+  }
+
+  html[dir="ltr"] .quran-tab-overlay {
+    left: 25%;
+    right: auto;
+  }
+
+  /* Keep bottom labels centered and prevent long Arabic labels from colliding. */
+  .mobile-nav a,
+  .mobile-nav button,
+  .quran-tab-overlay,
+  .quran-mobile-nav a {
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-nav {
+    direction: inherit;
+  }
+
+  /* Qur’an mobile navigation remains stable because its UI labels are English. */
+  .quran-mobile-nav {
+    direction: ltr;
+  }
+}
+
+@media (max-width: 390px) {
+  .app-shell[dir="rtl"] .date-nav {
+    left: 0;
+    right: auto;
+  }
+
+  .app-shell[dir="rtl"] .brand strong {
+    max-width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
