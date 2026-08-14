@@ -1,0 +1,6 @@
+/* Mobile navigation cleanup: the fixed bottom bar is the only primary menu on phones/tablets. */
+@media (max-width: 820px) {
+  .header-actions .round-button {
+    display: none;
+  }
+}
