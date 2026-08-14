@@ -6,6 +6,7 @@ import "./quran.css";
 import NavEnhancer from "./NavEnhancer";
 import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
+import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <NavEnhancer />
         <QuranAudioEnhancer />
         <QuranPlaybackSyncEnhancer />
+        <QuranUiFixEnhancer />
       </body>
     </html>
   );
