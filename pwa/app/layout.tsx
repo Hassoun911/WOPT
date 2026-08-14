@@ -15,10 +15,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const asset = (path: string) => `${basePath}${path}`;
+
 export const metadata: Metadata = {
   title: "Windsor Prayer Times",
   description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, and memorization tools.",
-  manifest: "/manifest.webmanifest",
+  manifest: asset("/manifest.webmanifest"),
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -27,11 +30,11 @@ export const metadata: Metadata = {
   other: { "codex-preview": "development" },
   icons: {
     icon: [
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+      { url: asset("/icon-192.png"), type: "image/png", sizes: "192x192" },
+      { url: asset("/icon-512.png"), type: "image/png", sizes: "512x512" },
     ],
-    shortcut: "/icon-192.png",
-    apple: "/apple-touch-icon.png",
+    shortcut: asset("/icon-192.png"),
+    apple: asset("/apple-touch-icon.png"),
   },
 };
 
