@@ -24,6 +24,12 @@ function chapterFromPage() {
   return key ? Number(key.split(":")[0]) : null;
 }
 
+function chapterFromPlayer() {
+  const text = document.querySelector<HTMLElement>(".wopt-now-playing span")?.textContent || "";
+  const match = text.match(/Surah\s+(\d+)\s+of\s+114/i);
+  return match ? Number(match[1]) : null;
+}
+
 function currentReciterId() {
   return Number(document.querySelector<HTMLSelectElement>(".wopt-quran-player [data-player='reciter']")?.value || 7);
 }
@@ -48,6 +54,8 @@ export default function QuranPlaybackSyncEnhancer() {
   const lastVerseRef = useRef<string | null>(null);
   const lastWordRef = useRef<string | null>(null);
   const lastScrollAtRef = useRef(0);
+  const switchingChapterRef = useRef(false);
+  const lastRequestedChapterRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!pathname.endsWith("/quran") && !pathname.endsWith("/quran/")) return;
@@ -112,6 +120,50 @@ export default function QuranPlaybackSyncEnhancer() {
       await loadTimestamps(chapterId, currentReciterId());
     };
 
+    const switchReaderChapter = async (targetChapter: number) => {
+      const rendered = chapterFromPage();
+      if (!targetChapter || rendered === targetChapter || switchingChapterRef.current) return;
+      if (lastRequestedChapterRef.current === targetChapter && switchingChapterRef.current) return;
+
+      switchingChapterRef.current = true;
+      lastRequestedChapterRef.current = targetChapter;
+      clearSyncHighlight();
+      timestampsRef.current = [];
+
+      const surahsButton = Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-top-actions button"))
+        .find((button) => /surahs/i.test(button.textContent || ""));
+      surahsButton?.click();
+
+      let attempts = 0;
+      const choose = () => {
+        attempts += 1;
+        const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".surah-list > button"));
+        const target = buttons.find((button) => {
+          const number = Number(button.querySelector("span")?.textContent?.trim() || 0);
+          return number === targetChapter;
+        });
+
+        if (target) {
+          target.click();
+          window.setTimeout(async () => {
+            await loadTimestamps(targetChapter, currentReciterId());
+            cleanDuplicateNumbers();
+            const firstAyah = document.querySelector<HTMLElement>(`[data-verse-key="${targetChapter}:1"]`);
+            firstAyah?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+            switchingChapterRef.current = false;
+          }, 650);
+          return;
+        }
+
+        if (attempts < 15) {
+          window.setTimeout(choose, 100);
+        } else {
+          switchingChapterRef.current = false;
+        }
+      };
+      window.setTimeout(choose, 80);
+    };
+
     const getPlaybackMs = () => {
       const player = document.querySelector<HTMLElement>(".wopt-quran-player");
       const progress = player?.querySelector<HTMLInputElement>("[data-player='progress']");
@@ -148,6 +200,14 @@ export default function QuranPlaybackSyncEnhancer() {
       const playing = !!playButton && /Pause/i.test(playButton.textContent || "");
       if (!playing) return;
 
+      const audioChapter = chapterFromPlayer();
+      const renderedChapter = chapterFromPage();
+      if (audioChapter && renderedChapter && audioChapter !== renderedChapter) {
+        void switchReaderChapter(audioChapter);
+        return;
+      }
+      if (switchingChapterRef.current) return;
+
       const currentMs = getPlaybackMs();
       if (currentMs == null || !timestampsRef.current.length) return;
 
@@ -179,12 +239,23 @@ export default function QuranPlaybackSyncEnhancer() {
 
     const observer = new MutationObserver(() => {
       cleanDuplicateNumbers();
-      void ensureTimestamps();
+      const audioChapter = chapterFromPlayer();
+      const renderedChapter = chapterFromPage();
+      if (audioChapter && renderedChapter && audioChapter !== renderedChapter) {
+        void switchReaderChapter(audioChapter);
+      } else {
+        void ensureTimestamps();
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
     const timer = window.setInterval(sync, 180);
-    const refreshTimer = window.setInterval(() => void ensureTimestamps(), 1400);
+    const refreshTimer = window.setInterval(() => {
+      const audioChapter = chapterFromPlayer();
+      const renderedChapter = chapterFromPage();
+      if (audioChapter && renderedChapter && audioChapter !== renderedChapter) void switchReaderChapter(audioChapter);
+      else void ensureTimestamps();
+    }, 900);
     void ensureTimestamps();
     cleanDuplicateNumbers();
 
