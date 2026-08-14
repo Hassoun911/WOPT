@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { ATHAN_CHANNEL_ID, CITY_LABEL, REMINDER_CHANNEL_ID, STORAGE_KEYS } from "./config";
 import { buildPrayerEvents } from "./events";
+import { cancelAndroidPrayerAudio, scheduleAndroidPrayerAudio } from "./prayerAudio";
 import { formatPrayerTime } from "./time";
 import type { PrayerEvent, PrayerKey, PrayerTimes } from "./types";
 
@@ -29,16 +30,16 @@ export async function configureNotificationChannels() {
     name: "Prayer reminders",
     description: "Reminders 20 and 10 minutes before each prayer",
     importance: Notifications.AndroidImportance.MAX,
-    sound: "ding.wav",
+    sound: "attention_chime.wav",
     vibrationPattern: [0, 240, 120, 240, 120, 240],
     lightColor: "#d9b85f",
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
   });
   await Notifications.setNotificationChannelAsync(ATHAN_CHANNEL_ID, {
-    name: "Prayer time — Adhan",
-    description: "Notification at the exact prayer time",
+    name: "Prayer time",
+    description: "Visual notification at the exact prayer time; native Android playback supplies the Adhan",
     importance: Notifications.AndroidImportance.MAX,
-    sound: "default",
+    sound: null,
     vibrationPattern: [0, 400, 180, 400],
     lightColor: "#0b5b47",
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
@@ -72,7 +73,7 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
       ...common,
       title: locale === "ar" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : `${prayer} in 20 minutes`,
       body: `${time} • ${CITY_LABEL}`,
-      sound: "ding.wav"
+      sound: "attention_chime.wav"
     };
   }
   if (event.kind === "ten") {
@@ -80,14 +81,15 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
       ...common,
       title: locale === "ar" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `${prayer} in 10 minutes`,
       body: `${time} • ${CITY_LABEL}`,
-      sound: "ding.wav"
+      sound: "attention_chime.wav"
     };
   }
   return {
     ...common,
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
     body: `${time} • ${CITY_LABEL}`,
-    // The final Adhan recording will replace the default sound after the audio is approved.
+    // Android exact-time audio is handled by the native alarm service. iOS uses
+    // this notification as its platform-safe exact-time alert.
     sound: "default"
   };
 }
@@ -96,7 +98,10 @@ export async function cancelPrayerNotifications() {
   const saved = await AsyncStorage.getItem(STORAGE_KEYS.scheduledNotificationIds);
   const identifiers = saved ? (JSON.parse(saved) as string[]) : [];
   await Promise.all(identifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
-  await AsyncStorage.removeItem(STORAGE_KEYS.scheduledNotificationIds);
+  await Promise.all([
+    AsyncStorage.removeItem(STORAGE_KEYS.scheduledNotificationIds),
+    cancelAndroidPrayerAudio()
+  ]);
 }
 
 export async function schedulePrayerNotifications(
@@ -110,7 +115,9 @@ export async function schedulePrayerNotifications(
   // iOS keeps at most 64 pending local notifications; four days uses at most 60.
   // The push server remains the primary path and local notifications are the fallback.
   const days = Platform.OS === "ios" ? 4 : 14;
-  const events = buildPrayerEvents(prayerTimes, days);
+  const events = buildPrayerEvents(prayerTimes, days).filter(
+    (event) => Platform.OS !== "android" || event.kind !== "athan"
+  );
   const identifiers: string[] = [];
 
   for (const event of events) {
@@ -125,11 +132,19 @@ export async function schedulePrayerNotifications(
     identifiers.push(identifier);
   }
 
+  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes);
+
   await Promise.all([
     AsyncStorage.setItem(STORAGE_KEYS.scheduledNotificationIds, JSON.stringify(identifiers)),
     AsyncStorage.setItem(STORAGE_KEYS.alertsEnabled, "on")
   ]);
-  return { granted: true, count: identifiers.length };
+  return {
+    granted: true,
+    count: identifiers.length + androidAudio.count,
+    reminderCount: identifiers.length,
+    audioCount: androidAudio.count,
+    exactAlarmGranted: Platform.OS !== "android" || androidAudio.exact
+  };
 }
 
 export async function disablePrayerNotifications() {

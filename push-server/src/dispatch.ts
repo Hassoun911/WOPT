@@ -42,7 +42,14 @@ async function sendExpo(env: Env, subscription: SubscriptionRow, event: DuePraye
       to: subscription.address,
       title: message.title,
       body: message.body,
-      sound: subscription.platform === "ios" ? message.sound : "default",
+      // Android's exact alarm service plays the full Adhan and dua. Keep the
+      // corresponding server push silent there so two sounds never overlap.
+      sound:
+        subscription.platform === "android" && event.kind === "athan"
+          ? null
+          : subscription.platform === "ios"
+            ? message.sound
+            : "default",
       channelId: subscription.platform === "android" ? message.channelId : undefined,
       priority: "high",
       data: {

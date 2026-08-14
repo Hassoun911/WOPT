@@ -25,22 +25,22 @@ export function notificationMessage(event: DuePrayerEvent, locale: Locale) {
     return {
       title: locale === "ar" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : `${prayer} in 20 minutes`,
       body,
-      sound: "ding.wav",
-      channelId: "prayer-reminders-v1"
+      sound: "attention_chime.wav",
+      channelId: "prayer-reminders-v2"
     };
   }
   if (event.kind === "ten") {
     return {
       title: locale === "ar" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `${prayer} in 10 minutes`,
       body,
-      sound: "ding.wav",
-      channelId: "prayer-reminders-v1"
+      sound: "attention_chime.wav",
+      channelId: "prayer-reminders-v2"
     };
   }
   return {
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
     body,
     sound: "default",
-    channelId: "prayer-athan-v1"
+    channelId: "prayer-time-v2"
   };
 }

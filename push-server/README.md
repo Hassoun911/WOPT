@@ -4,9 +4,11 @@ Cloudflare Worker that reads the official WOPT schedule and dispatches three uni
 
 1. 20-minute reminder
 2. 10-minute reminder
-3. Exact-time Adhan notification
+3. Exact-time prayer notification
 
 It supports Expo push tokens for the Android/iOS app and standards-based Web Push subscriptions for the installed website. D1 stores subscriptions and delivery IDs so a delayed or repeated cron invocation cannot send the same event twice to the same device.
+
+The two advance reminders use the same approved four-second chime. On Android, the exact-time server push is intentionally silent because native playback owns the prayer audio: Fajr plays its dedicated Adhan only, while the other prayers play the Adhan followed by the dua. This prevents a second notification sound from overlapping the prayer audio.
 
 ## Before deployment
 

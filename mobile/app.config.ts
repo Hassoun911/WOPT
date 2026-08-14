@@ -25,6 +25,8 @@ const config: ExpoConfig = {
       "android.permission.POST_NOTIFICATIONS",
       "android.permission.RECEIVE_BOOT_COMPLETED",
       "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
       "android.permission.VIBRATE",
       "android.permission.WAKE_LOCK"
     ]
@@ -35,8 +37,8 @@ const config: ExpoConfig = {
       {
         "icon": "./assets/notification-icon.png",
         "color": "#0b5b47",
-        "defaultChannel": "prayer-reminders-v1",
-        "sounds": ["./assets/ding.wav"],
+        "defaultChannel": "prayer-reminders-v2",
+        "sounds": ["./assets/attention_chime.wav"],
         "enableBackgroundRemoteNotifications": true
       }
     ]

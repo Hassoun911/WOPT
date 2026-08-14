@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { CITY_LABEL, STORAGE_KEYS } from "./src/config";
 import { disablePrayerNotifications, schedulePrayerNotifications } from "./src/notifications";
+import { openExactAlarmSettings } from "./src/prayerAudio";
 import { loadPrayerTimes } from "./src/prayerData";
 import { registerDeviceForServerPush } from "./src/push";
 import { formatPrayerTime, timeToMinutes, windsorDateKey, windsorSecondsSinceMidnight } from "./src/time";
@@ -109,6 +110,16 @@ export default function App() {
       setAlertsEnabled(true);
       setScheduledCount(result.count);
       void registerDeviceForServerPush(locale).catch(() => undefined);
+      if (!result.exactAlarmGranted) {
+        Alert.alert(
+          "Allow exact prayer alarms",
+          "Android needs Alarms & reminders access so the full Adhan can begin at the exact prayer time, even when the app is closed.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Open settings", onPress: openExactAlarmSettings }
+          ]
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -203,10 +214,10 @@ export default function App() {
             <Text style={styles.alertTitle}>{locale === "ar" ? "تنبيهات الصلاة" : "Prayer notifications"}</Text>
             <Text style={styles.alertDescription}>
               {locale === "ar"
-                ? "تنبيه قبل ٢٠ دقيقة، وقبل ١٠ دقائق، ثم إشعار الأذان عند دخول الوقت."
-                : "20-minute reminder, 10-minute reminder, then an Adhan notification at prayer time."}
+                ? "نفس نغمة التنبيه قبل ٢٠ و١٠ دقائق. عند الفجر يُشغّل أذان الفجر فقط، وللصلوات الأخرى يُشغّل الأذان ثم الدعاء."
+                : "The same chime at 20 and 10 minutes before prayer. Fajr plays its own Adhan only; the other prayers play the Adhan followed by the dua."}
             </Text>
-            {alertsEnabled ? <Text style={styles.alertStatus}>{scheduledCount} local backup alerts scheduled</Text> : null}
+            {alertsEnabled ? <Text style={styles.alertStatus}>{scheduledCount} native alerts and Adhans scheduled</Text> : null}
           </View>
           <Switch
             value={alertsEnabled}

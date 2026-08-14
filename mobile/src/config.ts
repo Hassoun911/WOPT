@@ -3,8 +3,10 @@ export const CITY_LABEL = "Windsor, Ontario";
 export const SCHEDULE_URL =
   "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
 
-export const REMINDER_CHANNEL_ID = "prayer-reminders-v1";
-export const ATHAN_CHANNEL_ID = "prayer-athan-v1";
+// Android notification-channel sound settings cannot be changed after creation,
+// so the approved chime gets a new channel ID.
+export const REMINDER_CHANNEL_ID = "prayer-reminders-v2";
+export const ATHAN_CHANNEL_ID = "prayer-time-v2";
 
 export const STORAGE_KEYS = {
   schedule: "wopt:schedule:v1",
