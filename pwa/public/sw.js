@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v4";
+const CACHE_NAME = "windsor-prayer-times-v5";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/maskable-icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
