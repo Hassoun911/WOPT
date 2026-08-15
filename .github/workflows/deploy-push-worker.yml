@@ -43,6 +43,32 @@ jobs:
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply wopt-prayer-push --remote
 
+      - name: Ensure workers.dev subdomain
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain"
+          existing="$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" "$api")"
+          current="$(printf '%s' "$existing" | jq -r 'if .success then (.result.subdomain // "") else "" end')"
+          if [ -n "$current" ]; then
+            echo "Workers subdomain already configured: ${current}.workers.dev"
+            exit 0
+          fi
+
+          for candidate in wopt-windsor wopt-f8834317 windsor-prayer-f8834317; do
+            response="$(curl -sS -X PUT \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "{\"subdomain\":\"${candidate}\"}" \
+              "$api")"
+            if [ "$(printf '%s' "$response" | jq -r '.success // false')" = "true" ]; then
+              echo "Workers subdomain created: ${candidate}.workers.dev"
+              exit 0
+            fi
+          done
+
+          echo "Unable to create a workers.dev subdomain"
+          exit 1
+
       - name: Deploy Worker
         run: npx wrangler deploy
 
