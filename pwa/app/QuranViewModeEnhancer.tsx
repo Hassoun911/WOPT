@@ -23,7 +23,6 @@ export default function QuranViewModeEnhancer() {
         background:transparent!important;
         box-shadow:none!important;
       }
-      .quran-app.wopt-reference-safe.wopt-ref-reading-mode .inline-translation,
       .quran-app.wopt-reference-safe.wopt-ref-reading-mode .inline-transliteration{
         display:block!important;
         width:100%!important;
@@ -60,7 +59,6 @@ export default function QuranViewModeEnhancer() {
         border-color:#73c7c4!important;
         background:#f2fbfa!important;
       }
-      .quran-app.wopt-reference-safe.wopt-ref-verse-mode .inline-translation,
       .quran-app.wopt-reference-safe.wopt-ref-verse-mode .inline-transliteration{
         display:block!important;
         width:100%!important;
@@ -82,7 +80,6 @@ export default function QuranViewModeEnhancer() {
       @media(max-width:700px){
         .quran-app.wopt-reference-safe.wopt-ref-verse-mode .mushaf-text{gap:14px!important}
         .quran-app.wopt-reference-safe.wopt-ref-verse-mode .mushaf-ayah{padding:18px 16px 16px!important;border-radius:14px!important}
-        .quran-app.wopt-reference-safe.wopt-ref-verse-mode .inline-translation,
         .quran-app.wopt-reference-safe.wopt-ref-verse-mode .inline-transliteration{font-size:13px!important}
       }
     `;
