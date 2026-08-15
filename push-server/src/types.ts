@@ -28,6 +28,9 @@ export interface SubscriptionRow {
   address: string;
   web_p256dh: string | null;
   web_auth: string | null;
+  notify_twenty: number;
+  notify_ten: number;
+  notify_athan: number;
 }
 
 export interface Env {
