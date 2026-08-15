@@ -5,6 +5,7 @@ import "./mobile-nav-fix.css";
 import "./quran.css";
 import "./direction-fixes.css";
 import NavEnhancer from "./NavEnhancer";
+import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
         <NavEnhancer />
+        <PrayerAlertAudioEnhancer />
         <QuranAudioEnhancer />
         <QuranPlaybackSyncEnhancer />
         <QuranUiFixEnhancer />
