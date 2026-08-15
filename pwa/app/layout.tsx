@@ -11,9 +11,9 @@ import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
 import QuranReferenceLayoutEnhancer from "./QuranReferenceLayoutEnhancer";
-import QuranTranslationLanguageEnhancer from "./QuranTranslationLanguageEnhancer";
 import QuranReferenceControlsEnhancer from "./QuranReferenceControlsEnhancer";
 import QuranViewModeEnhancer from "./QuranViewModeEnhancer";
+import QuranTranslationLanguageEnhancer from "./QuranTranslationLanguageEnhancer";
 import QuranVerseMenuEnhancer from "./QuranVerseMenuEnhancer";
 import QuranInfoMeaningEnhancer from "./QuranInfoMeaningEnhancer";
 import QuranSmartPlayerEnhancer from "./QuranSmartPlayerEnhancer";
@@ -72,9 +72,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranPlaybackSyncEnhancer />
         <QuranUiFixEnhancer />
         <QuranReferenceLayoutEnhancer />
-        <QuranTranslationLanguageEnhancer />
         <QuranReferenceControlsEnhancer />
         <QuranViewModeEnhancer />
+        <QuranTranslationLanguageEnhancer />
         <QuranVerseMenuEnhancer />
         <QuranInfoMeaningEnhancer />
         <QuranSmartPlayerEnhancer />
