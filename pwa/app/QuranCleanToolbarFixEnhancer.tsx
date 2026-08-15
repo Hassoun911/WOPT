@@ -31,8 +31,11 @@ export default function QuranCleanToolbarFixEnhancer() {
 
       if (action === "settings") {
         event.preventDefault();
+        event.stopPropagation();
         event.stopImmediatePropagation();
-        clickTopAction(/^Aa$/i);
+        const richSettings = document.querySelector<HTMLButtonElement>(".wopt-ref-safe [data-ref='settings']");
+        if (richSettings) richSettings.click();
+        return;
       }
 
       if (action === "search") {
