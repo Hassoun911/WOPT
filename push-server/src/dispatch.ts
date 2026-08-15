@@ -29,6 +29,12 @@ async function disableSubscription(env: Env, subscriptionId: number) {
   ).bind(subscriptionId).run();
 }
 
+function wantsEvent(subscription: SubscriptionRow, event: DuePrayerEvent) {
+  if (event.kind === "twenty") return subscription.notify_twenty === 1;
+  if (event.kind === "ten") return subscription.notify_ten === 1;
+  return subscription.notify_athan === 1;
+}
+
 async function sendExpo(env: Env, subscription: SubscriptionRow, event: DuePrayerEvent) {
   const message = notificationMessage(event, subscription.locale);
   const response = await fetch(EXPO_URL, {
@@ -104,10 +110,14 @@ async function sendWeb(env: Env, subscription: SubscriptionRow, event: DuePrayer
 
 export async function dispatchEvent(env: Env, event: DuePrayerEvent) {
   const { results } = await env.DB.prepare(
-    "SELECT id, installation_id, provider, platform, locale, address, web_p256dh, web_auth FROM subscriptions WHERE enabled = 1"
+    `SELECT id, installation_id, provider, platform, locale, address, web_p256dh, web_auth,
+            notify_twenty, notify_ten, notify_athan
+     FROM subscriptions
+     WHERE enabled = 1`
   ).all<SubscriptionRow>();
 
   for (const subscription of results) {
+    if (!wantsEvent(subscription, event)) continue;
     if (!(await claimDelivery(env, event.id, subscription.id))) continue;
     try {
       let ticket: string | undefined;
