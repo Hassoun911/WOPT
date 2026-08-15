@@ -7,6 +7,7 @@ import "./direction-fixes.css";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
+import WebPushRegistration from "./WebPushRegistration";
 import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <NavEnhancer />
         <PrayerAlertAudioEnhancer />
         <PrayerCardInteractionEnhancer />
+        <WebPushRegistration />
         <QuranAudioEnhancer />
         <QuranPlaybackSyncEnhancer />
         <QuranUiFixEnhancer />
