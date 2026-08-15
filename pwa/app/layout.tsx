@@ -23,6 +23,7 @@ import QuranMemorizeExperienceEnhancer from "./QuranMemorizeExperienceEnhancer";
 import QuranCleanReadingEnhancer from "./QuranCleanReadingEnhancer";
 import QuranCleanToolbarFixEnhancer from "./QuranCleanToolbarFixEnhancer";
 import QuranMoreMenuEnhancer from "./QuranMoreMenuEnhancer";
+import QuranTapAnchorEnhancer from "./QuranTapAnchorEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranCleanReadingEnhancer />
         <QuranCleanToolbarFixEnhancer />
         <QuranMoreMenuEnhancer />
+        <QuranTapAnchorEnhancer />
       </body>
     </html>
   );
