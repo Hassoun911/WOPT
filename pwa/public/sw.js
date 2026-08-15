@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v8";
+const CACHE_NAME = "windsor-prayer-times-v9";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
@@ -53,6 +53,8 @@ self.addEventListener("push", (event) => {
     badge: scoped("/icon-192.png"),
     tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
     renotify: true,
+    silent: false,
+    vibrate: data.kind === "athan" ? [300, 120, 300] : [180, 100, 180],
     requireInteraction: data.kind === "athan",
     data: {
       url: data.url ? scoped(data.url === "/" ? "/" : data.url) : scoped("/"),
@@ -62,7 +64,22 @@ self.addEventListener("push", (event) => {
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  const show = self.registration.showNotification(title, options);
+  const signalOpenClients = self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((clients) => {
+      for (const client of clients) {
+        client.postMessage({
+          type: "wopt-prayer-push",
+          eventId: data.eventId,
+          dateKey: data.dateKey,
+          prayer: data.prayer,
+          kind: data.kind,
+        });
+      }
+    });
+
+  event.waitUntil(Promise.all([show, signalOpenClients]));
 });
 
 self.addEventListener("notificationclick", (event) => {
