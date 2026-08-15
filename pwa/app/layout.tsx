@@ -30,6 +30,7 @@ import QuranPrintedPageEnhancer from "./QuranPrintedPageEnhancer";
 import QuranScriptTajweedEnhancer from "./QuranScriptTajweedEnhancer";
 import QuranPrintedScrollEnhancer from "./QuranPrintedScrollEnhancer";
 import QuranIndexEnhancer from "./QuranIndexEnhancer";
+import QuranAudioUnifiedFlowEnhancer from "./QuranAudioUnifiedFlowEnhancer";
 import QuranAudioEntryGuardEnhancer from "./QuranAudioEntryGuardEnhancer";
 import QuranPrintedAudioChooserEnhancer from "./QuranPrintedAudioChooserEnhancer";
 import QuranBackgroundMediaEnhancer from "./QuranBackgroundMediaEnhancer";
@@ -93,6 +94,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranScriptTajweedEnhancer />
         <QuranPrintedScrollEnhancer />
         <QuranIndexEnhancer />
+        <QuranAudioUnifiedFlowEnhancer />
         <QuranAudioEntryGuardEnhancer />
         <QuranPrintedAudioChooserEnhancer />
         <QuranBackgroundMediaEnhancer />
