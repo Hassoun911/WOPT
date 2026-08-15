@@ -36,6 +36,15 @@ function validLocale(value: unknown): value is Locale {
   return value === "en" || value === "ar";
 }
 
+function webPreferences(value: unknown) {
+  const preferences = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    twenty: preferences.twenty === true ? 1 : 0,
+    ten: preferences.ten === true ? 1 : 0,
+    athan: preferences.prayer === true || preferences.athan === true ? 1 : 0
+  };
+}
+
 async function registerExpo(request: Request, env: Env) {
   const body = await bodyJson(request);
   const token = body.token;
@@ -77,17 +86,33 @@ async function registerWeb(request: Request, env: Env) {
     return json({ error: "Invalid web push subscription" }, 400);
   }
   const locale = validLocale(body.locale) ? body.locale : "en";
+  const preferences = webPreferences(body.preferences);
   await env.DB.prepare(
-    `INSERT INTO subscriptions (installation_id, provider, platform, locale, address, web_p256dh, web_auth)
-     VALUES (?, 'web', 'web', ?, ?, ?, ?)
+    `INSERT INTO subscriptions (
+       installation_id, provider, platform, locale, address, web_p256dh, web_auth,
+       notify_twenty, notify_ten, notify_athan
+     )
+     VALUES (?, 'web', 'web', ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(provider, address) DO UPDATE SET
        installation_id = excluded.installation_id,
        locale = excluded.locale,
        web_p256dh = excluded.web_p256dh,
        web_auth = excluded.web_auth,
+       notify_twenty = excluded.notify_twenty,
+       notify_ten = excluded.notify_ten,
+       notify_athan = excluded.notify_athan,
        enabled = 1,
        updated_at = CURRENT_TIMESTAMP`
-  ).bind(body.installationId, locale, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth).run();
+  ).bind(
+    body.installationId,
+    locale,
+    subscription.endpoint,
+    subscription.keys.p256dh,
+    subscription.keys.auth,
+    preferences.twenty,
+    preferences.ten,
+    preferences.athan
+  ).run();
   return json({ ok: true });
 }
 
