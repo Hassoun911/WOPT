@@ -42,6 +42,7 @@ jobs:
         env:
           WOPT_STATIC_EXPORT: "1"
           NEXT_PUBLIC_BASE_PATH: "/WOPT"
+          NEXT_PUBLIC_PUSH_API_URL: ${{ vars.NEXT_PUBLIC_PUSH_API_URL }}
 
       - name: Verify exported routes
         run: |
