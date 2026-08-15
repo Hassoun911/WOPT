@@ -16,6 +16,7 @@ import QuranViewModeEnhancer from "./QuranViewModeEnhancer";
 import QuranVerseMenuEnhancer from "./QuranVerseMenuEnhancer";
 import QuranInfoMeaningEnhancer from "./QuranInfoMeaningEnhancer";
 import QuranSmartPlayerEnhancer from "./QuranSmartPlayerEnhancer";
+import QuranHeaderSearchEnhancer from "./QuranHeaderSearchEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranVerseMenuEnhancer />
         <QuranInfoMeaningEnhancer />
         <QuranSmartPlayerEnhancer />
+        <QuranHeaderSearchEnhancer />
       </body>
     </html>
   );
