@@ -12,12 +12,6 @@ export default function QuranCleanToolbarFixEnhancer() {
     let toolbar: HTMLElement | null = null;
     let app: HTMLElement | null = null;
 
-    const clickTopAction = (pattern: RegExp) => {
-      const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-top-actions button"))
-        .find((item) => pattern.test((item.textContent || "").trim()));
-      button?.click();
-    };
-
     const handleClick = (event: MouseEvent) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".wopt-clean-toolbar [data-clean]");
       if (!button) return;
@@ -25,8 +19,10 @@ export default function QuranCleanToolbarFixEnhancer() {
 
       if (action === "surahs") {
         event.preventDefault();
+        event.stopPropagation();
         event.stopImmediatePropagation();
-        clickTopAction(/surahs/i);
+        window.dispatchEvent(new Event("wopt-quran-context-surahs"));
+        return;
       }
 
       if (action === "settings") {
@@ -42,6 +38,7 @@ export default function QuranCleanToolbarFixEnhancer() {
         const search = document.querySelector<HTMLButtonElement>(".wopt-ref-safe [data-ref='search']");
         if (search) {
           event.preventDefault();
+          event.stopPropagation();
           event.stopImmediatePropagation();
           search.click();
         }
