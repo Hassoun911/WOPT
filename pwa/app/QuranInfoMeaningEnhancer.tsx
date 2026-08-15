@@ -31,24 +31,6 @@ function arabicText(ayah: HTMLElement) {
     .join(" ");
 }
 
-async function revealExistingText(ayah: HTMLElement, kind: "translation" | "transliteration") {
-  const className = kind === "translation" ? ".inline-translation" : ".inline-transliteration";
-  const existing = ayah.querySelector<HTMLElement>(className)?.textContent?.trim();
-  if (existing) return existing;
-
-  const label = kind === "translation" ? /^Translation$/i : /^Transliteration$/i;
-  const hiddenButton = Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-reader-toolbar button"))
-    .find((button) => label.test((button.textContent || "").trim()));
-  if (!hiddenButton) return "";
-
-  const wasActive = hiddenButton.classList.contains("active");
-  if (!wasActive) hiddenButton.click();
-  await new Promise((resolve) => window.setTimeout(resolve, 90));
-  const text = ayah.querySelector<HTMLElement>(className)?.textContent?.trim() || "";
-  if (!wasActive) hiddenButton.click();
-  return text;
-}
-
 export default function QuranInfoMeaningEnhancer() {
   const pathname = usePathname();
 
@@ -83,63 +65,77 @@ export default function QuranInfoMeaningEnhancer() {
     let english = "";
     let transliteration = "";
     let arabicMeaning = "";
-    let source = "";
+    let source = "Dr. Mustafa Khattab, The Clear Quran";
 
     const renderTab = (tab: "en" | "ar" | "translit") => {
       meaning.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
       const body = meaning.querySelector<HTMLElement>("[data-body]")!;
       body.className = `wopt-detail-body${tab === "ar" ? " ar" : tab === "translit" ? " translit" : ""}`;
       body.textContent = tab === "ar" ? arabicMeaning : tab === "translit" ? transliteration : english;
-      meaning.querySelector<HTMLElement>("[data-source]")!.textContent = tab === "en" ? `Source: ${source || "Dr. Mustafa Khattab, The Clear Quran"}` : tab === "ar" ? "Arabic explanation: available Arabic tafsir resource." : "Transliteration: Qur’an word data.";
+      meaning.querySelector<HTMLElement>("[data-source]")!.textContent = tab === "en"
+        ? `Source: ${source}`
+        : tab === "ar"
+          ? "Arabic explanation from available Qur’an tafsir data."
+          : "English-letter transliteration from Qur’an word data.";
     };
 
     const openMeaning = async (ayah: HTMLElement) => {
       const key = ayah.dataset.verseKey || "";
       if (!key) return;
+
       meaning.querySelector<HTMLElement>("[data-title]")!.textContent = `Ayah ${key}`;
       meaning.querySelector<HTMLElement>("[data-arabic]")!.textContent = arabicText(ayah);
       meaning.querySelector<HTMLElement>("[data-body]")!.textContent = "Loading verified meaning…";
       meaning.querySelector<HTMLElement>("[data-source]")!.textContent = "";
       meaning.classList.add("open");
 
-      english = await revealExistingText(ayah, "translation");
-      transliteration = await revealExistingText(ayah, "transliteration");
+      english = "";
+      transliteration = "";
+      arabicMeaning = "";
       source = "Dr. Mustafa Khattab, The Clear Quran";
 
+      try {
+        const response = await fetch(`${API}/verses/by_key/${encodeURIComponent(key)}?language=en&words=true&translations=131&fields=text_uthmani&word_fields=text_uthmani,transliteration`);
+        if (response.ok) {
+          const data = await response.json();
+          const verse = data.verse || data.verses?.[0] || {};
+          const translations = Array.isArray(verse.translations) ? verse.translations : [];
+          const selectedTranslation = translations.find((item: { resource_id?: number }) => Number(item.resource_id) === 131) || translations[0];
+          english = stripHtml(selectedTranslation?.text || "");
+          source = selectedTranslation?.resource_name || source;
+          transliteration = (verse.words || [])
+            .map((word: { transliteration?: { text?: string } }) => word.transliteration?.text || "")
+            .filter(Boolean)
+            .join(" ");
+        }
+      } catch {
+        // handled by explicit fallback text below
+      }
+
       if (!english) {
-        try {
-          const r = await fetch(`${API}/quran/translations/131?verse_key=${encodeURIComponent(key)}&fields=resource_name,language_name`);
-          if (r.ok) {
-            const data = await r.json();
-            const item = data.translations?.[0];
-            english = stripHtml(item?.text || "");
-            source = item?.resource_name || source;
-          }
-        } catch { /* local loaded data remains primary */ }
+        const existing = ayah.querySelector<HTMLElement>(".inline-translation")?.textContent?.trim();
+        if (existing) english = existing;
       }
 
       if (!transliteration) {
-        try {
-          const r = await fetch(`${API}/verses/by_key/${encodeURIComponent(key)}?language=en&words=true&word_fields=transliteration`);
-          if (r.ok) {
-            const data = await r.json();
-            transliteration = (data.verse?.words || []).map((w: { transliteration?: { text?: string } }) => w.transliteration?.text || "").filter(Boolean).join(" ");
-          }
-        } catch { /* optional */ }
+        const existing = ayah.querySelector<HTMLElement>(".inline-transliteration")?.textContent?.trim();
+        if (existing) transliteration = existing;
       }
 
-      arabicMeaning = "";
       try {
-        const r = await fetch(`${API}/tafsirs/16/by_ayah/${encodeURIComponent(key)}`);
-        if (r.ok) {
-          const data = await r.json();
+        const tafsir = await fetch(`${API}/tafsirs/16/by_ayah/${encodeURIComponent(key)}`);
+        if (tafsir.ok) {
+          const data = await tafsir.json();
           arabicMeaning = stripHtml(data.tafsir?.text || data.tafsirs?.[0]?.text || "");
         }
-      } catch { /* optional */ }
+      } catch {
+        // Arabic explanation is optional
+      }
 
       if (!english) english = "English meaning could not be loaded. Please check your connection and try again.";
       if (!transliteration) transliteration = "English-letter transliteration could not be loaded for this ayah.";
       if (!arabicMeaning) arabicMeaning = "التفسير العربي غير متاح حاليًا لهذا الموضع. حاول مرة أخرى عند توفر الاتصال.";
+
       renderTab("en");
     };
 
@@ -147,17 +143,21 @@ export default function QuranInfoMeaningEnhancer() {
       const firstKey = document.querySelector<HTMLElement>(".mushaf-ayah[data-verse-key]")?.dataset.verseKey || "";
       const chapterId = Number(firstKey.split(":")[0]);
       if (!chapterId) return;
+
       info.classList.add("open");
       const content = info.querySelector<HTMLElement>("[data-info-content]")!;
       content.innerHTML = `<div class="wopt-detail-body">Loading Surah information…</div>`;
+
       try {
         const response = await fetch(`${API}/chapters/${chapterId}?language=en`);
         if (!response.ok) throw new Error("chapter");
         const data = await response.json();
         const c = data.chapter as Chapter;
         const place = c.revelation_place ? `${c.revelation_place.charAt(0).toUpperCase()}${c.revelation_place.slice(1)}` : "—";
-        const pages = c.pages?.length ? (c.pages[0] === c.pages[c.pages.length - 1] ? `${c.pages[0]}` : `${c.pages[0]}–${c.pages[c.pages.length - 1]}`) : "—";
-        content.innerHTML = `<div class="wopt-info-hero"><div class="arabic">${c.name_arabic || ""}</div><div><h3>${c.id}. ${c.name_simple || "Surah"}</h3><p>${c.translated_name?.name || ""}</p></div></div><div class="wopt-info-grid"><div class="wopt-info-item"><span>Ayat</span><strong>${c.verses_count ?? "—"}</strong></div><div class="wopt-info-item"><span>Revelation</span><strong>${place}</strong></div><div class="wopt-info-item"><span>Revelation order</span><strong>${c.revelation_order ?? "—"}</strong></div><div class="wopt-info-item"><span>Pages</span><strong>${pages}</strong></div></div><p class="wopt-info-note">The Qur’an text and Surah metadata shown here come from verified Qur’an content data. Use the verse menu for translation, sharing, bookmarking, tagging, and memorization.</p>`;
+        const pages = c.pages?.length
+          ? (c.pages[0] === c.pages[c.pages.length - 1] ? `${c.pages[0]}` : `${c.pages[0]}–${c.pages[c.pages.length - 1]}`)
+          : "—";
+        content.innerHTML = `<div class="wopt-info-hero"><div class="arabic">${c.name_arabic || ""}</div><div><h3>${c.id}. ${c.name_simple || "Surah"}</h3><p>${c.translated_name?.name || ""}</p></div></div><div class="wopt-info-grid"><div class="wopt-info-item"><span>Ayat</span><strong>${c.verses_count ?? "—"}</strong></div><div class="wopt-info-item"><span>Revelation</span><strong>${place}</strong></div><div class="wopt-info-item"><span>Revelation order</span><strong>${c.revelation_order ?? "—"}</strong></div><div class="wopt-info-item"><span>Pages</span><strong>${pages}</strong></div></div><p class="wopt-info-note">Surah information is shown without changing the reading screen.</p>`;
       } catch {
         const en = document.querySelector<HTMLElement>(".quran-title-line strong")?.textContent?.trim() || `Surah ${chapterId}`;
         const ar = document.querySelector<HTMLElement>(".quran-heading-block h1")?.textContent?.trim() || "";
@@ -169,6 +169,7 @@ export default function QuranInfoMeaningEnhancer() {
       const target = event.target as HTMLElement;
       if (target === el || target.closest(".wopt-detail-close")) el.classList.remove("open");
     };
+
     meaning.addEventListener("click", (event) => {
       closeIfBackdrop(event, meaning);
       const tab = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tab]")?.dataset.tab as "en" | "ar" | "translit" | undefined;
@@ -189,13 +190,16 @@ export default function QuranInfoMeaningEnhancer() {
         void openMeaning(ayah);
         return;
       }
+
       const infoButton = target.closest<HTMLElement>("[data-ref='info']");
       if (infoButton) {
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         void openInfo();
       }
     };
+
     document.addEventListener("click", capture, true);
 
     return () => {
