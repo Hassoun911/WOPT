@@ -3,19 +3,52 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const FONT_KEY = "wopt-quran-reference-font";
-const SIZE_KEY = "wopt-quran-reference-font-size";
+const SETTINGS_KEY = "wopt-quran-reference-reader-v2";
+
+type ReaderPrefs = {
+  font: string;
+  size: number;
+  lineHeight: number;
+  align: "center" | "justify" | "right";
+  width: "compact" | "standard" | "wide";
+  theme: "white" | "cream" | "sepia" | "night";
+  textColor: string;
+  translationSize: number;
+  transliterationSize: number;
+};
+
+const DEFAULT_PREFS: ReaderPrefs = {
+  font: "Noto Naskh Arabic",
+  size: 28,
+  lineHeight: 1.95,
+  align: "center",
+  width: "standard",
+  theme: "white",
+  textColor: "#111111",
+  translationSize: 14,
+  transliterationSize: 14,
+};
 
 const FONTS = [
-  { value: "Noto Naskh Arabic", label: "Noto Naskh Arabic" },
-  { value: "Amiri", label: "Amiri" },
-  { value: "Scheherazade New", label: "Scheherazade New" },
-  { value: "Lateef", label: "Lateef" },
-  { value: "Traditional Arabic", label: "Traditional Arabic" },
+  "Noto Naskh Arabic",
+  "Amiri",
+  "Scheherazade New",
+  "Lateef",
+  "Traditional Arabic",
 ];
 
+function loadPrefs(): ReaderPrefs {
+  try {
+    return { ...DEFAULT_PREFS, ...JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || "{}") } as ReaderPrefs;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
 function isNumberOnly(value: string) {
-  const normalized = value.trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+  const normalized = value.trim()
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
   return /^\d+$/.test(normalized);
 }
 
@@ -29,26 +62,23 @@ export default function QuranReferenceControlsEnhancer() {
     style.dataset.woptReferenceControls = "true";
     style.textContent = `
       .quran-app.wopt-reference-safe .quran-word.wopt-ref-duplicate-number{display:none!important}
-      .quran-app.wopt-reference-safe .mushaf-text,
-      .quran-app.wopt-reference-safe .wopt-ref-safe-bismillah .ar,
-      .quran-app.wopt-reference-safe .wopt-ref-safe-ar{font-family:var(--wopt-reference-quran-font,"Noto Naskh Arabic","Amiri",serif)!important}
-      .quran-app.wopt-reference-safe .mushaf-text{font-size:var(--wopt-reference-quran-size,28px)!important}
-      .wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:58px 58px 66px 1fr 1fr!important}
-      .wopt-ref-safe-actions .wopt-stop{color:#666!important}
-      .wopt-ref-safe-actions .wopt-audio-active{background:#e9f7f4!important;border-color:#47aaa7!important;color:#167d7b!important}
-      .wopt-ref-audio-progress{display:grid;grid-template-columns:36px 1fr 42px;gap:8px;align-items:center;margin-top:13px;color:#777;font-size:10px}
-      .wopt-ref-audio-progress input{width:100%;accent-color:#3baaa8}.wopt-ref-audio-progress span:last-child{text-align:right}
-      .wopt-ref-play-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
-      .wopt-ref-play-modes button{min-height:38px;border:1px solid #e1e5e4;border-radius:12px;background:#fff;color:#555;font:700 11px/1.2 Arial,sans-serif;padding:0 10px}
-      .wopt-ref-play-modes button.active{background:#e8f7f4;border-color:#3baaa8;color:#137b78;box-shadow:inset 0 0 0 1px rgba(59,170,168,.08)}
-      .wopt-ref-play-mode-note{margin:7px 2px 0;color:#777;font:10px/1.45 Arial,sans-serif}
-      .wopt-ref-settings-backdrop{position:fixed;z-index:1000;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.28);padding:20px}.wopt-ref-settings-backdrop.open{display:flex}
-      .wopt-ref-settings{width:min(520px,100%);padding:20px;border-radius:20px 20px 14px 14px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.25);font-family:Arial,sans-serif;color:#222}
-      .wopt-ref-settings-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.wopt-ref-settings-head strong{font-size:18px}.wopt-ref-settings-head button{width:36px;height:36px;border:0;border-radius:50%;background:#f3f3f3;font-size:20px}
-      .wopt-ref-setting{display:grid;gap:8px;margin:14px 0}.wopt-ref-setting label{font-size:12px;font-weight:800;color:#555}.wopt-ref-setting select{height:44px;border:1px solid #ddd;border-radius:12px;background:#fff;padding:0 12px;font-size:14px}.wopt-ref-setting input[type=range]{width:100%;accent-color:#3baaa8}
-      .wopt-ref-font-preview{margin-top:14px;padding:16px;border-radius:14px;background:#f7f7f7;text-align:center;direction:rtl;font-family:var(--wopt-reference-quran-font,"Noto Naskh Arabic",serif);font-size:30px;line-height:1.7}
-      .wopt-ref-setting-row{display:flex;justify-content:space-between;align-items:center;color:#777;font-size:11px}
-      @media(max-width:700px){.wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:52px 52px 58px 1fr 1fr!important;gap:6px!important}.wopt-ref-safe-actions.wopt-controls-ready button{font-size:10px!important}.wopt-ref-settings-backdrop{padding:0 10px 10px}.wopt-ref-settings{padding:18px}.wopt-ref-play-modes button{font-size:10px}}
+      .quran-app.wopt-reference-safe .mushaf-shell{max-width:var(--wopt-reader-width,760px)!important;background:var(--wopt-reader-bg,#fff)!important}
+      .quran-app.wopt-reference-safe .mushaf-text{font-family:var(--wopt-reader-font,"Noto Naskh Arabic","Amiri",serif)!important;font-size:var(--wopt-reader-size,28px)!important;line-height:var(--wopt-reader-line,1.95)!important;text-align:var(--wopt-reader-align,center)!important;color:var(--wopt-reader-color,#111)!important;background:var(--wopt-reader-bg,#fff)!important}
+      .quran-app.wopt-reference-safe .wopt-ref-safe-bismillah .ar,.quran-app.wopt-reference-safe .wopt-ref-safe-ar{font-family:var(--wopt-reader-font,"Noto Naskh Arabic","Amiri",serif)!important;color:var(--wopt-reader-color,#111)!important}
+      .quran-app.wopt-reference-safe .inline-translation{font-size:var(--wopt-translation-size,14px)!important}
+      .quran-app.wopt-reference-safe .inline-transliteration{font-size:var(--wopt-translit-size,14px)!important}
+      .quran-app.wopt-reference-safe.wopt-theme-night,.quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe,.quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe-tabs button{background:#101b18!important;color:#f4f7f6!important}
+      .quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe-card{background:#182622!important;color:#f4f7f6!important}.quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe-title span,.quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe-desc,.quran-app.wopt-reference-safe.wopt-theme-night .wopt-ref-safe-bismillah .en{color:#b7c3bf!important}
+      .wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:58px 58px 1fr!important}
+      .wopt-ref-safe-actions .wopt-stop{color:#666!important}.wopt-ref-safe-actions .wopt-audio-active{background:#e9f7f4!important;border-color:#47aaa7!important;color:#167d7b!important}
+      .wopt-ref-text-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}.wopt-ref-text-modes button{min-height:40px;border:1px solid #e2e5e4;border-radius:20px;background:#fff;color:#39a3a1;font:750 11px/1.2 Arial,sans-serif;padding:0 8px;box-shadow:0 2px 7px rgba(0,0,0,.04)}.wopt-ref-text-modes button.active{background:#222;color:#fff;border-color:#222}
+      .wopt-ref-audio-progress{display:grid;grid-template-columns:36px 1fr 42px;gap:8px;align-items:center;margin-top:13px;color:#777;font-size:10px}.wopt-ref-audio-progress input{width:100%;accent-color:#3baaa8}.wopt-ref-audio-progress span:last-child{text-align:right}
+      .wopt-ref-play-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.wopt-ref-play-modes button{min-height:38px;border:1px solid #e1e5e4;border-radius:12px;background:#fff;color:#555;font:700 11px/1.2 Arial,sans-serif;padding:0 10px}.wopt-ref-play-modes button.active{background:#e8f7f4;border-color:#3baaa8;color:#137b78}.wopt-ref-play-mode-note{margin:7px 2px 0;color:#777;font:10px/1.45 Arial,sans-serif}
+      .wopt-ref-settings-backdrop{position:fixed;z-index:1400;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.3);padding:18px}.wopt-ref-settings-backdrop.open{display:flex}
+      .wopt-ref-settings{width:min(570px,100%);max-height:min(82dvh,760px);overflow:auto;padding:20px;border-radius:22px 22px 14px 14px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.28);font-family:Arial,sans-serif;color:#222}.wopt-ref-settings-head{position:sticky;top:-20px;z-index:2;display:flex;justify-content:space-between;align-items:center;margin:-20px -20px 12px;padding:20px;background:#fff;border-bottom:1px solid #eee}.wopt-ref-settings-head strong{font-size:19px}.wopt-ref-settings-head button{width:38px;height:38px;border:0;border-radius:50%;background:#f2f2f2;font-size:21px}
+      .wopt-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wopt-ref-setting{display:grid;gap:7px;margin:8px 0}.wopt-ref-setting.full{grid-column:1/-1}.wopt-ref-setting label,.wopt-ref-setting .setting-label{font-size:12px;font-weight:800;color:#555}.wopt-ref-setting select,.wopt-ref-setting input[type=color]{height:44px;border:1px solid #ddd;border-radius:12px;background:#fff;padding:0 11px;font-size:13px}.wopt-ref-setting input[type=color]{width:100%;padding:5px}.wopt-ref-setting input[type=range]{width:100%;accent-color:#3baaa8}.wopt-ref-setting-row{display:flex;justify-content:space-between;align-items:center;color:#777;font-size:11px}.wopt-ref-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.wopt-ref-choice button{height:38px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:11px;font-weight:700}.wopt-ref-choice button.active{border-color:#35aaa8;background:#eaf7f5;color:#177b79}
+      .wopt-ref-font-preview{grid-column:1/-1;margin-top:6px;padding:17px;border-radius:14px;background:var(--wopt-reader-bg,#f7f7f7);color:var(--wopt-reader-color,#111);text-align:center;direction:rtl;font-family:var(--wopt-reader-font,"Noto Naskh Arabic",serif);font-size:30px;line-height:1.65;border:1px solid #eee}.wopt-ref-reset{grid-column:1/-1;height:42px;border:1px solid #ddd;border-radius:12px;background:#fafafa;color:#555;font-weight:800}
+      @media(max-width:700px){.wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:52px 52px 1fr!important;gap:6px!important}.wopt-ref-text-modes{gap:6px}.wopt-ref-text-modes button{font-size:10px}.wopt-ref-settings-backdrop{padding:0 8px 8px}.wopt-ref-settings{padding:18px}.wopt-ref-settings-head{top:-18px;margin:-18px -18px 10px;padding:18px}.wopt-settings-grid{grid-template-columns:1fr}.wopt-ref-setting.full,.wopt-ref-font-preview,.wopt-ref-reset{grid-column:1}.wopt-ref-play-modes button{font-size:10px}}
     `;
     document.head.appendChild(style);
 
@@ -66,22 +96,31 @@ export default function QuranReferenceControlsEnhancer() {
     let remainingNode: HTMLElement | null = null;
     let modeNote: HTMLElement | null = null;
     let initialized = false;
+    let prefs = loadPrefs();
 
-    const applyFont = (font: string, size: number) => {
+    const widthValue = (value: ReaderPrefs["width"]) => value === "compact" ? "620px" : value === "wide" ? "940px" : "760px";
+    const bgValue = (value: ReaderPrefs["theme"]) => value === "cream" ? "#fffaf0" : value === "sepia" ? "#f6ecd7" : value === "night" ? "#101b18" : "#ffffff";
+
+    const applyPrefs = () => {
       root = document.querySelector<HTMLElement>(".quran-app");
       if (!root) return;
-      root.style.setProperty("--wopt-reference-quran-font", `"${font}", "Noto Naskh Arabic", "Amiri", serif`);
-      root.style.setProperty("--wopt-reference-quran-size", `${size}px`);
+      root.style.setProperty("--wopt-reader-font", `"${prefs.font}", "Noto Naskh Arabic", "Amiri", serif`);
+      root.style.setProperty("--wopt-reader-size", `${prefs.size}px`);
+      root.style.setProperty("--wopt-reader-line", String(prefs.lineHeight));
+      root.style.setProperty("--wopt-reader-align", prefs.align);
+      root.style.setProperty("--wopt-reader-width", widthValue(prefs.width));
+      root.style.setProperty("--wopt-reader-bg", bgValue(prefs.theme));
+      root.style.setProperty("--wopt-reader-color", prefs.theme === "night" ? "#f5f7f6" : prefs.textColor);
+      root.style.setProperty("--wopt-translation-size", `${prefs.translationSize}px`);
+      root.style.setProperty("--wopt-translit-size", `${prefs.transliterationSize}px`);
+      root.classList.toggle("wopt-theme-night", prefs.theme === "night");
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs));
     };
-
-    const savedFont = window.localStorage.getItem(FONT_KEY) || "Noto Naskh Arabic";
-    const savedSize = Math.max(22, Math.min(42, Number(window.localStorage.getItem(SIZE_KEY) || 28)));
-    applyFont(savedFont, savedSize);
+    applyPrefs();
 
     const cleanDuplicateNumbers = () => {
       document.querySelectorAll<HTMLElement>(".mushaf-text .quran-word").forEach((word) => {
-        const text = word.textContent || "";
-        word.classList.toggle("wopt-ref-duplicate-number", isNumberOnly(text));
+        word.classList.toggle("wopt-ref-duplicate-number", isNumberOnly(word.textContent || ""));
       });
     };
 
@@ -91,32 +130,74 @@ export default function QuranReferenceControlsEnhancer() {
       settingsBackdrop.className = "wopt-ref-settings-backdrop";
       settingsBackdrop.innerHTML = `
         <section class="wopt-ref-settings" role="dialog" aria-modal="true" aria-label="Qur’an reader settings">
-          <div class="wopt-ref-settings-head"><strong>Reader settings</strong><button type="button" data-ref-settings="close">×</button></div>
-          <div class="wopt-ref-setting"><label for="wopt-quran-font">Arabic font</label><select id="wopt-quran-font">${FONTS.map((font) => `<option value="${font.value}">${font.label}</option>`).join("")}</select></div>
-          <div class="wopt-ref-setting"><div class="wopt-ref-setting-row"><label for="wopt-quran-size">Font size</label><span data-ref-size-label>${savedSize}px</span></div><input id="wopt-quran-size" type="range" min="22" max="42" step="1" value="${savedSize}"></div>
-          <div class="wopt-ref-font-preview">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+          <div class="wopt-ref-settings-head"><strong>Reader settings</strong><button type="button" data-setting-close>×</button></div>
+          <div class="wopt-settings-grid">
+            <div class="wopt-ref-setting full"><label>Arabic font</label><select data-setting="font">${FONTS.map((font) => `<option value="${font}">${font}</option>`).join("")}</select></div>
+            <div class="wopt-ref-setting full"><div class="wopt-ref-setting-row"><label>Arabic size</label><span data-value="size"></span></div><input data-setting="size" type="range" min="20" max="46" step="1"></div>
+            <div class="wopt-ref-setting full"><div class="wopt-ref-setting-row"><label>Line spacing</label><span data-value="lineHeight"></span></div><input data-setting="lineHeight" type="range" min="1.35" max="2.6" step="0.05"></div>
+            <div class="wopt-ref-setting"><span class="setting-label">Alignment</span><div class="wopt-ref-choice" data-choice="align"><button data-value-choice="center">Center</button><button data-value-choice="justify">Justify</button><button data-value-choice="right">Right</button></div></div>
+            <div class="wopt-ref-setting"><span class="setting-label">Page width</span><div class="wopt-ref-choice" data-choice="width"><button data-value-choice="compact">Compact</button><button data-value-choice="standard">Normal</button><button data-value-choice="wide">Wide</button></div></div>
+            <div class="wopt-ref-setting"><label>Page tone</label><select data-setting="theme"><option value="white">White</option><option value="cream">Cream</option><option value="sepia">Sepia</option><option value="night">Night</option></select></div>
+            <div class="wopt-ref-setting"><label>Arabic text color</label><input data-setting="textColor" type="color"></div>
+            <div class="wopt-ref-setting full"><div class="wopt-ref-setting-row"><label>Translation size</label><span data-value="translationSize"></span></div><input data-setting="translationSize" type="range" min="11" max="22" step="1"></div>
+            <div class="wopt-ref-setting full"><div class="wopt-ref-setting-row"><label>Arabic in English letters size</label><span data-value="transliterationSize"></span></div><input data-setting="transliterationSize" type="range" min="11" max="22" step="1"></div>
+            <div class="wopt-ref-font-preview">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+            <button class="wopt-ref-reset" type="button" data-setting-reset>Reset reader defaults</button>
+          </div>
         </section>`;
       document.body.appendChild(settingsBackdrop);
-      const select = settingsBackdrop.querySelector<HTMLSelectElement>("#wopt-quran-font");
-      const size = settingsBackdrop.querySelector<HTMLInputElement>("#wopt-quran-size");
-      const sizeLabel = settingsBackdrop.querySelector<HTMLElement>("[data-ref-size-label]");
-      if (select) select.value = savedFont;
-      select?.addEventListener("change", () => {
-        const value = select.value;
-        window.localStorage.setItem(FONT_KEY, value);
-        applyFont(value, Number(size?.value || savedSize));
+
+      const refreshForm = () => {
+        settingsBackdrop?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-setting]").forEach((control) => {
+          const key = control.dataset.setting as keyof ReaderPrefs;
+          control.value = String(prefs[key]);
+        });
+        settingsBackdrop?.querySelectorAll<HTMLElement>("[data-value]").forEach((node) => {
+          const key = node.dataset.value as keyof ReaderPrefs;
+          const value = prefs[key];
+          node.textContent = key === "size" || key === "translationSize" || key === "transliterationSize" ? `${value}px` : String(value);
+        });
+        settingsBackdrop?.querySelectorAll<HTMLButtonElement>("[data-value-choice]").forEach((button) => {
+          const group = button.closest<HTMLElement>("[data-choice]")?.dataset.choice as "align" | "width" | undefined;
+          if (group) button.classList.toggle("active", prefs[group] === button.dataset.valueChoice);
+        });
+      };
+
+      settingsBackdrop.addEventListener("input", (event) => {
+        const target = event.target as HTMLInputElement | HTMLSelectElement;
+        const key = target.dataset.setting as keyof ReaderPrefs | undefined;
+        if (!key) return;
+        if (key === "size" || key === "translationSize" || key === "transliterationSize" || key === "lineHeight") {
+          (prefs as any)[key] = Number(target.value);
+        } else {
+          (prefs as any)[key] = target.value;
+        }
+        applyPrefs();
+        refreshForm();
       });
-      size?.addEventListener("input", () => {
-        const value = Number(size.value);
-        if (sizeLabel) sizeLabel.textContent = `${value}px`;
-        window.localStorage.setItem(SIZE_KEY, String(value));
-        applyFont(select?.value || savedFont, value);
+      settingsBackdrop.addEventListener("change", (event) => {
+        const target = event.target as HTMLInputElement | HTMLSelectElement;
+        const key = target.dataset.setting as keyof ReaderPrefs | undefined;
+        if (!key) return;
+        (prefs as any)[key] = key === "size" || key === "translationSize" || key === "transliterationSize" || key === "lineHeight" ? Number(target.value) : target.value;
+        applyPrefs();
+        refreshForm();
       });
       settingsBackdrop.addEventListener("click", (event) => {
         const target = event.target as HTMLElement;
-        if (target === settingsBackdrop || target.closest("[data-ref-settings='close']")) settingsBackdrop?.classList.remove("open");
+        if (target === settingsBackdrop || target.closest("[data-setting-close]")) { settingsBackdrop?.classList.remove("open"); return; }
+        const choice = target.closest<HTMLButtonElement>("[data-value-choice]");
+        if (choice) {
+          const group = choice.closest<HTMLElement>("[data-choice]")?.dataset.choice as "align" | "width" | undefined;
+          if (group) { (prefs as any)[group] = choice.dataset.valueChoice; applyPrefs(); refreshForm(); }
+        }
+        if (target.closest("[data-setting-reset]")) { prefs = { ...DEFAULT_PREFS }; applyPrefs(); refreshForm(); }
       });
+      refreshForm();
     };
+
+    const hiddenToggle = (label: "Translation" | "Transliteration") => Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-reader-toolbar button")).find((button) => new RegExp(`^${label}$`, "i").test((button.textContent || "").trim()));
+    const hiddenModeButton = (mode: "surah" | "quran") => document.querySelector<HTMLButtonElement>(`.wopt-quran-player [data-mode='${mode}']`);
 
     const initializeVisibleControls = () => {
       shell = document.querySelector<HTMLElement>(".wopt-ref-safe");
@@ -125,6 +206,25 @@ export default function QuranReferenceControlsEnhancer() {
       const actions = shell.querySelector<HTMLElement>(".wopt-ref-safe-actions");
       if (!actions) return false;
       actions.classList.add("wopt-controls-ready");
+
+      const arabic = actions.querySelector<HTMLButtonElement>("[data-ref='arabic']");
+      const translation = actions.querySelector<HTMLButtonElement>("[data-ref='translation']");
+      let textModes = shell.querySelector<HTMLElement>(".wopt-ref-text-modes");
+      if (!textModes) {
+        textModes = document.createElement("div");
+        textModes.className = "wopt-ref-text-modes";
+        actions.insertAdjacentElement("afterend", textModes);
+      }
+      if (arabic && arabic.parentElement !== textModes) textModes.appendChild(arabic);
+      if (translation && translation.parentElement !== textModes) textModes.appendChild(translation);
+      if (!textModes.querySelector("[data-ref='transliteration']")) {
+        const translit = document.createElement("button");
+        translit.type = "button";
+        translit.dataset.ref = "transliteration";
+        translit.textContent = "Arabic → English letters";
+        textModes.appendChild(translit);
+      }
+
       if (!actions.querySelector("[data-ref-extra='stop']")) {
         const stop = document.createElement("button");
         stop.type = "button";
@@ -135,11 +235,12 @@ export default function QuranReferenceControlsEnhancer() {
         const info = actions.querySelector("[data-ref='info']");
         actions.insertBefore(stop, info || actions.children[1] || null);
       }
+
       if (!shell.querySelector(".wopt-ref-audio-progress")) {
         const progress = document.createElement("div");
         progress.className = "wopt-ref-audio-progress";
         progress.innerHTML = `<span data-ref-elapsed>0:00</span><input type="range" min="0" max="1000" value="0" aria-label="Audio progress"><span data-ref-remaining>-0:00</span>`;
-        actions.insertAdjacentElement("afterend", progress);
+        textModes.insertAdjacentElement("afterend", progress);
         progressInput = progress.querySelector("input");
         elapsedNode = progress.querySelector("[data-ref-elapsed]");
         remainingNode = progress.querySelector("[data-ref-remaining]");
@@ -156,26 +257,21 @@ export default function QuranReferenceControlsEnhancer() {
           hidden.dispatchEvent(new Event("change", { bubbles: true }));
         });
       }
+
       if (!shell.querySelector(".wopt-ref-play-modes")) {
         const modes = document.createElement("div");
         modes.className = "wopt-ref-play-modes";
         modes.innerHTML = `<button type="button" data-ref-mode="surah">Selected Surah</button><button type="button" data-ref-mode="quran">Full Qur’an</button>`;
-        const progress = shell.querySelector(".wopt-ref-audio-progress");
-        progress?.insertAdjacentElement("afterend", modes);
+        shell.querySelector(".wopt-ref-audio-progress")?.insertAdjacentElement("afterend", modes);
         modeNote = document.createElement("p");
         modeNote.className = "wopt-ref-play-mode-note";
-        modeNote.textContent = "Selected Surah will stop at the end of this Surah.";
         modes.insertAdjacentElement("afterend", modeNote);
-      } else {
-        modeNote = shell.querySelector<HTMLElement>(".wopt-ref-play-mode-note");
-      }
+      } else modeNote = shell.querySelector(".wopt-ref-play-mode-note");
+
       buildSettings();
       initialized = true;
       return true;
     };
-
-    const hiddenTranslationButton = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-reader-toolbar button")).find((button) => /^Translation$/i.test((button.textContent || "").trim()));
-    const hiddenModeButton = (mode: "surah" | "quran") => document.querySelector<HTMLButtonElement>(`.wopt-quran-player [data-mode='${mode}']`);
 
     const syncControls = () => {
       if (!initialized && !initializeVisibleControls()) return;
@@ -196,80 +292,56 @@ export default function QuranReferenceControlsEnhancer() {
       visibleStop?.classList.toggle("wopt-audio-active", Boolean(hiddenStop && (isPlaying || isPaused)));
 
       const hiddenProgress = document.querySelector<HTMLInputElement>(".wopt-quran-player [data-player='progress']");
-      const hiddenElapsed = document.querySelector<HTMLElement>(".wopt-quran-player [data-player='elapsed']");
-      const hiddenRemaining = document.querySelector<HTMLElement>(".wopt-quran-player [data-player='remaining']");
       if (progressInput && hiddenProgress && document.activeElement !== progressInput) progressInput.value = hiddenProgress.value;
-      if (elapsedNode) elapsedNode.textContent = hiddenElapsed?.textContent || "0:00";
-      if (remainingNode) remainingNode.textContent = hiddenRemaining?.textContent || "-0:00";
+      if (elapsedNode) elapsedNode.textContent = document.querySelector<HTMLElement>(".wopt-quran-player [data-player='elapsed']")?.textContent || "0:00";
+      if (remainingNode) remainingNode.textContent = document.querySelector<HTMLElement>(".wopt-quran-player [data-player='remaining']")?.textContent || "-0:00";
 
-      const translationOn = hiddenTranslationButton()?.classList.contains("active") || false;
-      const arabicButton = shell?.querySelector<HTMLButtonElement>("[data-ref='arabic']");
-      const translationButton = shell?.querySelector<HTMLButtonElement>("[data-ref='translation']");
-      arabicButton?.classList.toggle("active", !translationOn);
-      translationButton?.classList.toggle("active", translationOn);
+      const translationOn = hiddenToggle("Translation")?.classList.contains("active") || false;
+      const translitOn = hiddenToggle("Transliteration")?.classList.contains("active") || false;
+      shell?.querySelector("[data-ref='arabic']")?.classList.toggle("active", !translationOn && !translitOn);
+      shell?.querySelector("[data-ref='translation']")?.classList.toggle("active", translationOn);
+      shell?.querySelector("[data-ref='transliteration']")?.classList.toggle("active", translitOn);
 
       const fullQuranOn = hiddenModeButton("quran")?.classList.contains("active") || false;
-      const surahMode = shell?.querySelector<HTMLButtonElement>("[data-ref-mode='surah']");
-      const quranMode = shell?.querySelector<HTMLButtonElement>("[data-ref-mode='quran']");
-      surahMode?.classList.toggle("active", !fullQuranOn);
-      quranMode?.classList.toggle("active", fullQuranOn);
-      if (modeNote) modeNote.textContent = fullQuranOn
-        ? "Full Qur’an starts with the selected Surah and continues automatically through the remaining Surahs."
-        : "Selected Surah plays only the Surah you are reading and stops at the end.";
+      shell?.querySelector("[data-ref-mode='surah']")?.classList.toggle("active", !fullQuranOn);
+      shell?.querySelector("[data-ref-mode='quran']")?.classList.toggle("active", fullQuranOn);
+      if (modeNote) modeNote.textContent = fullQuranOn ? "Full Qur’an starts with the selected Surah and continues automatically through the remaining Surahs." : "Selected Surah plays only the Surah you are reading and stops at the end.";
+    };
+
+    const setTextMode = (mode: "arabic" | "translation" | "transliteration") => {
+      const translation = hiddenToggle("Translation");
+      const translit = hiddenToggle("Transliteration");
+      if (mode === "arabic") {
+        if (translation?.classList.contains("active")) translation.click();
+        if (translit?.classList.contains("active")) translit.click();
+      } else if (mode === "translation") {
+        if (translit?.classList.contains("active")) translit.click();
+        if (translation && !translation.classList.contains("active")) translation.click();
+      } else {
+        if (translation?.classList.contains("active")) translation.click();
+        if (translit && !translit.classList.contains("active")) translit.click();
+      }
+      window.setTimeout(syncControls, 80);
     };
 
     const onCapture = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      const settings = target.closest<HTMLElement>("[data-ref='settings']");
-      if (settings) {
-        event.preventDefault();
-        event.stopPropagation();
-        buildSettings();
-        settingsBackdrop?.classList.add("open");
-        return;
+      if (target.closest("[data-ref='settings']")) {
+        event.preventDefault(); event.stopPropagation(); buildSettings(); settingsBackdrop?.classList.add("open"); return;
       }
       const mode = target.closest<HTMLElement>("[data-ref-mode]");
       if (mode) {
-        event.preventDefault();
-        event.stopPropagation();
-        const value = mode.dataset.refMode === "quran" ? "quran" : "surah";
-        hiddenModeButton(value)?.click();
-        window.setTimeout(syncControls, 40);
-        return;
+        event.preventDefault(); event.stopPropagation(); hiddenModeButton(mode.dataset.refMode === "quran" ? "quran" : "surah")?.click(); window.setTimeout(syncControls, 50); return;
       }
-      const play = target.closest<HTMLElement>("[data-ref='play']");
-      if (play) {
-        event.preventDefault();
-        event.stopPropagation();
-        document.querySelector<HTMLButtonElement>(".wopt-quran-player [data-player='play']")?.click();
-        window.setTimeout(syncControls, 40);
-        return;
+      if (target.closest("[data-ref='play']")) {
+        event.preventDefault(); event.stopPropagation(); document.querySelector<HTMLButtonElement>(".wopt-quran-player [data-player='play']")?.click(); window.setTimeout(syncControls, 50); return;
       }
-      const stop = target.closest<HTMLElement>("[data-ref-extra='stop']");
-      if (stop) {
-        event.preventDefault();
-        event.stopPropagation();
-        document.querySelector<HTMLButtonElement>(".wopt-quran-player [data-player='stop']")?.click();
-        window.setTimeout(syncControls, 40);
-        return;
+      if (target.closest("[data-ref-extra='stop']")) {
+        event.preventDefault(); event.stopPropagation(); document.querySelector<HTMLButtonElement>(".wopt-quran-player [data-player='stop']")?.click(); window.setTimeout(syncControls, 50); return;
       }
-      const translation = target.closest<HTMLElement>("[data-ref='translation']");
-      if (translation) {
-        event.preventDefault();
-        event.stopPropagation();
-        const source = hiddenTranslationButton();
-        if (source && !source.classList.contains("active")) source.click();
-        window.setTimeout(syncControls, 60);
-        return;
-      }
-      const arabic = target.closest<HTMLElement>("[data-ref='arabic']");
-      if (arabic) {
-        event.preventDefault();
-        event.stopPropagation();
-        const source = hiddenTranslationButton();
-        if (source?.classList.contains("active")) source.click();
-        window.setTimeout(syncControls, 60);
-      }
+      if (target.closest("[data-ref='arabic']")) { event.preventDefault(); event.stopPropagation(); setTextMode("arabic"); return; }
+      if (target.closest("[data-ref='translation']")) { event.preventDefault(); event.stopPropagation(); setTextMode("translation"); return; }
+      if (target.closest("[data-ref='transliteration']")) { event.preventDefault(); event.stopPropagation(); setTextMode("transliteration"); }
     };
 
     document.addEventListener("click", onCapture, true);
@@ -282,8 +354,7 @@ export default function QuranReferenceControlsEnhancer() {
       settingsBackdrop?.remove();
       style.remove();
       fontLink.remove();
-      root?.style.removeProperty("--wopt-reference-quran-font");
-      root?.style.removeProperty("--wopt-reference-quran-size");
+      root?.classList.remove("wopt-theme-night");
     };
   }, [pathname]);
 
