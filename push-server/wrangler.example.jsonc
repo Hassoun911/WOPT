@@ -16,6 +16,6 @@
   ],
   "vars": {
     "SCHEDULE_URL": "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json",
-    "ALLOWED_WEB_ORIGIN": "https://windsor-prayer-times.hassoun-samer.chatgpt.site"
+    "ALLOWED_WEB_ORIGIN": "https://hassoun911.github.io"
   }
 }
