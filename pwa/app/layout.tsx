@@ -26,6 +26,7 @@ import QuranMoreMenuEnhancer from "./QuranMoreMenuEnhancer";
 import QuranTapAnchorEnhancer from "./QuranTapAnchorEnhancer";
 import QuranPrintedPageEnhancer from "./QuranPrintedPageEnhancer";
 import QuranScriptTajweedEnhancer from "./QuranScriptTajweedEnhancer";
+import QuranPrintedScrollEnhancer from "./QuranPrintedScrollEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranTapAnchorEnhancer />
         <QuranPrintedPageEnhancer />
         <QuranScriptTajweedEnhancer />
+        <QuranPrintedScrollEnhancer />
       </body>
     </html>
   );
