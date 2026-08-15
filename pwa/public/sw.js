@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v7";
+const CACHE_NAME = "windsor-prayer-times-v8";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
@@ -35,5 +35,48 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match(scoped("/"))))
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "Prayer reminder" };
+  }
+
+  const title = data.title || "Windsor Prayer Times";
+  const options = {
+    body: data.body || "Prayer time notification",
+    icon: scoped("/icon-192.png"),
+    badge: scoped("/icon-192.png"),
+    tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
+    renotify: true,
+    requireInteraction: data.kind === "athan",
+    data: {
+      url: data.url ? scoped(data.url === "/" ? "/" : data.url) : scoped("/"),
+      eventId: data.eventId,
+      prayer: data.prayer,
+      kind: data.kind,
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || scoped("/");
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client && new URL(client.url).pathname.startsWith(SCOPE_PATH || "/")) {
+          if ("navigate" in client) void client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(target) : undefined;
+    })
   );
 });
