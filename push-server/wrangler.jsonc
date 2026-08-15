@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wopt-prayer-push",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wopt-prayer-push",
+      "database_id": "332361c8-4df0-4f65-8863-552ce8d50fab",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "SCHEDULE_URL": "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json",
+    "ALLOWED_WEB_ORIGIN": "https://hassoun911.github.io",
+    "VAPID_PUBLIC_KEY": "BNjENcU2OXt9nFVsqHm6Fs6tnq8iz3qJxSlK10u4PrXRqCffqHXArDb0F8eMVcW_EKItPBi09oY9l9txJkJdnWs",
+    "VAPID_SUBJECT": "https://hassoun911.github.io/WOPT/"
+  }
+}
