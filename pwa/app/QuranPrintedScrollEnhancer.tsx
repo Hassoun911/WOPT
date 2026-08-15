@@ -33,8 +33,6 @@ export default function QuranPrintedScrollEnhancer() {
       .wopt-scroll-page-surahs span{padding:4px 8px;border-radius:999px;background:#f3f7f5;color:#31594f;white-space:nowrap}
       .wopt-scroll-page-location{margin-left:auto;white-space:nowrap;text-align:right}
       .wopt-scroll-page-wrap .wopt-printed-page{margin:0}
-      .wopt-scroll-loading{padding:26px 10px;text-align:center;color:#78817e;font:12px/1.5 Arial,sans-serif}
-      .wopt-scroll-end{padding:24px 10px;text-align:center;color:#82908c;font:11px/1.4 Arial,sans-serif}
       @media(max-width:700px){.wopt-scroll-page-wrap{margin-top:12px}.wopt-scroll-page-meta{font-size:10px;margin:0 3px 8px}}
     `;
     document.head.appendChild(style);
@@ -42,10 +40,9 @@ export default function QuranPrintedScrollEnhancer() {
     let chapters = new Map<number, Chapter>();
     let reader: HTMLElement | null = null;
     let basePage = 0;
-    let minPage = 0;
-    let maxPage = 0;
     let loadingPrev = false;
     let loadingNext = false;
+    let repairing = false;
     const pageCache = new Map<number, Verse[]>();
     const mountedPages = new Set<number>();
 
@@ -112,13 +109,32 @@ export default function QuranPrintedScrollEnhancer() {
       return wrap;
     };
 
+    const directArticle = () => reader?.querySelector<HTMLElement>(":scope > .wopt-printed-page[data-printed-page]") || null;
+
+    const syncMountedPages = () => {
+      mountedPages.clear();
+      if (basePage) mountedPages.add(basePage);
+      reader?.querySelectorAll<HTMLElement>(".wopt-scroll-page-wrap[data-scroll-page]").forEach((node) => {
+        const page = Number(node.dataset.scrollPage || 0);
+        if (page) mountedPages.add(page);
+      });
+    };
+
+    const contiguousBounds = () => {
+      syncMountedPages();
+      let low = basePage;
+      let high = basePage;
+      while (low > 1 && mountedPages.has(low - 1)) low -= 1;
+      while (high < 604 && mountedPages.has(high + 1)) high += 1;
+      return { low, high };
+    };
+
     const appendPage = async (page: number) => {
       if (!reader || page < 1 || page > 604 || mountedPages.has(page)) return;
       const verses = await loadVerses(page);
       if (!reader || mountedPages.has(page)) return;
       reader.appendChild(buildPage(page, verses));
       mountedPages.add(page);
-      maxPage = Math.max(maxPage, page);
     };
 
     const prependPage = async (page: number) => {
@@ -128,17 +144,39 @@ export default function QuranPrintedScrollEnhancer() {
       const verses = await loadVerses(page);
       if (!reader || mountedPages.has(page)) return;
       const firstExtra = reader.querySelector<HTMLElement>(".wopt-scroll-page-wrap");
-      const baseArticle = reader.querySelector<HTMLElement>(":scope > .wopt-printed-page");
+      const baseArticle = directArticle();
       const node = buildPage(page, verses);
       if (firstExtra) reader.insertBefore(node, firstExtra);
       else if (baseArticle) reader.insertBefore(node, baseArticle);
       else reader.prepend(node);
       mountedPages.add(page);
-      minPage = Math.min(minPage || page, page);
       requestAnimationFrame(() => {
         const delta = document.documentElement.scrollHeight - oldHeight;
         window.scrollTo({ top: oldY + delta, behavior: "auto" });
       });
+    };
+
+    const repairSequence = async () => {
+      if (!reader || repairing || !basePage) return;
+      syncMountedPages();
+      const extras = Array.from(reader.querySelectorAll<HTMLElement>(".wopt-scroll-page-wrap[data-scroll-page]"));
+      const extraPages = extras.map((node) => Number(node.dataset.scrollPage || 0)).filter(Boolean);
+      if (!extraPages.length) return;
+
+      const { low, high } = contiguousBounds();
+      const hasGap = extraPages.some((page) => page < low || page > high) || mountedPages.size !== (high - low + 1);
+      if (!hasGap) return;
+
+      repairing = true;
+      extras.forEach((node) => node.remove());
+      mountedPages.clear();
+      mountedPages.add(basePage);
+      try {
+        await loadChapters();
+        if (basePage > 1) await prependPage(basePage - 1);
+        if (basePage < 604) await appendPage(basePage + 1);
+      } catch { /* retry naturally on next scroll */ }
+      repairing = false;
     };
 
     const loadAround = async () => {
@@ -152,13 +190,14 @@ export default function QuranPrintedScrollEnhancer() {
       const article = nextReader?.querySelector<HTMLElement>(":scope > .wopt-printed-page[data-printed-page]");
       const page = Number(article?.dataset.printedPage || 0);
       if (!nextReader || !page) return;
-      if (nextReader === reader && page === basePage) return;
+      if (nextReader === reader && page === basePage) {
+        void repairSequence();
+        return;
+      }
       reader = nextReader;
       reader.querySelectorAll(".wopt-scroll-page-wrap,.wopt-scroll-loading,.wopt-scroll-end").forEach((node) => node.remove());
       mountedPages.clear();
       basePage = page;
-      minPage = page;
-      maxPage = page;
       mountedPages.add(page);
       void loadAround();
     };
@@ -168,15 +207,18 @@ export default function QuranPrintedScrollEnhancer() {
       const rect = reader.getBoundingClientRect();
       const nearBottom = rect.bottom - window.innerHeight < window.innerHeight * 1.4;
       const nearTop = rect.top > -window.innerHeight * 0.75;
+      const { low, high } = contiguousBounds();
 
-      if (nearBottom && !loadingNext && maxPage < 604) {
+      if (nearBottom && !loadingNext && high < 604) {
         loadingNext = true;
-        void appendPage(maxPage + 1).catch(() => undefined).finally(() => { loadingNext = false; });
+        void appendPage(high + 1).catch(() => undefined).finally(() => { loadingNext = false; });
       }
-      if (nearTop && !loadingPrev && minPage > 1) {
+      if (nearTop && !loadingPrev && low > 1) {
         loadingPrev = true;
-        void prependPage(minPage - 1).catch(() => undefined).finally(() => { loadingPrev = false; });
+        void prependPage(low - 1).catch(() => undefined).finally(() => { loadingPrev = false; });
       }
+
+      void repairSequence();
 
       const pages = Array.from(reader.querySelectorAll<HTMLElement>("[data-printed-page]"));
       if (pages.length) {
@@ -196,7 +238,7 @@ export default function QuranPrintedScrollEnhancer() {
     const app = document.querySelector<HTMLElement>(".quran-app");
     if (app) observer.observe(app, { subtree: true, childList: true });
     window.addEventListener("scroll", onScroll, { passive: true });
-    const timer = window.setInterval(resetForCurrent, 500);
+    const timer = window.setInterval(resetForCurrent, 450);
     resetForCurrent();
 
     return () => {
