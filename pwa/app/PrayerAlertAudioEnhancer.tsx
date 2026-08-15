@@ -7,6 +7,7 @@ type PrayerKey = "fajr" | "dhuhr" | "asr" | "maghrib" | "isha";
 type AlertPrefs = { twenty?: boolean; ten?: boolean; prayer?: boolean };
 type PrayerDay = Record<PrayerKey, string>;
 type PrayerTimes = Record<string, PrayerDay>;
+type AlertKind = "twenty" | "ten" | "prayer";
 
 const DATA_URL = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
 const MUTED_KEY = "wpt-muted-prayers";
@@ -17,6 +18,13 @@ const AUDIO = {
   dua: "https://raw.githubusercontent.com/Hassoun911/WOPT/main/mobile/modules/prayer-audio/android/src/main/res/raw/dua_after_azan.mp3",
 };
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+const PRAYER_NAMES: Record<PrayerKey, string> = {
+  fajr: "Fajr",
+  dhuhr: "Dhuhr",
+  asr: "Asr",
+  maghrib: "Maghrib",
+  isha: "Isha",
+};
 
 function mutedPrayers() {
   try { return new Set<PrayerKey>(JSON.parse(window.localStorage.getItem(MUTED_KEY) || "[]") as PrayerKey[]); }
@@ -48,6 +56,29 @@ function playFile(player: HTMLAudioElement, src: string) {
     player.onended = () => resolve(); player.onerror = () => reject(new Error("audio"));
     player.play().catch(reject);
   });
+}
+
+async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: string, scopedBase: string) {
+  if (!("Notification" in window) || Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const name = PRAYER_NAMES[prayer];
+    const title = kind === "prayer" ? `${name} prayer time` : `${name} reminder`;
+    const body = kind === "prayer"
+      ? `${name} is now (${time}) in Windsor.`
+      : `${kind === "twenty" ? "20" : "10"} minutes until ${name} (${time}).`;
+    await registration.showNotification(title, {
+      body,
+      icon: `${scopedBase}/icon-192.png` || "/icon-192.png",
+      badge: `${scopedBase}/icon-192.png` || "/icon-192.png",
+      tag: `wopt-local-${prayer}-${kind}`,
+      renotify: true,
+      requireInteraction: kind === "prayer",
+      data: { url: `${scopedBase}/` || "/", prayer, kind },
+    });
+  } catch {
+    // Audio alert can still continue if notification display fails.
+  }
 }
 
 export default function PrayerAlertAudioEnhancer() {
@@ -96,14 +127,14 @@ export default function PrayerAlertAudioEnhancer() {
       try {
         if (prayer === "fajr") await playFile(player, AUDIO.fajr);
         else { await playFile(player, AUDIO.adhan); await playFile(player, AUDIO.dua); }
-      } catch { /* browser policy */ }
+      } catch { /* browser autoplay policy can still prevent background audio */ }
       finally { busy = false; }
     };
 
     const playReminder = async (prayer: PrayerKey) => {
       if (busy || mutedPrayers().has(prayer)) return;
       busy = true;
-      try { await playFile(player, AUDIO.chime); } catch { /* browser policy */ }
+      try { await playFile(player, AUDIO.chime); } catch { /* browser autoplay policy */ }
       finally { busy = false; }
     };
 
@@ -119,7 +150,7 @@ export default function PrayerAlertAudioEnhancer() {
       for (const prayer of PRAYERS) {
         if (muted.has(prayer)) continue;
         const until = minutesOf(day[prayer]) * 60 - seconds;
-        const due: Array<{ enabled: boolean | undefined; kind: "twenty" | "ten" | "prayer"; match: boolean }> = [
+        const due: Array<{ enabled: boolean | undefined; kind: AlertKind; match: boolean }> = [
           { enabled: prefs.twenty, kind: "twenty", match: until <= 1200 && until > 1170 },
           { enabled: prefs.ten, kind: "ten", match: until <= 600 && until > 570 },
           { enabled: prefs.prayer, kind: "prayer", match: until <= 0 && until > -30 },
@@ -129,6 +160,7 @@ export default function PrayerAlertAudioEnhancer() {
           const key = `wpt-sound:${dateKey}:${prayer}:${rule.kind}`;
           if (window.localStorage.getItem(key)) continue;
           window.localStorage.setItem(key, "played");
+          void showLocalNotification(prayer, rule.kind, day[prayer], scopedBase);
           if (rule.kind === "prayer") void playPrayer(prayer); else void playReminder(prayer);
         }
       }
