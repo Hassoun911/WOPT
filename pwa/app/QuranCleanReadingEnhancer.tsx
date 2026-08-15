@@ -17,8 +17,12 @@ export default function QuranCleanReadingEnhancer() {
       .quran-app.wopt-clean-reading .mushaf-shell{padding-top:0!important}
       .quran-app.wopt-clean-reading .wopt-clean-reader-head{display:block}
       .wopt-clean-reader-head{display:none;max-width:760px;margin:0 auto;padding:28px 22px 12px;background:var(--wopt-reader-bg,#fff);color:var(--wopt-reader-color,#111);font-family:Arial,sans-serif}
-      .wopt-clean-meta{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px;color:#5f6465;font-size:13px;font-weight:700}
-      .wopt-clean-meta span:last-child{text-align:right}
+      .wopt-clean-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;color:#5f6465;font-size:13px;font-weight:700}
+      .wopt-clean-meta-left,.wopt-clean-meta-right{display:flex;align-items:center;gap:8px;min-width:0}
+      .wopt-clean-meta-right{margin-left:auto}
+      .wopt-clean-meta-right>span{text-align:right;white-space:nowrap}
+      .wopt-clean-menu-dot{width:34px;height:34px;border:1px solid rgba(22,129,108,.22);border-radius:50%;background:#fff;color:#166d5b;font:800 21px/1 Arial,sans-serif;display:grid;place-items:center;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+      .wopt-clean-menu-dot:active{background:#eaf6f2}
       .wopt-clean-surah-banner{position:relative;display:flex;align-items:center;justify-content:center;min-height:58px;margin:0 0 20px;border:1.5px solid #16816c;background:rgba(250,248,240,.72);overflow:hidden}
       .wopt-clean-surah-banner:before,.wopt-clean-surah-banner:after{content:"✦  ❈  ✦";position:absolute;top:50%;transform:translateY(-50%);color:#16816c;font-size:14px;letter-spacing:4px;opacity:.85}
       .wopt-clean-surah-banner:before{left:14px}.wopt-clean-surah-banner:after{right:14px}
@@ -35,6 +39,7 @@ export default function QuranCleanReadingEnhancer() {
         .wopt-clean-reader-head{padding:24px 18px 8px}.wopt-clean-meta{margin-bottom:20px;font-size:12px}.wopt-clean-surah-banner{min-height:54px;margin-bottom:17px}.wopt-clean-surah-title{font-size:24px;padding:0 72px}.wopt-clean-bismillah{font-size:27px;margin-bottom:22px}
         .quran-app.wopt-clean-reading .mushaf-shell{padding-left:18px!important;padding-right:18px!important}
         .wopt-clean-toolbar{max-width:calc(100vw - 22px);gap:2px;padding:6px}.wopt-clean-toolbar button{min-width:48px;padding:0 8px;font-size:10px}
+        .wopt-clean-menu-dot{width:32px;height:32px;font-size:20px}
       }
     `;
     document.head.appendChild(style);
@@ -46,7 +51,10 @@ export default function QuranCleanReadingEnhancer() {
     const head = document.createElement("section");
     head.className = "wopt-clean-reader-head";
     head.innerHTML = `
-      <div class="wopt-clean-meta"><span data-clean-surah>Surah</span><span data-clean-location>Juz — · Page —</span></div>
+      <div class="wopt-clean-meta">
+        <div class="wopt-clean-meta-left"><span data-clean-surah>Surah</span></div>
+        <div class="wopt-clean-meta-right"><span data-clean-location>Juz — · Page —</span><button class="wopt-clean-menu-dot" type="button" data-clean-open-tools aria-label="Open reading tools">⋯</button></div>
+      </div>
       <div class="wopt-clean-surah-banner"><div class="wopt-clean-surah-title" data-clean-arabic>سورة</div></div>
       <div class="wopt-clean-bismillah" data-clean-bismillah>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>`;
     mushaf.insertAdjacentElement("beforebegin", head);
@@ -64,6 +72,9 @@ export default function QuranCleanReadingEnhancer() {
 
     let hideTimer: number | null = null;
     let lastSig = "";
+    let tapScrollY = 0;
+    let tapClientY = 0;
+    let wordTapTarget: HTMLElement | null = null;
 
     const clearHide = () => { if (hideTimer) window.clearTimeout(hideTimer); hideTimer = null; };
     const hideTools = () => { app.classList.remove("wopt-clean-tools-open"); };
@@ -137,15 +148,45 @@ export default function QuranCleanReadingEnhancer() {
       showTools(action === "settings" || action === "surahs" || action === "search" ? 8000 : 4200);
     };
 
+    const onOpenTools = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (app.classList.contains("wopt-clean-tools-open")) hideTools(); else showTools(6000);
+    };
+
     const onPageTap = (event: PointerEvent) => {
       if (!app.classList.contains("wopt-clean-reading")) return;
       const target = event.target as HTMLElement;
-      if (target.closest(".wopt-clean-toolbar,.wopt-ref-settings-backdrop,.quran-drawer-backdrop,.wopt-search-backdrop,.wopt-verse-menu,.wopt-verse-translate-backdrop,.memorize-overlay")) return;
+      if (target.closest(".quran-word,.ayah-marker,.mushaf-ayah")) return;
+      if (target.closest(".wopt-clean-toolbar,.wopt-clean-menu-dot,.wopt-ref-settings-backdrop,.quran-drawer-backdrop,.wopt-search-backdrop,.wopt-verse-menu,.wopt-verse-translate-backdrop,.memorize-overlay")) return;
       if (app.classList.contains("wopt-clean-tools-open")) hideTools(); else showTools();
     };
 
+    const onWordPointerDown = (event: PointerEvent) => {
+      const target = (event.target as HTMLElement).closest<HTMLElement>(".quran-word,.ayah-marker,.mushaf-ayah");
+      if (!target || !app.classList.contains("wopt-clean-reading")) { wordTapTarget = null; return; }
+      tapScrollY = window.scrollY;
+      tapClientY = event.clientY;
+      wordTapTarget = target;
+    };
+
+    const onWordPointerUp = (event: PointerEvent) => {
+      if (!wordTapTarget) return;
+      const moved = Math.abs(event.clientY - tapClientY);
+      const restoreY = tapScrollY;
+      wordTapTarget = null;
+      if (moved > 12) return;
+      const restore = () => window.scrollTo({ top: restoreY, behavior: "auto" });
+      requestAnimationFrame(restore);
+      window.setTimeout(restore, 40);
+      window.setTimeout(restore, 140);
+    };
+
     toolbar.addEventListener("click", onToolbar);
+    head.querySelector("[data-clean-open-tools]")?.addEventListener("click", onOpenTools);
     document.addEventListener("pointerdown", onPageTap, { passive: true });
+    document.addEventListener("pointerdown", onWordPointerDown, { passive: true });
+    document.addEventListener("pointerup", onWordPointerUp, { passive: true });
     const timer = window.setInterval(refresh, 350);
     refresh();
 
@@ -153,7 +194,10 @@ export default function QuranCleanReadingEnhancer() {
       clearHide();
       window.clearInterval(timer);
       toolbar.removeEventListener("click", onToolbar);
+      head.querySelector("[data-clean-open-tools]")?.removeEventListener("click", onOpenTools);
       document.removeEventListener("pointerdown", onPageTap);
+      document.removeEventListener("pointerdown", onWordPointerDown);
+      document.removeEventListener("pointerup", onWordPointerUp);
       toolbar.remove();
       head.remove();
       app.classList.remove("wopt-clean-reading", "wopt-clean-tools-open");
