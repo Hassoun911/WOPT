@@ -28,6 +28,7 @@ import QuranPrintedPageEnhancer from "./QuranPrintedPageEnhancer";
 import QuranScriptTajweedEnhancer from "./QuranScriptTajweedEnhancer";
 import QuranPrintedScrollEnhancer from "./QuranPrintedScrollEnhancer";
 import QuranIndexEnhancer from "./QuranIndexEnhancer";
+import QuranPrintedAudioChooserEnhancer from "./QuranPrintedAudioChooserEnhancer";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranScriptTajweedEnhancer />
         <QuranPrintedScrollEnhancer />
         <QuranIndexEnhancer />
+        <QuranPrintedAudioChooserEnhancer />
       </body>
     </html>
   );
