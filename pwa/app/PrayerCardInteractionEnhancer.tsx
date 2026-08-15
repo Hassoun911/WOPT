@@ -15,11 +15,8 @@ const AUDIO = {
 };
 
 function mutedSet() {
-  try {
-    return new Set<PrayerKey>(JSON.parse(window.localStorage.getItem(MUTED_KEY) || "[]") as PrayerKey[]);
-  } catch {
-    return new Set<PrayerKey>();
-  }
+  try { return new Set<PrayerKey>(JSON.parse(window.localStorage.getItem(MUTED_KEY) || "[]") as PrayerKey[]); }
+  catch { return new Set<PrayerKey>(); }
 }
 
 function saveMuted(value: Set<PrayerKey>) {
@@ -28,13 +25,7 @@ function saveMuted(value: Set<PrayerKey>) {
 }
 
 function windsorSeconds() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   const get = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
   return get("hour") * 3600 + get("minute") * 60 + get("second");
 }
@@ -42,6 +33,15 @@ function windsorSeconds() {
 function timeSeconds(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return hour * 3600 + minute * 60;
+}
+
+function countdownText(seconds: number, arabic: boolean) {
+  const total = Math.max(0, Math.ceil(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (arabic) return h > 0 ? `${h} س ${m} د متبقي` : `${m} د ${s} ث متبقي`;
+  return h > 0 ? `${h}h ${m}m left` : `${m}m ${s}s left`;
 }
 
 function playOnce(player: HTMLAudioElement, src: string) {
@@ -70,6 +70,7 @@ export default function PrayerCardInteractionEnhancer() {
       .prayer-card.wopt-prayer-urgent{border:2px solid #dc2626!important;animation:woptUrgentPrayerPulse 1s ease-in-out infinite!important}
       .prayer-card.wopt-prayer-muted{opacity:.66;position:relative}.prayer-card.wopt-prayer-muted:after{content:"🔇";position:absolute;top:10px;right:12px;font-size:15px;line-height:1}.app-shell[dir='rtl'] .prayer-card.wopt-prayer-muted:after{right:auto;left:12px}
       .prayer-card.wopt-longpress-ready{transform:scale(.985);transition:transform .12s ease}
+      .wopt-card-countdown{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);white-space:nowrap;padding:4px 9px;border-radius:999px;background:rgba(11,91,71,.09);color:#0b5b47;font:800 11px/1.1 Arial,sans-serif;letter-spacing:.01em}.prayer-card.wopt-prayer-urgent .wopt-card-countdown{background:#fee2e2;color:#b91c1c}.prayer-card.active{padding-bottom:36px!important;position:relative}
       .wopt-mute-toast{position:fixed;z-index:3000;left:50%;bottom:max(90px,calc(env(safe-area-inset-bottom) + 80px));transform:translate(-50%,12px);padding:10px 14px;border-radius:999px;background:#173e35;color:#fff;font:700 12px/1.2 Arial,sans-serif;box-shadow:0 10px 35px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:.18s ease}.wopt-mute-toast.show{opacity:1;transform:translate(-50%,0)}
       .wopt-sound-test{padding:14px!important;display:block!important}.wopt-sound-test-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.wopt-sound-test-head strong{font-size:14px}.wopt-sound-test-head span{font-size:11px;color:#71807b}.wopt-sound-test-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.wopt-sound-test-buttons button{min-height:42px;border:1px solid rgba(17,94,76,.18);border-radius:12px;background:#f5faf8;color:#0b5b47;font-weight:800;font-size:11px}.wopt-sound-test-buttons button.playing{background:#0b5b47;color:#fff}
       @media(max-width:560px){.wopt-sound-test-buttons{grid-template-columns:1fr}.wopt-sound-test-buttons button{min-height:40px}}
@@ -90,30 +91,19 @@ export default function PrayerCardInteractionEnhancer() {
     const player = new Audio();
     player.preload = "auto";
     let testBusy = false;
-
     const testSound = async (kind: "chime" | "fajr" | "adhan", button: HTMLButtonElement) => {
       if (testBusy) {
-        player.pause();
-        player.currentTime = 0;
-        testBusy = false;
+        player.pause(); player.currentTime = 0; testBusy = false;
         document.querySelectorAll(".wopt-sound-test-buttons button").forEach((item) => item.classList.remove("playing"));
         return;
       }
-      testBusy = true;
-      button.classList.add("playing");
+      testBusy = true; button.classList.add("playing");
       try {
         if (kind === "chime") await playOnce(player, AUDIO.chime);
         if (kind === "fajr") await playOnce(player, AUDIO.fajr);
-        if (kind === "adhan") {
-          await playOnce(player, AUDIO.adhan);
-          await playOnce(player, AUDIO.dua);
-        }
-      } catch {
-        showToast("Tap once, then try the sound again");
-      } finally {
-        testBusy = false;
-        button.classList.remove("playing");
-      }
+        if (kind === "adhan") { await playOnce(player, AUDIO.adhan); await playOnce(player, AUDIO.dua); }
+      } catch { showToast("Tap once, then try the sound again"); }
+      finally { testBusy = false; button.classList.remove("playing"); }
     };
 
     const ensureSoundTests = () => {
@@ -126,25 +116,21 @@ export default function PrayerCardInteractionEnhancer() {
       if (note) stack.insertBefore(card, note); else stack.appendChild(card);
       card.addEventListener("click", (event) => {
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-test]");
-        if (!button) return;
-        void testSound(button.dataset.test as "chime" | "fajr" | "adhan", button);
+        if (button) void testSound(button.dataset.test as "chime" | "fajr" | "adhan", button);
       });
     };
 
     const pressTimers = new WeakMap<HTMLElement, number>();
     const clearPress = (card: HTMLElement) => {
-      const timer = pressTimers.get(card);
-      if (timer) window.clearTimeout(timer);
-      pressTimers.delete(card);
-      card.classList.remove("wopt-longpress-ready");
+      const timer = pressTimers.get(card); if (timer) window.clearTimeout(timer);
+      pressTimers.delete(card); card.classList.remove("wopt-longpress-ready");
     };
 
     const wireCards = () => {
       const cards = Array.from(document.querySelectorAll<HTMLElement>(".prayer-grid .prayer-card"));
       const muted = mutedSet();
       cards.forEach((card, index) => {
-        const prayer = PRAYERS[index];
-        if (!prayer) return;
+        const prayer = PRAYERS[index]; if (!prayer) return;
         card.dataset.woptPrayer = prayer;
         card.classList.toggle("wopt-prayer-muted", muted.has(prayer));
         if (card.dataset.woptLongpress === "1") return;
@@ -152,11 +138,9 @@ export default function PrayerCardInteractionEnhancer() {
         card.addEventListener("pointerdown", () => {
           card.classList.add("wopt-longpress-ready");
           const timer = window.setTimeout(() => {
-            const current = mutedSet();
-            const willMute = !current.has(prayer);
+            const current = mutedSet(); const willMute = !current.has(prayer);
             if (willMute) current.add(prayer); else current.delete(prayer);
-            saveMuted(current);
-            card.classList.toggle("wopt-prayer-muted", willMute);
+            saveMuted(current); card.classList.toggle("wopt-prayer-muted", willMute);
             if (navigator.vibrate) navigator.vibrate(35);
             showToast(`${willMute ? "Muted" : "Unmuted"} ${prayer.charAt(0).toUpperCase()}${prayer.slice(1)} alerts`);
             clearPress(card);
@@ -167,17 +151,22 @@ export default function PrayerCardInteractionEnhancer() {
       });
     };
 
-    const updateUrgent = () => {
+    const updateCards = () => {
       const now = windsorSeconds();
+      const arabic = document.documentElement.dir === "rtl";
       document.querySelectorAll<HTMLElement>(".prayer-grid .prayer-card").forEach((card) => {
         const time = card.querySelector<HTMLTimeElement>("time[datetime]")?.dateTime || "";
         const until = time ? timeSeconds(time) - now : Number.POSITIVE_INFINITY;
-        const urgent = card.classList.contains("active") && until > 0 && until <= 600;
-        card.classList.toggle("wopt-prayer-urgent", urgent);
+        const active = card.classList.contains("active") && until > 0;
+        card.classList.toggle("wopt-prayer-urgent", active && until <= 600);
+        let badge = card.querySelector<HTMLElement>(".wopt-card-countdown");
+        if (active) {
+          if (!badge) { badge = document.createElement("span"); badge.className = "wopt-card-countdown"; card.appendChild(badge); }
+          badge.textContent = countdownText(until, arabic);
+        } else badge?.remove();
       });
     };
 
-    // Suppress service-worker notifications for prayers muted by long-press.
     const proto = typeof ServiceWorkerRegistration !== "undefined" ? ServiceWorkerRegistration.prototype : null;
     const originalShow = proto?.showNotification;
     if (proto && originalShow) {
@@ -189,27 +178,16 @@ export default function PrayerCardInteractionEnhancer() {
       };
     }
 
-    wireCards();
-    updateUrgent();
-    ensureSoundTests();
-    const timer = window.setInterval(() => {
-      wireCards();
-      updateUrgent();
-      ensureSoundTests();
-    }, 500);
-
+    wireCards(); updateCards(); ensureSoundTests();
+    const timer = window.setInterval(() => { wireCards(); updateCards(); ensureSoundTests(); }, 500);
     const onMutedChange = () => wireCards();
     window.addEventListener("wpt-muted-prayers-change", onMutedChange);
 
     return () => {
-      window.clearInterval(timer);
-      window.clearTimeout(toastTimer);
+      window.clearInterval(timer); window.clearTimeout(toastTimer);
       window.removeEventListener("wpt-muted-prayers-change", onMutedChange);
       if (proto && originalShow) proto.showNotification = originalShow;
-      player.pause();
-      player.src = "";
-      toast.remove();
-      style.remove();
+      player.pause(); player.src = ""; toast.remove(); style.remove();
     };
   }, [pathname]);
 
