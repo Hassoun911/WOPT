@@ -19,6 +19,7 @@ import QuranInfoMeaningEnhancer from "./QuranInfoMeaningEnhancer";
 import QuranSmartPlayerEnhancer from "./QuranSmartPlayerEnhancer";
 import QuranHeaderSearchEnhancer from "./QuranHeaderSearchEnhancer";
 import QuranHomeLinkFixEnhancer from "./QuranHomeLinkFixEnhancer";
+import QuranMemorizeExperienceEnhancer from "./QuranMemorizeExperienceEnhancer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranSmartPlayerEnhancer />
         <QuranHeaderSearchEnhancer />
         <QuranHomeLinkFixEnhancer />
+        <QuranMemorizeExperienceEnhancer />
       </body>
     </html>
   );
