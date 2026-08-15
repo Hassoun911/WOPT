@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+const BOOK_KEY = "wopt-quran-book-page-mode";
+
 export default function QuranMoreMenuEnhancer() {
   const pathname = usePathname();
 
@@ -45,6 +47,11 @@ export default function QuranMoreMenuEnhancer() {
     const open = () => backdrop.classList.add("open");
     const close = () => backdrop.classList.remove("open");
 
+    const setBook = (enabled: boolean) => {
+      window.localStorage.setItem(BOOK_KEY, enabled ? "true" : "false");
+      window.dispatchEvent(new CustomEvent("wopt-quran-book-mode", { detail: { enabled } }));
+    };
+
     const clickRef = (name: string) => document.querySelector<HTMLElement>(`.wopt-ref-safe [data-ref='${name}']`)?.click();
     const clickText = (selector: string, pattern: RegExp) => {
       const el = Array.from(document.querySelectorAll<HTMLElement>(selector)).find((node) => pattern.test((node.textContent || "").trim()));
@@ -69,20 +76,31 @@ export default function QuranMoreMenuEnhancer() {
       const action = button.dataset.more;
 
       if (action === "book") {
-        // Arabic-only mushaf/book reading. The Translation enhancer owns this mode switch.
         clickRef("arabic");
         window.localStorage.setItem("wopt-quran-text-mode", "arabic");
         document.querySelector<HTMLElement>(".quran-app")?.setAttribute("data-wopt-text-mode", "arabic");
+        setBook(true);
         close();
         return;
       }
-      if (action === "verse") clickRef("verse");
-      if (action === "translation") clickText("button", /^Translation(?:\s|$)/i);
-      if (action === "transliteration") clickText("button", /Arabic.*English|English letters/i);
+      if (action === "verse") {
+        setBook(false);
+        clickRef("verse");
+      }
+      if (action === "translation") {
+        setBook(false);
+        clickText("button", /^Translation(?:\s|$)/i);
+      }
+      if (action === "transliteration") {
+        setBook(false);
+        clickText("button", /Arabic.*English|English letters/i);
+      }
       if (action === "info") clickRef("info");
-      if (action === "memorize") clickText("button", /Memorize/i);
+      if (action === "memorize") {
+        setBook(false);
+        clickText("button", /Memorize/i);
+      }
       if (action === "home") {
-        // Use the actual browser path so GitHub Pages /WOPT/ is preserved.
         const current = window.location.pathname;
         const base = current.replace(/\/quran\/?$/, "/");
         window.location.assign(base || "/");
