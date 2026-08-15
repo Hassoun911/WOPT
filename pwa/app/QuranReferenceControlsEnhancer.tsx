@@ -38,13 +38,17 @@ export default function QuranReferenceControlsEnhancer() {
       .wopt-ref-safe-actions .wopt-audio-active{background:#e9f7f4!important;border-color:#47aaa7!important;color:#167d7b!important}
       .wopt-ref-audio-progress{display:grid;grid-template-columns:36px 1fr 42px;gap:8px;align-items:center;margin-top:13px;color:#777;font-size:10px}
       .wopt-ref-audio-progress input{width:100%;accent-color:#3baaa8}.wopt-ref-audio-progress span:last-child{text-align:right}
+      .wopt-ref-play-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+      .wopt-ref-play-modes button{min-height:38px;border:1px solid #e1e5e4;border-radius:12px;background:#fff;color:#555;font:700 11px/1.2 Arial,sans-serif;padding:0 10px}
+      .wopt-ref-play-modes button.active{background:#e8f7f4;border-color:#3baaa8;color:#137b78;box-shadow:inset 0 0 0 1px rgba(59,170,168,.08)}
+      .wopt-ref-play-mode-note{margin:7px 2px 0;color:#777;font:10px/1.45 Arial,sans-serif}
       .wopt-ref-settings-backdrop{position:fixed;z-index:1000;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.28);padding:20px}.wopt-ref-settings-backdrop.open{display:flex}
       .wopt-ref-settings{width:min(520px,100%);padding:20px;border-radius:20px 20px 14px 14px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.25);font-family:Arial,sans-serif;color:#222}
       .wopt-ref-settings-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.wopt-ref-settings-head strong{font-size:18px}.wopt-ref-settings-head button{width:36px;height:36px;border:0;border-radius:50%;background:#f3f3f3;font-size:20px}
       .wopt-ref-setting{display:grid;gap:8px;margin:14px 0}.wopt-ref-setting label{font-size:12px;font-weight:800;color:#555}.wopt-ref-setting select{height:44px;border:1px solid #ddd;border-radius:12px;background:#fff;padding:0 12px;font-size:14px}.wopt-ref-setting input[type=range]{width:100%;accent-color:#3baaa8}
       .wopt-ref-font-preview{margin-top:14px;padding:16px;border-radius:14px;background:#f7f7f7;text-align:center;direction:rtl;font-family:var(--wopt-reference-quran-font,"Noto Naskh Arabic",serif);font-size:30px;line-height:1.7}
       .wopt-ref-setting-row{display:flex;justify-content:space-between;align-items:center;color:#777;font-size:11px}
-      @media(max-width:700px){.wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:52px 52px 58px 1fr 1fr!important;gap:6px!important}.wopt-ref-safe-actions.wopt-controls-ready button{font-size:10px!important}.wopt-ref-settings-backdrop{padding:0 10px 10px}.wopt-ref-settings{padding:18px}}
+      @media(max-width:700px){.wopt-ref-safe-actions.wopt-controls-ready{grid-template-columns:52px 52px 58px 1fr 1fr!important;gap:6px!important}.wopt-ref-safe-actions.wopt-controls-ready button{font-size:10px!important}.wopt-ref-settings-backdrop{padding:0 10px 10px}.wopt-ref-settings{padding:18px}.wopt-ref-play-modes button{font-size:10px}}
     `;
     document.head.appendChild(style);
 
@@ -60,6 +64,7 @@ export default function QuranReferenceControlsEnhancer() {
     let progressInput: HTMLInputElement | null = null;
     let elapsedNode: HTMLElement | null = null;
     let remainingNode: HTMLElement | null = null;
+    let modeNote: HTMLElement | null = null;
     let initialized = false;
 
     const applyFont = (font: string, size: number) => {
@@ -151,12 +156,26 @@ export default function QuranReferenceControlsEnhancer() {
           hidden.dispatchEvent(new Event("change", { bubbles: true }));
         });
       }
+      if (!shell.querySelector(".wopt-ref-play-modes")) {
+        const modes = document.createElement("div");
+        modes.className = "wopt-ref-play-modes";
+        modes.innerHTML = `<button type="button" data-ref-mode="surah">Selected Surah</button><button type="button" data-ref-mode="quran">Full Qur’an</button>`;
+        const progress = shell.querySelector(".wopt-ref-audio-progress");
+        progress?.insertAdjacentElement("afterend", modes);
+        modeNote = document.createElement("p");
+        modeNote.className = "wopt-ref-play-mode-note";
+        modeNote.textContent = "Selected Surah will stop at the end of this Surah.";
+        modes.insertAdjacentElement("afterend", modeNote);
+      } else {
+        modeNote = shell.querySelector<HTMLElement>(".wopt-ref-play-mode-note");
+      }
       buildSettings();
       initialized = true;
       return true;
     };
 
     const hiddenTranslationButton = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-reader-toolbar button")).find((button) => /^Translation$/i.test((button.textContent || "").trim()));
+    const hiddenModeButton = (mode: "surah" | "quran") => document.querySelector<HTMLButtonElement>(`.wopt-quran-player [data-mode='${mode}']`);
 
     const syncControls = () => {
       if (!initialized && !initializeVisibleControls()) return;
@@ -188,6 +207,15 @@ export default function QuranReferenceControlsEnhancer() {
       const translationButton = shell?.querySelector<HTMLButtonElement>("[data-ref='translation']");
       arabicButton?.classList.toggle("active", !translationOn);
       translationButton?.classList.toggle("active", translationOn);
+
+      const fullQuranOn = hiddenModeButton("quran")?.classList.contains("active") || false;
+      const surahMode = shell?.querySelector<HTMLButtonElement>("[data-ref-mode='surah']");
+      const quranMode = shell?.querySelector<HTMLButtonElement>("[data-ref-mode='quran']");
+      surahMode?.classList.toggle("active", !fullQuranOn);
+      quranMode?.classList.toggle("active", fullQuranOn);
+      if (modeNote) modeNote.textContent = fullQuranOn
+        ? "Full Qur’an starts with the selected Surah and continues automatically through the remaining Surahs."
+        : "Selected Surah plays only the Surah you are reading and stops at the end.";
     };
 
     const onCapture = (event: MouseEvent) => {
@@ -198,6 +226,15 @@ export default function QuranReferenceControlsEnhancer() {
         event.stopPropagation();
         buildSettings();
         settingsBackdrop?.classList.add("open");
+        return;
+      }
+      const mode = target.closest<HTMLElement>("[data-ref-mode]");
+      if (mode) {
+        event.preventDefault();
+        event.stopPropagation();
+        const value = mode.dataset.refMode === "quran" ? "quran" : "surah";
+        hiddenModeButton(value)?.click();
+        window.setTimeout(syncControls, 40);
         return;
       }
       const play = target.closest<HTMLElement>("[data-ref='play']");
