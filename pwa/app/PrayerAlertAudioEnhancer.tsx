@@ -8,6 +8,13 @@ type AlertPrefs = { twenty?: boolean; ten?: boolean; prayer?: boolean };
 type PrayerDay = Record<PrayerKey, string>;
 type PrayerTimes = Record<string, PrayerDay>;
 type AlertKind = "twenty" | "ten" | "prayer";
+type PushAudioMessage = {
+  type?: string;
+  eventId?: string;
+  dateKey?: string;
+  prayer?: PrayerKey;
+  kind?: "twenty" | "ten" | "athan" | "prayer";
+};
 
 const DATA_URL = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
 const MUTED_KEY = "wpt-muted-prayers";
@@ -52,8 +59,12 @@ function basePath() {
 
 function playFile(player: HTMLAudioElement, src: string) {
   return new Promise<void>((resolve, reject) => {
-    player.pause(); player.src = src; player.currentTime = 0; player.volume = 1;
-    player.onended = () => resolve(); player.onerror = () => reject(new Error("audio"));
+    player.pause();
+    player.src = src;
+    player.currentTime = 0;
+    player.volume = 1;
+    player.onended = () => resolve();
+    player.onerror = () => reject(new Error("audio"));
     player.play().catch(reject);
   });
 }
@@ -73,6 +84,8 @@ async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: s
       badge: `${scopedBase}/icon-192.png` || "/icon-192.png",
       tag: `wopt-local-${prayer}-${kind}`,
       renotify: true,
+      silent: false,
+      vibrate: kind === "prayer" ? [300, 120, 300] : [180, 100, 180],
       requireInteraction: kind === "prayer",
       data: { url: `${scopedBase}/` || "/", prayer, kind },
     });
@@ -85,9 +98,6 @@ export default function PrayerAlertAudioEnhancer() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const isHome = pathname === "/" || pathname === "/WOPT" || pathname === "/WOPT/";
-    if (!isHome) return;
-
     const scopedBase = basePath();
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register(`${scopedBase}/sw.js`, { scope: `${scopedBase || ""}/`, updateViaCache: "none" })
@@ -103,8 +113,13 @@ export default function PrayerAlertAudioEnhancer() {
     const unlockAudio = () => {
       if (unlocked) return;
       unlocked = true;
-      player.src = AUDIO.chime; player.volume = 0;
-      void player.play().then(() => { player.pause(); player.currentTime = 0; player.volume = 1; }).catch(() => undefined);
+      player.src = AUDIO.chime;
+      player.volume = 0;
+      void player.play().then(() => {
+        player.pause();
+        player.currentTime = 0;
+        player.volume = 1;
+      }).catch(() => undefined);
     };
     window.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
     window.addEventListener("keydown", unlockAudio, { once: true, capture: true });
@@ -126,7 +141,10 @@ export default function PrayerAlertAudioEnhancer() {
       busy = true;
       try {
         if (prayer === "fajr") await playFile(player, AUDIO.fajr);
-        else { await playFile(player, AUDIO.adhan); await playFile(player, AUDIO.dua); }
+        else {
+          await playFile(player, AUDIO.adhan);
+          await playFile(player, AUDIO.dua);
+        }
       } catch { /* browser autoplay policy can still prevent background audio */ }
       finally { busy = false; }
     };
@@ -134,13 +152,46 @@ export default function PrayerAlertAudioEnhancer() {
     const playReminder = async (prayer: PrayerKey) => {
       if (busy || mutedPrayers().has(prayer)) return;
       busy = true;
-      try { await playFile(player, AUDIO.chime); } catch { /* browser autoplay policy */ }
+      try { await playFile(player, AUDIO.chime); }
+      catch { /* browser autoplay policy can still prevent background audio */ }
       finally { busy = false; }
     };
 
+    const prefsAllow = (kind: AlertKind) => {
+      let prefs: AlertPrefs = {};
+      try { prefs = JSON.parse(window.localStorage.getItem("wpt-alert-preferences") || "{}") as AlertPrefs; }
+      catch { /* ignore */ }
+      return kind === "twenty" ? Boolean(prefs.twenty) : kind === "ten" ? Boolean(prefs.ten) : Boolean(prefs.prayer);
+    };
+
+    const markAndPlay = (prayer: PrayerKey, kind: AlertKind, dateKey: string) => {
+      if (!prefsAllow(kind) || mutedPrayers().has(prayer)) return;
+      const key = `wpt-sound:${dateKey}:${prayer}:${kind}`;
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, "played");
+      if (kind === "prayer") void playPrayer(prayer);
+      else void playReminder(prayer);
+    };
+
+    const onServiceWorkerMessage = (event: MessageEvent<PushAudioMessage>) => {
+      const data = event.data;
+      if (!data || data.type !== "wopt-prayer-push" || !data.prayer || !PRAYERS.includes(data.prayer)) return;
+      const kind: AlertKind | null = data.kind === "athan" || data.kind === "prayer"
+        ? "prayer"
+        : data.kind === "twenty"
+          ? "twenty"
+          : data.kind === "ten"
+            ? "ten"
+            : null;
+      if (!kind) return;
+      markAndPlay(data.prayer, kind, data.dateKey || windsorParts().dateKey);
+    };
+    navigator.serviceWorker?.addEventListener("message", onServiceWorkerMessage);
+
     const check = () => {
       let prefs: AlertPrefs = {};
-      try { prefs = JSON.parse(window.localStorage.getItem("wpt-alert-preferences") || "{}") as AlertPrefs; } catch { /* ignore */ }
+      try { prefs = JSON.parse(window.localStorage.getItem("wpt-alert-preferences") || "{}") as AlertPrefs; }
+      catch { /* ignore */ }
       if (!prefs.twenty && !prefs.ten && !prefs.prayer) return;
       const muted = mutedPrayers();
       const { dateKey, seconds } = windsorParts();
@@ -161,7 +212,8 @@ export default function PrayerAlertAudioEnhancer() {
           if (window.localStorage.getItem(key)) continue;
           window.localStorage.setItem(key, "played");
           void showLocalNotification(prayer, rule.kind, day[prayer], scopedBase);
-          if (rule.kind === "prayer") void playPrayer(prayer); else void playReminder(prayer);
+          if (rule.kind === "prayer") void playPrayer(prayer);
+          else void playReminder(prayer);
         }
       }
     };
@@ -172,7 +224,9 @@ export default function PrayerAlertAudioEnhancer() {
       window.clearInterval(timer);
       window.removeEventListener("pointerdown", unlockAudio, true);
       window.removeEventListener("keydown", unlockAudio, true);
-      player.pause(); player.src = "";
+      navigator.serviceWorker?.removeEventListener("message", onServiceWorkerMessage);
+      player.pause();
+      player.src = "";
     };
   }, [pathname]);
 
