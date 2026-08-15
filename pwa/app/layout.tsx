@@ -27,16 +27,10 @@ import QuranTapAnchorEnhancer from "./QuranTapAnchorEnhancer";
 import QuranPrintedPageEnhancer from "./QuranPrintedPageEnhancer";
 import QuranScriptTajweedEnhancer from "./QuranScriptTajweedEnhancer";
 import QuranPrintedScrollEnhancer from "./QuranPrintedScrollEnhancer";
+import QuranIndexEnhancer from "./QuranIndexEnhancer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const asset = (path: string) => `${basePath}${path}`;
@@ -45,11 +39,7 @@ export const metadata: Metadata = {
   title: "Windsor Prayer Times",
   description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, and memorization tools.",
   manifest: asset("/manifest.webmanifest"),
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Windsor Prayer Times",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Windsor Prayer Times" },
   other: { "codex-preview": "development" },
   icons: {
     icon: [
@@ -61,12 +51,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#0b5b47",
-};
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0b5b47" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -96,6 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranPrintedPageEnhancer />
         <QuranScriptTajweedEnhancer />
         <QuranPrintedScrollEnhancer />
+        <QuranIndexEnhancer />
       </body>
     </html>
   );
