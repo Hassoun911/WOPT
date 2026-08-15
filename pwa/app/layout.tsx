@@ -11,6 +11,7 @@ import QuranAudioEnhancer from "./QuranAudioEnhancer";
 import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
 import QuranReferenceLayoutEnhancer from "./QuranReferenceLayoutEnhancer";
+import QuranTranslationLanguageEnhancer from "./QuranTranslationLanguageEnhancer";
 import QuranReferenceControlsEnhancer from "./QuranReferenceControlsEnhancer";
 import QuranViewModeEnhancer from "./QuranViewModeEnhancer";
 import QuranVerseMenuEnhancer from "./QuranVerseMenuEnhancer";
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranPlaybackSyncEnhancer />
         <QuranUiFixEnhancer />
         <QuranReferenceLayoutEnhancer />
+        <QuranTranslationLanguageEnhancer />
         <QuranReferenceControlsEnhancer />
         <QuranViewModeEnhancer />
         <QuranVerseMenuEnhancer />
