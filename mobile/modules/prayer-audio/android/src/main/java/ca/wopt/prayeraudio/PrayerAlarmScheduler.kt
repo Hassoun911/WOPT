@@ -45,6 +45,17 @@ object PrayerAlarmScheduler {
     return PrayerScheduleResult(future.length(), exact)
   }
 
+  fun scheduleTest(context: Context, prayer: String, delaySeconds: Int): Boolean {
+    val exact = canScheduleExactAlarms(context)
+    val event = JSONObject().apply {
+      put("id", "test-${System.currentTimeMillis()}")
+      put("prayer", prayer)
+      put("scheduledAtMs", System.currentTimeMillis() + delaySeconds.coerceAtLeast(5) * 1000L)
+    }
+    scheduleOne(context, event, exact)
+    return exact
+  }
+
   fun restoreSchedule(context: Context) {
     val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       .getString(EVENTS_KEY, "[]") ?: "[]"
