@@ -14,6 +14,7 @@ import {
   useWindowDimensions
 } from "react-native";
 import QuranAudio, { type QuranAudioStatus } from "../../modules/quran-audio";
+import SmartMemorize from "./SmartMemorize";
 import {
   absoluteIndex,
   allPages,
@@ -589,7 +590,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   else if (screen === "bookmarks") body = bookmarkScreen;
   else if (screen === "radio") body = radioScreen;
   else if (screen === "reader" && reader) body = reader;
-  else if (screen === "memorize") body = memorize;
+  else if (screen === "memorize") body = <SmartMemorize locale={locale} initialRange={memorizeRange} onBack={() => setScreen(memorizeRange ? "reader" : "home")} />;
 
   return (
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
