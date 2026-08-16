@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v10";
+const CACHE_NAME = "windsor-prayer-times-v11";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
@@ -47,6 +47,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "Prayer reminder" };
   }
 
+  const receivedAtMs = Date.now();
   const title = data.title || "Windsor Prayer Times";
   const options = {
     body: data.body || "Prayer time notification",
@@ -62,6 +63,7 @@ self.addEventListener("push", (event) => {
       eventId: data.eventId,
       prayer: data.prayer,
       kind: data.kind,
+      receivedAtMs,
     },
   };
 
@@ -76,6 +78,7 @@ self.addEventListener("push", (event) => {
           dateKey: data.dateKey,
           prayer: data.prayer,
           kind: data.kind,
+          receivedAtMs,
         });
       }
     });
