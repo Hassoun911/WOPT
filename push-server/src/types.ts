@@ -42,8 +42,12 @@ export interface Env {
   SCHEDULE_URL: string;
   ALLOWED_WEB_ORIGIN: string;
   PUBLIC_APP_URL?: string;
+  PUBLIC_API_URL?: string;
   GLOBAL_PRAYER_API_BASE?: string;
   EMAIL_LINK_SECRET?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  EMAIL_REPLY_TO?: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
