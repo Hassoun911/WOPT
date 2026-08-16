@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { ATHAN_CHANNEL_ID, CITY_LABEL, REMINDER_CHANNEL_ID, STORAGE_KEYS } from "./config";
+import {
+  ATHAN_CHANNEL_ID,
+  CITY_LABEL,
+  GENERAL_CHANNEL_ID,
+  REMINDER_CHANNEL_ID,
+  STORAGE_KEYS
+} from "./config";
 import { buildPrayerEvents } from "./events";
 import { cancelAndroidPrayerAudio, scheduleAndroidPrayerAudio } from "./prayerAudio";
 import { formatPrayerTime } from "./time";
@@ -41,6 +47,15 @@ export async function configureNotificationChannels() {
     importance: Notifications.AndroidImportance.MAX,
     sound: null,
     vibrationPattern: [0, 400, 180, 400],
+    lightColor: "#0b5b47",
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
+  });
+  await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL_ID, {
+    name: "WOPT updates",
+    description: "Announcements, community events, Islamic occasions and other WOPT updates",
+    importance: Notifications.AndroidImportance.MAX,
+    sound: "default",
+    vibrationPattern: [0, 260, 140, 260],
     lightColor: "#0b5b47",
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
   });
