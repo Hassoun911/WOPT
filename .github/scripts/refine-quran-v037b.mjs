@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 const sourceScript = ".github/scripts/refine-quran-v037.mjs";
 let source = fs.readFileSync(sourceScript, "utf8");
 source = source.replace(/\n  \[\n    "audio control styles",[\s\S]*?\n  \],(?=\n  \[\n    "surah frame styles")/, "");
+source = source.replace(/\n  \[\n    "theme mode styles",[\s\S]*?\n  \],(?=\n  \[\n    "player and action style extras")/, "");
 const temp = path.join(os.tmpdir(), `refine-quran-v037-${Date.now()}.mjs`);
 fs.writeFileSync(temp, source);
 await import(pathToFileURL(temp).href);
@@ -22,5 +23,10 @@ const oldActionText = `radioActionText: { color: "#31564b", fontSize: 8, fontWei
 if (!quran.includes(oldActionText)) throw new Error("Missing radioActionText style");
 quran = quran.replace(oldActionText, `radioActionText: { color: "#234a3f", fontSize: 8, fontWeight: "900", textAlign: "center", marginTop: 6 }`);
 quran = quran.replace(`radioActionRow: { flexDirection: "row", gap: 7, marginTop: 11 }`, `radioActionRow: { flexDirection: "row", gap: 9, marginTop: 12 }`);
+
+const readerModePattern = /  readerModeRow: \{[^\n]*?\},/;
+if (!readerModePattern.test(quran)) throw new Error("Missing readerModeRow style");
+quran = quran.replace(readerModePattern, `  themeModeRow: { flexDirection: "row", gap: 8, marginTop: 12 }, themeModeButton: { flex: 1, minHeight: 43, borderRadius: 14, borderWidth: 1, borderColor: "#dfe4e1", backgroundColor: "#f7f8f6", alignItems: "center", justifyContent: "center" }, themeModeButtonActive: { backgroundColor: "#0b654f", borderColor: "#0b654f" }, themeModeText: { color: "#4e625b", fontSize: 9, fontWeight: "900" }, themeModeTextActive: { color: "#fff" },\n  readerModeRow: { flexDirection: "row", gap: 7, marginTop: 12 },`);
+
 fs.writeFileSync(quranPath, quran);
 console.log("Applied hardened Quran v0.3.7 visual refinements.");
