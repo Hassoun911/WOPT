@@ -14,6 +14,7 @@ type PushAudioMessage = {
   dateKey?: string;
   prayer?: PrayerKey;
   kind?: "twenty" | "ten" | "athan" | "prayer";
+  receivedAtMs?: number;
 };
 
 const DATA_URL = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
@@ -81,7 +82,7 @@ async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: s
     await registration.showNotification(title, {
       body,
       icon: `${scopedBase}/icon-192.png` || "/icon-192.png",
-      badge: `${scopedBase}/icon-192.png` || "/icon-192.png",
+      badge: `${scopedBase}/notification-badge.png` || "/notification-badge.png",
       tag: `wopt-local-${prayer}-${kind}`,
       renotify: true,
       silent: false,
@@ -107,8 +108,14 @@ export default function PrayerAlertAudioEnhancer() {
     let prayerTimes: PrayerTimes = {};
     let unlocked = false;
     let busy = false;
+    let visibleSince = windsorParts();
     const player = new Audio();
     player.preload = "auto";
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") visibleSince = windsorParts();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     const unlockAudio = () => {
       if (unlocked) return;
@@ -137,7 +144,7 @@ export default function PrayerAlertAudioEnhancer() {
     };
 
     const playPrayer = async (prayer: PrayerKey) => {
-      if (busy || mutedPrayers().has(prayer)) return;
+      if (busy || mutedPrayers().has(prayer) || document.visibilityState !== "visible") return;
       busy = true;
       try {
         if (prayer === "fajr") await playFile(player, AUDIO.fajr);
@@ -145,15 +152,15 @@ export default function PrayerAlertAudioEnhancer() {
           await playFile(player, AUDIO.adhan);
           await playFile(player, AUDIO.dua);
         }
-      } catch { /* browser autoplay policy can still prevent background audio */ }
+      } catch { /* browser autoplay policy can still prevent foreground audio */ }
       finally { busy = false; }
     };
 
     const playReminder = async (prayer: PrayerKey) => {
-      if (busy || mutedPrayers().has(prayer)) return;
+      if (busy || mutedPrayers().has(prayer) || document.visibilityState !== "visible") return;
       busy = true;
       try { await playFile(player, AUDIO.chime); }
-      catch { /* browser autoplay policy can still prevent background audio */ }
+      catch { /* browser autoplay policy can still prevent foreground audio */ }
       finally { busy = false; }
     };
 
@@ -164,7 +171,9 @@ export default function PrayerAlertAudioEnhancer() {
       return kind === "twenty" ? Boolean(prefs.twenty) : kind === "ten" ? Boolean(prefs.ten) : Boolean(prefs.prayer);
     };
 
-    const markAndPlay = (prayer: PrayerKey, kind: AlertKind, dateKey: string) => {
+    const markAndPlay = (prayer: PrayerKey, kind: AlertKind, dateKey: string, receivedAtMs?: number) => {
+      if (document.visibilityState !== "visible") return;
+      if (receivedAtMs && Date.now() - receivedAtMs > 15000) return;
       if (!prefsAllow(kind) || mutedPrayers().has(prayer)) return;
       const key = `wpt-sound:${dateKey}:${prayer}:${kind}`;
       if (window.localStorage.getItem(key)) return;
@@ -184,11 +193,12 @@ export default function PrayerAlertAudioEnhancer() {
             ? "ten"
             : null;
       if (!kind) return;
-      markAndPlay(data.prayer, kind, data.dateKey || windsorParts().dateKey);
+      markAndPlay(data.prayer, kind, data.dateKey || windsorParts().dateKey, data.receivedAtMs);
     };
     navigator.serviceWorker?.addEventListener("message", onServiceWorkerMessage);
 
     const check = () => {
+      if (document.visibilityState !== "visible") return;
       let prefs: AlertPrefs = {};
       try { prefs = JSON.parse(window.localStorage.getItem("wpt-alert-preferences") || "{}") as AlertPrefs; }
       catch { /* ignore */ }
@@ -200,14 +210,17 @@ export default function PrayerAlertAudioEnhancer() {
 
       for (const prayer of PRAYERS) {
         if (muted.has(prayer)) continue;
-        const until = minutesOf(day[prayer]) * 60 - seconds;
-        const due: Array<{ enabled: boolean | undefined; kind: AlertKind; match: boolean }> = [
-          { enabled: prefs.twenty, kind: "twenty", match: until <= 1200 && until > 1170 },
-          { enabled: prefs.ten, kind: "ten", match: until <= 600 && until > 570 },
-          { enabled: prefs.prayer, kind: "prayer", match: until <= 0 && until > -30 },
+        const prayerSeconds = minutesOf(day[prayer]) * 60;
+        const until = prayerSeconds - seconds;
+        const due: Array<{ enabled: boolean | undefined; kind: AlertKind; match: boolean; scheduledSeconds: number }> = [
+          { enabled: prefs.twenty, kind: "twenty", match: until <= 1200 && until > 1170, scheduledSeconds: prayerSeconds - 1200 },
+          { enabled: prefs.ten, kind: "ten", match: until <= 600 && until > 570, scheduledSeconds: prayerSeconds - 600 },
+          { enabled: prefs.prayer, kind: "prayer", match: until <= 0 && until > -30, scheduledSeconds: prayerSeconds },
         ];
         for (const rule of due) {
           if (!rule.enabled || !rule.match) continue;
+          // Never back-fill an alert that became due while the PWA was hidden.
+          if (visibleSince.dateKey === dateKey && rule.scheduledSeconds < visibleSince.seconds) continue;
           const key = `wpt-sound:${dateKey}:${prayer}:${rule.kind}`;
           if (window.localStorage.getItem(key)) continue;
           window.localStorage.setItem(key, "played");
@@ -222,6 +235,7 @@ export default function PrayerAlertAudioEnhancer() {
     const timer = window.setInterval(check, 10000);
     return () => {
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pointerdown", unlockAudio, true);
       window.removeEventListener("keydown", unlockAudio, true);
       navigator.serviceWorker?.removeEventListener("message", onServiceWorkerMessage);
