@@ -14,7 +14,7 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     env:
-      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
     defaults:
       run:
         working-directory: mobile
@@ -40,11 +40,8 @@ jobs:
 
       - name: Check Expo push configuration
         run: |
-          if [ -z "${EXPO_PUBLIC_EAS_PROJECT_ID}" ]; then
-            echo "::warning::EXPO_PUBLIC_EAS_PROJECT_ID repository variable is not configured. Native local alarms will work, but Expo/admin server push registration will remain disabled in this APK."
-          else
-            echo "Expo project ID is configured for native server push registration."
-          fi
+          test -n "${EXPO_PUBLIC_EAS_PROJECT_ID}"
+          echo "Expo project ID is configured for native server push registration."
 
       - name: Typecheck mobile app
         run: npm run typecheck
