@@ -51,8 +51,8 @@ export async function configureNotificationChannels() {
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
   });
   await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL_ID, {
-    name: "WOPT updates",
-    description: "Announcements, community events, Islamic occasions and other WOPT updates",
+    name: "Hassoun updates",
+    description: "Announcements, community events, Islamic occasions and other Hassoun updates",
     importance: Notifications.AndroidImportance.MAX,
     sound: "default",
     vibrationPattern: [0, 260, 140, 260],
@@ -76,7 +76,7 @@ export async function scheduleTestReminder(delaySeconds = 15) {
   if (!granted) return { granted: false, identifier: null as string | null };
   const identifier = await Notifications.scheduleNotificationAsync({
     content: {
-      title: "WOPT test notification",
+      title: "Hassoun test notification",
       body: "Prayer reminder notifications are working.",
       sound: "attention_chime.wav",
       data: { kind: "test-reminder" }

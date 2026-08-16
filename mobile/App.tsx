@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -179,10 +180,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     try {
       const result = await scheduleTestReminder(15);
       if (!result.granted) {
-        Alert.alert("Notifications are off", "Allow notifications for WOPT in Android settings, then try again.");
+        Alert.alert("Notifications are off", "Allow notifications for Hassoun in Android settings, then try again.");
         return;
       }
-      Alert.alert("Test scheduled", "Lock the phone. A WOPT notification with the reminder chime should arrive in about 15 seconds.");
+      Alert.alert("Test scheduled", "Lock the phone. A Hassoun notification with the reminder chime should arrive in about 15 seconds.");
     } catch (error) {
       Alert.alert("Notification test failed", String(error));
     }
@@ -198,7 +199,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       if (!result.exact) {
         Alert.alert(
           "Allow Alarms & reminders",
-          "Exact alarm access is off. Enable it, return to WOPT, then run the Adhan test again.",
+          "Exact alarm access is off. Enable it, return to Hassoun, then run the Adhan test again.",
           [
             { text: "Cancel", style: "cancel" },
             { text: "Open settings", onPress: openExactAlarmSettings }
@@ -235,9 +236,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <Pressable onPress={() => setActiveTab("more")} style={styles.menuButton}>
         <Text style={styles.menuIcon}>☰</Text>
       </Pressable>
+      <Image source={require("./assets/hassoun-logo.png")} style={styles.headerLogo} />
       <View style={styles.brandText}>
-        <Text style={styles.title}>{locale === "ar" ? "مواقيت الصلاة في وندسور" : "Windsor Prayer Times"}</Text>
-        <Text style={styles.subtitle}>📍 {CITY_LABEL}</Text>
+        <Text style={styles.title}>Hassoun</Text>
+        <Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text>
       </View>
       <Pressable onPress={toggleLocale} style={styles.languageButton}>
         <Text style={styles.languageText}>{locale === "en" ? "AR" : "EN"}</Text>
@@ -255,7 +257,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
           {hijriDate ? <Text style={styles.dateHijri}>🌙 {hijriDate}</Text> : null}
           <View style={styles.syncRow}>
             <View style={[styles.syncDot, !live && styles.syncDotSaved]} />
-            <Text style={styles.syncText}>{live ? "Synced from WOPT" : "Saved official schedule"}</Text>
+            <Text style={styles.syncText}>{live ? (locale === "ar" ? "متزامن عبر Hassoun" : "Synced by Hassoun") : (locale === "ar" ? "الجدول الرسمي محفوظ" : "Saved official schedule")}</Text>
           </View>
         </View>
         <View style={styles.mosqueScene}>
@@ -409,7 +411,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const moreScreen = (
     <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {header}
-      <Text style={styles.pageEyebrow}>✨ WOPT</Text>
+      <Text style={styles.pageEyebrow}>✨ HASSOUN</Text>
       <Text style={styles.pageTitle}>{locale === "ar" ? "المزيد" : "More"}</Text>
       <Text style={styles.pageSubtitle}>{locale === "ar" ? "الوصول السريع إلى ميزاتك ومصادر التطبيق." : "Quick access to your features and app sources."}</Text>
 
@@ -488,6 +490,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 16 },
   menuButton: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0ddd5" },
   menuIcon: { color: "#173f35", fontSize: 21, fontWeight: "700" },
+  headerLogo: { width: 42, height: 42, borderRadius: 13, backgroundColor: "#003d33" },
   brandText: { flex: 1 },
   title: { color: "#173f35", fontSize: 17, fontWeight: "900" },
   subtitle: { color: "#74817c", fontSize: 11, marginTop: 3 },

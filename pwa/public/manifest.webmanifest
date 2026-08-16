@@ -1,14 +1,17 @@
 {
-  "name": "Windsor Prayer Times",
-  "short_name": "Prayer Times",
-  "description": "The five daily Adhan times for Windsor, Ontario with Qur’an reading, guided audio, search, memorization, and smart navigation tools.",
+  "name": "Hassoun",
+  "short_name": "Hassoun",
+  "description": "Prayer times, Qur’an reading and audio, smart memorization, Islamic quizzes, reminders, and Islamic tools in one app.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f5f2e9",
   "theme_color": "#0b5b47",
-  "categories": ["lifestyle", "utilities"],
+  "categories": [
+    "lifestyle",
+    "utilities"
+  ],
   "prefer_related_applications": false,
   "icons": [
     {

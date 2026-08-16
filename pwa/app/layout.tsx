@@ -40,10 +40,10 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const asset = (path: string) => `${basePath}${path}`;
 
 export const metadata: Metadata = {
-  title: "Windsor Prayer Times",
+  title: "Hassoun",
   description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, and memorization tools.",
   manifest: asset("/manifest.webmanifest"),
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Windsor Prayer Times" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
   icons: {
     icon: [

@@ -446,7 +446,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     <ScrollView style={styles.flex} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.heroHeader}>
         <Pressable onPress={onBackHome} style={styles.iconButton}><Text style={styles.back}>{ar ? "›" : "‹"}</Text></Pressable>
-        <View style={styles.topCopy}><Text style={styles.eyebrow}>🌙 {tr("WOPT QUR’AN", "قرآن ووبت")}</Text><Text style={[styles.heroTitle, ar && styles.rtl]}>{tr("The Noble Qur’an", "القرآن الكريم")}</Text><Text style={[styles.heroSub, ar && styles.rtl]}>{tr("Read • listen • memorize", "اقرأ • استمع • احفظ")}</Text></View>
+        <View style={styles.topCopy}><Text style={styles.eyebrow}>🌙 {tr("HASSOUN QUR’AN", "قرآن Hassoun")}</Text><Text style={[styles.heroTitle, ar && styles.rtl]}>{tr("The Noble Qur’an", "القرآن الكريم")}</Text><Text style={[styles.heroSub, ar && styles.rtl]}>{tr("Read • listen • memorize", "اقرأ • استمع • احفظ")}</Text></View>
         <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ {tr("Verified", "موثّق")}</Text></View>
       </View>
 
@@ -577,7 +577,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
 
             <View style={styles.menuElegantCard}><Text style={styles.menuCardTitle}>🧭 {tr("Go to Mushaf page", "الذهاب إلى صفحة المصحف")}</Text><View style={styles.jumpRow}><TextInput value={pageJump} onChangeText={setPageJump} keyboardType="number-pad" placeholder="1–604" style={styles.pageInput} /><Pressable onPress={() => { const page = clamp(Number(pageJump) || 1, 1, 604); const start = pages[page - 1]; if (start) openReader(start.surah, start.ayah, screen); setMenuOpen(false); }} style={styles.jumpButton}><Text style={styles.jumpButtonText}>{tr("Go", "اذهب")}</Text></Pressable></View></View>
 
-            <Pressable onPress={() => { setMenuOpen(false); onBackHome(); }} style={styles.returnWopt}><Text style={styles.returnWoptText}>⌂ {tr("Return to WOPT Home", "العودة إلى الرئيسية")}</Text></Pressable>
+            <Pressable onPress={() => { setMenuOpen(false); onBackHome(); }} style={styles.returnWopt}><Text style={styles.returnWoptText}>⌂ {tr("Return to Hassoun Home", "العودة إلى الرئيسية")}</Text></Pressable>
           </ScrollView>
         </Pressable>
       </Pressable>

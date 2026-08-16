@@ -70,7 +70,7 @@ function validPassword(value: unknown) {
 }
 
 function publicAppUrl(env: Env) {
-  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT/").replace(/\/$/, "");
+  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/Hassoun/").replace(/\/$/, "");
 }
 
 export async function requestAdminPasswordReset(request: Request, env: Env) {
@@ -78,7 +78,7 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
   const email = validEmail(body.email);
   const accepted = json({
     ok: true,
-    message: "If that email belongs to an active WOPT admin, a reset link will be sent."
+    message: "If that email belongs to an active Hassoun admin, a reset link will be sent."
   });
   if (!email) return accepted;
 

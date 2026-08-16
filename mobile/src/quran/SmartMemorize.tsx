@@ -412,7 +412,7 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
     if (!ayahs.length) {
       Alert.alert(
         t("Qur’an match not confirmed", "لم يتم تأكيد مطابقة النص"),
-        t("WOPT could not confidently match this pasted text to the verified Qur’an. It will not silently treat unmatched text as Qur’an.", "لم يتمكن WOPT من مطابقة النص بثقة مع القرآن الموثق، لذلك لن يعامل النص غير المطابق على أنه قرآن.")
+        t("Hassoun could not confidently match this pasted text to the verified Qur’an. It will not silently treat unmatched text as Qur’an.", "لم يتمكن Hassoun من مطابقة النص بثقة مع القرآن الموثق، لذلك لن يعامل النص غير المطابق على أنه قرآن.")
       );
       return;
     }
@@ -460,7 +460,7 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
     if (Platform.OS === "android") {
       const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
         title: t("Microphone for memorization", "الميكروفون للحفظ"),
-        message: t("WOPT uses the microphone only when you tap Speak & Check so it can compare your recitation with the selected Qur’an words.", "يستخدم WOPT الميكروفون فقط عند الضغط على التلاوة والفحص لمقارنة تلاوتك بكلمات القرآن المحددة."),
+        message: t("Hassoun uses the microphone only when you tap Speak & Check so it can compare your recitation with the selected Qur’an words.", "يستخدم Hassoun الميكروفون فقط عند الضغط على التلاوة والفحص لمقارنة تلاوتك بكلمات القرآن المحددة."),
         buttonPositive: t("Allow", "سماح"),
         buttonNegative: t("Not now", "ليس الآن")
       });
@@ -532,7 +532,7 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
         <Pressable onPress={() => setTipsOpen(true)} style={styles.tipButton}><Text style={styles.tipButtonText}>💡</Text></Pressable>
       </View>
 
-      <Text style={[styles.helper, ar && styles.rtl]}>{t("Choose a Surah/range or paste Qur’an text. Pasted text is matched back to WOPT’s verified Qur’an before it becomes a lesson.", "اختر سورة أو نطاق آيات أو الصق نصاً قرآنياً. يتم مطابقة النص مع القرآن الموثق قبل تحويله إلى درس.")}</Text>
+      <Text style={[styles.helper, ar && styles.rtl]}>{t("Choose a Surah/range or paste Qur’an text. Pasted text is matched back to Hassoun’s verified Qur’an before it becomes a lesson.", "اختر سورة أو نطاق آيات أو الصق نصاً قرآنياً. يتم مطابقة النص مع القرآن الموثق قبل تحويله إلى درس.")}</Text>
 
       <View style={styles.panel}>
         <Text style={[styles.panelTitle, ar && styles.rtl]}>🕋 {t("Choose from Qur’an", "اختر من القرآن")}</Text>
@@ -554,7 +554,7 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
         <Pressable onPress={importPasted} style={styles.verifyButton}><Text style={styles.verifyButtonText}>✓ {t("Verify & create lesson", "تحقق وأنشئ الدرس")}</Text></Pressable>
       </View>
 
-      <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("HOW SHOULD WOPT BREAK IT INTO CARDS?", "كيف يقسم WOPT الدرس إلى بطاقات؟")}</Text>
+      <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("HOW SHOULD Hassoun BREAK IT INTO CARDS?", "كيف يقسم Hassoun الدرس إلى بطاقات؟")}</Text>
       <View style={styles.modeGrid}>{([
         ["smart", "✨", t("Smart", "ذكي")],
         ["ayah", "☪️", t("Ayah", "آية")],
@@ -599,7 +599,7 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
         {trainingMode === "weak" ? (
           <View style={styles.panel}>
             <Text style={[styles.panelTitle, ar && styles.rtl]}>🎯 {t("Words to review", "كلمات تحتاج مراجعة")}</Text>
-            {weakWords.length ? <View style={styles.weakWrap}>{weakWords.map(([word, count]) => <View key={word} style={styles.weakChip}><Text style={styles.weakWord}>{word}</Text><Text style={styles.weakCount}>×{count}</Text></View>)}</View> : <Text style={styles.helper}>{t("Complete a Speak & Check attempt and WOPT will collect the words that need more practice.", "أكمل محاولة تلاوة وفحص وسيجمع WOPT الكلمات التي تحتاج إلى تدريب إضافي.")}</Text>}
+            {weakWords.length ? <View style={styles.weakWrap}>{weakWords.map(([word, count]) => <View key={word} style={styles.weakChip}><Text style={styles.weakWord}>{word}</Text><Text style={styles.weakCount}>×{count}</Text></View>)}</View> : <Text style={styles.helper}>{t("Complete a Speak & Check attempt and Hassoun will collect the words that need more practice.", "أكمل محاولة تلاوة وفحص وسيجمع Hassoun الكلمات التي تحتاج إلى تدريب إضافي.")}</Text>}
           </View>
         ) : (
           <View style={styles.lessonCard}>

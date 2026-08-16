@@ -95,8 +95,8 @@ function brandedEmail(options: {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:24px;overflow:hidden">
           <tr><td style="padding:24px 24px 18px;text-align:${textAlign}" dir="${direction}">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-              <td style="vertical-align:middle"><div style="width:44px;height:44px;line-height:44px;text-align:center;border-radius:14px;background:#0b5b47;color:#fff;font-size:24px;font-weight:900">و</div></td>
-              <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">WOPT</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer Times</div></td>
+              <td style="vertical-align:middle"><img src="https://hassoun911.github.io/WOPT/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33" /></td>
+              <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div></td>
             </tr></table>
           </td></tr>
           <tr><td style="padding:0 24px 26px;text-align:${textAlign}" dir="${direction}">
@@ -108,7 +108,7 @@ function brandedEmail(options: {
             ${options.note ? `<p style="margin:18px 0 0;color:#8a8377;font-size:12px;line-height:1.6">${escapeHtml(options.note)}</p>` : ""}
           </td></tr>
         </table>
-        <div style="max-width:520px;margin:14px auto 0;color:#9a9488;font-size:11px;line-height:1.5;text-align:center">WOPT • Prayer alerts based on your local time zone</div>
+        <div style="max-width:520px;margin:14px auto 0;color:#9a9488;font-size:11px;line-height:1.5;text-align:center">Hassoun • Prayer alerts based on your local time zone</div>
       </td></tr>
     </table>
   </body></html>`;
@@ -148,7 +148,7 @@ function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale:
     const verificationUrl = String(data.verificationUrl ?? "");
     const location = String(data.locationLabel ?? "");
     const timezone = String(data.timezone ?? "");
-    const subject = locale === "ar" ? "تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your WOPT prayer email alerts";
+    const subject = locale === "ar" ? "تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your Hassoun prayer email alerts";
     return {
       subject,
       text: locale === "ar"
@@ -174,7 +174,7 @@ function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale:
 
   if (kind === "manage") {
     const manageUrl = String(data.manageUrl ?? "");
-    const subject = locale === "ar" ? "إدارة تنبيهات WOPT عبر البريد" : "Manage your WOPT email alerts";
+    const subject = locale === "ar" ? "إدارة تنبيهات Hassoun عبر البريد" : "Manage your Hassoun email alerts";
     return {
       subject,
       text: `${subject}: ${manageUrl}`,
@@ -191,13 +191,13 @@ function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale:
 
   if (kind === "admin_password_reset") {
     const resetUrl = String(data.resetUrl ?? "");
-    const subject = locale === "ar" ? "إعادة تعيين كلمة مرور إدارة WOPT" : "Reset your WOPT admin password";
+    const subject = locale === "ar" ? "إعادة تعيين كلمة مرور إدارة Hassoun" : "Reset your Hassoun admin password";
     return {
       subject,
       text: `${subject}: ${resetUrl}`,
       html: brandedEmail({
         locale,
-        eyebrow: "WOPT ADMIN",
+        eyebrow: "Hassoun ADMIN",
         title: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset your admin password",
         intro: locale === "ar" ? "استخدم هذا الرابط الآمن لإنشاء كلمة مرور جديدة." : "Use this secure link to create a new admin password.",
         buttonLabel: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password",
@@ -208,13 +208,13 @@ function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale:
   }
 
   return {
-    subject: locale === "ar" ? "تنبيه من WOPT" : "WOPT notification",
-    text: String(data.message ?? "WOPT notification"),
+    subject: locale === "ar" ? "تنبيه من Hassoun" : "Hassoun notification",
+    text: String(data.message ?? "Hassoun notification"),
     html: brandedEmail({
       locale,
-      eyebrow: "WOPT",
+      eyebrow: "Hassoun",
       title: locale === "ar" ? "تنبيه جديد" : "New notification",
-      intro: String(data.message ?? "WOPT notification")
+      intro: String(data.message ?? "Hassoun notification")
     })
   };
 }
@@ -241,7 +241,7 @@ async function renderEmail(env: Env, row: OutboxRow) {
     ? builtInPrayerEmail(data, row.locale)
     : builtInSystemEmail(row.kind, data, row.locale);
 
-  // Core WOPT system emails are rendered in code so their responsive design
+  // Core Hassoun system emails are rendered in code so their responsive design
   // cannot be replaced by an older plain-text database template.
   if (["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind)) return builtIn;
 
@@ -275,7 +275,7 @@ async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
       ...(row.idempotency_key ? { "Idempotency-Key": row.idempotency_key.slice(0, 256) } : {})
     },
     body: JSON.stringify({
-      from: env.EMAIL_FROM,
+      from: env.EMAIL_FROM.includes("<") ? env.EMAIL_FROM.replace(/^[^<]+</, "Hassoun <") : `Hassoun <${env.EMAIL_FROM}>`,
       to: [row.recipient_email],
       subject: email.subject,
       html: email.html,

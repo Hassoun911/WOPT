@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v11";
+const CACHE_NAME = "hassoun-v1";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
@@ -48,10 +48,10 @@ self.addEventListener("push", (event) => {
   }
 
   const receivedAtMs = Date.now();
-  const title = data.title || "Windsor Prayer Times";
+  const title = data.title || "Hassoun";
   const options = {
     body: data.body || "Prayer time notification",
-    icon: scoped("/icon-192.png"),
+    icon: scoped("/assets/hassoun-logo.png"),
     badge: scoped("/notification-badge.png"),
     tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
     renotify: true,

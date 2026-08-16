@@ -92,7 +92,7 @@ class PrayerAudioService : Service() {
     val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
     wakeLock = powerManager.newWakeLock(
       PowerManager.PARTIAL_WAKE_LOCK,
-      "WOPT:PrayerAudio"
+      "Hassoun:PrayerAudio"
     ).apply { acquire(6 * 60 * 1000L) }
   }
 
@@ -157,7 +157,7 @@ class PrayerAudioService : Service() {
         resources.getIdentifier("notification_icon", "drawable", packageName)
           .takeIf { it != 0 } ?: applicationInfo.icon
       )
-      .setContentTitle("$prayer Adhan")
+      .setContentTitle("Hassoun • $prayer Adhan")
       .setContentText(
         if (includesDua) "Playing the Adhan, followed by the dua" else "Playing the Fajr Adhan"
       )

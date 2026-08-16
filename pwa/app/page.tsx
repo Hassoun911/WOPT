@@ -31,7 +31,7 @@ const fallbackTimes: PrayerTimes = {
 
 const labels = {
   en: {
-    title: "Windsor Prayer Times",
+    title: "Hassoun",
     subtitle: "Official local prayer schedule",
     city: "Windsor, Ontario",
     next: "Next prayer",
@@ -53,7 +53,7 @@ const labels = {
     selected: "Selected date",
     install: "Install app",
     installed: "App installed",
-    installTitle: "Install Windsor Prayer Times",
+    installTitle: "Install Hassoun",
     installIntro: "Add the prayer-times app to your home screen for one-tap access and offline use.",
     openChrome: "Open in Chrome",
     installSteps: "On your Android phone",
@@ -99,7 +99,7 @@ const labels = {
     hadith: "Hadith of the day",
     sourceLink: "View source",
     offline: "Install on your phone for quick access and offline support after your first visit.",
-    dataLive: "Synced from WOPT",
+    dataLive: "Synced by Hassoun",
     dataFallback: "Using saved schedule",
   },
   ar: {
@@ -125,7 +125,7 @@ const labels = {
     selected: "التاريخ المحدد",
     install: "تثبيت التطبيق",
     installed: "تم تثبيت التطبيق",
-    installTitle: "تثبيت تطبيق مواقيت وندسور",
+    installTitle: "تثبيت تطبيق Hassoun",
     installIntro: "أضف تطبيق مواقيت الصلاة إلى الشاشة الرئيسية للوصول السريع والعمل دون اتصال.",
     openChrome: "فتح في Chrome",
     installSteps: "على هاتف أندرويد",
@@ -171,7 +171,7 @@ const labels = {
     hadith: "حديث اليوم",
     sourceLink: "عرض المصدر",
     offline: "ثبّت التطبيق على هاتفك للوصول السريع والعمل دون اتصال بعد الزيارة الأولى.",
-    dataLive: "متزامن من WOPT",
+    dataLive: "متزامن عبر Hassoun",
     dataFallback: "استخدام الجدول المحفوظ",
   },
 };

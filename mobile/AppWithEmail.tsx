@@ -70,7 +70,7 @@ function AppWithEmailShell() {
           <View style={styles.receiptTopRow}>
             <View style={styles.receiptCheck}><Text style={styles.receiptCheckText}>✓</Text></View>
             <View style={styles.receiptHeadingWrap}>
-              <Text style={styles.receiptEyebrow}>WOPT EMAIL ALERTS</Text>
+              <Text style={styles.receiptEyebrow}>HASSOUN EMAIL ALERTS</Text>
               <Text style={styles.receiptTitle}>
                 {completion.alreadySubscribed
                   ? (locale === "ar" ? "تم إرسال رابط إدارة آمن" : "Manage link sent")
@@ -113,7 +113,7 @@ function AppWithEmailShell() {
         <SafeAreaView style={styles.modalSafe} edges={["top", "bottom", "left", "right"]}>
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalEyebrow}>WOPT</Text>
+              <Text style={styles.modalEyebrow}>HASSOUN</Text>
               <Text style={styles.modalTitle}>
                 {locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}
               </Text>
