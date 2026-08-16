@@ -1,22 +1,24 @@
 PRAGMA foreign_keys = ON;
 
 -- Regular WOPT users do not have accounts or passwords. They subscribe by email
--- and manage preferences through secure email links.
+-- and manage preferences through secure email links. GPS coordinates + timezone
+-- are the source of truth; city/country are auto-resolved metadata.
 CREATE TABLE IF NOT EXISTS email_subscribers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   public_id TEXT NOT NULL UNIQUE,
   email TEXT NOT NULL COLLATE NOCASE UNIQUE,
   display_name TEXT,
   locale TEXT NOT NULL DEFAULT 'en' CHECK (locale IN ('en', 'ar')),
-  country_code TEXT NOT NULL,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  timezone TEXT NOT NULL,
+  country_code TEXT,
   country_name TEXT,
   region TEXT,
-  city TEXT NOT NULL,
-  timezone TEXT NOT NULL,
-  latitude REAL,
-  longitude REAL,
+  city TEXT,
   calculation_method INTEGER,
   madhab TEXT NOT NULL DEFAULT 'standard' CHECK (madhab IN ('standard', 'hanafi')),
+  location_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'unsubscribed', 'bounced', 'disabled')),
   verification_token_hash TEXT,
   verification_expires_at TEXT,
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS email_subscribers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_email_subscribers_location_status
-  ON email_subscribers(status, country_code, city, timezone);
+  ON email_subscribers(status, timezone, country_code, city);
 
 CREATE TABLE IF NOT EXISTS subscriber_email_preferences (
   subscriber_id INTEGER PRIMARY KEY,
