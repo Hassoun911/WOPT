@@ -35,6 +35,17 @@ INSERT OR IGNORE INTO email_templates (
   '{{emailHtml}}',
   '{{emailText}}',
   '{{emailText}}'
+),
+(
+  'admin_password_reset',
+  'Admin password reset',
+  'system',
+  'Reset your WOPT admin password',
+  'إعادة تعيين كلمة مرور إدارة WOPT',
+  '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173f35"><h2>Reset your WOPT admin password</h2><p>This secure link expires in one hour.</p><p><a href="{{resetUrl}}" style="display:inline-block;padding:12px 18px;background:#0b5b47;color:#fff;text-decoration:none;border-radius:10px">Reset password</a></p></div>',
+  '<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8;color:#173f35"><h2>إعادة تعيين كلمة مرور إدارة WOPT</h2><p>تنتهي صلاحية هذا الرابط الآمن خلال ساعة واحدة.</p><p><a href="{{resetUrl}}" style="display:inline-block;padding:12px 18px;background:#0b5b47;color:#fff;text-decoration:none;border-radius:10px">إعادة تعيين كلمة المرور</a></p></div>',
+  'Reset your WOPT admin password. This link expires in one hour: {{resetUrl}}',
+  'إعادة تعيين كلمة مرور إدارة WOPT. تنتهي صلاحية الرابط خلال ساعة: {{resetUrl}}'
 );
 
 CREATE TABLE IF NOT EXISTS email_outbox (
