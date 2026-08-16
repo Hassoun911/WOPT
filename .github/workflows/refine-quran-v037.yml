@@ -1,0 +1,30 @@
+name: Refine Quran V037
+
+on:
+  push:
+    paths:
+      - ".github/workflows/refine-quran-v037.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Quran v0.3.7 visual refinements
+        run: node .github/scripts/refine-quran-v037.mjs
+
+      - name: Commit refinements
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/src/quran/QuranV3.tsx mobile/src/quran/quranRendering.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Refine Quran reader visuals and night mode"
+          git push origin HEAD:main
