@@ -1,5 +1,11 @@
 import { getAdminDashboard, listAdminSubscribers } from "./adminData";
 import {
+  createAdminEmailCampaign,
+  dispatchDueAdminEmailCampaigns,
+  listAdminEmailCampaigns,
+  refreshAdminEmailCampaignStatuses
+} from "./adminEmail";
+import {
   bootstrapAdmin,
   changeAdminPassword,
   getAdminMe,
@@ -163,12 +169,14 @@ async function runScheduled(env: Env, scheduledTime: number) {
   const events = duePrayerEvents(schedule.prayer_times, new Date(scheduledTime));
   for (const event of events) await dispatchEvent(env, event);
 
-  // Admin broadcasts are a separate delivery stream from prayer-time pushes.
+  // Admin push and email broadcasts are independent from prayer-time delivery.
   await dispatchDueAdminPushCampaigns(env);
+  await dispatchDueAdminEmailCampaigns(env);
 
   // Worldwide email subscribers use their detected GPS location and time zone.
   await dispatchGlobalPrayerEmails(env, scheduledTime);
   await processEmailOutbox(env);
+  await refreshAdminEmailCampaignStatuses(env);
 
   await env.DB.batch([
     env.DB.prepare("DELETE FROM deliveries WHERE created_at < datetime('now', '-60 days')"),
@@ -228,6 +236,10 @@ export default {
         response = await createAdminPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
         response = await listAdminPushCampaigns(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/email/campaigns") {
+        response = await createAdminEmailCampaign(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
+        response = await listAdminEmailCampaigns(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
