@@ -38,19 +38,27 @@ function formatTime(value: number) {
     : `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function isVisible(node: HTMLElement) {
+  const style = window.getComputedStyle(node);
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity || 1) === 0) return false;
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
 function visiblePrintedPage() {
   const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-printed-page]"));
   if (!pages.length) return null;
   const target = window.innerHeight * 0.46;
-  return pages
+  const visible = pages
     .map((node) => {
       const rect = node.getBoundingClientRect();
-      const visible = rect.bottom > 0 && rect.top < window.innerHeight;
+      const overlap = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
       const center = (Math.max(0, rect.top) + Math.min(window.innerHeight, rect.bottom)) / 2;
-      return { node, visible, distance: Math.abs(center - target) };
+      return { node, overlap, distance: Math.abs(center - target) };
     })
-    .filter((item) => item.visible)
-    .sort((a, b) => a.distance - b.distance)[0]?.node || pages[0] || null;
+    .filter((item) => item.overlap > 0)
+    .sort((a, b) => (b.overlap - a.overlap) || (a.distance - b.distance));
+  return visible[0]?.node || pages[0] || null;
 }
 
 function verseNodes(pageNode?: HTMLElement | null) {
@@ -85,8 +93,8 @@ export default function QuranAudioSystem() {
   useEffect(() => {
     if (!isQuranPath(pathname)) return;
 
-    document.querySelectorAll(".wopt-book-audio-backdrop,.wopt-active-quran-player,.wopt-audio-start-backdrop").forEach((node) => node.remove());
-    document.querySelectorAll<HTMLAudioElement>("audio[data-wopt-continuous-quran='true']").forEach((node) => { node.pause(); node.remove(); });
+    document.querySelectorAll(".wopt-audio2-backdrop,.wopt-audio2-mini,.wopt-book-audio-backdrop,.wopt-active-quran-player,.wopt-audio-start-backdrop").forEach((node) => node.remove());
+    document.querySelectorAll<HTMLAudioElement>("audio[data-wopt-quran-audio-system],audio[data-wopt-continuous-quran='true']").forEach((node) => { node.pause(); node.remove(); });
 
     const style = document.createElement("style");
     style.dataset.woptQuranAudioSystem = "true";
@@ -102,9 +110,11 @@ export default function QuranAudioSystem() {
       .wopt-audio2-select{width:100%;height:49px;border:1px solid #d5e1dd;border-radius:14px;background:#fff;padding:0 12px;color:#193f35;font-size:14px}
       .wopt-audio2-scopes{display:grid;grid-template-columns:1fr 1fr;gap:8px}.wopt-audio2-scopes button{min-height:58px;border:1px solid #d7e4df;border-radius:14px;background:#f9fbfa;color:#185d4e;padding:9px;font-weight:850}.wopt-audio2-scopes button span{display:block;margin-top:3px;color:#76817e;font-size:10px;font-weight:500}.wopt-audio2-scopes button.active{background:#e3f5ef;border-color:#50b6a2;color:#0a6652}
       .wopt-audio2-play{width:100%;height:50px;margin-top:14px;border:0;border-radius:14px;background:#0b6f59;color:#fff;font-size:14px;font-weight:900}.wopt-audio2-status{min-height:18px;margin-top:9px;color:#6d7975;font-size:10px;text-align:center}
-      .wopt-audio2-mini{position:fixed;z-index:4550;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);transform:translateX(-50%) translateY(18px);width:min(650px,calc(100vw - 20px));display:none;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:10px 11px;border:1px solid rgba(20,112,91,.18);border-radius:18px;background:rgba(255,255,255,.97);box-shadow:0 16px 46px rgba(17,61,50,.2);backdrop-filter:blur(16px);font-family:Arial,sans-serif;color:#174d41;opacity:0;transition:opacity .16s ease,transform .16s ease}.wopt-audio2-mini.show{display:grid;opacity:1;transform:translateX(-50%) translateY(0)}
+      .wopt-audio2-mini{position:fixed;z-index:4550;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);transform:translateX(-50%) translateY(18px);width:min(650px,calc(100vw - 20px));display:none;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:10px 11px;border:1px solid rgba(20,112,91,.18);border-radius:18px;background:rgba(255,255,255,.97);box-shadow:0 16px 46px rgba(17,61,50,.2);backdrop-filter:blur(16px);font-family:Arial,sans-serif;color:#174d41;opacity:0;transition:opacity .16s ease,transform .16s ease}.wopt-audio2-mini.show{display:grid;opacity:1;transform:translateX(-50%) translateY(0)}.wopt-audio2-mini.suppressed{display:none!important;opacity:0!important;pointer-events:none!important}
       .wopt-audio2-copy{min-width:0}.wopt-audio2-copy strong,.wopt-audio2-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wopt-audio2-copy strong{font-size:12px}.wopt-audio2-copy span{margin-top:2px;color:#6d7a76;font-size:9px}.wopt-audio2-actions{display:flex;align-items:center;gap:4px}.wopt-audio2-actions button{height:34px;min-width:34px;border:1px solid #d9e4e0;border-radius:10px;background:#fff;color:#175949;font-size:10px;font-weight:900;padding:0 7px}.wopt-audio2-actions button.primary{background:#0b6f59;border-color:#0b6f59;color:#fff}.wopt-audio2-actions button.stop{color:#8a4037}.wopt-audio2-progress{grid-column:1/-1;display:grid;grid-template-columns:32px 1fr 38px;gap:6px;align-items:center}.wopt-audio2-progress span{color:#74807d;font-size:9px;text-align:center}.wopt-audio2-progress input{width:100%;accent-color:#0b6f59}
-      .mushaf-ayah.wopt-audio2-follow,.wopt-printed-ayah.wopt-audio2-follow{background:rgba(30,157,127,.19)!important;box-shadow:0 0 0 4px rgba(30,157,127,.11)!important;border-radius:6px!important;transition:background .15s ease,box-shadow .15s ease}
+      .wopt-audio2-follow{box-decoration-break:clone;-webkit-box-decoration-break:clone;background:rgba(26,157,124,.18)!important;box-shadow:0 0 0 3px rgba(26,157,124,.12)!important;border-radius:6px!important;transition:background .12s ease,box-shadow .12s ease}
+      .wopt-audio2-follow .quran-word{background:rgba(26,157,124,.12)!important;border-radius:5px!important}
+      .wopt-audio2-follow .ayah-marker,.wopt-audio2-follow.wopt-printed-marker{background:#147a64!important;border-color:#147a64!important;color:#fff!important}
       @media(max-width:520px){.wopt-audio2-backdrop{padding:0}.wopt-audio2-sheet{max-height:88dvh;border-radius:24px 24px 0 0;padding:15px}.wopt-audio2-head h2{font-size:20px}.wopt-audio2-mini{bottom:calc(env(safe-area-inset-bottom,0px) + 78px);padding:9px}.wopt-audio2-actions button{min-width:32px;height:32px;padding:0 6px}.wopt-audio2-actions .audio-label{display:none}}
     `;
     document.head.appendChild(style);
@@ -180,12 +190,38 @@ export default function QuranAudioSystem() {
     let lastKey = "";
     let lastPage = 0;
     let nextWarmKey = "";
+    let modalSyncFrame = 0;
+    let highlightFrame = 0;
     const streamCache = new Map<string, Promise<Stream>>();
     const versePageCache = new Map<string, number>();
 
     const chapterName = (id: number) => chapters.get(id)?.name_simple || `Surah ${id}`;
     const reciterName = () => reciterSelect.selectedOptions[0]?.textContent?.trim() || "Qur’an reciter";
     const selectedReciter = () => Number(reciterSelect.value || 0) || reciters[0]?.id || 1;
+
+    const visibleForeignDialog = () => {
+      const dialogs = Array.from(document.querySelectorAll<HTMLElement>("[role='dialog'][aria-modal='true']"));
+      return dialogs.some((dialog) => {
+        if (dialog === overlay.querySelector(".wopt-audio2-sheet")) return overlay.classList.contains("open");
+        const backdrop = dialog.parentElement;
+        if (backdrop?.classList.contains("open")) return true;
+        return isVisible(dialog);
+      });
+    };
+
+    const syncMiniVisibility = () => {
+      const shouldSuppress = active && visibleForeignDialog();
+      mini.classList.toggle("suppressed", shouldSuppress);
+      mini.classList.toggle("show", active && !shouldSuppress);
+    };
+
+    const scheduleMiniVisibilitySync = () => {
+      if (modalSyncFrame) return;
+      modalSyncFrame = window.requestAnimationFrame(() => {
+        modalSyncFrame = 0;
+        syncMiniVisibility();
+      });
+    };
 
     const setScope = (next: Scope) => {
       scope = next;
@@ -215,7 +251,7 @@ export default function QuranAudioSystem() {
             const data = await response.json() as { reciters?: Reciter[] };
             reciters = data.reciters || [];
           }
-        } catch { /* fallback option below */ }
+        } catch { /* fallback below */ }
         if (!reciters.length) reciters = [{ id: 7, name: "Mishari Rashid al-`Afasy" }];
         const stored = Number(localStorage.getItem(RECITER_KEY) || 0);
         const afasy = reciters.find((item) => /mish|afasy/i.test(item.name || item.reciter_name || ""));
@@ -232,7 +268,8 @@ export default function QuranAudioSystem() {
     const pageForKey = async (key: string) => {
       const cached = versePageCache.get(key);
       if (cached) return cached;
-      const local = document.querySelector<HTMLElement>(`[data-verse-key="${key}"]`);
+      const localNodes = Array.from(document.querySelectorAll<HTMLElement>(`[data-verse-key="${key}"]`));
+      const local = localNodes.find((node) => node.closest(".wopt-printed-reader")) || localNodes[0];
       const localPage = Number(local?.dataset.page || local?.closest<HTMLElement>("[data-printed-page]")?.dataset.printedPage || 0);
       if (localPage) { versePageCache.set(key, localPage); return localPage; }
       try {
@@ -246,8 +283,9 @@ export default function QuranAudioSystem() {
     };
 
     const pageKeys = async (page: number) => {
-      const root = document.querySelector<HTMLElement>(`[data-printed-page="${page}"]`);
-      const dom = verseNodes(root).map((node) => node.dataset.verseKey || "").filter(Boolean);
+      const roots = Array.from(document.querySelectorAll<HTMLElement>(`[data-printed-page="${page}"]`));
+      const visibleRoot = roots.find(isVisible) || roots[0] || null;
+      const dom = verseNodes(visibleRoot).map((node) => node.dataset.verseKey || "").filter(Boolean);
       if (dom.length) return dom;
       try {
         const response = await fetch(`${API}/verses/by_page/${page}?language=en&words=false&page=1&per_page=50`);
@@ -306,12 +344,12 @@ export default function QuranAudioSystem() {
       setScope(scope);
       status.textContent = active ? `Playing ${lastKey || context.key} · ${reciterName()}` : "Choose where to begin.";
       overlay.classList.add("open");
-      document.body.classList.add("wopt-quran-modal-open");
+      scheduleMiniVisibilitySync();
     };
 
     const close = () => {
       overlay.classList.remove("open");
-      document.body.classList.remove("wopt-quran-modal-open");
+      scheduleMiniVisibilitySync();
     };
 
     const fetchStream = (reciterId: number, surah: number) => {
@@ -368,17 +406,31 @@ export default function QuranAudioSystem() {
 
     const clearHighlight = () => document.querySelectorAll(".wopt-audio2-follow").forEach((node) => node.classList.remove("wopt-audio2-follow"));
 
+    const nodesForKey = (key: string) => Array.from(document.querySelectorAll<HTMLElement>(`[data-verse-key="${key}"]`));
+
     const bestNode = (key: string) => {
-      const nodes = Array.from(document.querySelectorAll<HTMLElement>(`[data-verse-key="${key}"]`));
-      return nodes.find((node) => Boolean(node.closest(".wopt-printed-reader"))) || nodes[0] || null;
+      const nodes = nodesForKey(key);
+      const ranked = nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        const visible = isVisible(node);
+        const printed = Boolean(node.closest(".wopt-printed-reader"));
+        const overlap = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+        const centerDistance = Math.abs((rect.top + rect.bottom) / 2 - window.innerHeight * .46);
+        return { node, visible, printed, overlap, centerDistance };
+      }).sort((a, b) => Number(b.printed) - Number(a.printed) || Number(b.visible) - Number(a.visible) || b.overlap - a.overlap || a.centerDistance - b.centerDistance);
+      return ranked[0]?.node || null;
     };
 
     const highlightAndFollow = async (key: string) => {
-      if (!key || key === lastKey) return;
-      lastKey = key;
-      clearHighlight();
+      if (!key) return;
+      const keyChanged = key !== lastKey;
+      if (keyChanged) {
+        lastKey = key;
+        clearHighlight();
+      }
+
       let node = bestNode(key);
-      const page = Number(node?.dataset.page || node?.closest<HTMLElement>("[data-printed-page]")?.dataset.printedPage || 0) || await pageForKey(key);
+      let page = Number(node?.dataset.page || node?.closest<HTMLElement>("[data-printed-page]")?.dataset.printedPage || 0) || await pageForKey(key);
       if (!node && page) {
         window.dispatchEvent(new CustomEvent("wopt-quran-book-mode", { detail: { enabled: true, page } }));
         const started = Date.now();
@@ -388,14 +440,28 @@ export default function QuranAudioSystem() {
         }
       }
       if (!node) return;
-      node.classList.add("wopt-audio2-follow");
-      const rect = node.getBoundingClientRect();
-      const upper = window.innerHeight * .26;
-      const lower = window.innerHeight * .66;
-      if (page !== lastPage || rect.top < upper || rect.bottom > lower) {
-        node.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
+      page = Number(node.dataset.page || node.closest<HTMLElement>("[data-printed-page]")?.dataset.printedPage || page || 0);
+      const visibleMatches = nodesForKey(key).filter((candidate) => Boolean(candidate.closest(".wopt-printed-reader")) && isVisible(candidate));
+      const targets = visibleMatches.length ? visibleMatches : [node];
+      targets.forEach((target) => target.classList.add("wopt-audio2-follow"));
+
+      const followNode = targets.find(isVisible) || node;
+      const rect = followNode.getBoundingClientRect();
+      const upper = window.innerHeight * .23;
+      const lower = window.innerHeight * .63;
+      if (keyChanged && (page !== lastPage || rect.top < upper || rect.bottom > lower)) {
+        followNode.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       }
       lastPage = page || lastPage;
+    };
+
+    const scheduleHighlightRefresh = () => {
+      if (!active || !lastKey || highlightFrame) return;
+      highlightFrame = window.requestAnimationFrame(() => {
+        highlightFrame = 0;
+        if (active && lastKey) void highlightAndFollow(lastKey);
+      });
     };
 
     const currentTiming = () => {
@@ -404,27 +470,6 @@ export default function QuranAudioSystem() {
       return activeSegment.stream.timings.find((item) => ms >= item.timestamp_from && ms < item.timestamp_to)
         || [...activeSegment.stream.timings].reverse().find((item) => ms >= item.timestamp_from)
         || activeSegment.stream.timings[0];
-    };
-
-    const updateMini = () => {
-      if (!active || !activeSegment) return;
-      const timing = currentTiming();
-      const key = timing?.verse_key || activeSegment.descriptor.startKey || `${activeSegment.descriptor.surah}:1`;
-      mini.classList.add("show");
-      miniTitle.textContent = `${chapterName(parseKey(key).surah)} · ${key}`;
-      miniDetail.textContent = `${reciterName()}${audio.paused ? " · Paused" : ""}`;
-      miniToggle.textContent = audio.paused ? "▶" : "❚❚";
-      miniToggle.setAttribute("aria-label", audio.paused ? "Play" : "Pause");
-      const start = activeSegment.start;
-      const end = activeSegment.end ?? (Number.isFinite(audio.duration) ? audio.duration : start);
-      const position = Math.max(start, Math.min(audio.currentTime || start, end));
-      const duration = Math.max(0, end - start);
-      const elapsed = Math.max(0, position - start);
-      miniProgress.value = duration > 0 ? String(Math.round((elapsed / duration) * 1000)) : "0";
-      miniElapsed.textContent = formatTime(elapsed);
-      miniRemaining.textContent = `-${formatTime(Math.max(0, duration - elapsed))}`;
-      void highlightAndFollow(key);
-      updateMediaSession(key);
     };
 
     const updateMediaSession = (key = lastKey || context.key) => {
@@ -442,6 +487,27 @@ export default function QuranAudioSystem() {
           navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate || 1, position: Math.max(0, Math.min(audio.currentTime || 0, audio.duration)) });
         }
       } catch { /* browser may reject transient position state */ }
+    };
+
+    const updateMini = () => {
+      if (!active || !activeSegment) return;
+      const timing = currentTiming();
+      const key = timing?.verse_key || activeSegment.descriptor.startKey || `${activeSegment.descriptor.surah}:1`;
+      miniTitle.textContent = `${chapterName(parseKey(key).surah)} · ${key}`;
+      miniDetail.textContent = `${reciterName()}${audio.paused ? " · Paused" : ""}`;
+      miniToggle.textContent = audio.paused ? "▶" : "❚❚";
+      miniToggle.setAttribute("aria-label", audio.paused ? "Play" : "Pause");
+      const start = activeSegment.start;
+      const end = activeSegment.end ?? (Number.isFinite(audio.duration) ? audio.duration : start);
+      const position = Math.max(start, Math.min(audio.currentTime || start, end));
+      const duration = Math.max(0, end - start);
+      const elapsed = Math.max(0, position - start);
+      miniProgress.value = duration > 0 ? String(Math.round((elapsed / duration) * 1000)) : "0";
+      miniElapsed.textContent = formatTime(elapsed);
+      miniRemaining.textContent = `-${formatTime(Math.max(0, duration - elapsed))}`;
+      void highlightAndFollow(key);
+      updateMediaSession(key);
+      syncMiniVisibility();
     };
 
     const warmNext = () => {
@@ -472,7 +538,6 @@ export default function QuranAudioSystem() {
       if (token !== playToken) return;
       if (start > 0) audio.currentTime = Math.min(start, Math.max(0, audio.duration - .05));
       active = true;
-      mini.classList.add("show");
       close();
       try { await audio.play(); }
       catch { status.textContent = "Tap Play again to allow audio on this device."; miniDetail.textContent = "Tap ▶ to start"; }
@@ -486,7 +551,7 @@ export default function QuranAudioSystem() {
       if (planIndex + 1 >= plan.length) {
         active = false;
         audio.pause();
-        mini.classList.remove("show");
+        syncMiniVisibility();
         clearHighlight();
         status.textContent = "Finished.";
         return;
@@ -506,7 +571,7 @@ export default function QuranAudioSystem() {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
-      mini.classList.remove("show");
+      mini.classList.remove("show", "suppressed");
       clearHighlight();
       lastKey = "";
       lastPage = 0;
@@ -526,10 +591,11 @@ export default function QuranAudioSystem() {
       planIndex = 0;
       lastKey = "";
       lastPage = 0;
+      clearHighlight();
       if (!plan.length) { status.textContent = "No audio is available for this selection."; return; }
       await playSegment(0, token).catch((error: unknown) => {
         active = false;
-        mini.classList.remove("show");
+        syncMiniVisibility();
         status.textContent = error instanceof Error ? error.message : "Unable to start audio.";
       });
     };
@@ -548,7 +614,10 @@ export default function QuranAudioSystem() {
       const current = currentTiming();
       const at = Math.max(0, timings.findIndex((item) => item.verse_key === current?.verse_key));
       const next = timings[Math.max(0, Math.min(timings.length - 1, at + direction))];
-      if (next) audio.currentTime = next.timestamp_from / 1000;
+      if (next) {
+        audio.currentTime = next.timestamp_from / 1000;
+        updateMini();
+      }
     };
 
     const installMediaHandlers = () => {
@@ -561,7 +630,7 @@ export default function QuranAudioSystem() {
       safe("stop", stop);
       safe("seekbackward", (detail) => seekRelative(-(detail.seekOffset || 10)));
       safe("seekforward", (detail) => seekRelative(detail.seekOffset || 10));
-      safe("seekto", (detail) => { if (typeof detail.seekTime === "number") audio.currentTime = Math.max(0, Math.min(audio.duration || detail.seekTime, detail.seekTime)); });
+      safe("seekto", (detail) => { if (typeof detail.seekTime === "number") { audio.currentTime = Math.max(0, Math.min(audio.duration || detail.seekTime, detail.seekTime)); updateMini(); } });
       safe("previoustrack", () => seekVerse(-1));
       safe("nexttrack", () => seekVerse(1));
     };
@@ -636,6 +705,7 @@ export default function QuranAudioSystem() {
       if (indexAudio) {
         event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
       }
+      window.setTimeout(scheduleMiniVisibilitySync, 0);
     };
 
     const disableIndexAudio = () => {
@@ -657,7 +727,7 @@ export default function QuranAudioSystem() {
       updateMini();
     };
 
-    const onPlay = () => { if (active) { mini.classList.add("show"); close(); updateMini(); } };
+    const onPlay = () => { if (active) { close(); updateMini(); syncMiniVisibility(); } };
     const onPause = () => updateMini();
     const onEnded = () => void advance();
     const onError = () => { if (active) miniDetail.textContent = "Audio connection interrupted"; };
@@ -676,11 +746,26 @@ export default function QuranAudioSystem() {
     audio.addEventListener("error", onError);
     installMediaHandlers();
     disableIndexAudio();
-    const observer = new MutationObserver(disableIndexAudio);
-    observer.observe(document.body, { childList: true, subtree: true });
+
+    const observer = new MutationObserver((mutations) => {
+      disableIndexAudio();
+      scheduleMiniVisibilitySync();
+      if (!active || !lastKey) return;
+      const relevant = mutations.some((mutation) => mutation.type === "childList" && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0));
+      if (relevant || !document.querySelector(`.wopt-audio2-follow[data-verse-key="${lastKey}"]`)) scheduleHighlightRefresh();
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "aria-hidden"] });
+
+    const highlightSafetyTimer = window.setInterval(() => {
+      if (active && lastKey && !document.querySelector(`.wopt-audio2-follow[data-verse-key="${lastKey}"]`)) scheduleHighlightRefresh();
+      scheduleMiniVisibilitySync();
+    }, 450);
 
     return () => {
       observer.disconnect();
+      window.clearInterval(highlightSafetyTimer);
+      if (modalSyncFrame) window.cancelAnimationFrame(modalSyncFrame);
+      if (highlightFrame) window.cancelAnimationFrame(highlightFrame);
       stop();
       overlay.removeEventListener("click", onOverlayClick);
       mini.removeEventListener("click", onMiniClick);
@@ -698,6 +783,11 @@ export default function QuranAudioSystem() {
       mini.remove();
       overlay.remove();
       style.remove();
+      if ("mediaSession" in navigator) {
+        (["play", "pause", "stop", "seekbackward", "seekforward", "seekto", "previoustrack", "nexttrack"] as MediaSessionAction[]).forEach((action) => {
+          try { navigator.mediaSession.setActionHandler(action, null); } catch { /* ignore */ }
+        });
+      }
     };
   }, [pathname]);
 
