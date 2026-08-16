@@ -82,9 +82,21 @@ export default function QuranIndexEnhancer() {
     document.body.appendChild(overlay);
 
     let chapters: Chapter[] = [];
+    const historyState = () => (window.history.state || {}) as Record<string, unknown>;
+    const ensureIndexHistory = () => {
+      const current = historyState();
+      if (current.woptQuranIndex || current.woptQuranReader || current.woptQuranSearchResult) return;
+      window.history.replaceState({ ...current, woptQuranIndex: true }, "", window.location.href);
+    };
+    const enterReaderHistory = () => {
+      const current = historyState();
+      if (current.woptQuranReader) return;
+      window.history.pushState({ ...current, woptQuranIndex: false, woptQuranReader: true }, "", window.location.href);
+    };
     const open = () => { overlay.classList.add("open"); renderLocal(); void loadChapters(); };
     const close = () => overlay.classList.remove("open");
     const setBookPage = (page: number) => {
+      enterReaderHistory();
       close();
       window.localStorage.setItem("wopt-quran-book-page-mode", "true");
       window.localStorage.setItem("wopt-quran-text-mode", "arabic");
@@ -157,7 +169,7 @@ export default function QuranIndexEnhancer() {
 
     const onClick = async (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target.closest(".wopt-qindex-close")) { close(); return; }
+      if (target.closest(".wopt-qindex-close")) { enterReaderHistory(); close(); return; }
       const tab = target.closest<HTMLButtonElement>("[data-tab]");
       if (tab) {
         overlay.querySelectorAll(".wopt-qindex-tab").forEach((node) => node.classList.toggle("active", node === tab));
@@ -205,14 +217,31 @@ export default function QuranIndexEnhancer() {
       const input = event.target as HTMLInputElement;
       if (input.matches(".wopt-qindex-filter")) renderChapters(input.value);
     };
-    const onOpenEvent = () => open();
+    const onOpenEvent = () => {
+      const current = historyState();
+      if (current.woptQuranReader && !overlay.classList.contains("open")) {
+        window.history.back();
+        return;
+      }
+      open();
+    };
+    const onPopState = (event: PopStateEvent) => {
+      const next = (event.state || {}) as Record<string, unknown>;
+      if (next.woptQuranIndex) {
+        open();
+        return;
+      }
+      if (next.woptQuranReader || next.woptQuranSearchResult) close();
+    };
 
     overlay.addEventListener("click", onClick);
     overlay.addEventListener("keydown", onKey);
     overlay.addEventListener("input", onFilter);
     window.addEventListener("wopt-quran-open-index", onOpenEvent);
+    window.addEventListener("popstate", onPopState);
 
-    // Qur’an opens to the smart index by default. Internal reader actions can reopen it anytime.
+    // Qur’an index is the first in-section history level; reader pages sit one level above it.
+    ensureIndexHistory();
     window.setTimeout(open, 80);
 
     return () => {
@@ -220,6 +249,7 @@ export default function QuranIndexEnhancer() {
       overlay.removeEventListener("keydown", onKey);
       overlay.removeEventListener("input", onFilter);
       window.removeEventListener("wopt-quran-open-index", onOpenEvent);
+      window.removeEventListener("popstate", onPopState);
       overlay.remove();
       style.remove();
     };
