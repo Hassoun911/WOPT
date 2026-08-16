@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BackHandler,
   FlatList,
   Pressable,
   ScrollView,
@@ -8,6 +9,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken
 } from "react-native";
 import {
@@ -56,15 +59,23 @@ function parseRef(value: string): QuranPosition | null {
 export default function Quran({ locale, onBackHome }: Props) {
   const [screen, setScreen] = useState<QuranScreen>("home");
   const [readerPosition, setReaderPosition] = useState<QuranPosition>({ surah: 1, ayah: 1 });
+  const [readerBackTarget, setReaderBackTarget] = useState<QuranScreen>("home");
   const [lastPosition, setLastPosition] = useState<QuranPosition | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [memorizeRange, setMemorizeRange] = useState<MemorizeRange | null>(null);
   const [query, setQuery] = useState("");
   const [selectedAyah, setSelectedAyah] = useState<QuranAyah | null>(null);
+  const [searchHighlight, setSearchHighlight] = useState<QuranPosition | null>(null);
+  const [searchHighlightQuery, setSearchHighlightQuery] = useState("");
+  const [searchFocusOnOpen, setSearchFocusOnOpen] = useState(false);
   const [memorizeHidden, setMemorizeHidden] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const listRef = useRef<FlatList<QuranAyah>>(null);
+
+  const readerListRef = useRef<FlatList<QuranAyah>>(null);
+  const searchListRef = useRef<FlatList<QuranSearchResult>>(null);
+  const searchScrollOffsetRef = useRef(0);
   const lastSeenRef = useRef("");
+  const readerViewabilityConfig = useRef({ itemVisiblePercentThreshold: 55 }).current;
 
   const source = quranSource();
   const surahs = allSurahs();
@@ -72,11 +83,12 @@ export default function Quran({ locale, onBackHome }: Props) {
   const juz = allJuz();
   const readerSurah = getSurah(readerPosition.surah);
   const readerAyahs = useMemo(() => getSurahAyahs(readerPosition.surah), [readerPosition.surah]);
-  const searchResults = useMemo(() => searchQuran(query, 80), [query]);
+  const searchResults = useMemo(() => query.trim() ? searchQuran(query, 80) : [], [query]);
   const memorizeAyahs = useMemo(
     () => memorizeRange ? ayahsInRange(memorizeRange.surah, memorizeRange.start, memorizeRange.surah, memorizeRange.end) : [],
     [memorizeRange]
   );
+  const basmala = getAyah(1, 1)?.text ?? "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
 
   useEffect(() => {
     void (async () => {
@@ -109,13 +121,63 @@ export default function Quran({ locale, onBackHome }: Props) {
     void AsyncStorage.setItem(KEYS.last, JSON.stringify(position));
   };
 
-  const openReader = (surah: number, ayah = 1) => {
-    if (!getAyah(surah, ayah)) return;
+  const openSearch = () => {
+    setSearchFocusOnOpen(true);
+    setScreen("search");
+  };
+
+  const restoreSearch = () => {
+    setSearchFocusOnOpen(false);
+    setScreen("search");
+    setTimeout(() => {
+      searchListRef.current?.scrollToOffset({ offset: searchScrollOffsetRef.current, animated: false });
+    }, 80);
+  };
+
+  const openReader = (
+    surah: number,
+    ayah = 1,
+    options?: { backTo?: QuranScreen; highlightSearch?: boolean }
+  ) => {
+    const target = getAyah(surah, ayah);
+    if (!target) return;
     setSelectedAyah(null);
     setReaderPosition({ surah, ayah });
+    setReaderBackTarget(options?.backTo ?? screen);
+    if (options?.highlightSearch) {
+      setSearchHighlight({ surah, ayah });
+      setSearchHighlightQuery(query.trim());
+    } else {
+      setSearchHighlight(null);
+      setSearchHighlightQuery("");
+    }
     persistLast({ surah, ayah });
     setScreen("reader");
   };
+
+  const openSearchResult = (item: QuranSearchResult) => {
+    const ayah = item.ayah?.ayah ?? 1;
+    openReader(item.surah.number, ayah, { backTo: "search", highlightSearch: Boolean(item.ayah) });
+  };
+
+  const handleBack = () => {
+    if (screen === "reader") {
+      if (readerBackTarget === "search") restoreSearch();
+      else setScreen(readerBackTarget === "reader" ? "home" : readerBackTarget);
+      return true;
+    }
+    if (screen === "home") {
+      onBackHome();
+      return true;
+    }
+    setScreen("home");
+    return true;
+  };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", handleBack);
+    return () => subscription.remove();
+  }, [screen, readerBackTarget]);
 
   const toggleBookmark = (ayah: QuranAyah) => {
     const key = refKey(ayah);
@@ -151,34 +213,37 @@ export default function Quran({ locale, onBackHome }: Props) {
   }).current;
 
   useEffect(() => {
-    if (screen !== "reader" || readerPosition.ayah <= 1) return;
+    if (screen !== "reader") return;
+    const index = Math.max(0, readerPosition.ayah - 1);
     const timer = setTimeout(() => {
-      listRef.current?.scrollToIndex({ index: Math.max(0, readerPosition.ayah - 1), animated: false, viewPosition: 0.12 });
+      readerListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.12 });
     }, 120);
     return () => clearTimeout(timer);
-  }, [readerPosition, screen]);
+  }, [readerPosition.surah, readerPosition.ayah, screen]);
 
   if (!quranReady()) {
     return (
-      <View style={styles.notReady}>
-        <Text style={styles.notReadyIcon}>📖</Text>
-        <Text style={styles.notReadyTitle}>Native Qur’an data is preparing</Text>
-        <Text style={styles.notReadyText}>This development source tree contains only a placeholder. Android builds generate and validate all 6,236 Tanzil Uthmani ayahs before compiling.</Text>
+      <View style={styles.centered}>
+        <Text style={styles.bigIcon}>📖</Text>
+        <Text style={styles.centerTitle}>Qur’an data unavailable</Text>
+        <Text style={styles.centerText}>This build requires the verified offline Qur’an bundle before the native reader can open.</Text>
         <Pressable onPress={onBackHome} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Back to Home</Text></Pressable>
       </View>
     );
   }
 
-  const topBar = (title: string, subtitle?: string, back: QuranScreen | "app" = "home") => (
+  if (!loaded) {
+    return <View style={styles.centered}><Text style={styles.centerText}>Loading Qur’an…</Text></View>;
+  }
+
+  const topBar = (title: string, subtitle?: string, showSearch = true) => (
     <View style={styles.topBar}>
-      <Pressable onPress={() => back === "app" ? onBackHome() : setScreen(back)} style={styles.backButton}>
-        <Text style={styles.backText}>‹</Text>
-      </Pressable>
+      <Pressable onPress={handleBack} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
       <View style={styles.topCopy}>
         <Text style={styles.topTitle}>{title}</Text>
         {subtitle ? <Text style={styles.topSubtitle}>{subtitle}</Text> : null}
       </View>
-      <Pressable onPress={() => setScreen("search")} style={styles.searchIconButton}><Text style={styles.searchIcon}>⌕</Text></Pressable>
+      {showSearch ? <Pressable onPress={openSearch} style={styles.searchIconButton}><Text style={styles.searchIcon}>⌕</Text></Pressable> : <View style={styles.topSpacer} />}
     </View>
   );
 
@@ -193,30 +258,26 @@ export default function Quran({ locale, onBackHome }: Props) {
         <View style={styles.verifiedPill}><Text style={styles.verifiedText}>✓ Verified</Text></View>
       </View>
 
-      <Pressable onPress={() => setScreen("search")} style={styles.searchBox}>
+      <Pressable onPress={openSearch} style={styles.searchBox}>
         <Text style={styles.searchBoxIcon}>⌕</Text>
         <Text style={styles.searchPlaceholder}>{locale === "ar" ? "ابحث في القرآن أو السور" : "Search Arabic, Surah name or number"}</Text>
       </Pressable>
 
       {lastPosition && getAyah(lastPosition.surah, lastPosition.ayah) ? (
-        <Pressable onPress={() => openReader(lastPosition.surah, lastPosition.ayah)} style={styles.continueCard}>
+        <Pressable onPress={() => openReader(lastPosition.surah, lastPosition.ayah, { backTo: "home" })} style={styles.continueCard}>
           <View style={styles.continueIcon}><Text style={styles.continueEmoji}>📖</Text></View>
           <View style={styles.continueCopy}>
-            <Text style={styles.continueEyebrow}>{locale === "ar" ? "متابعة القراءة" : "CONTINUE READING"}</Text>
+            <Text style={styles.continueEyebrow}>CONTINUE READING</Text>
             <Text style={styles.continueTitle}>{getSurah(lastPosition.surah)?.nameTransliterated}</Text>
             <Text style={styles.continueMeta}>Ayah {lastPosition.ayah} • Page {pageForAyah(lastPosition.surah, lastPosition.ayah) ?? "—"} • Juz {juzForAyah(lastPosition.surah, lastPosition.ayah) ?? "—"}</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Text style={styles.lightChevron}>›</Text>
         </Pressable>
       ) : (
-        <Pressable onPress={() => openReader(1, 1)} style={styles.continueCard}>
+        <Pressable onPress={() => openReader(1, 1, { backTo: "home" })} style={styles.continueCard}>
           <View style={styles.continueIcon}><Text style={styles.continueEmoji}>📖</Text></View>
-          <View style={styles.continueCopy}>
-            <Text style={styles.continueEyebrow}>BEGIN READING</Text>
-            <Text style={styles.continueTitle}>Al-Faatiha</Text>
-            <Text style={styles.continueMeta}>Start at the beginning of the Qur’an</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
+          <View style={styles.continueCopy}><Text style={styles.continueEyebrow}>BEGIN READING</Text><Text style={styles.continueTitle}>Al-Faatiha</Text><Text style={styles.continueMeta}>Start at the beginning of the Qur’an</Text></View>
+          <Text style={styles.lightChevron}>›</Text>
         </Pressable>
       )}
 
@@ -228,23 +289,17 @@ export default function Quran({ locale, onBackHome }: Props) {
         <Pressable onPress={() => setScreen("bookmarks")} style={styles.gridCard}><Text style={styles.gridEmoji}>★</Text><Text style={styles.gridTitle}>Bookmarks</Text><Text style={styles.gridMeta}>{bookmarks.length} saved</Text></Pressable>
       </View>
 
-      <Pressable onPress={() => memorizeRange ? setScreen("memorize") : openReader(lastPosition?.surah ?? 1, lastPosition?.ayah ?? 1)} style={styles.memorizeCard}>
+      <Pressable onPress={() => memorizeRange ? setScreen("memorize") : openReader(lastPosition?.surah ?? 1, lastPosition?.ayah ?? 1, { backTo: "home" })} style={styles.memorizeCard}>
         <View style={styles.memorizeIcon}><Text style={styles.memorizeEmoji}>🧠</Text></View>
         <View style={styles.continueCopy}>
           <Text style={styles.memorizeEyebrow}>MEMORIZATION</Text>
           <Text style={styles.memorizeTitle}>{memorizeRange ? `${getSurah(memorizeRange.surah)?.nameTransliterated} ${memorizeRange.start}${memorizeRange.end > memorizeRange.start ? `–${memorizeRange.end}` : ""}` : "Choose an ayah to memorize"}</Text>
-          <Text style={styles.memorizeMeta}>Focus mode • reveal/hide • selected ayah range</Text>
+          <Text style={styles.memorizeMeta}>Focus mode • hide/reveal • selected range</Text>
         </View>
         <Text style={styles.chevron}>›</Text>
       </Pressable>
 
-      <View style={styles.sourceCard}>
-        <Text style={styles.sourceIcon}>✓</Text>
-        <View style={styles.continueCopy}>
-          <Text style={styles.sourceTitle}>Verified Uthmani Arabic</Text>
-          <Text style={styles.sourceText}>{source.name} v{source.version} • Medina Mushaf-compatible Unicode • bundled offline</Text>
-        </View>
-      </View>
+      <View style={styles.sourceCard}><Text style={styles.sourceIcon}>✓</Text><View style={styles.continueCopy}><Text style={styles.sourceTitle}>Verified Uthmani Arabic</Text><Text style={styles.sourceText}>{source.name} v{source.version} • bundled offline • {source.verifiedCounts.ayahs} verified ayahs</Text></View></View>
     </ScrollView>
   );
 
@@ -255,15 +310,13 @@ export default function Quran({ locale, onBackHome }: Props) {
         data={surahs}
         keyExtractor={(item) => String(item.number)}
         contentContainerStyle={styles.listContent}
-        initialNumToRender={18}
-        windowSize={8}
+        initialNumToRender={16}
+        maxToRenderPerBatch={16}
+        windowSize={7}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openReader(item.number, 1)} style={styles.surahRow}>
+          <Pressable onPress={() => openReader(item.number, 1, { backTo: "surahs" })} style={styles.surahRow}>
             <View style={styles.numberBadge}><Text style={styles.numberText}>{item.number}</Text></View>
-            <View style={styles.rowCopy}>
-              <Text style={styles.rowTitle}>{item.nameTransliterated}</Text>
-              <Text style={styles.rowMeta}>{item.nameEnglish} • {item.ayahCount} ayahs • {item.revelationType}</Text>
-            </View>
+            <View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.nameTransliterated}</Text><Text style={styles.rowMeta}>{item.nameEnglish} • {item.ayahCount} ayahs • {item.revelationType}</Text></View>
             <Text style={styles.arabicSurahName}>{item.nameArabic}</Text>
           </Pressable>
         )}
@@ -279,7 +332,7 @@ export default function Quran({ locale, onBackHome }: Props) {
         keyExtractor={(item) => String(item.juz)}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openReader(item.surah, item.ayah)} style={styles.simpleRow}>
+          <Pressable onPress={() => openReader(item.surah, item.ayah, { backTo: "juz" })} style={styles.simpleRow}>
             <View style={styles.numberBadge}><Text style={styles.numberText}>{item.juz}</Text></View>
             <View style={styles.rowCopy}><Text style={styles.rowTitle}>Juz {item.juz}</Text><Text style={styles.rowMeta}>{getSurah(item.surah)?.nameTransliterated} • Ayah {item.ayah}</Text></View>
             <Text style={styles.chevron}>›</Text>
@@ -296,10 +349,11 @@ export default function Quran({ locale, onBackHome }: Props) {
         data={pages}
         keyExtractor={(item) => String(item.page)}
         contentContainerStyle={styles.listContent}
-        initialNumToRender={24}
-        windowSize={8}
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        windowSize={7}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openReader(item.surah, item.ayah)} style={styles.simpleRow}>
+          <Pressable onPress={() => openReader(item.surah, item.ayah, { backTo: "pages" })} style={styles.simpleRow}>
             <View style={styles.numberBadge}><Text style={styles.numberText}>{item.page}</Text></View>
             <View style={styles.rowCopy}><Text style={styles.rowTitle}>Page {item.page}</Text><Text style={styles.rowMeta}>{getSurah(item.surah)?.nameTransliterated} • Ayah {item.ayah}</Text></View>
             <Text style={styles.chevron}>›</Text>
@@ -309,14 +363,18 @@ export default function Quran({ locale, onBackHome }: Props) {
     </View>
   );
 
+  const onSearchScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    searchScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+  };
+
   const searchScreen = (
     <View style={styles.flex}>
-      {topBar("Search Qur’an", "Arabic text, Surah name or number")}
+      {topBar("Search Qur’an", "Open any match in the Qur’an and return here", false)}
       <View style={styles.searchInputWrap}>
         <TextInput
           value={query}
           onChangeText={setQuery}
-          autoFocus
+          autoFocus={searchFocusOnOpen}
           placeholder="Search الرحمة, Al-Kahf, 18…"
           placeholderTextColor="#909a96"
           style={styles.searchInput}
@@ -324,16 +382,20 @@ export default function Quran({ locale, onBackHome }: Props) {
         />
       </View>
       <FlatList<QuranSearchResult>
-        data={query.trim() ? searchResults : []}
+        ref={searchListRef}
+        data={searchResults}
         keyExtractor={(item, index) => item.kind === "surah" ? `s-${item.surah.number}-${index}` : `a-${item.ayah?.surah}-${item.ayah?.ayah}`}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContent}
+        onScroll={onSearchScroll}
+        scrollEventThrottle={32}
         ListEmptyComponent={<Text style={styles.emptyLabel}>{query.trim() ? "No matches found." : "Type Arabic text, a Surah name, or Surah number."}</Text>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openReader(item.surah.number, item.ayah?.ayah ?? 1)} style={styles.searchResult}>
+          <Pressable onPress={() => openSearchResult(item)} style={styles.searchResult}>
             <View style={styles.rowCopy}>
               <Text style={styles.rowTitle}>{item.surah.nameTransliterated} {item.ayah ? `${item.surah.number}:${item.ayah.ayah}` : `• Surah ${item.surah.number}`}</Text>
-              {item.ayah ? <Text style={styles.searchArabic} numberOfLines={2}>{item.ayah.text}</Text> : <Text style={styles.rowMeta}>{item.surah.nameEnglish} • {item.surah.ayahCount} ayahs</Text>}
+              {item.ayah ? <Text style={styles.searchArabic} numberOfLines={3}>{item.ayah.text}</Text> : <Text style={styles.rowMeta}>{item.surah.nameEnglish} • {item.surah.ayahCount} ayahs</Text>}
+              <View style={styles.openInQuranPill}><Text style={styles.openInQuranText}>📖 Open in Qur’an</Text></View>
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
@@ -342,7 +404,12 @@ export default function Quran({ locale, onBackHome }: Props) {
     </View>
   );
 
-  const bookmarkItems = bookmarks.map(parseRef).filter((item): item is QuranPosition => Boolean(item)).map((item) => getAyah(item.surah, item.ayah)).filter((item): item is QuranAyah => Boolean(item));
+  const bookmarkItems = bookmarks
+    .map(parseRef)
+    .filter((item): item is QuranPosition => Boolean(item))
+    .map((item) => getAyah(item.surah, item.ayah))
+    .filter((item): item is QuranAyah => Boolean(item));
+
   const bookmarksScreen = (
     <View style={styles.flex}>
       {topBar("Bookmarks", `${bookmarkItems.length} saved ayahs`)}
@@ -352,7 +419,7 @@ export default function Quran({ locale, onBackHome }: Props) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={<Text style={styles.emptyLabel}>Tap an ayah in the reader and choose Bookmark.</Text>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openReader(item.surah, item.ayah)} style={styles.bookmarkRow}>
+          <Pressable onPress={() => openReader(item.surah, item.ayah, { backTo: "bookmarks" })} style={styles.bookmarkRow}>
             <Text style={styles.bookmarkRef}>{getSurah(item.surah)?.nameTransliterated} {item.surah}:{item.ayah}</Text>
             <Text style={styles.bookmarkArabic} numberOfLines={3}>{item.text}</Text>
           </Pressable>
@@ -373,54 +440,59 @@ export default function Quran({ locale, onBackHome }: Props) {
         </View>
         <Pressable onPress={() => setMemorizeHidden((value) => !value)} style={styles.hideButton}><Text style={styles.hideButtonText}>{memorizeHidden ? "Reveal Arabic" : "Hide Arabic to test yourself"}</Text></Pressable>
       </View>
-
-      {memorizeAyahs.map((ayah) => (
-        <View key={refKey(ayah)} style={styles.memoryAyah}>
-          <Text style={styles.memoryRef}>{ayah.surah}:{ayah.ayah}</Text>
-          <Text style={[styles.memoryArabic, memorizeHidden && styles.hiddenArabic]}>{memorizeHidden ? "••••••••••••••••••••" : ayah.text}</Text>
-        </View>
-      ))}
-      <Pressable onPress={() => openReader(memorizeRange.surah, memorizeRange.start)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Open in reader</Text></Pressable>
+      {memorizeAyahs.map((ayah) => <View key={refKey(ayah)} style={styles.memoryAyah}><Text style={styles.memoryRef}>{ayah.surah}:{ayah.ayah}</Text><Text style={[styles.memoryArabic, memorizeHidden && styles.hiddenArabic]}>{memorizeHidden ? "••••••••••••••••••••" : ayah.text}</Text></View>)}
+      <Pressable onPress={() => openReader(memorizeRange.surah, memorizeRange.start, { backTo: "memorize" })} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Open in reader</Text></Pressable>
     </ScrollView>
   ) : (
-    <View style={styles.notReady}><Text style={styles.notReadyTitle}>No memorization range yet</Text><Text style={styles.notReadyText}>Open any Surah, tap an ayah, then choose Memorize.</Text><Pressable onPress={() => setScreen("surahs")} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Choose Surah</Text></Pressable></View>
+    <View style={styles.centered}><Text style={styles.centerTitle}>No memorization range yet</Text><Text style={styles.centerText}>Open any Surah, tap an ayah, then choose Memorize.</Text><Pressable onPress={() => setScreen("surahs")} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Choose Surah</Text></Pressable></View>
   );
 
   const readerScreen = readerSurah ? (
     <View style={styles.flex}>
       {topBar(readerSurah.nameTransliterated, `${readerSurah.nameArabic} • ${readerSurah.ayahCount} ayahs • Page ${pageForAyah(readerPosition.surah, readerPosition.ayah) ?? "—"}`)}
       <FlatList
-        ref={listRef}
+        ref={readerListRef}
         data={readerAyahs}
         keyExtractor={(item) => refKey(item)}
         contentContainerStyle={styles.readerContent}
-        initialNumToRender={10}
-        maxToRenderPerBatch={12}
-        windowSize={7}
-        removeClippedSubviews
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={6}
         onViewableItemsChanged={onVisibleAyahsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 55 }}
+        viewabilityConfig={readerViewabilityConfig}
+        ListHeaderComponent={
+          <View style={styles.surahHeaderCard}>
+            <Text style={styles.surahHeaderArabic}>{readerSurah.nameArabic}</Text>
+            <Text style={styles.surahHeaderEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text>
+            {readerSurah.number !== 1 && readerSurah.number !== 9 ? <Text style={styles.basmala}>{basmala}</Text> : null}
+          </View>
+        }
         onScrollToIndexFailed={({ index, averageItemLength }) => {
-          listRef.current?.scrollToOffset({ offset: Math.max(0, index * averageItemLength), animated: false });
-          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.1 }), 120);
+          readerListRef.current?.scrollToOffset({ offset: Math.max(0, index * Math.max(averageItemLength, 150)), animated: false });
+          setTimeout(() => readerListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.1 }), 180);
         }}
         renderItem={({ item }) => {
           const selected = selectedAyah?.surah === item.surah && selectedAyah?.ayah === item.ayah;
+          const searchMatched = searchHighlight?.surah === item.surah && searchHighlight?.ayah === item.ayah;
           const bookmarked = bookmarks.includes(refKey(item));
           return (
-            <View style={[styles.ayahCard, selected && styles.ayahCardSelected]}>
+            <View style={[styles.ayahCard, selected && styles.ayahCardSelected, searchMatched && styles.ayahCardSearchMatch]}>
               <Pressable onPress={() => setSelectedAyah(selected ? null : item)}>
                 <View style={styles.ayahTopRow}>
                   <View style={styles.ayahNumber}><Text style={styles.ayahNumberText}>{item.ayah}</Text></View>
-                  <Text style={styles.ayahMeta}>Juz {juzForAyah(item.surah, item.ayah) ?? "—"} • Page {pageForAyah(item.surah, item.ayah) ?? "—"}{bookmarked ? " • ★" : ""}</Text>
+                  <View style={styles.ayahMetaWrap}>
+                    {searchMatched ? <View style={styles.searchMatchPill}><Text style={styles.searchMatchText}>SEARCH MATCH</Text></View> : null}
+                    <Text style={styles.ayahMeta}>Juz {juzForAyah(item.surah, item.ayah) ?? "—"} • Page {pageForAyah(item.surah, item.ayah) ?? "—"}{bookmarked ? " • ★" : ""}</Text>
+                  </View>
                 </View>
+                {searchMatched && searchHighlightQuery ? <Text style={styles.searchMatchQuery}>From search: {searchHighlightQuery}</Text> : null}
                 <Text style={styles.ayahArabic}>{item.text}</Text>
               </Pressable>
               {selected ? (
                 <View style={styles.ayahActions}>
                   <Pressable onPress={() => toggleBookmark(item)} style={styles.actionButton}><Text style={styles.actionIcon}>{bookmarked ? "★" : "☆"}</Text><Text style={styles.actionText}>{bookmarked ? "Saved" : "Bookmark"}</Text></Pressable>
                   <Pressable onPress={() => startMemorizing(item)} style={styles.actionButton}><Text style={styles.actionIcon}>🧠</Text><Text style={styles.actionText}>Memorize</Text></Pressable>
-                  <Pressable onPress={() => setScreen("search")} style={styles.actionButton}><Text style={styles.actionIcon}>⌕</Text><Text style={styles.actionText}>Search</Text></Pressable>
+                  <Pressable onPress={openSearch} style={styles.actionButton}><Text style={styles.actionIcon}>⌕</Text><Text style={styles.actionText}>Search</Text></Pressable>
                 </View>
               ) : null}
             </View>
@@ -428,9 +500,10 @@ export default function Quran({ locale, onBackHome }: Props) {
         }}
       />
     </View>
-  ) : null;
+  ) : (
+    <View style={styles.centered}><Text style={styles.centerText}>Unable to open this Qur’an position.</Text><Pressable onPress={() => setScreen("home")} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Qur’an Home</Text></Pressable></View>
+  );
 
-  if (!loaded) return <View style={styles.notReady}><Text style={styles.notReadyText}>Loading Qur’an…</Text></View>;
   if (screen === "surahs") return surahScreen;
   if (screen === "juz") return juzScreen;
   if (screen === "pages") return pagesScreen;
@@ -453,6 +526,7 @@ const styles = StyleSheet.create({
   topCopy: { flex: 1 },
   topTitle: { color: "#173f35", fontSize: 17, fontWeight: "900" },
   topSubtitle: { color: "#78857f", fontSize: 9, marginTop: 2 },
+  topSpacer: { width: 39 },
   backButton: { width: 39, height: 39, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#dfdbd1" },
   backText: { color: "#17483c", fontSize: 30, lineHeight: 31, marginTop: -2 },
   searchIconButton: { width: 39, height: 39, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" },
@@ -467,7 +541,8 @@ const styles = StyleSheet.create({
   continueEyebrow: { color: "#c3ddd4", fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },
   continueTitle: { color: "#fff", fontSize: 21, fontWeight: "900", marginTop: 3 },
   continueMeta: { color: "#cce2da", fontSize: 10, marginTop: 4 },
-  chevron: { color: "#0b604b", fontSize: 29, fontWeight: "300" },
+  lightChevron: { color: "#e4f3ed", fontSize: 30 },
+  chevron: { color: "#0b604b", fontSize: 29 },
   sectionTitle: { color: "#173f35", fontSize: 18, fontWeight: "900", marginTop: 22, marginBottom: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   gridCard: { width: "48%", minHeight: 112, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0ddd5", borderRadius: 21, padding: 14 },
@@ -492,22 +567,33 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1 },
   rowTitle: { color: "#173f35", fontSize: 13, fontWeight: "900" },
   rowMeta: { color: "#85908b", fontSize: 9, marginTop: 3 },
-  arabicSurahName: { color: "#17483c", fontSize: 18, fontWeight: "700", maxWidth: 98, textAlign: "right" },
+  arabicSurahName: { color: "#17483c", fontSize: 18, fontWeight: "700", maxWidth: 105, textAlign: "right" },
   searchInputWrap: { padding: 12, backgroundColor: "#f7f4ec" },
   searchInput: { minHeight: 50, borderRadius: 16, borderWidth: 1, borderColor: "#dcd8ce", backgroundColor: "#fff", paddingHorizontal: 14, color: "#173f35", fontSize: 14 },
   emptyLabel: { color: "#7e8a85", textAlign: "center", padding: 30, lineHeight: 20 },
   searchResult: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#e3dfd6", padding: 13, marginBottom: 8 },
-  searchArabic: { color: "#244b40", fontSize: 18, lineHeight: 30, textAlign: "right", marginTop: 5 },
+  searchArabic: { color: "#244b40", fontSize: 18, lineHeight: 30, textAlign: "right", marginTop: 5, writingDirection: "rtl" },
+  openInQuranPill: { alignSelf: "flex-start", marginTop: 8, backgroundColor: "#edf5f1", borderRadius: 99, paddingHorizontal: 9, paddingVertical: 5 },
+  openInQuranText: { color: "#0b654f", fontSize: 9, fontWeight: "900" },
   bookmarkRow: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#e3dfd6", padding: 14, marginBottom: 9 },
   bookmarkRef: { color: "#0b654f", fontSize: 10, fontWeight: "900" },
-  bookmarkArabic: { color: "#244b40", fontSize: 20, lineHeight: 33, textAlign: "right", marginTop: 8 },
+  bookmarkArabic: { color: "#244b40", fontSize: 20, lineHeight: 33, textAlign: "right", writingDirection: "rtl", marginTop: 8 },
   readerContent: { padding: 12, paddingBottom: 42 },
+  surahHeaderCard: { backgroundColor: "#efe8d9", borderRadius: 22, borderWidth: 1, borderColor: "#dfd2bb", padding: 17, marginBottom: 12, alignItems: "center" },
+  surahHeaderArabic: { color: "#173f35", fontSize: 27, fontWeight: "800", textAlign: "center", writingDirection: "rtl" },
+  surahHeaderEnglish: { color: "#7d776d", fontSize: 10, marginTop: 5 },
+  basmala: { color: "#173f35", fontSize: 24, lineHeight: 40, textAlign: "center", writingDirection: "rtl", marginTop: 14 },
   ayahCard: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#e3dfd6", padding: 15, marginBottom: 10 },
   ayahCardSelected: { borderColor: "#8dbbaa", backgroundColor: "#fbfefc" },
-  ayahTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  ayahCardSearchMatch: { borderWidth: 2, borderColor: "#c59b42", backgroundColor: "#fff9e9" },
+  ayahTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   ayahNumber: { width: 34, height: 34, borderRadius: 12, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" },
   ayahNumberText: { color: "#0b654f", fontSize: 10, fontWeight: "900" },
+  ayahMetaWrap: { flex: 1, alignItems: "flex-end" },
   ayahMeta: { color: "#89938f", fontSize: 9 },
+  searchMatchPill: { backgroundColor: "#f1d995", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 5 },
+  searchMatchText: { color: "#6e5217", fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
+  searchMatchQuery: { color: "#87681f", fontSize: 9, fontWeight: "800", marginTop: 8 },
   ayahArabic: { color: "#183e34", fontSize: 25, lineHeight: 44, textAlign: "right", writingDirection: "rtl", marginTop: 10 },
   ayahActions: { flexDirection: "row", gap: 7, marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: "#ece8df" },
   actionButton: { flex: 1, minHeight: 54, borderRadius: 14, backgroundColor: "#f3f5f1", alignItems: "center", justifyContent: "center", padding: 6 },
@@ -528,8 +614,8 @@ const styles = StyleSheet.create({
   hiddenArabic: { letterSpacing: 3, color: "#9ca6a1", textAlign: "center" },
   primaryButton: { minHeight: 48, margin: 14, borderRadius: 15, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center", paddingHorizontal: 18 },
   primaryButtonText: { color: "#fff", fontSize: 12, fontWeight: "900" },
-  notReady: { flex: 1, backgroundColor: "#f7f4ec", alignItems: "center", justifyContent: "center", padding: 28 },
-  notReadyIcon: { fontSize: 44 },
-  notReadyTitle: { color: "#173f35", fontSize: 20, fontWeight: "900", textAlign: "center", marginTop: 10 },
-  notReadyText: { color: "#73817b", fontSize: 12, lineHeight: 19, textAlign: "center", marginTop: 7 }
+  centered: { flex: 1, backgroundColor: "#f7f4ec", alignItems: "center", justifyContent: "center", padding: 28 },
+  bigIcon: { fontSize: 44 },
+  centerTitle: { color: "#173f35", fontSize: 20, fontWeight: "900", textAlign: "center", marginTop: 10 },
+  centerText: { color: "#73817b", fontSize: 12, lineHeight: 19, textAlign: "center", marginTop: 7 }
 });
