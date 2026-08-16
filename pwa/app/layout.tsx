@@ -9,8 +9,6 @@ import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 import WebPushRegistration from "./WebPushRegistration";
-import QuranAudioEnhancer from "./QuranAudioEnhancer";
-import QuranPlaybackSyncEnhancer from "./QuranPlaybackSyncEnhancer";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
 import QuranReferenceLayoutEnhancer from "./QuranReferenceLayoutEnhancer";
 import QuranReferenceControlsEnhancer from "./QuranReferenceControlsEnhancer";
@@ -18,7 +16,6 @@ import QuranViewModeEnhancer from "./QuranViewModeEnhancer";
 import QuranTranslationLanguageEnhancer from "./QuranTranslationLanguageEnhancer";
 import QuranVerseMenuEnhancer from "./QuranVerseMenuEnhancer";
 import QuranInfoMeaningEnhancer from "./QuranInfoMeaningEnhancer";
-import QuranSmartPlayerEnhancer from "./QuranSmartPlayerEnhancer";
 import QuranHeaderSearchEnhancer from "./QuranHeaderSearchEnhancer";
 import QuranHomeLinkFixEnhancer from "./QuranHomeLinkFixEnhancer";
 import QuranMemorizeExperienceEnhancer from "./QuranMemorizeExperienceEnhancer";
@@ -30,13 +27,7 @@ import QuranPrintedPageEnhancer from "./QuranPrintedPageEnhancer";
 import QuranScriptTajweedEnhancer from "./QuranScriptTajweedEnhancer";
 import QuranPrintedScrollEnhancer from "./QuranPrintedScrollEnhancer";
 import QuranIndexEnhancer from "./QuranIndexEnhancer";
-import QuranAudioUnifiedFlowEnhancer from "./QuranAudioUnifiedFlowEnhancer";
-import QuranAudioEntryGuardEnhancer from "./QuranAudioEntryGuardEnhancer";
-import QuranPrintedAudioChooserEnhancer from "./QuranPrintedAudioChooserEnhancer";
-import QuranBackgroundMediaEnhancer from "./QuranBackgroundMediaEnhancer";
-import QuranContinuousAudioEnhancer from "./QuranContinuousAudioEnhancer";
-import QuranActiveAudioUiEnhancer from "./QuranActiveAudioUiEnhancer";
-import QuranAudioAutoMinimizeEnhancer from "./QuranAudioAutoMinimizeEnhancer";
+import QuranAudioSystem from "./QuranAudioSystem";
 import QuranGlyphSafetyEnhancer from "./QuranGlyphSafetyEnhancer";
 import QuranContextSurahChooserEnhancer from "./QuranContextSurahChooserEnhancer";
 import QuranPageOrderGuardEnhancer from "./QuranPageOrderGuardEnhancer";
@@ -75,8 +66,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <PrayerCardInteractionEnhancer />
         <ServiceWorkerRegistration />
         <WebPushRegistration />
-        <QuranAudioEnhancer />
-        <QuranPlaybackSyncEnhancer />
         <QuranUiFixEnhancer />
         <QuranReferenceLayoutEnhancer />
         <QuranReferenceControlsEnhancer />
@@ -84,7 +73,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranTranslationLanguageEnhancer />
         <QuranVerseMenuEnhancer />
         <QuranInfoMeaningEnhancer />
-        <QuranSmartPlayerEnhancer />
         <QuranHeaderSearchEnhancer />
         <QuranHomeLinkFixEnhancer />
         <QuranMemorizeExperienceEnhancer />
@@ -96,13 +84,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranScriptTajweedEnhancer />
         <QuranPrintedScrollEnhancer />
         <QuranIndexEnhancer />
-        <QuranAudioUnifiedFlowEnhancer />
-        <QuranAudioEntryGuardEnhancer />
-        <QuranPrintedAudioChooserEnhancer />
-        <QuranBackgroundMediaEnhancer />
-        <QuranContinuousAudioEnhancer />
-        <QuranActiveAudioUiEnhancer />
-        <QuranAudioAutoMinimizeEnhancer />
+        <QuranAudioSystem />
         <QuranGlyphSafetyEnhancer />
         <QuranContextSurahChooserEnhancer />
         <QuranPageOrderGuardEnhancer />
