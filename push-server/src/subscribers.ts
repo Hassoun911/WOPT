@@ -3,10 +3,10 @@ import type { Env, Locale, PrayerKey } from "./types";
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function response(data: unknown, status = 200) {
+function response(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json", ...headers }
   });
 }
 
@@ -42,6 +42,17 @@ function validTimezone(value: unknown): value is string {
   }
 }
 
+function coordinate(value: unknown, min: number, max: number) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) return null;
+  return value;
+}
+
+function countryCode(value: unknown) {
+  if (typeof value !== "string") return null;
+  const code = value.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(code) ? code : null;
+}
+
 function base64Url(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -66,12 +77,17 @@ async function sha256Hex(input: string) {
 }
 
 function linkSecret(env: Env) {
-  if (!env.EMAIL_LINK_SECRET) throw new Error("EMAIL_LINK_SECRET is not configured");
-  return env.EMAIL_LINK_SECRET;
+  // A dedicated secret is preferred, but the already-private stable VAPID key
+  // keeps signup/manage links functional until EMAIL_LINK_SECRET is configured.
+  return env.EMAIL_LINK_SECRET || env.VAPID_PRIVATE_KEY;
 }
 
 function publicAppUrl(env: Env) {
-  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT").replace(/\/$/, "");
+  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT/").replace(/\/$/, "");
+}
+
+function publicApiUrl(env: Env) {
+  return (env.PUBLIC_API_URL || "https://wopt-prayer-push.wopt-windsor.workers.dev").replace(/\/$/, "");
 }
 
 async function manageToken(env: Env, publicId: string, email: string) {
@@ -80,6 +96,11 @@ async function manageToken(env: Env, publicId: string, email: string) {
 
 async function verificationToken(env: Env, publicId: string, email: string, expiresAt: string) {
   return hmacToken(linkSecret(env), `verify|${publicId}|${email}|${expiresAt}`);
+}
+
+export async function subscriberManageUrl(env: Env, publicId: string, email: string) {
+  const token = await manageToken(env, publicId, email);
+  return `${publicAppUrl(env)}/?emailManage=${encodeURIComponent(publicId)}&token=${encodeURIComponent(token)}`;
 }
 
 function preferenceFlag(value: unknown, fallback: number) {
@@ -127,7 +148,7 @@ async function queueVerification(
   expiresAt: string
 ) {
   const token = await verificationToken(env, publicId, email, expiresAt);
-  const verifyUrl = `${publicAppUrl(env)}/?emailVerify=${encodeURIComponent(publicId)}&token=${encodeURIComponent(token)}`;
+  const verifyUrl = `${publicApiUrl(env)}/email/subscribers/verify?id=${encodeURIComponent(publicId)}&token=${encodeURIComponent(token)}`;
   await env.DB.prepare(
     `INSERT INTO email_outbox (
        subscriber_id, recipient_email, locale, kind, template_key, template_data_json
@@ -138,7 +159,6 @@ async function queueVerification(
     locale,
     JSON.stringify({ verificationUrl: verifyUrl, expiresAt })
   ).run();
-  return token;
 }
 
 async function queueManageLink(
@@ -148,8 +168,7 @@ async function queueManageLink(
   email: string,
   locale: Locale
 ) {
-  const token = await manageToken(env, publicId, email);
-  const manageUrl = `${publicAppUrl(env)}/?emailManage=${encodeURIComponent(publicId)}&token=${encodeURIComponent(token)}`;
+  const manageUrl = await subscriberManageUrl(env, publicId, email);
   await env.DB.prepare(
     `INSERT INTO email_outbox (
        subscriber_id, recipient_email, locale, kind, template_key, template_data_json
@@ -203,11 +222,13 @@ type SubscriberRow = {
   public_id: string;
   email: string;
   locale: Locale;
-  country_code: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  country_code: string | null;
   country_name: string | null;
   region: string | null;
-  city: string;
-  timezone: string;
+  city: string | null;
   calculation_method: number | null;
   madhab: "standard" | "hanafi";
   status: string;
@@ -216,22 +237,20 @@ type SubscriberRow = {
   manage_token_hash: string;
 };
 
+const SUBSCRIBER_SELECT = `
+  SELECT id, public_id, email, locale, latitude, longitude, timezone,
+         country_code, country_name, region, city, calculation_method, madhab,
+         status, verification_token_hash, verification_expires_at, manage_token_hash
+  FROM email_subscribers`;
+
 async function subscriberByEmail(env: Env, email: string) {
-  return env.DB.prepare(
-    `SELECT id, public_id, email, locale, country_code, country_name, region, city, timezone,
-            calculation_method, madhab, status, verification_token_hash, verification_expires_at,
-            manage_token_hash
-     FROM email_subscribers WHERE email = ? COLLATE NOCASE LIMIT 1`
-  ).bind(email).first<SubscriberRow>();
+  return env.DB.prepare(`${SUBSCRIBER_SELECT} WHERE email = ? COLLATE NOCASE LIMIT 1`)
+    .bind(email).first<SubscriberRow>();
 }
 
 async function subscriberByPublicId(env: Env, publicId: string) {
-  return env.DB.prepare(
-    `SELECT id, public_id, email, locale, country_code, country_name, region, city, timezone,
-            calculation_method, madhab, status, verification_token_hash, verification_expires_at,
-            manage_token_hash
-     FROM email_subscribers WHERE public_id = ? LIMIT 1`
-  ).bind(publicId).first<SubscriberRow>();
+  return env.DB.prepare(`${SUBSCRIBER_SELECT} WHERE public_id = ? LIMIT 1`)
+    .bind(publicId).first<SubscriberRow>();
 }
 
 async function validateManage(env: Env, subscriber: SubscriberRow, token: string) {
@@ -240,30 +259,55 @@ async function validateManage(env: Env, subscriber: SubscriberRow, token: string
   return (await sha256Hex(token)) === subscriber.manage_token_hash;
 }
 
+function locationFromBody(body: Record<string, unknown>) {
+  const latitude = coordinate(body.latitude, -90, 90);
+  const longitude = coordinate(body.longitude, -180, 180);
+  const timezone = body.timezone;
+  if (latitude === null || longitude === null || !validTimezone(timezone)) return null;
+  return {
+    latitude,
+    longitude,
+    timezone,
+    countryCode: countryCode(body.countryCode),
+    countryName: cleanText(body.countryName, 100),
+    region: cleanText(body.region, 100),
+    city: cleanText(body.city, 100)
+  };
+}
+
+function calculationMethod(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 99 ? Number(value) : 3;
+}
+
+async function linkInstallation(env: Env, subscriberId: number, value: unknown) {
+  const installationId = cleanText(value, 128);
+  if (!installationId || !/^[A-Za-z0-9_-]{16,128}$/.test(installationId)) return;
+  await env.DB.prepare(
+    "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"
+  ).bind(subscriberId, installationId).run();
+}
+
 export async function subscribeByEmail(request: Request, env: Env) {
   const body = await bodyJson(request);
   const email = normalizeEmail(body.email);
-  const city = cleanText(body.city, 100);
-  const countryCode = typeof body.countryCode === "string" ? body.countryCode.trim().toUpperCase() : "";
-  const countryName = cleanText(body.countryName, 100);
-  const region = cleanText(body.region, 100);
-  const timezone = body.timezone;
+  const location = locationFromBody(body);
   const displayName = cleanText(body.displayName, 100);
   const locale = validLocale(body.locale);
   const madhab = body.madhab === "hanafi" ? "hanafi" : "standard";
-  const calculationMethod = Number.isInteger(body.calculationMethod) && Number(body.calculationMethod) >= 0 && Number(body.calculationMethod) <= 99
-    ? Number(body.calculationMethod)
-    : null;
+  const method = calculationMethod(body.calculationMethod);
 
   if (!email) return response({ error: "Enter a valid email address" }, 400);
-  if (!city) return response({ error: "City is required" }, 400);
-  if (!/^[A-Z]{2}$/.test(countryCode)) return response({ error: "Country code must be a 2-letter ISO code" }, 400);
-  if (!validTimezone(timezone)) return response({ error: "Enter a valid IANA time zone" }, 400);
+  if (!location) return response({ error: "Location permission is required to select local prayer times" }, 400);
 
   const existing = await subscriberByEmail(env, email);
   if (existing?.status === "active") {
     await queueManageLink(env, existing.id, existing.public_id, existing.email, existing.locale);
-    return response({ ok: true, message: "Check your email to manage the existing subscription." });
+    await linkInstallation(env, existing.id, body.installationId);
+    return response({
+      ok: true,
+      alreadySubscribed: true,
+      message: "This email is already subscribed. A secure manage link has been sent."
+    });
   }
 
   const publicId = existing?.public_id ?? crypto.randomUUID();
@@ -276,20 +320,23 @@ export async function subscribeByEmail(request: Request, env: Env) {
   if (existing) {
     await env.DB.prepare(
       `UPDATE email_subscribers SET
-         display_name = ?, locale = ?, country_code = ?, country_name = ?, region = ?, city = ?,
-         timezone = ?, calculation_method = ?, madhab = ?, status = 'pending',
+         display_name = ?, locale = ?, latitude = ?, longitude = ?, timezone = ?,
+         country_code = ?, country_name = ?, region = ?, city = ?, calculation_method = ?,
+         madhab = ?, location_updated_at = CURRENT_TIMESTAMP, status = 'pending',
          verification_token_hash = ?, verification_expires_at = ?, manage_token_hash = ?,
          unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     ).bind(
       displayName,
       locale,
-      countryCode,
-      countryName,
-      region,
-      city,
-      timezone,
-      calculationMethod,
+      location.latitude,
+      location.longitude,
+      location.timezone,
+      location.countryCode,
+      location.countryName,
+      location.region,
+      location.city,
+      method,
       madhab,
       verifyHash,
       expiresAt,
@@ -297,27 +344,30 @@ export async function subscribeByEmail(request: Request, env: Env) {
       existing.id
     ).run();
     await replacePreferences(env, existing.id, body);
+    await linkInstallation(env, existing.id, body.installationId);
     await queueVerification(env, existing.id, publicId, email, locale, expiresAt);
     return response({ ok: true, verificationRequired: true });
   }
 
   await env.DB.prepare(
     `INSERT INTO email_subscribers (
-       public_id, email, display_name, locale, country_code, country_name, region, city, timezone,
-       calculation_method, madhab, status, verification_token_hash, verification_expires_at,
-       manage_token_hash
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+       public_id, email, display_name, locale, latitude, longitude, timezone,
+       country_code, country_name, region, city, calculation_method, madhab, status,
+       verification_token_hash, verification_expires_at, manage_token_hash
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
   ).bind(
     publicId,
     email,
     displayName,
     locale,
-    countryCode,
-    countryName,
-    region,
-    city,
-    timezone,
-    calculationMethod,
+    location.latitude,
+    location.longitude,
+    location.timezone,
+    location.countryCode,
+    location.countryName,
+    location.region,
+    location.city,
+    method,
     madhab,
     verifyHash,
     expiresAt,
@@ -327,16 +377,20 @@ export async function subscribeByEmail(request: Request, env: Env) {
   const created = await subscriberByEmail(env, email);
   if (!created) throw new Error("Subscriber creation failed");
   await replacePreferences(env, created.id, body);
+  await linkInstallation(env, created.id, body.installationId);
   await queueVerification(env, created.id, publicId, email, locale, expiresAt);
 
-  const installationId = cleanText(body.installationId, 128);
-  if (installationId && /^[A-Za-z0-9_-]{16,128}$/.test(installationId)) {
-    await env.DB.prepare(
-      "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"
-    ).bind(created.id, installationId).run();
-  }
-
-  return response({ ok: true, verificationRequired: true });
+  return response({
+    ok: true,
+    verificationRequired: true,
+    location: {
+      city: location.city,
+      region: location.region,
+      countryCode: location.countryCode,
+      countryName: location.countryName,
+      timezone: location.timezone
+    }
+  });
 }
 
 export async function verifyEmailSubscription(url: URL, env: Env) {
@@ -344,7 +398,11 @@ export async function verifyEmailSubscription(url: URL, env: Env) {
   const token = url.searchParams.get("token") ?? "";
   if (!publicId || !token) return response({ error: "Invalid verification link" }, 400);
   const subscriber = await subscriberByPublicId(env, publicId);
-  if (!subscriber || subscriber.status !== "pending" || !subscriber.verification_expires_at || !subscriber.verification_token_hash) {
+  if (!subscriber) return response({ error: "Verification link is invalid" }, 400);
+  if (subscriber.status === "active") {
+    return response({ ok: true, active: true, alreadyVerified: true });
+  }
+  if (subscriber.status !== "pending" || !subscriber.verification_expires_at || !subscriber.verification_token_hash) {
     return response({ error: "Verification link is invalid or already used" }, 400);
   }
   if (Date.parse(subscriber.verification_expires_at) <= Date.now()) {
@@ -359,7 +417,11 @@ export async function verifyEmailSubscription(url: URL, env: Env) {
        verification_token_hash = NULL, verification_expires_at = NULL,
        updated_at = CURRENT_TIMESTAMP WHERE id = ?`
   ).bind(subscriber.id).run();
-  return response({ ok: true, active: true });
+
+  const locationLabel = [subscriber.city, subscriber.region, subscriber.country_name].filter(Boolean).join(", ");
+  const destination = `${publicAppUrl(env)}/?emailVerified=1`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WOPT Email Alerts</title></head><body style="font-family:system-ui,-apple-system,sans-serif;background:#f5f2e9;color:#173f35;padding:32px"><main style="max-width:560px;margin:auto;background:#fff;border-radius:24px;padding:28px"><h1 style="margin-top:0">Email alerts are active</h1><p>Prayer-time email alerts are now enabled${locationLabel ? ` for ${locationLabel}` : ""}.</p><p>Time zone: <strong>${subscriber.timezone}</strong></p><p><a href="${destination}">Return to Windsor Prayer Times</a></p></main></body></html>`;
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
 export async function getSubscriberPreferences(url: URL, env: Env) {
@@ -383,11 +445,13 @@ export async function getSubscriberPreferences(url: URL, env: Env) {
     subscription: {
       email: subscriber.email,
       locale: subscriber.locale,
+      latitude: subscriber.latitude,
+      longitude: subscriber.longitude,
+      timezone: subscriber.timezone,
       city: subscriber.city,
       countryCode: subscriber.country_code,
       countryName: subscriber.country_name,
       region: subscriber.region,
-      timezone: subscriber.timezone,
       calculationMethod: subscriber.calculation_method,
       madhab: subscriber.madhab,
       status: subscriber.status,
@@ -406,36 +470,50 @@ export async function updateSubscriberPreferences(request: Request, env: Env) {
     return response({ error: "Invalid manage link" }, 403);
   }
 
-  const city = body.city === undefined ? subscriber.city : cleanText(body.city, 100);
-  const countryCode = body.countryCode === undefined
-    ? subscriber.country_code
-    : typeof body.countryCode === "string" ? body.countryCode.trim().toUpperCase() : "";
-  const timezone = body.timezone === undefined ? subscriber.timezone : body.timezone;
-  const locale = body.locale === undefined ? subscriber.locale : validLocale(body.locale);
-  const madhab = body.madhab === undefined ? subscriber.madhab : body.madhab === "hanafi" ? "hanafi" : "standard";
-  const calculationMethod = body.calculationMethod === undefined
-    ? subscriber.calculation_method
-    : Number.isInteger(body.calculationMethod) && Number(body.calculationMethod) >= 0 && Number(body.calculationMethod) <= 99
-      ? Number(body.calculationMethod)
-      : null;
+  let latitude = subscriber.latitude;
+  let longitude = subscriber.longitude;
+  let timezone = subscriber.timezone;
+  let detectedCountryCode = subscriber.country_code;
+  let countryName = subscriber.country_name;
+  let region = subscriber.region;
+  let city = subscriber.city;
 
-  if (!city || !/^[A-Z]{2}$/.test(countryCode) || !validTimezone(timezone)) {
-    return response({ error: "Invalid location settings" }, 400);
+  const hasLocationUpdate = body.latitude !== undefined || body.longitude !== undefined || body.timezone !== undefined;
+  if (hasLocationUpdate) {
+    const location = locationFromBody(body);
+    if (!location) return response({ error: "Invalid location settings" }, 400);
+    latitude = location.latitude;
+    longitude = location.longitude;
+    timezone = location.timezone;
+    detectedCountryCode = location.countryCode;
+    countryName = location.countryName;
+    region = location.region;
+    city = location.city;
   }
 
+  const locale = body.locale === undefined ? subscriber.locale : validLocale(body.locale);
+  const madhab = body.madhab === undefined ? subscriber.madhab : body.madhab === "hanafi" ? "hanafi" : "standard";
+  const method = body.calculationMethod === undefined
+    ? (subscriber.calculation_method ?? 3)
+    : calculationMethod(body.calculationMethod);
+
   await env.DB.prepare(
-    `UPDATE email_subscribers SET locale = ?, country_code = ?, country_name = ?, region = ?,
-       city = ?, timezone = ?, calculation_method = ?, madhab = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?`
+    `UPDATE email_subscribers SET locale = ?, latitude = ?, longitude = ?, timezone = ?,
+       country_code = ?, country_name = ?, region = ?, city = ?, calculation_method = ?, madhab = ?,
+       location_updated_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE location_updated_at END,
+       updated_at = CURRENT_TIMESTAMP WHERE id = ?`
   ).bind(
     locale,
-    countryCode,
-    body.countryName === undefined ? subscriber.country_name : cleanText(body.countryName, 100),
-    body.region === undefined ? subscriber.region : cleanText(body.region, 100),
-    city,
+    latitude,
+    longitude,
     timezone,
-    calculationMethod,
+    detectedCountryCode,
+    countryName,
+    region,
+    city,
+    method,
     madhab,
+    hasLocationUpdate ? 1 : 0,
     subscriber.id
   ).run();
   await replacePreferences(env, subscriber.id, body);
