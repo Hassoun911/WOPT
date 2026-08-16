@@ -8,16 +8,13 @@ function replaceAllSafe(path, replacements) {
   write(path, src);
 }
 
-// Native app display name/version + splash.
+// Native app display name/version.
 {
   const path = "mobile/app.config.ts";
   let src = read(path);
   src = src.replace('name: "Windsor Prayer Times"', 'name: "Hassoun"');
   src = src.replace('version: "0.3.8"', 'version: "0.4.0"');
   src = src.replace('versionCode: 11', 'versionCode: 12');
-  if (!src.includes('splash: {')) {
-    src = src.replace('userInterfaceStyle: "automatic",', 'userInterfaceStyle: "automatic",\n  splash: {\n    image: "./assets/splash-logo.png",\n    resizeMode: "contain",\n    backgroundColor: "#003d33"\n  },');
-  }
   write(path, src);
 }
 
