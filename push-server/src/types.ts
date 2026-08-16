@@ -48,6 +48,7 @@ export interface Env {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   EMAIL_REPLY_TO?: string;
+  ADMIN_BOOTSTRAP_KEY?: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
