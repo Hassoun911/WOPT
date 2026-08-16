@@ -59,12 +59,11 @@ function AppWithEmailShell() {
     setCompletion(summary);
   };
 
-  const launcherBottom = Math.max(insets.bottom, 10) + 12;
   const receiptTop = Math.max(insets.top, 12) + 12;
 
   return (
     <View style={styles.root}>
-      <App />
+      <App onOpenEmailAlerts={() => void open()} />
 
       {completion ? (
         <View style={[styles.receipt, { top: receiptTop }]}>
@@ -109,30 +108,6 @@ function AppWithEmailShell() {
           </Text>
         </View>
       ) : null}
-
-      <Pressable
-        onPress={() => void open()}
-        accessibilityRole="button"
-        accessibilityLabel={locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}
-        style={({ pressed }) => [
-          styles.floatingButton,
-          { bottom: launcherBottom },
-          pressed && styles.floatingButtonPressed
-        ]}
-      >
-        <View style={styles.floatingIconWrap}>
-          <Text style={styles.floatingIcon}>✉</Text>
-        </View>
-        <View style={styles.floatingCopy}>
-          <Text style={styles.floatingTitle}>
-            {locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}
-          </Text>
-          <Text style={styles.floatingSubtitle} numberOfLines={1}>
-            {locale === "ar" ? "حسب موقعك ومواقيت الصلاة المحلية" : "Automatic local prayer times wherever you are"}
-          </Text>
-        </View>
-        <Text style={styles.floatingArrow}>{locale === "ar" ? "‹" : "›"}</Text>
-      </Pressable>
 
       <Modal visible={visible} animationType="slide" onRequestClose={() => setVisible(false)}>
         <SafeAreaView style={styles.modalSafe} edges={["top", "bottom", "left", "right"]}>
@@ -188,33 +163,6 @@ export default function AppWithEmail() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  floatingButton: {
-    position: "absolute",
-    left: 18,
-    right: 18,
-    minHeight: 66,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#0b5b47",
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 12,
-    zIndex: 40
-  },
-  floatingButtonPressed: { transform: [{ scale: 0.985 }], opacity: 0.96 },
-  floatingIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center" },
-  floatingIcon: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  floatingCopy: { flex: 1, minWidth: 0 },
-  floatingTitle: { color: "#fff", fontSize: 15, fontWeight: "900" },
-  floatingSubtitle: { color: "#d6e9e3", fontSize: 11, fontWeight: "600", marginTop: 2 },
-  floatingArrow: { color: "#fff", fontSize: 27, lineHeight: 28, fontWeight: "400", opacity: 0.9 },
-
   receipt: {
     position: "absolute",
     left: 16,
@@ -244,7 +192,6 @@ const styles = StyleSheet.create({
   receiptLabel: { width: 88, color: "#81796c", fontSize: 11, fontWeight: "800" },
   receiptValue: { flex: 1, color: "#254d43", fontSize: 11, fontWeight: "800" },
   receiptMessage: { color: "#5d7069", fontSize: 11, lineHeight: 17, marginTop: 11 },
-
   modalSafe: { flex: 1, backgroundColor: "#f6f0e5" },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
   modalEyebrow: { color: "#9a8a70", fontSize: 9, fontWeight: "900", letterSpacing: 1.8 },
