@@ -2,7 +2,8 @@ import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
   name: "Windsor Prayer Times",
-  slug: "windsor-prayer-times",
+  slug: "wopt",
+  owner: "hassoun911",
   scheme: "windsorprayer",
   version: "0.1.0",
   orientation: "portrait",
@@ -47,9 +48,9 @@ const config: ExpoConfig = {
     ]
   ],
   extra: {
-    pushApiUrl: process.env.EXPO_PUBLIC_PUSH_API_URL ?? "https://wopt-prayer-push.wopt-windsor.workers.dev",
+    pushApiUrl: process.env.EXPO_PUBLIC_PUSH_API_URL || "https://wopt-prayer-push.wopt-windsor.workers.dev",
     eas: {
-      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "69276452-f6f2-4d13-80e8-399ab32746ff"
+      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "69276452-f6f2-4d13-80e8-399ab32746ff"
     }
   }
 };
