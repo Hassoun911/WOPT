@@ -1,0 +1,42 @@
+name: Apply Quran index shortcuts
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-quran-index-shortcuts.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fix index shortcuts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('pwa/app/QuranIndexEnhancer.tsx')
+          s = p.read_text()
+          replacements = {
+            '''      if (target.closest("[data-open-memorize]")) { openExisting(["button[data-more='memorize']", ".memorize-button"]); return; }''': '''      if (target.closest("[data-open-memorize]")) { close(); document.querySelector<HTMLButtonElement>(".memorize-launch")?.click(); return; }''',
+            '''      if (quick === "bookmarks") { overlay.querySelector<HTMLButtonElement>("[data-tab='saved']")?.click(); return; }''': '''      if (quick === "bookmarks") { close(); const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-top-actions button")).find((node) => /^Bookmarks$/i.test((node.textContent || "").trim())); button?.click(); return; }''',
+            '''      if (quick === "memorize") { close(); window.dispatchEvent(new Event("wopt-quran-open-memorize")); openExisting(["button[data-more='memorize']", ".memorize-button"]); return; }''': '''      if (quick === "memorize") { close(); document.querySelector<HTMLButtonElement>(".memorize-launch")?.click(); return; }''',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'missing expected snippet: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Commit shortcut fix
+        run: |
+          rm .github/workflows/apply-quran-index-shortcuts.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pwa/app/QuranIndexEnhancer.tsx .github/workflows/apply-quran-index-shortcuts.yml
+          git commit -m "Fix Quran bookmarks and memorize shortcuts"
+          git push
