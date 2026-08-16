@@ -1,13 +1,14 @@
 PRAGMA foreign_keys = ON;
 
-ALTER TABLE user_notification_preferences
-  ADD COLUMN announcements_push INTEGER NOT NULL DEFAULT 1 CHECK (announcements_push IN (0, 1));
+-- Push preferences remain device-based. Regular users do not need accounts.
+ALTER TABLE subscriptions
+  ADD COLUMN notify_announcements INTEGER NOT NULL DEFAULT 1 CHECK (notify_announcements IN (0, 1));
 
-ALTER TABLE user_notification_preferences
-  ADD COLUMN community_events_push INTEGER NOT NULL DEFAULT 1 CHECK (community_events_push IN (0, 1));
+ALTER TABLE subscriptions
+  ADD COLUMN notify_community_events INTEGER NOT NULL DEFAULT 1 CHECK (notify_community_events IN (0, 1));
 
-ALTER TABLE user_notification_preferences
-  ADD COLUMN marketing_push INTEGER NOT NULL DEFAULT 0 CHECK (marketing_push IN (0, 1));
+ALTER TABLE subscriptions
+  ADD COLUMN notify_marketing INTEGER NOT NULL DEFAULT 0 CHECK (notify_marketing IN (0, 1));
 
 CREATE TABLE IF NOT EXISTS push_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,8 +42,8 @@ CREATE TABLE IF NOT EXISTS push_campaigns (
   body_ar TEXT,
   deep_link TEXT,
   image_url TEXT,
-  audience TEXT NOT NULL DEFAULT 'all_users' CHECK (
-    audience IN ('all_users', 'registered_users', 'anonymous_devices', 'custom')
+  audience TEXT NOT NULL DEFAULT 'all_devices' CHECK (
+    audience IN ('all_devices', 'linked_subscribers', 'anonymous_devices', 'custom')
   ),
   target_platform TEXT NOT NULL DEFAULT 'all' CHECK (
     target_platform IN ('all', 'android', 'ios', 'web')
@@ -50,6 +51,9 @@ CREATE TABLE IF NOT EXISTS push_campaigns (
   target_locale TEXT NOT NULL DEFAULT 'all' CHECK (
     target_locale IN ('all', 'en', 'ar')
   ),
+  target_country_code TEXT,
+  target_city TEXT,
+  target_timezone TEXT,
   target_filter_json TEXT,
   priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'high')),
   status TEXT NOT NULL DEFAULT 'draft' CHECK (
@@ -58,11 +62,11 @@ CREATE TABLE IF NOT EXISTS push_campaigns (
   scheduled_at TEXT,
   started_at TEXT,
   sent_at TEXT,
-  created_by_user_id INTEGER,
+  created_by_admin_id INTEGER,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(template_key) REFERENCES push_templates(template_key) ON DELETE SET NULL,
-  FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY(created_by_admin_id) REFERENCES admin_users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_campaigns_status_scheduled
@@ -95,7 +99,7 @@ CREATE TABLE IF NOT EXISTS admin_activity_log (
   entity_id TEXT,
   details_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY(admin_user_id) REFERENCES admin_users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_activity_created
