@@ -1,4 +1,6 @@
 import { dispatchEvent } from "./dispatch";
+import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
+import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
 import { duePrayerEvents } from "./schedule";
 import {
   getSubscriberPreferences,
@@ -143,10 +145,20 @@ async function loadSchedule(env: Env) {
 }
 
 async function runScheduled(env: Env, scheduledTime: number) {
+  // Existing Windsor push path remains unchanged.
   const schedule = await loadSchedule(env);
   const events = duePrayerEvents(schedule.prayer_times, new Date(scheduledTime));
   for (const event of events) await dispatchEvent(env, event);
-  await env.DB.prepare("DELETE FROM deliveries WHERE created_at < datetime('now', '-60 days')").run();
+
+  // Worldwide email subscribers use their detected GPS location and time zone.
+  await dispatchGlobalPrayerEmails(env, scheduledTime);
+  await processEmailOutbox(env);
+
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM deliveries WHERE created_at < datetime('now', '-60 days')"),
+    env.DB.prepare("DELETE FROM email_outbox WHERE status IN ('sent', 'cancelled') AND created_at < datetime('now', '-90 days')"),
+    env.DB.prepare("DELETE FROM location_prayer_cache WHERE prayer_date < date('now', '-45 days')")
+  ]);
 }
 
 export default {
@@ -159,7 +171,12 @@ export default {
       if (request.method === "GET" && url.pathname === "/health") {
         response = json({ ok: true, service: "wopt-prayer-push" });
       } else if (request.method === "GET" && url.pathname === "/config") {
-        response = json({ vapidPublicKey: env.VAPID_PUBLIC_KEY });
+        response = json({
+          vapidPublicKey: env.VAPID_PUBLIC_KEY,
+          emailSignup: true,
+          emailDeliveryConfigured: emailDeliveryConfigured(env),
+          automaticLocation: true
+        });
       } else if (request.method === "POST" && url.pathname === "/subscriptions/expo") {
         response = await registerExpo(request, env);
       } else if (request.method === "POST" && url.pathname === "/subscriptions/web") {
