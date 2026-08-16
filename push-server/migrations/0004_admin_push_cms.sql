@@ -10,6 +10,18 @@ ALTER TABLE subscriptions
 ALTER TABLE subscriptions
   ADD COLUMN notify_marketing INTEGER NOT NULL DEFAULT 0 CHECK (notify_marketing IN (0, 1));
 
+-- Location is detected by the app. Coordinates + timezone are authoritative;
+-- city/country are reverse-geocoded labels for targeting and display.
+ALTER TABLE subscriptions ADD COLUMN latitude REAL;
+ALTER TABLE subscriptions ADD COLUMN longitude REAL;
+ALTER TABLE subscriptions ADD COLUMN timezone TEXT;
+ALTER TABLE subscriptions ADD COLUMN country_code TEXT;
+ALTER TABLE subscriptions ADD COLUMN city TEXT;
+ALTER TABLE subscriptions ADD COLUMN location_updated_at TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_location_enabled
+  ON subscriptions(enabled, timezone, country_code, city);
+
 CREATE TABLE IF NOT EXISTS push_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   template_key TEXT NOT NULL UNIQUE,
