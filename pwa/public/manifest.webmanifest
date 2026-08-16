@@ -1,7 +1,7 @@
 {
   "name": "Windsor Prayer Times",
   "short_name": "Prayer Times",
-  "description": "The five daily Adhan times for Windsor, Ontario with Qur’an reading, guided audio, search, and memorization tools.",
+  "description": "The five daily Adhan times for Windsor, Ontario with Qur’an reading, guided audio, search, memorization, and smart navigation tools.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
