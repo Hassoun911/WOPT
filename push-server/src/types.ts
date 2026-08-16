@@ -22,6 +22,7 @@ export interface DuePrayerEvent {
 export interface SubscriptionRow {
   id: number;
   installation_id: string;
+  subscriber_id?: number | null;
   provider: "expo" | "web";
   platform: "android" | "ios" | "web";
   locale: Locale;
@@ -31,12 +32,18 @@ export interface SubscriptionRow {
   notify_twenty: number;
   notify_ten: number;
   notify_athan: number;
+  notify_announcements?: number;
+  notify_community_events?: number;
+  notify_marketing?: number;
 }
 
 export interface Env {
   DB: D1Database;
   SCHEDULE_URL: string;
   ALLOWED_WEB_ORIGIN: string;
+  PUBLIC_APP_URL?: string;
+  GLOBAL_PRAYER_API_BASE?: string;
+  EMAIL_LINK_SECRET?: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
