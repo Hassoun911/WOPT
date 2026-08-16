@@ -12,6 +12,7 @@ import {
   loginAdmin,
   logoutAdmin
 } from "./adminAuth";
+import { requestAdminPasswordReset, resetAdminPassword } from "./adminPasswordReset";
 import {
   createAdminPushCampaign,
   dispatchDueAdminPushCampaigns,
@@ -164,16 +165,13 @@ async function loadSchedule(env: Env) {
 }
 
 async function runScheduled(env: Env, scheduledTime: number) {
-  // Existing Windsor prayer push path remains isolated and unchanged.
   const schedule = await loadSchedule(env);
   const events = duePrayerEvents(schedule.prayer_times, new Date(scheduledTime));
   for (const event of events) await dispatchEvent(env, event);
 
-  // Admin push and email broadcasts are independent from prayer-time delivery.
   await dispatchDueAdminPushCampaigns(env);
   await dispatchDueAdminEmailCampaigns(env);
 
-  // Worldwide email subscribers use their detected GPS location and time zone.
   await dispatchGlobalPrayerEmails(env, scheduledTime);
   await processEmailOutbox(env);
   await refreshAdminEmailCampaignStatuses(env);
@@ -182,7 +180,8 @@ async function runScheduled(env: Env, scheduledTime: number) {
     env.DB.prepare("DELETE FROM deliveries WHERE created_at < datetime('now', '-60 days')"),
     env.DB.prepare("DELETE FROM email_outbox WHERE status IN ('sent', 'cancelled') AND created_at < datetime('now', '-90 days')"),
     env.DB.prepare("DELETE FROM location_prayer_cache WHERE prayer_date < date('now', '-45 days')"),
-    env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < datetime('now', '-30 days')")
+    env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < datetime('now', '-30 days')"),
+    env.DB.prepare("DELETE FROM admin_password_resets WHERE consumed_at IS NOT NULL AND created_at < datetime('now', '-30 days')")
   ]);
 }
 
@@ -228,6 +227,10 @@ export default {
         response = await getAdminMe(request, env);
       } else if (request.method === "POST" && url.pathname === "/admin/password") {
         response = await changeAdminPassword(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/password/forgot") {
+        response = await requestAdminPasswordReset(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/password/reset") {
+        response = await resetAdminPassword(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/dashboard") {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
