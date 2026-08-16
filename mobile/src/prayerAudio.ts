@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import PrayerAudio from "../modules/prayer-audio";
 import { buildPrayerEvents } from "./events";
-import type { PrayerTimes } from "./types";
+import type { PrayerKey, PrayerTimes } from "./types";
 
 export type AndroidPrayerAudioResult = {
   count: number;
@@ -27,10 +27,22 @@ export async function scheduleAndroidPrayerAudio(
   return { count: result.scheduled, exact: result.exact, available: true };
 }
 
+export async function scheduleAndroidTestAdhan(prayer: PrayerKey = "fajr", delaySeconds = 30) {
+  if (Platform.OS !== "android" || !PrayerAudio) {
+    return { exact: false, available: false };
+  }
+  const result = await PrayerAudio.scheduleTestPrayerAlarm(prayer, delaySeconds);
+  return { exact: result.exact, available: true };
+}
+
 export async function cancelAndroidPrayerAudio() {
   if (Platform.OS === "android" && PrayerAudio) {
     await PrayerAudio.cancelExactPrayerAlarms();
   }
+}
+
+export function canScheduleAndroidExactAlarms() {
+  return Platform.OS === "android" && PrayerAudio ? PrayerAudio.canScheduleExactAlarms() : false;
 }
 
 export function openExactAlarmSettings() {
