@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -13,8 +14,8 @@ import {
   View
 } from "react-native";
 import { CITY_LABEL, STORAGE_KEYS } from "./src/config";
-import { disablePrayerNotifications, schedulePrayerNotifications } from "./src/notifications";
-import { openExactAlarmSettings } from "./src/prayerAudio";
+import { disablePrayerNotifications, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
+import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
 import { loadPrayerTimes } from "./src/prayerData";
 import { registerDeviceForServerPush } from "./src/push";
 import { formatPrayerTime, timeToMinutes, windsorDateKey, windsorSecondsSinceMidnight } from "./src/time";
@@ -83,6 +84,18 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      setNow(new Date());
+      if (!alertsEnabled || !Object.keys(prayerTimes).length) return;
+      void schedulePrayerNotifications(prayerTimes, locale)
+        .then((result) => setScheduledCount(result.count))
+        .catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [alertsEnabled, locale, prayerTimes]);
+
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
     setLocale(nextLocale);
@@ -122,6 +135,43 @@ export default function App() {
       }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const testNotification = async () => {
+    try {
+      const result = await scheduleTestReminder(15);
+      if (!result.granted) {
+        Alert.alert("Notifications are off", "Allow notifications for WOPT in Android settings, then try again.");
+        return;
+      }
+      Alert.alert("Test scheduled", "Lock the phone. A WOPT notification with the reminder chime should arrive in about 15 seconds.");
+    } catch (error) {
+      Alert.alert("Notification test failed", String(error));
+    }
+  };
+
+  const testAdhan = async () => {
+    try {
+      const result = await scheduleAndroidTestAdhan("fajr", 30);
+      if (!result.available) {
+        Alert.alert("Native Adhan unavailable", "This build does not contain the native Android prayer-audio module.");
+        return;
+      }
+      if (!result.exact) {
+        Alert.alert(
+          "Allow Alarms & reminders",
+          "Exact alarm access is off. Enable it, return to WOPT, then run the Adhan test again.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open settings", onPress: openExactAlarmSettings }
+          ]
+        );
+        return;
+      }
+      Alert.alert("Adhan test scheduled", "Lock the phone now. The Fajr Adhan should start by itself in about 30 seconds.");
+    } catch (error) {
+      Alert.alert("Adhan test failed", String(error));
     }
   };
 
@@ -228,6 +278,21 @@ export default function App() {
           />
         </View>
 
+        <View style={styles.testCard}>
+          <Text style={styles.testTitle}>Notification & Adhan test</Text>
+          <Text style={styles.testDescription}>Use these without changing the phone clock. Lock the phone immediately after starting each test.</Text>
+          <View style={styles.testRow}>
+            <Pressable onPress={testNotification} style={styles.testButton} disabled={busy}>
+              <Text style={styles.testButtonTitle}>Test notification</Text>
+              <Text style={styles.testButtonMeta}>15 seconds</Text>
+            </Pressable>
+            <Pressable onPress={testAdhan} style={[styles.testButton, styles.testButtonPrimary]} disabled={busy}>
+              <Text style={[styles.testButtonTitle, styles.testButtonPrimaryText]}>Test Adhan</Text>
+              <Text style={[styles.testButtonMeta, styles.testButtonPrimaryMeta]}>30 seconds</Text>
+            </Pressable>
+          </View>
+        </View>
+
         <Text style={styles.footer}>Official Windsor Islamic Association schedule • America/Toronto</Text>
       </ScrollView>
     </SafeAreaView>
@@ -278,5 +343,15 @@ const styles = StyleSheet.create({
   alertTitle: { color: "#173f35", fontSize: 20, fontWeight: "900" },
   alertDescription: { color: "#617871", fontSize: 14, lineHeight: 21, marginTop: 6 },
   alertStatus: { color: "#0b7a5c", fontSize: 12, fontWeight: "800", marginTop: 10 },
+  testCard: { marginTop: 16, padding: 20, borderRadius: 24, backgroundColor: "#fff", borderWidth: 1, borderColor: "#d7dfda" },
+  testTitle: { color: "#173f35", fontSize: 18, fontWeight: "900" },
+  testDescription: { color: "#617871", fontSize: 13, lineHeight: 19, marginTop: 5 },
+  testRow: { flexDirection: "row", gap: 10, marginTop: 16 },
+  testButton: { flex: 1, minHeight: 64, borderRadius: 17, borderWidth: 1, borderColor: "#bfd4cd", backgroundColor: "#f7fbf9", padding: 12, justifyContent: "center" },
+  testButtonPrimary: { backgroundColor: "#0b5b47", borderColor: "#0b5b47" },
+  testButtonTitle: { color: "#164b3e", fontSize: 13, fontWeight: "900" },
+  testButtonMeta: { color: "#72847e", fontSize: 11, marginTop: 3 },
+  testButtonPrimaryText: { color: "#fff" },
+  testButtonPrimaryMeta: { color: "#bdd9cf" },
   footer: { color: "#7f8d88", fontSize: 11, textAlign: "center", marginTop: 28 }
 });
