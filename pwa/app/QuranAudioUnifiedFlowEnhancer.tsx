@@ -73,6 +73,7 @@ export default function QuranAudioUnifiedFlowEnhancer() {
     let pageNumber = 1;
     let pendingSelection: HTMLElement | null = null;
     let pendingWasAdded = false;
+    let selectedStartKey = "";
 
     const loadChapters = async () => {
       if (chapters.size) return;
@@ -121,6 +122,18 @@ export default function QuranAudioUnifiedFlowEnhancer() {
       bookOverlay()?.querySelector<HTMLButtonElement>(`[data-scope='${scope}']`)?.click();
     };
 
+    const restoreSelectedContext = (scope: string) => {
+      if (!selectedStartKey) return;
+      const selected = parts(selectedStartKey);
+      if (scope === "surah") {
+        const key = `${selected.surah}:1`;
+        selectedStartKey = key;
+        setContextText(key, pageNumber, `Full ${chapterLabel(selected.surah)}`);
+      } else if (scope === "quran") {
+        setContextText(selectedStartKey, pageNumber, `Continue from ${selectedStartKey}`);
+      }
+    };
+
     const renderStartChoices = async () => {
       const overlay = bookOverlay();
       if (!overlay) return;
@@ -130,6 +143,7 @@ export default function QuranAudioUnifiedFlowEnhancer() {
       const visible = nearestVerse(verses);
       const visibleKey = visible?.dataset.verseKey || verses[0]?.dataset.verseKey || "1:1";
       const firstKey = verses[0]?.dataset.verseKey || visibleKey;
+      selectedStartKey = firstKey;
       const surahs = new Map<number, HTMLElement>();
       verses.forEach((verse) => {
         const surah = parts(verse.dataset.verseKey || "").surah;
@@ -153,6 +167,7 @@ export default function QuranAudioUnifiedFlowEnhancer() {
 
     const openUnified = async () => {
       clearSelection();
+      selectedStartKey = "";
       currentPage = visiblePrintedPage();
       verses = uniqueVerses(currentPage || document);
       const visible = nearestVerse(verses);
@@ -172,6 +187,7 @@ export default function QuranAudioUnifiedFlowEnhancer() {
       overlay?.querySelectorAll("[data-unified-kind]").forEach((node) => node.classList.toggle("active", node === button));
 
       if (kind === "page") {
+        selectedStartKey = key;
         clearSelection();
         clickScope("page");
         setContextText(key, pageNumber, `Page ${pageNumber}`);
@@ -182,14 +198,16 @@ export default function QuranAudioUnifiedFlowEnhancer() {
       if (target) target.scrollIntoView({ behavior: "auto", block: "center" });
 
       if (kind === "visible") {
+        selectedStartKey = key;
         clickScope("quran");
         setContextText(key, pageNumber, `Continue from ${key}`);
         return;
       }
 
       const surah = Number(button.dataset.surah || 0) || parts(key).surah;
+      selectedStartKey = `${surah}:1`;
       clickScope("surah");
-      setContextText(`${surah}:1`, pageNumber, `Full ${chapterLabel(surah)}`);
+      setContextText(selectedStartKey, pageNumber, `Full ${chapterLabel(surah)}`);
     };
 
     const onDocumentClick = (event: MouseEvent) => {
@@ -210,6 +228,18 @@ export default function QuranAudioUnifiedFlowEnhancer() {
         event.stopPropagation();
         event.stopImmediatePropagation();
         choose(startButton);
+        return;
+      }
+
+      const scopeButton = target.closest<HTMLButtonElement>(".wopt-book-audio-backdrop.open [data-scope]");
+      if (scopeButton) {
+        const scope = scopeButton.dataset.scope || "";
+        if (scope === "surah" || scope === "quran") {
+          // The legacy chooser recalculates context from the verse nearest the
+          // middle of the viewport whenever a scope button is pressed. Restore
+          // the explicit start chosen by the user after those handlers finish.
+          window.setTimeout(() => restoreSelectedContext(scope), 0);
+        }
         return;
       }
 
