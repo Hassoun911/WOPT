@@ -56,6 +56,26 @@ export async function requestNotificationPermission() {
   return requested.granted;
 }
 
+export async function scheduleTestReminder(delaySeconds = 15) {
+  const granted = await requestNotificationPermission();
+  if (!granted) return { granted: false, identifier: null as string | null };
+  const identifier = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "WOPT test notification",
+      body: "Prayer reminder notifications are working.",
+      sound: "attention_chime.wav",
+      data: { kind: "test-reminder" }
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(5, delaySeconds),
+      repeats: false,
+      channelId: REMINDER_CHANNEL_ID
+    }
+  });
+  return { granted: true, identifier };
+}
+
 function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
   const prayer = NAMES[event.prayer][locale];
   const time = formatPrayerTime(event.prayerTime, locale);
@@ -88,8 +108,6 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
     ...common,
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
     body: `${time} • ${CITY_LABEL}`,
-    // Android exact-time audio is handled by the native alarm service. iOS uses
-    // this notification as its platform-safe exact-time alert.
     sound: "default"
   };
 }
@@ -112,8 +130,6 @@ export async function schedulePrayerNotifications(
   if (!granted) return { granted: false, count: 0 };
 
   await cancelPrayerNotifications();
-  // iOS keeps at most 64 pending local notifications; four days uses at most 60.
-  // The push server remains the primary path and local notifications are the fallback.
   const days = Platform.OS === "ios" ? 4 : 14;
   const events = buildPrayerEvents(prayerTimes, days).filter(
     (event) => Platform.OS !== "android" || event.kind !== "athan"
