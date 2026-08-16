@@ -27,6 +27,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       >
         <a href={`${basePath}/admin/`} style={linkStyle}>Dashboard</a>
         <a href={`${basePath}/admin/email/`} style={linkStyle}>Email campaigns</a>
+        <a href={`${basePath}/admin/reset/`} style={linkStyle}>Password recovery</a>
       </nav>
     </>
   );
