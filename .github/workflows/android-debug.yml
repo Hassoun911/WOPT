@@ -1,6 +1,5 @@
 name: Build WOPT Android APK
 
-# Rebuild marker: include latest locked-screen Adhan fixes.
 on:
   workflow_dispatch:
   push:
@@ -43,14 +42,14 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Build standalone release APK
+        run: ./gradlew assembleRelease
         working-directory: mobile/android
 
-      - name: Upload APK
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: wopt-android-debug
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: wopt-android-standalone
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
