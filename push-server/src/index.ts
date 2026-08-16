@@ -1,5 +1,12 @@
 import { dispatchEvent } from "./dispatch";
 import { duePrayerEvents } from "./schedule";
+import {
+  getSubscriberPreferences,
+  subscribeByEmail,
+  unsubscribeEmail,
+  updateSubscriberPreferences,
+  verifyEmailSubscription
+} from "./subscribers";
 import type { Env, Locale, PrayerFile } from "./types";
 
 let cachedSchedule: { expiresAt: number; data: PrayerFile } | null = null;
@@ -16,7 +23,7 @@ function corsHeaders(request: Request, env: Env) {
   const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     Vary: "Origin"
   };
@@ -159,6 +166,16 @@ export default {
         response = await registerWeb(request, env);
       } else if (request.method === "DELETE" && url.pathname === "/subscriptions") {
         response = await unsubscribe(request, env);
+      } else if (request.method === "POST" && url.pathname === "/email/subscribers") {
+        response = await subscribeByEmail(request, env);
+      } else if (request.method === "GET" && url.pathname === "/email/subscribers/verify") {
+        response = await verifyEmailSubscription(url, env);
+      } else if (request.method === "GET" && url.pathname === "/email/subscribers/preferences") {
+        response = await getSubscriberPreferences(url, env);
+      } else if (request.method === "POST" && url.pathname === "/email/subscribers/preferences") {
+        response = await updateSubscriberPreferences(request, env);
+      } else if (request.method === "POST" && url.pathname === "/email/subscribers/unsubscribe") {
+        response = await unsubscribeEmail(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
