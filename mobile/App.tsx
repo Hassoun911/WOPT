@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,10 +20,11 @@ import { disablePrayerNotifications, schedulePrayerNotifications, scheduleTestRe
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
 import { loadPrayerTimes } from "./src/prayerData";
 import { registerDeviceForServerPush } from "./src/push";
+import Quran from "./src/quran/Quran";
 import { formatPrayerTime, timeToMinutes, windsorDateKey, windsorSecondsSinceMidnight } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
-type AppTab = "home" | "quiz" | "alerts" | "more";
+type AppTab = "home" | "quran" | "quiz" | "alerts" | "more";
 
 type AppProps = {
   onOpenEmailAlerts?: () => void;
@@ -211,12 +211,6 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     }
   };
 
-  const openQuran = () => {
-    void Linking.openURL("https://hassoun911.github.io/WOPT/quran/").catch(() => {
-      Alert.alert("Qur’an reader", "Unable to open the Qur’an reader right now.");
-    });
-  };
-
   if (busy && !today) {
     return (
       <SafeAreaView style={styles.loading} edges={["top", "bottom", "left", "right"]}>
@@ -335,10 +329,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       </Pressable>
 
       <View style={styles.smartGrid}>
-        <Pressable onPress={openQuran} style={styles.smartCard}>
+        <Pressable onPress={() => setActiveTab("quran")} style={styles.smartCard}>
           <Text style={styles.smartEmoji}>📖</Text>
           <Text style={styles.smartTitle}>{locale === "ar" ? "القرآن" : "Qur’an"}</Text>
-          <Text style={styles.smartText}>{locale === "ar" ? "تابع القراءة والاستماع" : "Read & listen"}</Text>
+          <Text style={styles.smartText}>{locale === "ar" ? "قارئ أندرويد أصلي" : "Native Android reader"}</Text>
         </Pressable>
         <Pressable onPress={() => setActiveTab("alerts")} style={styles.smartCard}>
           <Text style={styles.smartEmoji}>🔔</Text>
@@ -418,8 +412,8 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <Text style={styles.pageTitle}>{locale === "ar" ? "المزيد" : "More"}</Text>
       <Text style={styles.pageSubtitle}>{locale === "ar" ? "الوصول السريع إلى ميزاتك ومصادر التطبيق." : "Quick access to your features and app sources."}</Text>
 
-      <Pressable onPress={openQuran} style={styles.moreRow}>
-        <Text style={styles.moreEmoji}>📖</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "قارئ القرآن" : "Qur’an reader"}</Text><Text style={styles.moreText}>{locale === "ar" ? "قراءة، استماع، بحث وحفظ مكانك" : "Read, listen, search, and continue where you left off"}</Text></View><Text style={styles.settingArrow}>›</Text>
+      <Pressable onPress={() => setActiveTab("quran")} style={styles.moreRow}>
+        <Text style={styles.moreEmoji}>📖</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "قارئ القرآن" : "Qur’an reader"}</Text><Text style={styles.moreText}>{locale === "ar" ? "قارئ أندرويد أصلي سريع ومحفوظ محلياً" : "Fresh native Android reader with offline verified text"}</Text></View><Text style={styles.settingArrow}>›</Text>
       </Pressable>
       <Pressable onPress={() => setActiveTab("quiz")} style={styles.moreRow}>
         <Text style={styles.moreEmoji}>🧠</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "المسابقة اليومية" : "Daily Islamic Quiz"}</Text><Text style={styles.moreText}>{badge.emoji} {badge.name[locale]} • 🔥 {quizStats.streak} • 🏆 {quizStats.totalWins}</Text></View><Text style={styles.settingArrow}>›</Text>
@@ -441,15 +435,17 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     </ScrollView>
   );
 
-  const body = activeTab === "quiz"
-    ? <IslamicQuiz locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
-    : activeTab === "alerts"
-      ? alertsScreen
-      : activeTab === "more"
-        ? moreScreen
-        : homeScreen;
+  const body = activeTab === "quran"
+    ? <Quran locale={locale} onBackHome={() => setActiveTab("home")} />
+    : activeTab === "quiz"
+      ? <IslamicQuiz locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
+      : activeTab === "alerts"
+        ? alertsScreen
+        : activeTab === "more"
+          ? moreScreen
+          : homeScreen;
 
-  const navItems: Array<{ tab: AppTab | "quran"; emoji: string; en: string; ar: string }> = [
+  const navItems: Array<{ tab: AppTab; emoji: string; en: string; ar: string }> = [
     { tab: "home", emoji: "🏠", en: "Home", ar: "الرئيسية" },
     { tab: "quran", emoji: "📖", en: "Qur’an", ar: "القرآن" },
     { tab: "quiz", emoji: "🧠", en: "Quiz", ar: "مسابقة" },
@@ -463,11 +459,11 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <View style={styles.flex}>{body}</View>
       <View style={styles.bottomNav}>
         {navItems.map((item) => {
-          const active = item.tab !== "quran" && activeTab === item.tab;
+          const active = activeTab === item.tab;
           return (
             <Pressable
               key={item.tab}
-              onPress={() => item.tab === "quran" ? openQuran() : setActiveTab(item.tab)}
+              onPress={() => setActiveTab(item.tab)}
               style={[styles.navItem, active && styles.navItemActive]}
             >
               <Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text>
