@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useState } from "react";
+import * as Notifications from "expo-notifications";
+import { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -12,10 +13,29 @@ import {
 import App from "./App";
 import EmailSignupCard from "./src/EmailSignupCard";
 import { STORAGE_KEYS } from "./src/config";
+import { configureNotificationChannels } from "./src/notifications";
+import { registerDeviceForServerPush } from "./src/push";
 
 export default function AppWithEmail() {
   const [visible, setVisible] = useState(false);
   const [locale, setLocale] = useState<"en" | "ar">("en");
+
+  useEffect(() => {
+    void (async () => {
+      await configureNotificationChannels();
+      const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
+      const currentLocale = saved === "ar" ? "ar" : "en";
+      setLocale(currentLocale);
+
+      // Do not prompt for notification permission here. If the user has already
+      // granted permission, make sure the server registration is fresh so admin
+      // broadcasts can reach the device even after preferences change.
+      const permission = await Notifications.getPermissionsAsync();
+      if (permission.granted) {
+        await registerDeviceForServerPush(currentLocale).catch(() => undefined);
+      }
+    })().catch(() => undefined);
+  }, []);
 
   const open = async () => {
     const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
