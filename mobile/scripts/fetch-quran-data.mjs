@@ -41,7 +41,11 @@ function parseMetadata(source) {
   const data = context.QuranData;
   if (!data?.Sura || !data?.Page || !data?.Juz) throw new Error("Tanzil metadata is incomplete");
 
-  const surahs = data.Sura.slice(1).map((item, index) => ({
+  // Tanzil metadata arrays end with terminal sentinel rows such as [6236, 1]
+  // for Sura and [115, 1] for Juz/Page. They mark the end boundary and are
+  // not actual Surahs, Juz or pages, so keep only real Quran entries.
+  const realSurahRows = data.Sura.slice(1).filter((item) => Array.isArray(item) && item.length >= 8).slice(0, 114);
+  const surahs = realSurahRows.map((item, index) => ({
     number: index + 1,
     startIndex: item[0],
     ayahCount: item[1],
@@ -53,13 +57,15 @@ function parseMetadata(source) {
     revelationType: item[7]
   }));
 
-  const pages = data.Page.slice(1).map((item, index) => ({
+  const pageRows = data.Page.slice(1).filter((item) => Array.isArray(item) && item[0] >= 1 && item[0] <= 114).slice(0, 604);
+  const pages = pageRows.map((item, index) => ({
     page: index + 1,
     surah: item[0],
     ayah: item[1]
   }));
 
-  const juz = data.Juz.slice(1).map((item, index) => ({
+  const juzRows = data.Juz.slice(1).filter((item) => Array.isArray(item) && item[0] >= 1 && item[0] <= 114).slice(0, 30);
+  const juz = juzRows.map((item, index) => ({
     juz: index + 1,
     surah: item[0],
     ayah: item[1]
