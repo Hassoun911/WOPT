@@ -2,9 +2,6 @@ name: Deploy WOPT Push Worker
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "push-server/.deploy-email-ui"
 
 permissions:
   contents: read
