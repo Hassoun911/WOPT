@@ -202,10 +202,10 @@ export default function QuranIndexEnhancer() {
       }
       const savedPage = target.closest<HTMLButtonElement>("[data-saved-page]");
       if (savedPage) { setBookPage(Number(savedPage.dataset.savedPage || 1)); return; }
-      if (target.closest("[data-open-memorize]")) { openExisting(["button[data-more='memorize']", ".memorize-button"]); return; }
+      if (target.closest("[data-open-memorize]")) { close(); document.querySelector<HTMLButtonElement>(".memorize-launch")?.click(); return; }
       const quick = target.closest<HTMLButtonElement>("[data-quick]")?.dataset.quick;
-      if (quick === "bookmarks") { overlay.querySelector<HTMLButtonElement>("[data-tab='saved']")?.click(); return; }
-      if (quick === "memorize") { close(); window.dispatchEvent(new Event("wopt-quran-open-memorize")); openExisting(["button[data-more='memorize']", ".memorize-button"]); return; }
+      if (quick === "bookmarks") { close(); const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".quran-top-actions button")).find((node) => /^Bookmarks$/i.test((node.textContent || "").trim())); button?.click(); return; }
+      if (quick === "memorize") { close(); document.querySelector<HTMLButtonElement>(".memorize-launch")?.click(); return; }
       if (quick === "audio") { close(); openExisting(["[data-clean='audio']", ".wopt-ref-safe [data-ref='play']"]); return; }
       if (quick === "settings") { close(); openExisting(["[data-clean='reader']", ".wopt-ref-safe [data-ref='settings']"]); return; }
     };
