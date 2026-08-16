@@ -9,6 +9,7 @@ let firstLaunchAlarmCheckStarted = false;
 
 function startFirstLaunchExactAlarmSetup() {
   if (Platform.OS !== "android" || !PrayerAudio || firstLaunchAlarmCheckStarted) return;
+  const prayerAudio = PrayerAudio;
   firstLaunchAlarmCheckStarted = true;
 
   // Give the first app screen time to mount before Android opens its system
@@ -22,8 +23,8 @@ function startFirstLaunchExactAlarmSetup() {
         if (alreadyHandled) return;
 
         await AsyncStorage.setItem(EXACT_ALARM_SETUP_KEY, "shown");
-        if (!PrayerAudio.canScheduleExactAlarms()) {
-          PrayerAudio.openExactAlarmSettings();
+        if (!prayerAudio.canScheduleExactAlarms()) {
+          prayerAudio.openExactAlarmSettings();
         }
       } catch {
         // Never block the app if onboarding storage fails. The Alerts tab and
