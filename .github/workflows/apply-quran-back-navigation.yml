@@ -1,0 +1,25 @@
+name: Apply Quran back navigation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix-quran-back-navigation.mjs'
+      - '.github/workflows/apply-quran-back-navigation.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply navigation migration
+        run: node scripts/fix-quran-back-navigation.mjs
+      - name: Commit navigation fix
+        run: |
+          rm scripts/fix-quran-back-navigation.mjs
+          rm .github/workflows/apply-quran-back-navigation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Quran Android back navigation"
+          git push
