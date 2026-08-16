@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { detectPrayerLocation } from "./deviceLocation";
+import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import { getInstallationId } from "./installation";
 import { PRAYER_KEYS } from "./types";
 
@@ -13,6 +13,7 @@ export type EmailSignupResult = {
   ok: boolean;
   verificationRequired?: boolean;
   alreadySubscribed?: boolean;
+  verificationAlreadySent?: boolean;
   message?: string;
   location?: {
     city?: string | null;
@@ -41,9 +42,10 @@ export async function getEmailBackendStatus() {
 export async function subscribeToPrayerEmails(
   email: string,
   locale: "en" | "ar",
-  choices: EmailAlertChoices
+  choices: EmailAlertChoices,
+  detectedLocation?: DetectedPrayerLocation | null
 ) {
-  const location = await detectPrayerLocation();
+  const location = detectedLocation ?? await detectPrayerLocation();
   if (!location) throw new Error("Location permission is required so WOPT can use your local prayer times.");
 
   const installationId = await getInstallationId();
