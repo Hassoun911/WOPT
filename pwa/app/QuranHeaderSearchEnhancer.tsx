@@ -157,11 +157,11 @@ export default function QuranHeaderSearchEnhancer() {
       }
     };
 
-    const isVisibleVerseNode = (node: HTMLElement) => {
+    const isRenderedVerseNode = (node: HTMLElement) => {
       const style = window.getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity || 1) === 0) return false;
       const rect = node.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+      return rect.width > 0 && rect.height > 0;
     };
 
     const clearSearchHighlight = () => {
@@ -178,8 +178,8 @@ export default function QuranHeaderSearchEnhancer() {
       if (!target?.verseKey || Date.now() - target.savedAt > 180000) return false;
 
       const matches = Array.from(document.querySelectorAll<HTMLElement>(`[data-verse-key="${target.verseKey}"]`));
-      const ayah = matches.find((node) => Boolean(node.closest(".wopt-printed-reader")) && isVisibleVerseNode(node))
-        || matches.find(isVisibleVerseNode)
+      const ayah = matches.find((node) => Boolean(node.closest(".wopt-printed-reader")) && isRenderedVerseNode(node))
+        || matches.find(isRenderedVerseNode)
         || null;
       if (!ayah) return false;
 
@@ -212,7 +212,7 @@ export default function QuranHeaderSearchEnhancer() {
 
     const pageForVerse = async (key: string) => {
       const localNodes = Array.from(document.querySelectorAll<HTMLElement>(`[data-verse-key="${key}"]`));
-      const local = localNodes.find(isVisibleVerseNode) || localNodes[0];
+      const local = localNodes.find(isRenderedVerseNode) || localNodes[0];
       const localPage = Number(local?.dataset.page || local?.closest<HTMLElement>("[data-printed-page]")?.dataset.printedPage || 0);
       if (localPage) return localPage;
       try {
