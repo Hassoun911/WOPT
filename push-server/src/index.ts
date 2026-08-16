@@ -1,3 +1,16 @@
+import { getAdminDashboard, listAdminSubscribers } from "./adminData";
+import {
+  bootstrapAdmin,
+  changeAdminPassword,
+  getAdminMe,
+  loginAdmin,
+  logoutAdmin
+} from "./adminAuth";
+import {
+  createAdminPushCampaign,
+  dispatchDueAdminPushCampaigns,
+  listAdminPushCampaigns
+} from "./adminPush";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -25,7 +38,7 @@ function corsHeaders(request: Request, env: Env) {
   const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     Vary: "Origin"
   };
@@ -145,10 +158,13 @@ async function loadSchedule(env: Env) {
 }
 
 async function runScheduled(env: Env, scheduledTime: number) {
-  // Existing Windsor push path remains unchanged.
+  // Existing Windsor prayer push path remains isolated and unchanged.
   const schedule = await loadSchedule(env);
   const events = duePrayerEvents(schedule.prayer_times, new Date(scheduledTime));
   for (const event of events) await dispatchEvent(env, event);
+
+  // Admin broadcasts are a separate delivery stream from prayer-time pushes.
+  await dispatchDueAdminPushCampaigns(env);
 
   // Worldwide email subscribers use their detected GPS location and time zone.
   await dispatchGlobalPrayerEmails(env, scheduledTime);
@@ -157,7 +173,8 @@ async function runScheduled(env: Env, scheduledTime: number) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM deliveries WHERE created_at < datetime('now', '-60 days')"),
     env.DB.prepare("DELETE FROM email_outbox WHERE status IN ('sent', 'cancelled') AND created_at < datetime('now', '-90 days')"),
-    env.DB.prepare("DELETE FROM location_prayer_cache WHERE prayer_date < date('now', '-45 days')")
+    env.DB.prepare("DELETE FROM location_prayer_cache WHERE prayer_date < date('now', '-45 days')"),
+    env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < datetime('now', '-30 days')")
   ]);
 }
 
@@ -193,6 +210,24 @@ export default {
         response = await updateSubscriberPreferences(request, env);
       } else if (request.method === "POST" && url.pathname === "/email/subscribers/unsubscribe") {
         response = await unsubscribeEmail(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/bootstrap") {
+        response = await bootstrapAdmin(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/login") {
+        response = await loginAdmin(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/logout") {
+        response = await logoutAdmin(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/me") {
+        response = await getAdminMe(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/password") {
+        response = await changeAdminPassword(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/dashboard") {
+        response = await getAdminDashboard(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
+        response = await listAdminSubscribers(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
+        response = await createAdminPushCampaign(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
+        response = await listAdminPushCampaigns(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
