@@ -1,4 +1,4 @@
 import { registerRootComponent } from "expo";
-import App from "./App";
+import AppWithEmail from "./AppWithEmail";
 
-registerRootComponent(App);
+registerRootComponent(AppWithEmail);
