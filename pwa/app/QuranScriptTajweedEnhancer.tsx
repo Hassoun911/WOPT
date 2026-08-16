@@ -13,13 +13,12 @@ type Prefs = { script: ScriptMode; font: FontMode; tajweed: boolean; copyGlyphs:
 type ApiWord = {
   position?: number;
   text_uthmani?: string;
-  text_uthmani_tajweed?: string;
   text_indopak?: string;
   text_qpc_hafs?: string;
   code_v1?: string;
   code_v2?: string;
 };
-type ApiVerse = { verse_key?: string; words?: ApiWord[] };
+type ApiVerse = { verse_key?: string; text_uthmani_tajweed?: string; words?: ApiWord[] };
 
 const DEFAULTS: Prefs = { script: "uthmani", font: "qcf-v2", tajweed: false, copyGlyphs: false };
 
@@ -28,10 +27,20 @@ function loadPrefs(): Prefs {
   catch { return DEFAULTS; }
 }
 
+function escapeHtml(value: string) {
+  const span = document.createElement("span");
+  span.textContent = value;
+  return span.innerHTML;
+}
+
 function sanitizeTajweedMarkup(value: string) {
   const template = document.createElement("template");
   template.innerHTML = value;
   template.content.querySelectorAll<HTMLElement>("*").forEach((node) => {
+    if (node.matches("span.end,.end")) {
+      node.remove();
+      return;
+    }
     if (node.tagName.toLowerCase() !== "tajweed") {
       node.replaceWith(document.createTextNode(node.textContent || ""));
       return;
@@ -44,6 +53,35 @@ function sanitizeTajweedMarkup(value: string) {
     if (safeClass) node.setAttribute("class", safeClass);
   });
   return template.innerHTML;
+}
+
+function splitTajweedWords(value: string) {
+  const template = document.createElement("template");
+  template.innerHTML = sanitizeTajweedMarkup(value);
+  const words: string[] = [];
+  let current = "";
+
+  const flush = () => {
+    const value = current.trim();
+    if (value) words.push(value);
+    current = "";
+  };
+
+  template.content.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      (node.textContent || "").split(/(\s+)/).forEach((piece) => {
+        if (!piece) return;
+        if (/^\s+$/.test(piece)) flush();
+        else current += escapeHtml(piece);
+      });
+      return;
+    }
+    if (node instanceof HTMLElement && node.tagName.toLowerCase() === "tajweed") {
+      current += node.outerHTML;
+    }
+  });
+  flush();
+  return words;
 }
 
 export default function QuranScriptTajweedEnhancer() {
@@ -91,28 +129,30 @@ export default function QuranScriptTajweedEnhancer() {
 
     const app = () => document.querySelector<HTMLElement>(".quran-app");
     const isContinuousBook = () => document.querySelectorAll<HTMLElement>("[data-printed-page]").length > 1 || Boolean(document.querySelector(".wopt-scroll-page-wrap"));
+    const tajweedEnabled = () => prefs.tajweed || prefs.script === "tajweed";
 
     const applyModeAttributes = () => {
       const root = app();
       if (!root) return;
-      const effective = prefs.tajweed || prefs.script === "tajweed" ? "tajweed" : prefs.script === "indopak" ? "indopak" : prefs.font === "qpc-hafs" ? "qpc-hafs" : prefs.font;
+      const effective = tajweedEnabled() ? "tajweed" : prefs.script === "indopak" ? "indopak" : prefs.font === "qpc-hafs" ? "qpc-hafs" : prefs.font;
       root.dataset.woptScript = effective;
-      root.dataset.woptTajweed = prefs.tajweed || prefs.script === "tajweed" ? "true" : "false";
+      root.dataset.woptTajweed = tajweedEnabled() ? "true" : "false";
     };
 
     const syncForm = () => {
       if (!section) return;
       section.querySelectorAll<HTMLButtonElement>("[data-script]").forEach((button) => button.classList.toggle("active", button.dataset.script === prefs.script));
       section.querySelectorAll<HTMLButtonElement>("[data-font]").forEach((button) => button.classList.toggle("active", button.dataset.font === prefs.font));
-      section.querySelector<HTMLButtonElement>("[data-tajweed]")?.classList.toggle("on", prefs.tajweed || prefs.script === "tajweed");
+      section.querySelector<HTMLButtonElement>("[data-tajweed]")?.classList.toggle("on", tajweedEnabled());
       section.querySelector<HTMLButtonElement>("[data-copy-glyphs]")?.classList.toggle("on", prefs.copyGlyphs);
       const preview = section.querySelector<HTMLElement>("[data-script-preview]");
       if (preview) { preview.dataset.font = prefs.font; preview.dataset.script = prefs.script; }
-      section.querySelector<HTMLElement>(".wopt-tajweed-legend")?.classList.toggle("show", prefs.tajweed || prefs.script === "tajweed");
+      section.querySelector<HTMLElement>(".wopt-tajweed-legend")?.classList.toggle("show", tajweedEnabled());
     };
 
     const save = () => {
       window.localStorage.setItem(KEY, JSON.stringify(prefs));
+      currentPage = 0;
       applyModeAttributes();
       syncForm();
       void refreshVisibleText(true);
@@ -165,11 +205,11 @@ export default function QuranScriptTajweedEnhancer() {
     };
 
     const fetchPage = async (page: number) => {
-      const tajweed = prefs.tajweed || prefs.script === "tajweed";
+      const tajweed = tajweedEnabled();
       const mushaf = prefs.script === "indopak" ? 3 : prefs.font === "qcf-v1" ? 2 : prefs.font === "qpc-hafs" ? 5 : 1;
       const cacheKey = `${page}:${mushaf}:${tajweed ? "tajweed" : "plain"}`;
       if (pageCache.has(cacheKey)) return pageCache.get(cacheKey)!;
-      const response = await fetch(`${API}/verses/by_page/${page}?language=en&words=true&mushaf=${mushaf}&fields=text_uthmani,text_uthmani_tajweed,text_indopak,text_qpc_hafs,code_v1,code_v2,page_number&word_fields=text_uthmani,text_uthmani_tajweed,text_indopak,text_qpc_hafs,code_v1,code_v2&per_page=50`);
+      const response = await fetch(`${API}/verses/by_page/${page}?language=en&words=true&mushaf=${mushaf}&fields=text_uthmani,text_uthmani_tajweed,text_indopak,text_qpc_hafs,code_v1,code_v2,page_number&word_fields=text_uthmani,text_indopak,text_qpc_hafs,code_v1,code_v2&per_page=50`);
       if (!response.ok) throw new Error("script");
       const data = await response.json() as { verses?: ApiVerse[] };
       const verses = data.verses || [];
@@ -198,12 +238,12 @@ export default function QuranScriptTajweedEnhancer() {
     };
 
     const applyVerseWords = async (page: number, verses: ApiVerse[]) => {
-      if (isContinuousBook()) {
+      const tajweed = tajweedEnabled();
+      if (isContinuousBook() && !tajweed) {
         restoreContinuousUnicode();
         return;
       }
 
-      const tajweed = prefs.tajweed || prefs.script === "tajweed";
       let fontFamily = "WOPT-UthmanicHafs";
       if (prefs.script === "indopak") fontFamily = "WOPT-IndoPak";
       else if (prefs.font === "qpc-hafs" || tajweed) fontFamily = "WOPT-UthmanicHafs";
@@ -213,10 +253,13 @@ export default function QuranScriptTajweedEnhancer() {
       document.querySelectorAll<HTMLElement>(`.mushaf-ayah[data-page='${page}'][data-verse-key]`).forEach((ayah) => {
         const verse = byKey.get(ayah.dataset.verseKey || "");
         if (!verse?.words?.length) return;
-        const words = new Map(verse.words.map((word, index) => [Number(word.position || index + 1), word]));
-        ayah.querySelectorAll<HTMLElement>(".quran-word[data-word-position]").forEach((node) => {
-          const pos = Number(node.dataset.wordPosition || 0);
-          const word = words.get(pos);
+        const apiWords = new Map(verse.words.map((word, index) => [Number(word.position || index + 1), word]));
+        const tajweedWords = tajweed && verse.text_uthmani_tajweed ? splitTajweedWords(verse.text_uthmani_tajweed) : [];
+        const nodes = Array.from(ayah.querySelectorAll<HTMLElement>(".quran-word[data-word-position]"));
+
+        nodes.forEach((node, index) => {
+          const pos = Number(node.dataset.wordPosition || index + 1);
+          const word = apiWords.get(pos);
           if (!word) return;
           if (!node.dataset.woptOriginalText) node.dataset.woptOriginalText = node.textContent || "";
 
@@ -224,9 +267,9 @@ export default function QuranScriptTajweedEnhancer() {
           delete node.dataset.woptCopyGlyph;
 
           if (tajweed) {
-            const value = word.text_uthmani_tajweed || word.text_uthmani || node.dataset.woptOriginalText || "";
-            if (word.text_uthmani_tajweed) node.innerHTML = sanitizeTajweedMarkup(value);
-            else node.textContent = value;
+            const markup = tajweedWords[index] || "";
+            if (markup) node.innerHTML = markup;
+            else node.textContent = word.text_uthmani || node.dataset.woptOriginalText || "";
             return;
           }
 
@@ -237,14 +280,15 @@ export default function QuranScriptTajweedEnhancer() {
           else if (prefs.font === "qcf-v1") { value = word.code_v1 || word.text_qpc_hafs || word.text_uthmani || value; glyph = Boolean(word.code_v1); }
           else { value = word.code_v2 || word.text_qpc_hafs || word.text_uthmani || value; glyph = Boolean(word.code_v2); }
 
-          if (glyph) node.textContent = value; else node.textContent = value;
+          node.textContent = value;
           if (prefs.copyGlyphs && glyph) node.dataset.woptCopyGlyph = value;
         });
       });
     };
 
     const refreshVisibleText = async (force = false) => {
-      if (isContinuousBook()) {
+      const tajweed = tajweedEnabled();
+      if (isContinuousBook() && !tajweed) {
         restoreContinuousUnicode();
         currentPage = findVisiblePage();
         return;
