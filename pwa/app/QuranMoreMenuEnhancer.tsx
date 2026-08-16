@@ -52,7 +52,7 @@ export default function QuranMoreMenuEnhancer() {
       if (action === "translation") { setBook(false); clickText("button", /^Translation(?:\s|$)/i); }
       if (action === "transliteration") { setBook(false); clickText("button", /Arabic.*English|English letters/i); }
       if (action === "info") clickRef("info");
-      if (action === "memorize") { setBook(false); clickText("button", /Memorize/i); }
+      if (action === "memorize") { close(); document.querySelector<HTMLButtonElement>(".memorize-launch")?.click(); return; }
       if (action === "home") { const current = window.location.pathname; const base = current.replace(/\/quran\/?$/, "/"); window.location.assign(base || "/"); return; }
       close();
     };
