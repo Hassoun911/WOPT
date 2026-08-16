@@ -67,6 +67,53 @@ function prayerName(prayer: unknown, locale: Locale) {
   return names[prayer as PrayerKey][locale];
 }
 
+function brandedEmail(options: {
+  locale: Locale;
+  eyebrow: string;
+  title: string;
+  intro: string;
+  details?: Array<{ label: string; value: string }>;
+  buttonLabel?: string;
+  buttonUrl?: string;
+  note?: string;
+}) {
+  const direction = options.locale === "ar" ? "rtl" : "ltr";
+  const textAlign = options.locale === "ar" ? "right" : "left";
+  const details = (options.details ?? []).filter((item) => item.value).map((item) => `
+    <tr>
+      <td style="padding:8px 0;color:#8a806f;font-size:12px;font-weight:700;vertical-align:top;width:120px">${escapeHtml(item.label)}</td>
+      <td style="padding:8px 0;color:#214d42;font-size:13px;font-weight:700;vertical-align:top">${escapeHtml(item.value)}</td>
+    </tr>`).join("");
+  const action = options.buttonUrl && options.buttonLabel
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:22px"><tr><td align="center"><a href="${escapeHtml(options.buttonUrl)}" style="display:block;background:#0b5b47;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;text-align:center;padding:15px 20px;border-radius:14px">${escapeHtml(options.buttonLabel)}</a></td></tr></table>`
+    : "";
+
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#f6f0e5;font-family:Arial,Helvetica,sans-serif;color:#173f35">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f0e5;padding:24px 12px">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:24px;overflow:hidden">
+          <tr><td style="padding:24px 24px 18px;text-align:${textAlign}" dir="${direction}">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+              <td style="vertical-align:middle"><div style="width:44px;height:44px;line-height:44px;text-align:center;border-radius:14px;background:#0b5b47;color:#fff;font-size:24px;font-weight:900">و</div></td>
+              <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">WOPT</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer Times</div></td>
+            </tr></table>
+          </td></tr>
+          <tr><td style="padding:0 24px 26px;text-align:${textAlign}" dir="${direction}">
+            <div style="font-size:11px;letter-spacing:1.6px;color:#9a8a70;font-weight:800;text-transform:uppercase">${escapeHtml(options.eyebrow)}</div>
+            <h1 style="margin:9px 0 10px;font-size:28px;line-height:1.18;color:#153f35">${escapeHtml(options.title)}</h1>
+            <p style="margin:0;color:#6f746c;font-size:15px;line-height:1.65">${escapeHtml(options.intro)}</p>
+            ${details ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;background:#f8f3e9;border:1px solid #e6dccb;border-radius:16px;padding:10px 14px">${details}</table>` : ""}
+            ${action}
+            ${options.note ? `<p style="margin:18px 0 0;color:#8a8377;font-size:12px;line-height:1.6">${escapeHtml(options.note)}</p>` : ""}
+          </td></tr>
+        </table>
+        <div style="max-width:520px;margin:14px auto 0;color:#9a9488;font-size:11px;line-height:1.5;text-align:center">WOPT • Prayer alerts based on your local time zone</div>
+      </td></tr>
+    </table>
+  </body></html>`;
+}
+
 function builtInPrayerEmail(data: Record<string, unknown>, locale: Locale): RenderedEmail {
   const prayer = prayerName(data.prayer, locale);
   const kind = data.kind;
@@ -75,64 +122,100 @@ function builtInPrayerEmail(data: Record<string, unknown>, locale: Locale): Rend
   const timezone = String(data.timezone ?? "");
   const manageUrl = String(data.manageUrl ?? "");
 
-  if (locale === "ar") {
-    const subject = kind === "twenty"
-      ? `بقي ٢٠ دقيقة على صلاة ${prayer}`
-      : kind === "ten"
-        ? `بقي ١٠ دقائق على صلاة ${prayer}`
-        : `حان وقت صلاة ${prayer}`;
-    const text = `${subject}\n${prayerTime} • ${location}\n${timezone}${manageUrl ? `\nإدارة التنبيهات: ${manageUrl}` : ""}`;
-    const html = `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;color:#173f35"><h2>${escapeHtml(subject)}</h2><p><strong>${escapeHtml(prayerTime)}</strong> • ${escapeHtml(location)}</p><p style="color:#617871">${escapeHtml(timezone)}</p>${manageUrl ? `<p><a href="${escapeHtml(manageUrl)}">إدارة تنبيهات البريد</a></p>` : ""}</div>`;
-    return { subject, text, html };
-  }
+  const subject = locale === "ar"
+    ? kind === "twenty" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : kind === "ten" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `حان وقت صلاة ${prayer}`
+    : kind === "twenty" ? `${prayer} in 20 minutes` : kind === "ten" ? `${prayer} in 10 minutes` : `It is time for ${prayer}`;
 
-  const subject = kind === "twenty"
-    ? `${prayer} in 20 minutes`
-    : kind === "ten"
-      ? `${prayer} in 10 minutes`
-      : `It is time for ${prayer}`;
-  const text = `${subject}\n${prayerTime} • ${location}\n${timezone}${manageUrl ? `\nManage alerts: ${manageUrl}` : ""}`;
-  const html = `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173f35"><h2>${escapeHtml(subject)}</h2><p><strong>${escapeHtml(prayerTime)}</strong> • ${escapeHtml(location)}</p><p style="color:#617871">${escapeHtml(timezone)}</p>${manageUrl ? `<p><a href="${escapeHtml(manageUrl)}">Manage email alerts</a></p>` : ""}</div>`;
-  return { subject, text, html };
+  const html = brandedEmail({
+    locale,
+    eyebrow: locale === "ar" ? "تنبيه الصلاة" : "PRAYER ALERT",
+    title: subject,
+    intro: locale === "ar" ? "هذا التنبيه مبني على مواقيت الصلاة المحلية لموقعك." : "This alert is based on the local prayer schedule for your location.",
+    details: [
+      { label: locale === "ar" ? "الوقت" : "Prayer time", value: prayerTime },
+      { label: locale === "ar" ? "الموقع" : "Location", value: location },
+      { label: locale === "ar" ? "المنطقة الزمنية" : "Time zone", value: timezone }
+    ],
+    buttonLabel: manageUrl ? (locale === "ar" ? "إدارة التنبيهات" : "Manage email alerts") : undefined,
+    buttonUrl: manageUrl || undefined
+  });
+  const text = `${subject}\n${prayerTime} • ${location}\n${timezone}${manageUrl ? `\n${locale === "ar" ? "إدارة التنبيهات" : "Manage alerts"}: ${manageUrl}` : ""}`;
+  return { subject, html, text };
 }
 
 function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale: Locale): RenderedEmail {
   if (kind === "verification") {
     const verificationUrl = String(data.verificationUrl ?? "");
-    if (locale === "ar") {
-      return {
-        subject: "تأكيد تنبيهات مواقيت الصلاة عبر البريد",
-        text: `أكد تنبيهات WOPT عبر البريد: ${verificationUrl}`,
-        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;color:#173f35"><h2>تأكيد تنبيهات الصلاة</h2><p>اضغط الزر لتأكيد بريدك وتفعيل التنبيهات حسب موقعك.</p><p><a href="${escapeHtml(verificationUrl)}" style="display:inline-block;padding:12px 18px;background:#0b5b47;color:#fff;text-decoration:none;border-radius:10px">تأكيد البريد</a></p></div>`
-      };
-    }
+    const location = String(data.locationLabel ?? "");
+    const timezone = String(data.timezone ?? "");
+    const subject = locale === "ar" ? "تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your WOPT prayer email alerts";
     return {
-      subject: "Confirm your WOPT prayer email alerts",
-      text: `Confirm your WOPT prayer email alerts: ${verificationUrl}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173f35"><h2>Confirm prayer email alerts</h2><p>Confirm your email to activate prayer alerts for your detected location.</p><p><a href="${escapeHtml(verificationUrl)}" style="display:inline-block;padding:12px 18px;background:#0b5b47;color:#fff;text-decoration:none;border-radius:10px">Confirm email</a></p></div>`
+      subject,
+      text: locale === "ar"
+        ? `أكد تنبيهات الصلاة عبر البريد. الموقع: ${location}. المنطقة الزمنية: ${timezone}. ${verificationUrl}`
+        : `Confirm your prayer email alerts. Location: ${location}. Time zone: ${timezone}. ${verificationUrl}`,
+      html: brandedEmail({
+        locale,
+        eyebrow: locale === "ar" ? "خطوة أخيرة" : "ONE LAST STEP",
+        title: locale === "ar" ? "أكد تنبيهات الصلاة" : "Confirm your prayer email alerts",
+        intro: locale === "ar"
+          ? "أكد بريدك لتفعيل التنبيهات حسب موقعك ومواقيت الصلاة المحلية."
+          : "Confirm your email to activate alerts based on your detected location and local prayer times.",
+        details: [
+          { label: locale === "ar" ? "موقع الصلاة" : "Prayer location", value: location },
+          { label: locale === "ar" ? "المنطقة الزمنية" : "Time zone", value: timezone }
+        ],
+        buttonLabel: locale === "ar" ? "تأكيد تنبيهات البريد" : "Confirm email alerts",
+        buttonUrl: verificationUrl,
+        note: locale === "ar" ? "تنتهي صلاحية رابط التأكيد خلال 24 ساعة." : "This confirmation link expires in 24 hours."
+      })
     };
   }
 
   if (kind === "manage") {
     const manageUrl = String(data.manageUrl ?? "");
-    if (locale === "ar") {
-      return {
-        subject: "إدارة تنبيهات WOPT عبر البريد",
-        text: `إدارة التنبيهات: ${manageUrl}`,
-        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;color:#173f35"><h2>إدارة تنبيهات البريد</h2><p><a href="${escapeHtml(manageUrl)}">فتح إعدادات التنبيهات</a></p></div>`
-      };
-    }
+    const subject = locale === "ar" ? "إدارة تنبيهات WOPT عبر البريد" : "Manage your WOPT email alerts";
     return {
-      subject: "Manage your WOPT email alerts",
-      text: `Manage your WOPT email alerts: ${manageUrl}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#173f35"><h2>Manage email alerts</h2><p><a href="${escapeHtml(manageUrl)}">Open your alert settings</a></p></div>`
+      subject,
+      text: `${subject}: ${manageUrl}`,
+      html: brandedEmail({
+        locale,
+        eyebrow: locale === "ar" ? "إعدادات التنبيهات" : "ALERT SETTINGS",
+        title: locale === "ar" ? "إدارة تنبيهات الصلاة" : "Manage your prayer alerts",
+        intro: locale === "ar" ? "استخدم الرابط الآمن لتعديل تنبيهاتك أو موقع الصلاة أو إلغاء الاشتراك." : "Use your secure link to change reminder timing, prayer location, or unsubscribe.",
+        buttonLabel: locale === "ar" ? "فتح إعدادات التنبيهات" : "Open alert settings",
+        buttonUrl: manageUrl
+      })
+    };
+  }
+
+  if (kind === "admin_password_reset") {
+    const resetUrl = String(data.resetUrl ?? "");
+    const subject = locale === "ar" ? "إعادة تعيين كلمة مرور إدارة WOPT" : "Reset your WOPT admin password";
+    return {
+      subject,
+      text: `${subject}: ${resetUrl}`,
+      html: brandedEmail({
+        locale,
+        eyebrow: "WOPT ADMIN",
+        title: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset your admin password",
+        intro: locale === "ar" ? "استخدم هذا الرابط الآمن لإنشاء كلمة مرور جديدة." : "Use this secure link to create a new admin password.",
+        buttonLabel: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password",
+        buttonUrl: resetUrl,
+        note: locale === "ar" ? "تنتهي صلاحية الرابط خلال ساعة واحدة." : "This link expires in one hour."
+      })
     };
   }
 
   return {
     subject: locale === "ar" ? "تنبيه من WOPT" : "WOPT notification",
     text: String(data.message ?? "WOPT notification"),
-    html: `<p>${escapeHtml(data.message ?? "WOPT notification")}</p>`
+    html: brandedEmail({
+      locale,
+      eyebrow: "WOPT",
+      title: locale === "ar" ? "تنبيه جديد" : "New notification",
+      intro: String(data.message ?? "WOPT notification")
+    })
   };
 }
 
@@ -157,6 +240,10 @@ async function renderEmail(env: Env, row: OutboxRow) {
   const builtIn = row.kind === "prayer"
     ? builtInPrayerEmail(data, row.locale)
     : builtInSystemEmail(row.kind, data, row.locale);
+
+  // Core WOPT system emails are rendered in code so their responsive design
+  // cannot be replaced by an older plain-text database template.
+  if (["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind)) return builtIn;
 
   if (!row.template_key) return builtIn;
   const template = await env.DB.prepare(
