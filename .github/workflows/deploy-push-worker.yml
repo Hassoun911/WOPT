@@ -1,7 +1,12 @@
-name: Deploy WOPT Push Worker
+name: Deploy Hassoun Push Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "push-server/**"
+      - ".github/workflows/deploy-push-worker.yml"
 
 permissions:
   contents: read
