@@ -1,4 +1,4 @@
-const CACHE_NAME = "windsor-prayer-times-v9";
+const CACHE_NAME = "windsor-prayer-times-v10";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
@@ -7,6 +7,7 @@ const APP_SHELL = [
   scoped("/manifest.webmanifest"),
   scoped("/icon-192.png"),
   scoped("/icon-512.png"),
+  scoped("/notification-badge.png"),
   scoped("/maskable-icon-512.png"),
   scoped("/apple-touch-icon.png"),
 ];
@@ -50,7 +51,7 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "Prayer time notification",
     icon: scoped("/icon-192.png"),
-    badge: scoped("/icon-192.png"),
+    badge: scoped("/notification-badge.png"),
     tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
     renotify: true,
     silent: false,
