@@ -2,10 +2,6 @@ import fs from "node:fs";
 
 function read(path) { return fs.readFileSync(path, "utf8"); }
 function write(path, value) { fs.writeFileSync(path, value); }
-function replaceRequired(src, from, to, label) {
-  if (!src.includes(from)) throw new Error(`Missing ${label}`);
-  return src.replace(from, to);
-}
 function replaceAllSafe(path, replacements) {
   let src = read(path);
   for (const [from, to] of replacements) src = src.split(from).join(to);
@@ -34,7 +30,7 @@ function replaceAllSafe(path, replacements) {
   src = src.replace('Alert.alert("Test scheduled", "Lock the phone. A WOPT notification with the reminder chime should arrive in about 15 seconds.");', 'Alert.alert("Test scheduled", "Lock the phone. A Hassoun notification with the reminder chime should arrive in about 15 seconds.");');
   src = src.replace('"Exact alarm access is off. Enable it, return to WOPT, then run the Adhan test again."', '"Exact alarm access is off. Enable it, return to Hassoun, then run the Adhan test again."');
   const oldHeader = `      <View style={styles.brandText}>\n        <Text style={styles.title}>{locale === "ar" ? "مواقيت الصلاة في وندسور" : "Windsor Prayer Times"}</Text>\n        <Text style={styles.subtitle}>📍 {CITY_LABEL}</Text>\n      </View>`;
-  const newHeader = `      <Image source={require("./assets/hassoun-logo.png")} style={styles.headerLogo} />\n      <View style={styles.brandText}>\n        <Text style={styles.title}>Hassoun</Text>\n        <Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : \`📍 ${CITY_LABEL} • Prayer Times\`}</Text>\n      </View>`;
+  const newHeader = `      <Image source={require("./assets/hassoun-logo.png")} style={styles.headerLogo} />\n      <View style={styles.brandText}>\n        <Text style={styles.title}>Hassoun</Text>\n        <Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text>\n      </View>`;
   if (src.includes(oldHeader)) src = src.replace(oldHeader, newHeader);
   src = src.replace('live ? "Synced from WOPT" : "Saved official schedule"', 'live ? (locale === "ar" ? "متزامن عبر Hassoun" : "Synced by Hassoun") : (locale === "ar" ? "الجدول الرسمي محفوظ" : "Saved official schedule")');
   src = src.replace('<Text style={styles.pageEyebrow}>✨ WOPT</Text>', '<Text style={styles.pageEyebrow}>✨ HASSOUN</Text>');
@@ -61,7 +57,6 @@ replaceAllSafe("mobile/src/quran/QuranV3.tsx", [
   ["WOPT QUR’AN", "HASSOUN QUR’AN"],
   ["قرآن ووبت", "قرآن Hassoun"],
   ["Return to WOPT Home", "Return to Hassoun Home"],
-  ["العودة إلى الرئيسية", "العودة إلى Hassoun"],
   ["WOPT’s", "Hassoun’s"],
   ["WOPT's", "Hassoun's"],
   ["WOPT", "Hassoun"]
@@ -86,9 +81,14 @@ replaceAllSafe("mobile/src/quran/SmartMemorize.tsx", [
   const path = "push-server/src/emailDelivery.ts";
   let src = read(path);
   src = src.split("WOPT").join("Hassoun");
-  const oldBrand = `<td style="vertical-align:middle"><div style="width:44px;height:44px;line-height:44px;text-align:center;border-radius:14px;background:#0b5b47;color:#fff;font-size:24px;font-weight:900">و</div></td>\n              <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">Hassoun</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer Times</div></td>`;
-  const newBrand = `<td style="vertical-align:middle"><img src="https://hassoun911.github.io/WOPT/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33" /></td>\n              <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div></td>`;
-  if (src.includes(oldBrand)) src = src.replace(oldBrand, newBrand);
+  src = src.replace(
+    '<td style="vertical-align:middle"><div style="width:44px;height:44px;line-height:44px;text-align:center;border-radius:14px;background:#0b5b47;color:#fff;font-size:24px;font-weight:900">و</div></td>',
+    '<td style="vertical-align:middle"><img src="https://hassoun911.github.io/WOPT/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33" /></td>'
+  );
+  src = src.replace(
+    '<div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">Hassoun</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer Times</div>',
+    '<div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div>'
+  );
   const fromNeedle = '      from: env.EMAIL_FROM,';
   const fromReplacement = '      from: env.EMAIL_FROM.includes("<") ? env.EMAIL_FROM.replace(/^[^<]+</, "Hassoun <") : `Hassoun <${env.EMAIL_FROM}>`,';
   if (src.includes(fromNeedle)) src = src.replace(fromNeedle, fromReplacement);
@@ -105,7 +105,6 @@ for (const path of [
 
 // PWA/web branding and notification title.
 replaceAllSafe("pwa/app/layout.tsx", [
-  ['title: "Windsor Prayer Times"', 'title: "Hassoun"'],
   ['title: "Windsor Prayer Times"', 'title: "Hassoun"']
 ]);
 replaceAllSafe("pwa/app/page.tsx", [
