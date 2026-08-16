@@ -55,9 +55,4 @@ patchFile("mobile/app.config.ts", [
   ["version code", `    versionCode: 8,`, `    versionCode: 9,`]
 ]);
 
-patchFile(".github/workflows/android-debug.yml", [
-  ["apk filename", `WOPT-native-quran-v0.3.5.apk`, `WOPT-native-quran-v0.3.6.apk`],
-  ["artifact name", `wopt-native-quran-v0.3.5-`, `wopt-native-quran-v0.3.6-`]
-]);
-
-console.log("Finalized Quran V3: Quran-only dock, book layout modes, v0.3.6 build metadata.");
+console.log("Finalized Quran V3: Quran-only dock, book layout modes, v0.3.6 app metadata.");
