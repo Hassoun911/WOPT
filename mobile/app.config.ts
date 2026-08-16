@@ -12,7 +12,8 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     infoPlist: {
-      UIBackgroundModes: ["remote-notification"]
+      UIBackgroundModes: ["remote-notification"],
+      NSLocationWhenInUseUsageDescription: "WOPT uses your location to automatically select the correct local prayer times and email alert time zone."
     }
   },
   android: {
@@ -28,7 +29,9 @@ const config: ExpoConfig = {
       "android.permission.FOREGROUND_SERVICE",
       "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
       "android.permission.VIBRATE",
-      "android.permission.WAKE_LOCK"
+      "android.permission.WAKE_LOCK",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION"
     ]
   },
   plugins: [
