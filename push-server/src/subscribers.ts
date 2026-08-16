@@ -28,6 +28,15 @@ function cleanText(value: unknown, max: number) {
   return text && text.length <= max ? text : null;
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function validLocale(value: unknown): Locale {
   return value === "ar" ? "ar" : "en";
 }
@@ -77,8 +86,6 @@ async function sha256Hex(input: string) {
 }
 
 function linkSecret(env: Env) {
-  // A dedicated secret is preferred, but the already-private stable VAPID key
-  // keeps signup/manage links functional until EMAIL_LINK_SECRET is configured.
   return env.EMAIL_LINK_SECRET || env.VAPID_PRIVATE_KEY;
 }
 
@@ -139,25 +146,39 @@ function generalPreferences(body: Record<string, unknown>) {
   };
 }
 
+function placeLabel(location: { city: string | null; region: string | null; countryName: string | null; timezone: string }) {
+  return [location.city, location.region, location.countryName].filter(Boolean).join(", ") || location.timezone;
+}
+
 async function queueVerification(
   env: Env,
   subscriberId: number,
   publicId: string,
   email: string,
   locale: Locale,
-  expiresAt: string
+  expiresAt: string,
+  locationLabel: string,
+  timezone: string
 ) {
   const token = await verificationToken(env, publicId, email, expiresAt);
   const verifyUrl = `${publicApiUrl(env)}/email/subscribers/verify?id=${encodeURIComponent(publicId)}&token=${encodeURIComponent(token)}`;
+  const tokenHash = await sha256Hex(token);
+
   await env.DB.prepare(
-    `INSERT INTO email_outbox (
-       subscriber_id, recipient_email, locale, kind, template_key, template_data_json
-     ) VALUES (?, ?, ?, 'verification', 'subscriber_verification', ?)`
+    `UPDATE email_outbox SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+     WHERE subscriber_id = ? AND kind = 'verification' AND status = 'pending'`
+  ).bind(subscriberId).run();
+
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO email_outbox (
+       subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key
+     ) VALUES (?, ?, ?, 'verification', 'subscriber_verification', ?, ?)`
   ).bind(
     subscriberId,
     email,
     locale,
-    JSON.stringify({ verificationUrl: verifyUrl, expiresAt })
+    JSON.stringify({ verificationUrl: verifyUrl, expiresAt, locationLabel, timezone }),
+    `verification:${subscriberId}:${tokenHash}`
   ).run();
 }
 
@@ -170,10 +191,20 @@ async function queueManageLink(
 ) {
   const manageUrl = await subscriberManageUrl(env, publicId, email);
   await env.DB.prepare(
+    `UPDATE email_outbox SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+     WHERE subscriber_id = ? AND kind = 'manage' AND status = 'pending'`
+  ).bind(subscriberId).run();
+  await env.DB.prepare(
     `INSERT INTO email_outbox (
-       subscriber_id, recipient_email, locale, kind, template_key, template_data_json
-     ) VALUES (?, ?, ?, 'manage', 'subscriber_manage', ?)`
-  ).bind(subscriberId, email, locale, JSON.stringify({ manageUrl })).run();
+       subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key
+     ) VALUES (?, ?, ?, 'manage', 'subscriber_manage', ?, ?)`
+  ).bind(
+    subscriberId,
+    email,
+    locale,
+    JSON.stringify({ manageUrl }),
+    `manage:${subscriberId}:${Date.now()}`
+  ).run();
 }
 
 async function replacePreferences(env: Env, subscriberId: number, body: Record<string, unknown>) {
@@ -287,6 +318,41 @@ async function linkInstallation(env: Env, subscriberId: number, value: unknown) 
   ).bind(subscriberId, installationId).run();
 }
 
+async function updateExistingSubscriber(
+  env: Env,
+  subscriberId: number,
+  values: {
+    displayName: string | null;
+    locale: Locale;
+    location: ReturnType<typeof locationFromBody> extends infer T ? Exclude<T, null> : never;
+    method: number;
+    madhab: "standard" | "hanafi";
+  }
+) {
+  const { displayName, locale, location, method, madhab } = values;
+  await env.DB.prepare(
+    `UPDATE email_subscribers SET
+       display_name = ?, locale = ?, latitude = ?, longitude = ?, timezone = ?,
+       country_code = ?, country_name = ?, region = ?, city = ?, calculation_method = ?,
+       madhab = ?, location_updated_at = CURRENT_TIMESTAMP, status = 'pending',
+       unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`
+  ).bind(
+    displayName,
+    locale,
+    location.latitude,
+    location.longitude,
+    location.timezone,
+    location.countryCode,
+    location.countryName,
+    location.region,
+    location.city,
+    method,
+    madhab,
+    subscriberId
+  ).run();
+}
+
 export async function subscribeByEmail(request: Request, env: Env) {
   const body = await bodyJson(request);
   const email = normalizeEmail(body.email);
@@ -311,6 +377,32 @@ export async function subscribeByEmail(request: Request, env: Env) {
   }
 
   const publicId = existing?.public_id ?? crypto.randomUUID();
+  const locationText = placeLabel(location);
+
+  // If a pending verification was created within roughly the last hour, keep
+  // that secure link valid instead of sending a second confirmation email.
+  const recentPending = existing?.status === "pending"
+    && existing.verification_expires_at
+    && Date.parse(existing.verification_expires_at) - Date.now() > 23 * 60 * 60 * 1000;
+
+  if (existing && recentPending) {
+    await updateExistingSubscriber(env, existing.id, { displayName, locale, location, method, madhab });
+    await replacePreferences(env, existing.id, body);
+    await linkInstallation(env, existing.id, body.installationId);
+    return response({
+      ok: true,
+      verificationRequired: true,
+      verificationAlreadySent: true,
+      location: {
+        city: location.city,
+        region: location.region,
+        countryCode: location.countryCode,
+        countryName: location.countryName,
+        timezone: location.timezone
+      }
+    });
+  }
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const verifyToken = await verificationToken(env, publicId, email, expiresAt);
   const manage = await manageToken(env, publicId, email);
@@ -345,7 +437,7 @@ export async function subscribeByEmail(request: Request, env: Env) {
     ).run();
     await replacePreferences(env, existing.id, body);
     await linkInstallation(env, existing.id, body.installationId);
-    await queueVerification(env, existing.id, publicId, email, locale, expiresAt);
+    await queueVerification(env, existing.id, publicId, email, locale, expiresAt, locationText, location.timezone);
     return response({ ok: true, verificationRequired: true });
   }
 
@@ -378,7 +470,7 @@ export async function subscribeByEmail(request: Request, env: Env) {
   if (!created) throw new Error("Subscriber creation failed");
   await replacePreferences(env, created.id, body);
   await linkInstallation(env, created.id, body.installationId);
-  await queueVerification(env, created.id, publicId, email, locale, expiresAt);
+  await queueVerification(env, created.id, publicId, email, locale, expiresAt, locationText, location.timezone);
 
   return response({
     ok: true,
@@ -393,6 +485,56 @@ export async function subscribeByEmail(request: Request, env: Env) {
   });
 }
 
+async function confirmationTiming(env: Env, subscriberId: number, locale: Locale) {
+  const row = await env.DB.prepare(
+    `SELECT email_twenty, email_ten, email_athan
+     FROM subscriber_prayer_preferences WHERE subscriber_id = ? AND prayer = 'fajr' LIMIT 1`
+  ).bind(subscriberId).first<{ email_twenty: number; email_ten: number; email_athan: number }>();
+  if (!row) return locale === "ar" ? "عند وقت الصلاة" : "At prayer time";
+  const parts = [
+    row.email_twenty === 1 ? (locale === "ar" ? "قبل ٢٠ دقيقة" : "20 min before") : null,
+    row.email_ten === 1 ? (locale === "ar" ? "قبل ١٠ دقائق" : "10 min before") : null,
+    row.email_athan === 1 ? (locale === "ar" ? "عند وقت الصلاة" : "At prayer time") : null
+  ].filter(Boolean);
+  return parts.join(" • ");
+}
+
+async function verificationSuccessPage(env: Env, subscriber: SubscriberRow, alreadyVerified = false) {
+  const locale = subscriber.locale;
+  const rtl = locale === "ar";
+  const locationLabel = [subscriber.city, subscriber.region, subscriber.country_name].filter(Boolean).join(", ") || subscriber.timezone;
+  const timing = await confirmationTiming(env, subscriber.id, locale);
+  const destination = `${publicAppUrl(env)}/?emailVerified=1`;
+  const title = alreadyVerified
+    ? (rtl ? "تنبيهات البريد مفعلة مسبقاً" : "Email alerts are already active")
+    : (rtl ? "تم تفعيل تنبيهات البريد" : "Prayer email alerts are active");
+  const intro = rtl
+    ? "تم تأكيد بريدك. ستصلك التنبيهات حسب موقع الصلاة والمنطقة الزمنية أدناه."
+    : "Your email is confirmed. WOPT will use the prayer location and time zone below for your alerts.";
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WOPT Email Alerts</title></head>
+  <body style="margin:0;background:#f6f0e5;font-family:Arial,Helvetica,sans-serif;color:#173f35" dir="${rtl ? "rtl" : "ltr"}">
+    <main style="max-width:560px;margin:0 auto;padding:34px 16px 48px">
+      <section style="background:#fffdf8;border:1px solid #e3dac9;border-radius:26px;padding:26px;box-shadow:0 12px 36px rgba(70,60,45,.08)">
+        <div style="width:58px;height:58px;line-height:58px;text-align:center;border-radius:50%;background:#dcefe5;color:#087052;font-size:30px;font-weight:900;margin-bottom:18px">✓</div>
+        <div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">WOPT EMAIL ALERTS</div>
+        <h1 style="margin:8px 0 12px;font-size:30px;line-height:1.15;color:#153f35">${escapeHtml(title)}</h1>
+        <p style="font-size:15px;line-height:1.65;color:#6f746c;margin:0">${escapeHtml(intro)}</p>
+        <div style="margin-top:22px;background:#f8f3e9;border:1px solid #e6dccb;border-radius:17px;padding:14px 16px">
+          <p style="margin:0 0 10px"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "البريد" : "Email"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(subscriber.email)}</strong></p>
+          <p style="margin:0 0 10px"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "موقع الصلاة" : "Prayer location"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(locationLabel)}</strong></p>
+          <p style="margin:0 0 10px"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "المنطقة الزمنية" : "Time zone"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(subscriber.timezone)}</strong></p>
+          <p style="margin:0"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "التنبيهات" : "Alerts"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(timing)}</strong></p>
+        </div>
+        <a href="${escapeHtml(destination)}" style="display:block;margin-top:20px;background:#0b5b47;color:#fff;text-decoration:none;text-align:center;font-size:15px;font-weight:800;padding:15px 18px;border-radius:14px">${rtl ? "العودة إلى مواقيت الصلاة" : "Go to Windsor Prayer Times"}</a>
+        <p style="margin:14px 0 0;color:#938b7f;font-size:11px;line-height:1.5;text-align:center">${rtl ? "سيتم تحويلك تلقائياً خلال لحظات." : "You’ll return to Prayer Times automatically in a few seconds."}</p>
+      </section>
+    </main>
+    <script>setTimeout(function(){window.location.replace(${JSON.stringify(destination)});},5500);</script>
+  </body></html>`;
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
 export async function verifyEmailSubscription(url: URL, env: Env) {
   const publicId = url.searchParams.get("id") ?? "";
   const token = url.searchParams.get("token") ?? "";
@@ -400,7 +542,7 @@ export async function verifyEmailSubscription(url: URL, env: Env) {
   const subscriber = await subscriberByPublicId(env, publicId);
   if (!subscriber) return response({ error: "Verification link is invalid" }, 400);
   if (subscriber.status === "active") {
-    return response({ ok: true, active: true, alreadyVerified: true });
+    return verificationSuccessPage(env, subscriber, true);
   }
   if (subscriber.status !== "pending" || !subscriber.verification_expires_at || !subscriber.verification_token_hash) {
     return response({ error: "Verification link is invalid or already used" }, 400);
@@ -418,10 +560,7 @@ export async function verifyEmailSubscription(url: URL, env: Env) {
        updated_at = CURRENT_TIMESTAMP WHERE id = ?`
   ).bind(subscriber.id).run();
 
-  const locationLabel = [subscriber.city, subscriber.region, subscriber.country_name].filter(Boolean).join(", ");
-  const destination = `${publicAppUrl(env)}/?emailVerified=1`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WOPT Email Alerts</title></head><body style="font-family:system-ui,-apple-system,sans-serif;background:#f5f2e9;color:#173f35;padding:32px"><main style="max-width:560px;margin:auto;background:#fff;border-radius:24px;padding:28px"><h1 style="margin-top:0">Email alerts are active</h1><p>Prayer-time email alerts are now enabled${locationLabel ? ` for ${locationLabel}` : ""}.</p><p>Time zone: <strong>${subscriber.timezone}</strong></p><p><a href="${destination}">Return to Windsor Prayer Times</a></p></main></body></html>`;
-  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  return verificationSuccessPage(env, { ...subscriber, status: "active" });
 }
 
 export async function getSubscriberPreferences(url: URL, env: Env) {
