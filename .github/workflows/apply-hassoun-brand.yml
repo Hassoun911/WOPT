@@ -63,4 +63,4 @@ jobs:
           git commit -m "Rebrand WOPT app as Hassoun"
           git push origin HEAD:main
 
-# rerun after migration-script correction
+# rerun after Expo config correction
