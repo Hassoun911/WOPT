@@ -29,6 +29,12 @@ import {
   type QuranSearchResult,
   type QuranSurah
 } from "./quranData";
+import {
+  QuranPageText,
+  ReaderSettingsSheet,
+  quranPageBackground,
+  useQuranAppearance
+} from "./quranRendering";
 
 type Props = { locale: QuranLocale; onBackHome: () => void };
 type Screen = "home" | "surahs" | "search" | "bookmarks" | "reader" | "memorize";
@@ -93,7 +99,7 @@ function fontFamily(choice: FontChoice) {
   if (choice === "clean") return undefined;
   return "serif";
 }
-function reciterInfo(id: string) { return RECITERS.find((item) => item.id === id) ?? RECITERS[0]; }
+function reciterInfo(id: string) { return RECITERS.find((item) => item.id === id) ?? RECITERS[0]!; }
 function audioUrl(ayah: QuranAyah, reciterId: string) {
   const reciter = reciterInfo(reciterId);
   return `https://cdn.islamic.network/quran/audio/${reciter.bitrate}/${reciter.id}/${absoluteIndex(ayah.surah, ayah.ayah) + 1}.mp3`;
@@ -128,6 +134,8 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
   const [selectedAyah, setSelectedAyah] = useState<QuranAyah | null>(null);
   const [range, setRange] = useState<Range | null>(null);
   const [rangeSelecting, setRangeSelecting] = useState(false);
@@ -152,6 +160,35 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   const searchResults = useMemo(() => query.trim() ? searchQuran(query, 100) : [], [query]);
   const activeAyah = audioIndex >= 0 ? audioQueue[audioIndex] : undefined;
   const activeReciter = reciterInfo(prefs.reciter);
+  const currentPage = pageForAyah(position.surah, position.ayah) ?? 1;
+  const currentJuz = juzForAyah(position.surah, position.ayah) ?? 1;
+  const pageAyahs = useMemo(() => {
+    const start = pages[currentPage - 1];
+    if (!start) return [] as QuranAyah[];
+    const next = pages[currentPage];
+    const startAbs = absoluteIndex(start.surah, start.ayah);
+    const endAbs = next ? absoluteIndex(next.surah, next.ayah) : Number.POSITIVE_INFINITY;
+    const out: QuranAyah[] = [];
+    for (let surahNumber = start.surah; surahNumber <= 114; surahNumber += 1) {
+      for (const ayah of getSurahAyahs(surahNumber)) {
+        const index = absoluteIndex(ayah.surah, ayah.ayah);
+        if (index < startAbs) continue;
+        if (index >= endAbs) return out;
+        out.push(ayah);
+      }
+      if (next && surahNumber > next.surah) break;
+    }
+    return out;
+  }, [currentPage, pages]);
+  const pageSegments = useMemo(() => {
+    const segments: Array<{ surah: number; ayahs: QuranAyah[] }> = [];
+    for (const ayah of pageAyahs) {
+      const previous = segments[segments.length - 1];
+      if (!previous || previous.surah !== ayah.surah) segments.push({ surah: ayah.surah, ayahs: [ayah] });
+      else previous.ayahs.push(ayah);
+    }
+    return segments;
+  }, [pageAyahs]);
 
   useEffect(() => {
     void (async () => {
@@ -213,6 +250,18 @@ export default function QuranV2({ locale, onBackHome }: Props) {
     void AsyncStorage.setItem(KEYS.last, JSON.stringify(next));
   };
 
+  const openPage = (page: number) => {
+    const safePage = clamp(page, 1, 604);
+    const start = pages[safePage - 1];
+    if (!start) return;
+    const next = { surah: start.surah, ayah: start.ayah };
+    setPosition(next);
+    setSelectedAyah(null);
+    setRange(null);
+    setRangeSelecting(false);
+    persistLast(next);
+  };
+
   const openReader = (surah: number, ayah = 1, from: Screen = screen) => {
     const target = getAyah(surah, ayah);
     if (!target) return;
@@ -227,6 +276,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   };
 
   const handleBack = () => {
+    if (appearanceOpen) { setAppearanceOpen(false); return true; }
     if (menuOpen) { setMenuOpen(false); return true; }
     if (screen === "home") { onBackHome(); return true; }
     if (screen === "reader") { setScreen(backTarget); return true; }
@@ -237,7 +287,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", handleBack);
     return () => subscription.remove();
-  }, [screen, backTarget, menuOpen]);
+  }, [screen, backTarget, menuOpen, appearanceOpen]);
 
   const toggleBookmark = (ayah: QuranAyah) => {
     const key = refKey(ayah);
@@ -270,10 +320,12 @@ export default function QuranV2({ locale, onBackHome }: Props) {
 
   const playQueue = (queue: QuranAyah[], repeat = false) => {
     if (!queue.length || !QuranAudio) return;
+    const first = queue[0];
+    if (!first) return;
     setAudioQueue(queue);
     setAudioIndex(0);
     setRepeatQueue(repeat);
-    playNativeAyah(queue[0]);
+    playNativeAyah(first);
   };
 
   const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);
@@ -303,11 +355,15 @@ export default function QuranV2({ locale, onBackHome }: Props) {
     if (!audioQueue.length) return;
     const next = audioIndex + 1;
     if (next < audioQueue.length) {
+      const nextAyah = audioQueue[next];
+      if (!nextAyah) return;
       setAudioIndex(next);
-      playNativeAyah(audioQueue[next]);
+      playNativeAyah(nextAyah);
     } else if (repeatQueue) {
+      const first = audioQueue[0];
+      if (!first) return;
       setAudioIndex(0);
-      playNativeAyah(audioQueue[0]);
+      playNativeAyah(first);
     } else {
       stopAudio();
     }
@@ -316,8 +372,10 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   const previousAudio = () => {
     if (!audioQueue.length) return;
     const prev = Math.max(0, audioIndex - 1);
+    const previousAyah = audioQueue[prev];
+    if (!previousAyah) return;
     setAudioIndex(prev);
-    playNativeAyah(audioQueue[prev]);
+    playNativeAyah(previousAyah);
   };
 
   useEffect(() => {
@@ -430,7 +488,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
     <View style={styles.flex}>{topBar(tr("Search Qur’an", "البحث في القرآن"), tr("Arabic, Surah name or number", "كلمة عربية أو اسم سورة أو رقمها"))}<View style={styles.searchInputWrap}><TextInput value={query} onChangeText={setQuery} placeholder={tr("Search…", "ابحث…")} placeholderTextColor="#8a938f" style={[styles.searchInput, ar && styles.rtl]} /></View><FlatList<QuranSearchResult> data={searchResults} keyExtractor={(item, i) => item.kind === "surah" ? `s-${item.surah.number}-${i}` : `a-${item.ayah?.surah}-${item.ayah?.ayah}`} contentContainerStyle={styles.listContent} ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? tr("No matches found", "لا توجد نتائج") : tr("Type to search", "اكتب للبحث")}</Text>} renderItem={({ item }) => <Pressable onPress={() => openReader(item.surah.number, item.ayah?.ayah ?? 1, "search")} style={styles.searchResult}><Text style={styles.resultTitle}>{ar ? item.surah.nameArabic : item.surah.nameTransliterated} {item.ayah ? `${num(item.surah.number)}:${num(item.ayah.ayah)}` : ""}</Text>{item.ayah ? <Text style={styles.resultArabic} numberOfLines={3}>{item.ayah.text}</Text> : null}</Pressable>} /></View>
   );
 
-  const bookmarkAyahs = bookmarks.map((key) => { const [s, a] = key.split(":").map(Number); return getAyah(s, a); }).filter(Boolean) as QuranAyah[];
+  const bookmarkAyahs = bookmarks.map((key) => { const parts = key.split(":").map(Number); const s = parts[0]; const a = parts[1]; return s && a ? getAyah(s, a) : undefined; }).filter(Boolean) as QuranAyah[];
   const bookmarkScreen = (
     <View style={styles.flex}>{topBar(tr("Bookmarks", "العلامات"), tr(`${bookmarkAyahs.length} saved`, `${num(bookmarkAyahs.length)} محفوظة`))}<FlatList data={bookmarkAyahs} keyExtractor={refKey} contentContainerStyle={styles.listContent} ListEmptyComponent={<Text style={styles.empty}>{tr("No bookmarks yet", "لا توجد علامات بعد")}</Text>} renderItem={({ item }) => <Pressable onPress={() => openReader(item.surah, item.ayah, "bookmarks")} style={styles.bookmarkCard}><Text style={styles.bookmarkRef}>🔖 {ar ? getSurah(item.surah)?.nameArabic : getSurah(item.surah)?.nameTransliterated} {num(item.surah)}:{num(item.ayah)}</Text><Text style={styles.bookmarkArabic}>{item.text}</Text></Pressable>} /></View>
   );
@@ -440,13 +498,44 @@ export default function QuranV2({ locale, onBackHome }: Props) {
       {topBar(ar ? readerSurah.nameArabic : readerSurah.nameTransliterated, tr(`Page ${pageForAyah(position.surah, position.ayah) ?? "—"} • Juz ${juzForAyah(position.surah, position.ayah) ?? "—"}`, `الصفحة ${num(pageForAyah(position.surah, position.ayah) ?? 0)} • الجزء ${num(juzForAyah(position.surah, position.ayah) ?? 0)}`))}
       {rangeSelecting ? <View style={styles.rangeBanner}><Text style={styles.rangeBannerText}>✨ {tr("Tap the last ayah of the phrase/range", "اضغط على آخر آية في المقطع")}</Text></View> : null}
       {prefs.tajweed && tajweedLoading ? <View style={styles.tajweedBanner}><Text style={styles.tajweedBannerText}>🎨 {tr("Loading verified Tajweed colours…", "جارٍ تحميل ألوان التجويد الموثقة…")}</Text></View> : null}
-      <ScrollView style={styles.flex} contentContainerStyle={prefs.readerMode === "mushaf" ? styles.mushafWrap : styles.studyWrap} showsVerticalScrollIndicator={false}>
-        <View style={prefs.readerMode === "mushaf" ? styles.mushafSheet : styles.studySheet}>
-          <View style={styles.surahHeader}><Text style={styles.surahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.surahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>
-          {readerSurah.number !== 1 && readerSurah.number !== 9 ? <Text style={[styles.basmala, { fontFamily: fontFamily(prefs.font), fontSize: prefs.fontSize - 2 }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
-          {prefs.readerMode === "mushaf" ? <Text style={styles.mushafText}>{readerAyahs.map((ayah) => <Text key={refKey(ayah)}>{renderAyahText(ayah)}</Text>)}</Text> : readerAyahs.map((ayah) => <Pressable key={refKey(ayah)} onPress={() => handleAyahTap(ayah)} style={[styles.studyAyah, activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && prefs.highlightAudio && styles.studyPlaying]}><View style={styles.studyTop}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontFamily: fontFamily(prefs.font), fontSize: prefs.fontSize, lineHeight: prefs.lineHeight }]}>{prefs.tajweed && tajweedText[ayah.ayah] ? parseTajweed(tajweedText[ayah.ayah]).map((part, i) => <Text key={i} style={part.color ? { color: part.color } : undefined}>{part.text}</Text>) : ayah.text}</Text></Pressable>)}
+      {prefs.readerMode === "mushaf" ? (
+        <View style={styles.readerPageBody}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.mushafWrap} showsVerticalScrollIndicator={false}>
+            <View style={[styles.mushafSheet, { backgroundColor: quranPageBackground(appearance.pageTheme) }]}>
+              <View style={styles.mushafPageMeta}><Text style={styles.mushafMetaText}>{ar ? readerSurah.nameArabic : readerSurah.nameTransliterated}</Text><Text style={styles.mushafMetaText}>{tr(`Juz ${currentJuz}`, `الجزء ${num(currentJuz)}`)}</Text></View>
+              {pageSegments.map((segment) => {
+                const segmentSurah = getSurah(segment.surah);
+                const beginsSurah = segment.ayahs[0]?.ayah === 1;
+                return (
+                  <View key={`page-${currentPage}-surah-${segment.surah}`}>
+                    {beginsSurah ? <View style={styles.surahHeader}><Text style={styles.surahArabic}>{segmentSurah?.nameArabic}</Text>{!ar ? <Text style={styles.surahEnglish}>{segmentSurah?.nameTransliterated} • {segmentSurah?.nameEnglish}</Text> : null}</View> : null}
+                    {beginsSurah && segment.surah !== 1 && segment.surah !== 9 ? <Text style={[styles.basmala, { color: appearance.pageTheme === "dark" && appearance.textColor === "#111111" ? "#f2efe7" : appearance.textColor, fontSize: Math.max(22, appearance.fontSize - 2), lineHeight: Math.round(Math.max(22, appearance.fontSize - 2) * appearance.lineHeightMultiplier) }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
+                    <QuranPageText
+                      page={currentPage}
+                      ayahs={segment.ayahs}
+                      appearance={appearance}
+                      locale={locale}
+                      selectedKey={selectedAyah ? refKey(selectedAyah) : null}
+                      highlightedKey={prefs.highlightAudio && activeAyah ? refKey(activeAyah) : null}
+                      onPressAyah={handleAyahTap}
+                    />
+                  </View>
+                );
+              })}
+              <Text style={styles.mushafPageNumber}>{num(currentPage)}</Text>
+            </View>
+          </ScrollView>
+          <View style={styles.pageNav}><Pressable disabled={currentPage <= 1} onPress={() => openPage(currentPage - 1)} style={[styles.pageNavButton, currentPage <= 1 && styles.disabled]}><Text style={styles.pageNavText}>{ar ? "›" : "‹"} {tr("Previous", "السابق")}</Text></Pressable><View style={styles.pageNumberPill}><Text style={styles.pageNumberPillText}>📖 {tr(`Page ${currentPage}`, `صفحة ${num(currentPage)}`)}</Text></View><Pressable disabled={currentPage >= 604} onPress={() => openPage(currentPage + 1)} style={[styles.pageNavButton, currentPage >= 604 && styles.disabled]}><Text style={styles.pageNavText}>{tr("Next", "التالي")} {ar ? "‹" : "›"}</Text></Pressable></View>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView style={styles.flex} contentContainerStyle={styles.studyWrap} showsVerticalScrollIndicator={false}>
+          <View style={styles.studySheet}>
+            <View style={styles.surahHeader}><Text style={styles.surahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.surahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>
+            {readerSurah.number !== 1 && readerSurah.number !== 9 ? <Text style={[styles.basmala, { fontSize: Math.max(22, appearance.fontSize - 2), lineHeight: Math.round(Math.max(22, appearance.fontSize - 2) * appearance.lineHeightMultiplier) }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
+            {readerAyahs.map((ayah) => <Pressable key={refKey(ayah)} onPress={() => handleAyahTap(ayah)} style={[styles.studyAyah, activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && prefs.highlightAudio && styles.studyPlaying]}><View style={styles.studyTop}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontSize: appearance.fontSize, lineHeight: Math.round(appearance.fontSize * appearance.lineHeightMultiplier) }]}>{ayah.text}</Text></Pressable>)}
+          </View>
+        </ScrollView>
+      )}
       {selectedAyah ? <View style={styles.ayahActions}><Text style={styles.actionRef}>{ar ? getSurah(selectedAyah.surah)?.nameArabic : getSurah(selectedAyah.surah)?.nameTransliterated} • {tr("Ayah", "الآية")} {num(selectedAyah.ayah)}</Text><View style={styles.actionRow}><Pressable onPress={() => playAyah(selectedAyah)} style={styles.actionButton}><Text style={styles.actionEmoji}>▶️</Text><Text style={styles.actionLabel}>{tr("Play", "تشغيل")}</Text></Pressable><Pressable onPress={() => playAyah(selectedAyah, true)} style={styles.actionButton}><Text style={styles.actionEmoji}>🔁</Text><Text style={styles.actionLabel}>{tr("Repeat", "تكرار")}</Text></Pressable><Pressable onPress={() => startRange(selectedAyah)} style={styles.actionButton}><Text style={styles.actionEmoji}>✨</Text><Text style={styles.actionLabel}>{tr("Phrase", "مقطع")}</Text></Pressable><Pressable onPress={() => toggleBookmark(selectedAyah)} style={styles.actionButton}><Text style={styles.actionEmoji}>🔖</Text><Text style={styles.actionLabel}>{tr("Save", "حفظ")}</Text></Pressable><Pressable onPress={() => { const next = { surah: selectedAyah.surah, start: selectedAyah.ayah, end: selectedAyah.ayah }; setMemorizeRange(next); void AsyncStorage.setItem(KEYS.memorize, JSON.stringify(next)); setScreen("memorize"); }} style={styles.actionButton}><Text style={styles.actionEmoji}>📿</Text><Text style={styles.actionLabel}>{tr("Memorize", "حفظ")}</Text></Pressable></View></View> : null}
       {miniPlayer}
     </View>
@@ -481,16 +570,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
             <Text style={styles.menuLabel}>{tr("Reader layout", "شكل القارئ")}</Text>
             <View style={styles.twoCol}><Pressable onPress={() => persistPrefs({ readerMode: "mushaf" })} style={[styles.choice, prefs.readerMode === "mushaf" && styles.choiceActive]}><Text style={prefs.readerMode === "mushaf" ? styles.choiceTextActive : styles.choiceText}>📖 {tr("Mushaf", "المصحف")}</Text></Pressable><Pressable onPress={() => persistPrefs({ readerMode: "study" })} style={[styles.choice, prefs.readerMode === "study" && styles.choiceActive]}><Text style={prefs.readerMode === "study" ? styles.choiceTextActive : styles.choiceText}>📿 {tr("Study", "الدراسة")}</Text></Pressable></View>
 
-            <Text style={styles.menuLabel}>{tr("Qur’an font", "خط القرآن")}</Text>
-            <View style={styles.threeCol}>{(["mushaf", "naskh", "clean"] as FontChoice[]).map((choice) => <Pressable key={choice} onPress={() => persistPrefs({ font: choice })} style={[styles.smallChoice, prefs.font === choice && styles.choiceActive]}><Text style={prefs.font === choice ? styles.choiceTextActive : styles.choiceText}>{choice === "mushaf" ? tr("Mushaf", "مصحف") : choice === "naskh" ? tr("Naskh", "نسخ") : tr("Clean", "واضح")}</Text></Pressable>)}</View>
-
-            <Text style={styles.menuLabel}>{tr("Font size", "حجم الخط")} · {prefs.fontSize}</Text>
-            <View style={styles.stepRow}><Pressable onPress={() => persistPrefs({ fontSize: clamp(prefs.fontSize - 1, 20, 42) })} style={styles.stepButton}><Text style={styles.stepText}>A−</Text></Pressable><View style={styles.stepValue}><Text style={styles.stepValueText}>{prefs.fontSize}</Text></View><Pressable onPress={() => persistPrefs({ fontSize: clamp(prefs.fontSize + 1, 20, 42) })} style={styles.stepButton}><Text style={styles.stepText}>A+</Text></Pressable></View>
-
-            <Text style={styles.menuLabel}>{tr("Line spacing", "تباعد السطور")} · {prefs.lineHeight}</Text>
-            <View style={styles.stepRow}><Pressable onPress={() => persistPrefs({ lineHeight: clamp(prefs.lineHeight - 2, 36, 72) })} style={styles.stepButton}><Text style={styles.stepText}>−</Text></Pressable><View style={styles.stepValue}><Text style={styles.stepValueText}>{prefs.lineHeight}</Text></View><Pressable onPress={() => persistPrefs({ lineHeight: clamp(prefs.lineHeight + 2, 36, 72) })} style={styles.stepButton}><Text style={styles.stepText}>+</Text></Pressable></View>
-
-            <View style={styles.menuToggle}><View style={styles.toggleCopy}><Text style={styles.toggleTitle}>🎨 {tr("Tajweed colours", "ألوان التجويد")}</Text><Text style={styles.toggleSub}>{tr("Verified rule colouring; cached after first load", "ألوان أحكام التجويد وتُحفظ بعد أول تحميل")}</Text></View><Switch value={prefs.tajweed} onValueChange={(value) => persistPrefs({ tajweed: value })} /></View>
+            <Pressable onPress={() => { setMenuOpen(false); setTimeout(() => setAppearanceOpen(true), 120); }} style={styles.appearanceLauncher}><View style={styles.appearanceIcon}><Text style={styles.appearanceIconText}>Aa</Text></View><View style={styles.toggleCopy}><Text style={styles.toggleTitle}>🎨 {tr("Qur’an appearance", "مظهر القرآن")}</Text><Text style={styles.toggleSub}>{tr(appearance.font === "qcf-v2" ? "King Fahad Complex V2" : appearance.font === "qcf-v1" ? "King Fahad Complex V1" : "QPC Uthmani Hafs", appearance.font === "qcf-v2" ? "مجمع الملك فهد V2" : appearance.font === "qcf-v1" ? "مجمع الملك فهد V1" : "عثماني حفص QPC")} · {appearance.fontSize} · {appearance.tajweed ? tr("Tajweed on", "التجويد مفعّل") : tr("Tajweed off", "التجويد متوقف")}</Text></View><Text style={styles.launchArrow}>{ar ? "‹" : "›"}</Text></Pressable>
 
             <View style={styles.divider} />
             <Text style={styles.menuSection}>🧭 {tr("NAVIGATION", "التنقل")}</Text>
@@ -511,7 +591,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
   else if (screen === "reader" && reader) body = reader;
   else if (screen === "memorize") body = memorize;
 
-  return <View style={styles.flex}>{body}{screen !== "reader" && screen !== "memorize" ? miniPlayer : null}{menu}</View>;
+  return <View style={styles.flex}>{body}{screen !== "reader" && screen !== "memorize" ? miniPlayer : null}{menu}<ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} /></View>;
 }
 
 const styles = StyleSheet.create({
@@ -533,7 +613,7 @@ const styles = StyleSheet.create({
   searchInputWrap: { padding: 12 }, searchInput: { minHeight: 52, borderRadius: 17, backgroundColor: "white", borderWidth: 1, borderColor: "#ddd8ce", paddingHorizontal: 14, color: "#173f35" }, empty: { textAlign: "center", color: "#7b8782", padding: 30 }, searchResult: { backgroundColor: "white", borderRadius: 18, borderWidth: 1, borderColor: "#e1ddd4", padding: 13, marginBottom: 8 }, resultTitle: { color: "#17483c", fontSize: 11, fontWeight: "900" }, resultArabic: { color: "#203f37", fontSize: 21, lineHeight: 34, textAlign: "right", writingDirection: "rtl", marginTop: 6 },
   bookmarkCard: { backgroundColor: "white", borderRadius: 18, borderWidth: 1, borderColor: "#e1ddd4", padding: 14, marginBottom: 8 }, bookmarkRef: { color: "#9a7838", fontSize: 9, fontWeight: "900" }, bookmarkArabic: { fontSize: 23, lineHeight: 38, color: "#183e34", textAlign: "right", writingDirection: "rtl", marginTop: 8 },
   rangeBanner: { backgroundColor: "#fff1c7", padding: 9 }, rangeBannerText: { color: "#7b5d17", fontSize: 10, fontWeight: "900", textAlign: "center" }, tajweedBanner: { backgroundColor: "#edf2ff", padding: 8 }, tajweedBannerText: { color: "#4050aa", fontSize: 9, fontWeight: "800", textAlign: "center" },
-  mushafWrap: { padding: 10, paddingBottom: 150 }, studyWrap: { padding: 11, paddingBottom: 150 }, mushafSheet: { backgroundColor: "#fcf9ef", borderRadius: 15, borderWidth: 1, borderColor: "#ded7c8", padding: 16, minHeight: 650 }, studySheet: { backgroundColor: "transparent" },
+  readerPageBody: { flex: 1, backgroundColor: "#f2efe6" }, mushafWrap: { padding: 10, paddingBottom: 16 }, studyWrap: { padding: 11, paddingBottom: 150 }, mushafSheet: { backgroundColor: "#fcf9ef", borderRadius: 15, borderWidth: 1, borderColor: "#ded7c8", padding: 16, minHeight: 650 }, studySheet: { backgroundColor: "transparent" }, mushafPageMeta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }, mushafMetaText: { color: "#69716e", fontSize: 9, fontWeight: "800" }, mushafPageNumber: { color: "#6f7673", fontSize: 11, fontWeight: "800", textAlign: "center", marginTop: 14 }, pageNav: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e3ded4", padding: 8 }, pageNavButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" }, pageNavText: { color: "#0b654f", fontSize: 9, fontWeight: "900" }, pageNumberPill: { minWidth: 92, minHeight: 42, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }, pageNumberPillText: { color: "#fff", fontSize: 9, fontWeight: "900" },
   surahHeader: { alignItems: "center", borderWidth: 1, borderColor: "#0b8063", backgroundColor: "#f8f3e7", padding: 10, marginBottom: 12 }, surahArabic: { fontSize: 25, color: "#173f35", fontWeight: "900", writingDirection: "rtl" }, surahEnglish: { color: "#7d776d", fontSize: 9, marginTop: 3 }, basmala: { textAlign: "center", writingDirection: "rtl", color: "#111", lineHeight: 44, marginVertical: 9 }, mushafText: { textAlign: "right", writingDirection: "rtl" }, inlineAyah: { color: "#111", textAlign: "right", writingDirection: "rtl" }, verseNumber: { color: "#0b8b69", fontSize: 19, fontWeight: "700" }, audioHighlight: { backgroundColor: "#dff4e8" }, rangeHighlight: { backgroundColor: "#fff2be" }, selectedHighlight: { backgroundColor: "#dbe9ff" },
   studyAyah: { backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: "#e1ddd4", padding: 15, marginBottom: 9 }, studyPlaying: { borderColor: "#0b8b69", borderWidth: 2, backgroundColor: "#f5fff9" }, studyTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, ayahPill: { minWidth: 34, textAlign: "center", backgroundColor: "#edf5f1", color: "#0b654f", padding: 7, borderRadius: 11, fontWeight: "900" }, smallPlay: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, studyArabic: { color: "#173f35", textAlign: "right", writingDirection: "rtl", marginTop: 9 },
   ayahActions: { backgroundColor: "white", borderTopWidth: 1, borderTopColor: "#e1ddd4", padding: 9 }, actionRef: { color: "#17483c", fontSize: 9, fontWeight: "900", marginBottom: 7 }, actionRow: { flexDirection: "row", gap: 6 }, actionButton: { flex: 1, minHeight: 50, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#f0f5f2" }, actionEmoji: { fontSize: 17 }, actionLabel: { color: "#31564b", fontSize: 7, fontWeight: "900", marginTop: 2 },
@@ -541,7 +621,7 @@ const styles = StyleSheet.create({
   memoryWrap: { padding: 12, paddingBottom: 120 }, memoryControls: { flexDirection: "row", gap: 8, marginBottom: 10 }, memoryButton: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, memoryCard: { backgroundColor: "white", borderRadius: 19, borderWidth: 1, borderColor: "#e0ddd4", padding: 15, marginBottom: 8 }, memoryArabic: { color: "#183e34", fontSize: 28, lineHeight: 48, textAlign: "right", writingDirection: "rtl", marginTop: 7 }, hidden: { color: "#9ca6a1", textAlign: "center", letterSpacing: 3 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.45)" }, sheet: { maxHeight: "92%", backgroundColor: "#fbfaf6", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 8 }, sheetHandle: { width: 44, height: 5, borderRadius: 99, backgroundColor: "#c9c5bc", alignSelf: "center", marginBottom: 7 }, sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 17, paddingBottom: 11, borderBottomWidth: 1, borderBottomColor: "#e5e0d6" }, sheetTitle: { color: "#173f35", fontSize: 20, fontWeight: "900" }, sheetSub: { color: "#83908a", fontSize: 9, marginTop: 2 }, closeButton: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#efede7" }, sheetContent: { padding: 16, paddingBottom: 42 },
   menuSection: { color: "#9a7838", fontSize: 10, fontWeight: "900", letterSpacing: .8, marginBottom: 10 }, menuLabel: { color: "#31564b", fontSize: 10, fontWeight: "900", marginTop: 10, marginBottom: 7 }, chipsRow: { gap: 7, paddingBottom: 3 }, chip: { borderRadius: 99, borderWidth: 1, borderColor: "#d8d3c9", backgroundColor: "white", paddingHorizontal: 11, paddingVertical: 9 }, chipActive: { backgroundColor: "#0b654f", borderColor: "#0b654f" }, chipText: { color: "#53645e", fontSize: 9, fontWeight: "800" }, chipTextActive: { color: "white" },
-  menuToggle: { marginTop: 11, padding: 13, borderRadius: 17, backgroundColor: "white", borderWidth: 1, borderColor: "#e1ddd4", flexDirection: "row", alignItems: "center", gap: 10 }, toggleCopy: { flex: 1 }, toggleTitle: { color: "#173f35", fontSize: 11, fontWeight: "900" }, toggleSub: { color: "#87918d", fontSize: 8, marginTop: 3 },
+  menuToggle: { marginTop: 11, padding: 13, borderRadius: 17, backgroundColor: "white", borderWidth: 1, borderColor: "#e1ddd4", flexDirection: "row", alignItems: "center", gap: 10 }, appearanceLauncher: { marginTop: 11, padding: 13, borderRadius: 17, backgroundColor: "#edf6f2", borderWidth: 1, borderColor: "#d5e9e0", flexDirection: "row", alignItems: "center", gap: 11 }, appearanceIcon: { width: 43, height: 43, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, appearanceIconText: { color: "#fff", fontSize: 14, fontWeight: "900" }, launchArrow: { color: "#0b654f", fontSize: 25, fontWeight: "800" }, toggleCopy: { flex: 1 }, toggleTitle: { color: "#173f35", fontSize: 11, fontWeight: "900" }, toggleSub: { color: "#87918d", fontSize: 8, marginTop: 3 },
   stepRow: { flexDirection: "row", gap: 8, alignItems: "center" }, stepButton: { width: 55, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, stepText: { color: "#0b654f", fontSize: 16, fontWeight: "900" }, stepValue: { flex: 1, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "white", borderWidth: 1, borderColor: "#e0dbd2" }, stepValueText: { color: "#173f35", fontWeight: "900" },
   menuGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }, menuAction: { width: "48%", minHeight: 72, borderRadius: 17, backgroundColor: "white", borderWidth: 1, borderColor: "#e1ddd4", padding: 11, alignItems: "center", justifyContent: "center" }, menuActionEmoji: { fontSize: 20 }, menuActionText: { color: "#31564b", fontSize: 9, fontWeight: "900", textAlign: "center", marginTop: 5 }, disabled: { opacity: .38 },
   transport: { flexDirection: "row", gap: 7, marginTop: 10 }, transportButton: { flex: 1, height: 45, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, transportMain: { width: 55, height: 45, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, divider: { height: 1, backgroundColor: "#e4ded4", marginVertical: 18 },
