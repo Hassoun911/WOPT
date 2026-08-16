@@ -1,5 +1,42 @@
 PRAGMA foreign_keys = ON;
 
+INSERT OR IGNORE INTO email_templates (
+  template_key, name, category, subject_en, subject_ar, html_en, html_ar, text_en, text_ar
+) VALUES
+(
+  'subscriber_verification',
+  'Subscriber email verification',
+  'system',
+  'Confirm your WOPT prayer email alerts',
+  'تأكيد تنبيهات مواقيت الصلاة عبر البريد',
+  '<p>Confirm your prayer-time email alerts:</p><p><a href="{{verificationUrl}}">Confirm email alerts</a></p>',
+  '<p dir="rtl">أكد تنبيهات مواقيت الصلاة عبر البريد:</p><p dir="rtl"><a href="{{verificationUrl}}">تأكيد البريد الإلكتروني</a></p>',
+  'Confirm your prayer-time email alerts: {{verificationUrl}}',
+  'أكد تنبيهات مواقيت الصلاة عبر البريد: {{verificationUrl}}'
+),
+(
+  'subscriber_manage',
+  'Subscriber manage link',
+  'system',
+  'Manage your WOPT email alerts',
+  'إدارة تنبيهات WOPT عبر البريد',
+  '<p>Use this secure link to manage your WOPT email alerts:</p><p><a href="{{manageUrl}}">Manage email alerts</a></p>',
+  '<p dir="rtl">استخدم هذا الرابط الآمن لإدارة تنبيهات WOPT عبر البريد:</p><p dir="rtl"><a href="{{manageUrl}}">إدارة التنبيهات</a></p>',
+  'Manage your WOPT email alerts: {{manageUrl}}',
+  'إدارة تنبيهات WOPT عبر البريد: {{manageUrl}}'
+),
+(
+  'prayer_alert',
+  'Prayer time email alert',
+  'prayer',
+  '{{emailSubject}}',
+  '{{emailSubject}}',
+  '{{emailHtml}}',
+  '{{emailHtml}}',
+  '{{emailText}}',
+  '{{emailText}}'
+);
+
 CREATE TABLE IF NOT EXISTS email_outbox (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   delivery_id INTEGER,
