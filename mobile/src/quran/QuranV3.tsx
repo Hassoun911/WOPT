@@ -37,7 +37,11 @@ import {
   useQuranAppearance
 } from "./quranRendering";
 
-type Props = { locale: QuranLocale; onBackHome: () => void };
+type Props = {
+  locale: QuranLocale;
+  onBackHome: () => void;
+  onAppNavVisibilityChange?: (visible: boolean) => void;
+};
 type Screen = "home" | "surahs" | "search" | "bookmarks" | "reader" | "memorize" | "radio";
 type Position = { surah: number; ayah: number };
 type ReaderMode = "mushaf" | "study";
@@ -136,7 +140,7 @@ function buildSurahQueue(startSurah: number, endSurah: number) {
   return queue;
 }
 
-export default function QuranV3({ locale, onBackHome }: Props) {
+export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }: Props) {
   const { width } = useWindowDimensions();
   const ar = locale === "ar";
   const tr = (en: string, arabic: string) => ar ? arabic : en;
@@ -174,6 +178,7 @@ export default function QuranV3({ locale, onBackHome }: Props) {
     speed: 1
   });
   const completionRef = useRef<string | null>(null);
+  const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
   const surahs = allSurahs();
@@ -258,6 +263,43 @@ export default function QuranV3({ locale, onBackHome }: Props) {
     const subscription = BackHandler.addEventListener("hardwareBackPress", handleBack);
     return () => subscription.remove();
   }, [screen, backTarget, menuOpen, appearanceOpen]);
+
+  const clearAppNavTimer = () => {
+    if (appNavHideTimer.current) {
+      clearTimeout(appNavHideTimer.current);
+      appNavHideTimer.current = null;
+    }
+  };
+
+  const scheduleAppNavHide = () => {
+    clearAppNavTimer();
+    appNavHideTimer.current = setTimeout(() => {
+      onAppNavVisibilityChange?.(false);
+      appNavHideTimer.current = null;
+    }, 1800);
+  };
+
+  const revealAppNav = () => {
+    if (screen === "reader" || screen === "radio") return;
+    onAppNavVisibilityChange?.(true);
+    if (screen !== "home") scheduleAppNavHide();
+  };
+
+  useEffect(() => {
+    clearAppNavTimer();
+    if (screen === "reader" || screen === "radio") {
+      onAppNavVisibilityChange?.(false);
+      return;
+    }
+    onAppNavVisibilityChange?.(true);
+    if (screen !== "home") scheduleAppNavHide();
+    return clearAppNavTimer;
+  }, [screen, onAppNavVisibilityChange]);
+
+  useEffect(() => () => {
+    clearAppNavTimer();
+    onAppNavVisibilityChange?.(true);
+  }, [onAppNavVisibilityChange]);
 
   const toggleBookmark = (ayah: QuranAyah) => {
     const key = refKey(ayah);
@@ -550,10 +592,10 @@ export default function QuranV3({ locale, onBackHome }: Props) {
   else if (screen === "memorize") body = memorize;
 
   return (
-    <View style={styles.flex}>
+    <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
       {miniPlayer}
-      {quranDock}
+      {(screen === "reader" || screen === "radio") ? quranDock : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
     </View>

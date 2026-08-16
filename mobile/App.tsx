@@ -85,6 +85,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [busy, setBusy] = useState(true);
   const [scheduledCount, setScheduledCount] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
+  const [quranAppNavVisible, setQuranAppNavVisible] = useState(true);
   const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
 
   const todayKey = windsorDateKey(now);
@@ -436,7 +437,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   );
 
   const body = activeTab === "quran"
-    ? <Quran locale={locale} onBackHome={() => setActiveTab("home")} />
+    ? <Quran locale={locale} onBackHome={() => { setQuranAppNavVisible(true); setActiveTab("home"); }} onAppNavVisibilityChange={setQuranAppNavVisible} />
     : activeTab === "quiz"
       ? <IslamicQuiz locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
       : activeTab === "alerts"
@@ -457,7 +458,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="dark" />
       <View style={styles.flex}>{body}</View>
-      {activeTab !== "quran" ? (
+      {(activeTab !== "quran" || quranAppNavVisible) ? (
         <View style={styles.bottomNav}>
           {navItems.map((item) => {
             const active = activeTab === item.tab;
