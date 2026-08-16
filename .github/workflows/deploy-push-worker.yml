@@ -69,12 +69,43 @@ jobs:
       - name: Deploy Worker
         run: npx wrangler deploy
 
-      - name: Install VAPID private key
+      - name: Install Worker secrets
         env:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+          EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
+          ADMIN_BOOTSTRAP_KEY: ${{ secrets.ADMIN_BOOTSTRAP_KEY }}
+          EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
         run: |
-          test -n "$VAPID_PRIVATE_KEY"
-          printf '%s' "$VAPID_PRIVATE_KEY" | npx wrangler secret put VAPID_PRIVATE_KEY
+          set -euo pipefail
+
+          put_required_secret() {
+            name="$1"
+            value="$2"
+            test -n "$value"
+            printf '%s' "$value" | npx wrangler secret put "$name"
+          }
+
+          put_optional_secret() {
+            name="$1"
+            value="$2"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx wrangler secret put "$name"
+              echo "Installed optional Worker secret: $name"
+            else
+              echo "Optional Worker secret not configured: $name"
+            fi
+          }
+
+          put_required_secret VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+          put_optional_secret RESEND_API_KEY "$RESEND_API_KEY"
+          put_optional_secret EMAIL_FROM "$EMAIL_FROM"
+          put_optional_secret EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
+          put_optional_secret EMAIL_LINK_SECRET "$EMAIL_LINK_SECRET"
+          put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
+          put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
 
       - name: Smoke test Worker
         run: |
@@ -88,4 +119,6 @@ jobs:
           jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json
           curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json
           jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json
-          echo "Worker health and VAPID config checks passed."
+          jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json
+          echo "Worker health, push, and email-signup config checks passed."
+          jq '{emailDeliveryConfigured}' /tmp/config.json
