@@ -1,7 +1,39 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import PrayerAudio from "../modules/prayer-audio";
 import { buildPrayerEvents } from "./events";
 import type { PrayerKey, PrayerTimes } from "./types";
+
+const EXACT_ALARM_SETUP_KEY = "wopt:exact-alarm-setup:v1";
+let firstLaunchAlarmCheckStarted = false;
+
+function startFirstLaunchExactAlarmSetup() {
+  if (Platform.OS !== "android" || !PrayerAudio || firstLaunchAlarmCheckStarted) return;
+  firstLaunchAlarmCheckStarted = true;
+
+  // Give the first app screen time to mount before Android opens its system
+  // Alarms & reminders page. AsyncStorage is cleared by a fresh uninstall, so
+  // this runs once per installation. Existing users also receive it once when
+  // upgrading from a build that did not yet store this marker.
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const alreadyHandled = await AsyncStorage.getItem(EXACT_ALARM_SETUP_KEY);
+        if (alreadyHandled) return;
+
+        await AsyncStorage.setItem(EXACT_ALARM_SETUP_KEY, "shown");
+        if (!PrayerAudio.canScheduleExactAlarms()) {
+          PrayerAudio.openExactAlarmSettings();
+        }
+      } catch {
+        // Never block the app if onboarding storage fails. The Alerts tab and
+        // Test Adhan flow remain the recovery path for exact-alarm access.
+      }
+    })();
+  }, 1200);
+}
+
+startFirstLaunchExactAlarmSetup();
 
 export type AndroidPrayerAudioResult = {
   count: number;
