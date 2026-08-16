@@ -1,1 +1,1 @@
-export { default } from "./QuranV2";
+export { default } from "./QuranV3";
