@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "0.3.7",
+  version: "0.3.8",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
@@ -19,7 +19,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 10,
+    versionCode: 11,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#0b5b47"
@@ -33,7 +33,8 @@ const config: ExpoConfig = {
       "android.permission.VIBRATE",
       "android.permission.WAKE_LOCK",
       "android.permission.ACCESS_COARSE_LOCATION",
-      "android.permission.ACCESS_FINE_LOCATION"
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.RECORD_AUDIO"
     ]
   },
   plugins: [
