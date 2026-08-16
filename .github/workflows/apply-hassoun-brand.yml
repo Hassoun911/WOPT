@@ -1,0 +1,64 @@
+name: Apply Hassoun Rebrand
+
+on:
+  push:
+    paths:
+      - ".github/workflows/apply-hassoun-brand.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rebrand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install SVG renderer
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y librsvg2-bin
+
+      - name: Render Hassoun brand assets
+        run: |
+          mkdir -p mobile/assets pwa/public/assets
+          rsvg-convert -w 1024 -h 1024 mobile/assets/hassoun-brand.svg -o mobile/assets/icon.png
+          rsvg-convert -w 1024 -h 1024 mobile/assets/hassoun-brand.svg -o mobile/assets/adaptive-icon.png
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o mobile/assets/hassoun-logo.png
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o mobile/assets/splash-logo.png
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-notification.svg -o mobile/assets/notification-icon.png
+          cp mobile/assets/hassoun-notification.svg mobile/assets/notification-icon.svg
+
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o pwa/public/assets/hassoun-logo.png
+          rsvg-convert -w 192 -h 192 mobile/assets/hassoun-brand.svg -o pwa/public/icon-192.png
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o pwa/public/icon-512.png
+          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o pwa/public/maskable-icon-512.png
+          rsvg-convert -w 180 -h 180 mobile/assets/hassoun-brand.svg -o pwa/public/apple-touch-icon.png
+          rsvg-convert -w 96 -h 96 mobile/assets/hassoun-notification.svg -o pwa/public/notification-badge.png
+
+      - name: Apply visible Hassoun branding
+        run: node .github/scripts/apply-hassoun-brand.mjs
+
+      - name: Validate mobile TypeScript
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+
+      - name: Validate push/email worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+
+      - name: Commit rebrand
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile push-server pwa .github/scripts/apply-hassoun-brand.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "Rebrand WOPT app as Hassoun"
+          git push origin HEAD:main
