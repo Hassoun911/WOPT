@@ -62,3 +62,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Rebrand WOPT app as Hassoun"
           git push origin HEAD:main
+
+# rerun after migration-script correction
