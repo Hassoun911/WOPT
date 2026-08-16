@@ -10,7 +10,15 @@ const KEY = "wopt-quran-script-tajweed-v1";
 type ScriptMode = "uthmani" | "indopak" | "tajweed";
 type FontMode = "qcf-v2" | "qcf-v1" | "qpc-hafs";
 type Prefs = { script: ScriptMode; font: FontMode; tajweed: boolean; copyGlyphs: boolean };
-type ApiWord = { position?: number; text_uthmani?: string; text_indopak?: string; text_qpc_hafs?: string; code_v1?: string; code_v2?: string };
+type ApiWord = {
+  position?: number;
+  text_uthmani?: string;
+  text_uthmani_tajweed?: string;
+  text_indopak?: string;
+  text_qpc_hafs?: string;
+  code_v1?: string;
+  code_v2?: string;
+};
 type ApiVerse = { verse_key?: string; words?: ApiWord[] };
 
 const DEFAULTS: Prefs = { script: "uthmani", font: "qcf-v2", tajweed: false, copyGlyphs: false };
@@ -18,6 +26,24 @@ const DEFAULTS: Prefs = { script: "uthmani", font: "qcf-v2", tajweed: false, cop
 function loadPrefs(): Prefs {
   try { return { ...DEFAULTS, ...JSON.parse(window.localStorage.getItem(KEY) || "{}") } as Prefs; }
   catch { return DEFAULTS; }
+}
+
+function sanitizeTajweedMarkup(value: string) {
+  const template = document.createElement("template");
+  template.innerHTML = value;
+  template.content.querySelectorAll<HTMLElement>("*").forEach((node) => {
+    if (node.tagName.toLowerCase() !== "tajweed") {
+      node.replaceWith(document.createTextNode(node.textContent || ""));
+      return;
+    }
+    const safeClass = (node.getAttribute("class") || "")
+      .split(/\s+/)
+      .filter((item) => /^[a-z0-9_-]+$/i.test(item))
+      .join(" ");
+    Array.from(node.attributes).forEach((attribute) => node.removeAttribute(attribute.name));
+    if (safeClass) node.setAttribute("class", safeClass);
+  });
+  return template.innerHTML;
 }
 
 export default function QuranScriptTajweedEnhancer() {
@@ -48,7 +74,17 @@ export default function QuranScriptTajweedEnhancer() {
       .wopt-tajweed-legend{display:none;flex-wrap:wrap;gap:6px;margin-top:8px;color:#6e7774;font-size:9px}.wopt-tajweed-legend.show{display:flex}.wopt-tajweed-legend span{padding:4px 7px;border-radius:999px;background:#f4f7f6}
       .quran-app[data-wopt-script='qpc-hafs'] .mushaf-text,.quran-app[data-wopt-script='qpc-hafs'] .wopt-printed-content{font-family:'WOPT-UthmanicHafs',serif!important}
       .quran-app[data-wopt-script='indopak'] .mushaf-text,.quran-app[data-wopt-script='indopak'] .wopt-printed-content{font-family:'WOPT-IndoPak',serif!important}
+      .quran-app[data-wopt-script='tajweed'] .mushaf-text,.quran-app[data-wopt-script='tajweed'] .wopt-printed-content{font-family:'WOPT-UthmanicHafs','Noto Naskh Arabic','Amiri',serif!important}
       .quran-app.wopt-printed-page-mode .wopt-scroll-page-wrap .quran-word,.quran-app.wopt-printed-page-mode .wopt-scroll-page-wrap .mushaf-ayah{font-family:'WOPT-UthmanicHafs','Noto Naskh Arabic','Amiri',serif!important}
+      tajweed{color:inherit}
+      tajweed.ham_wasl,tajweed.silent{color:#8a9692}
+      tajweed.laam_shamsiyah{color:#6d7774}
+      tajweed.madda_normal{color:#536dfe}
+      tajweed.madda_permissible{color:#3949db}
+      tajweed.madda_necessary{color:#1926a8}
+      tajweed.ghunnah,tajweed.idgham_ghunnah{color:#e57a19}
+      tajweed.ikhfa,tajweed.iqlab,tajweed.idgham_wo_ghunnah{color:#168e71}
+      tajweed.qalqalah{color:#d2473e}
       @media(max-width:700px){.wopt-script-settings{grid-column:1}.wopt-quran-font-choice{min-height:45px}.wopt-script-preview{font-size:27px}}
     `;
     document.head.appendChild(style);
@@ -89,7 +125,7 @@ export default function QuranScriptTajweedEnhancer() {
       section.className = "wopt-script-settings";
       section.innerHTML = `
         <h3>Qur’an script & Tajweed</h3>
-        <p>Choose the printed Qur’an script/font. Continuous Book scrolling always uses verified Unicode text for safety.</p>
+        <p>Choose the printed Qur’an script/font. Tajweed keeps verified Unicode Qur’an text and only adds supported colour rules.</p>
         <div class="wopt-script-tabs" role="group" aria-label="Qur’an script">
           <button type="button" data-script="uthmani">Uthmani</button><button type="button" data-script="indopak">IndoPak</button><button type="button" data-script="tajweed">Tajweed</button>
         </div>
@@ -98,7 +134,7 @@ export default function QuranScriptTajweedEnhancer() {
           <button type="button" class="wopt-quran-font-choice" data-font="qcf-v1"><span><strong>King Fahad Complex V1</strong><small>Traditional Madani mushaf</small></span><i></i></button>
           <button type="button" class="wopt-quran-font-choice" data-font="qpc-hafs"><span><strong>QPC Uthmani Hafs</strong><small>Safe Unicode Uthmani Hafs</small></span><i></i></button>
         </div>
-        <div class="wopt-tajweed-toggle"><div><strong>Show Tajweed rules while reading</strong><small>Colour-coded recitation rules when supported.</small></div><button type="button" class="wopt-toggle-switch" data-tajweed aria-label="Toggle Tajweed"></button></div>
+        <div class="wopt-tajweed-toggle"><div><strong>Show Tajweed rules while reading</strong><small>Colour-coded rules without replacing the Qur’an text with glyph codes.</small></div><button type="button" class="wopt-toggle-switch" data-tajweed aria-label="Toggle Tajweed"></button></div>
         <div class="wopt-tajweed-toggle"><div><strong>Copy verse as glyphs</strong><small>Preserve printed glyph form only when safely available.</small></div><button type="button" class="wopt-toggle-switch" data-copy-glyphs aria-label="Toggle glyph copying"></button></div>
         <div class="wopt-script-preview" data-script-preview>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
         <div class="wopt-tajweed-legend"><span>Ghunnah</span><span>Ikhfa</span><span>Idgham</span><span>Qalqalah</span><span>Madd</span></div>`;
@@ -115,10 +151,10 @@ export default function QuranScriptTajweedEnhancer() {
       syncForm();
     };
 
-    const pageFont = async (page: number, version: "v1" | "v2" | "v4") => {
+    const pageFont = async (page: number, version: "v1" | "v2") => {
       const name = `wopt-p${page}-${version}`;
       if (loadedFonts.has(name)) return name;
-      const url = version === "v4" ? `${CDN}/hafs/v4/colrv1/woff2/p${page}.woff2` : `${CDN}/hafs/${version}/woff2/p${page}.woff2`;
+      const url = `${CDN}/hafs/${version}/woff2/p${page}.woff2`;
       try {
         const face = new FontFace(name, `url('${url}')`);
         await face.load();
@@ -130,10 +166,10 @@ export default function QuranScriptTajweedEnhancer() {
 
     const fetchPage = async (page: number) => {
       const tajweed = prefs.tajweed || prefs.script === "tajweed";
-      const mushaf = tajweed ? 19 : prefs.script === "indopak" ? 3 : prefs.font === "qcf-v1" ? 2 : prefs.font === "qpc-hafs" ? 5 : 1;
-      const cacheKey = `${page}:${mushaf}`;
+      const mushaf = prefs.script === "indopak" ? 3 : prefs.font === "qcf-v1" ? 2 : prefs.font === "qpc-hafs" ? 5 : 1;
+      const cacheKey = `${page}:${mushaf}:${tajweed ? "tajweed" : "plain"}`;
       if (pageCache.has(cacheKey)) return pageCache.get(cacheKey)!;
-      const response = await fetch(`${API}/verses/by_page/${page}?language=en&words=true&mushaf=${mushaf}&fields=text_uthmani,text_indopak,text_qpc_hafs,code_v1,code_v2,page_number&word_fields=text_uthmani,text_indopak,text_qpc_hafs,code_v1,code_v2&per_page=50`);
+      const response = await fetch(`${API}/verses/by_page/${page}?language=en&words=true&mushaf=${mushaf}&fields=text_uthmani,text_uthmani_tajweed,text_indopak,text_qpc_hafs,code_v1,code_v2,page_number&word_fields=text_uthmani,text_uthmani_tajweed,text_indopak,text_qpc_hafs,code_v1,code_v2&per_page=50`);
       if (!response.ok) throw new Error("script");
       const data = await response.json() as { verses?: ApiVerse[] };
       const verses = data.verses || [];
@@ -169,9 +205,8 @@ export default function QuranScriptTajweedEnhancer() {
 
       const tajweed = prefs.tajweed || prefs.script === "tajweed";
       let fontFamily = "WOPT-UthmanicHafs";
-      if (tajweed) fontFamily = await pageFont(page, "v4");
-      else if (prefs.script === "indopak") fontFamily = "WOPT-IndoPak";
-      else if (prefs.font === "qpc-hafs") fontFamily = "WOPT-UthmanicHafs";
+      if (prefs.script === "indopak") fontFamily = "WOPT-IndoPak";
+      else if (prefs.font === "qpc-hafs" || tajweed) fontFamily = "WOPT-UthmanicHafs";
       else fontFamily = await pageFont(page, prefs.font === "qcf-v1" ? "v1" : "v2");
 
       const byKey = new Map(verses.map((verse) => [verse.verse_key || "", verse]));
@@ -184,16 +219,26 @@ export default function QuranScriptTajweedEnhancer() {
           const word = words.get(pos);
           if (!word) return;
           if (!node.dataset.woptOriginalText) node.dataset.woptOriginalText = node.textContent || "";
+
+          node.style.fontFamily = `'${fontFamily}',serif`;
+          delete node.dataset.woptCopyGlyph;
+
+          if (tajweed) {
+            const value = word.text_uthmani_tajweed || word.text_uthmani || node.dataset.woptOriginalText || "";
+            if (word.text_uthmani_tajweed) node.innerHTML = sanitizeTajweedMarkup(value);
+            else node.textContent = value;
+            return;
+          }
+
           let value = word.text_uthmani || node.dataset.woptOriginalText || "";
           let glyph = false;
-          if (tajweed) { value = word.code_v2 || word.text_qpc_hafs || word.text_uthmani || value; glyph = Boolean(word.code_v2); }
-          else if (prefs.script === "indopak") value = word.text_indopak || word.text_uthmani || value;
+          if (prefs.script === "indopak") value = word.text_indopak || word.text_uthmani || value;
           else if (prefs.font === "qpc-hafs") value = word.text_qpc_hafs || word.text_uthmani || value;
           else if (prefs.font === "qcf-v1") { value = word.code_v1 || word.text_qpc_hafs || word.text_uthmani || value; glyph = Boolean(word.code_v1); }
           else { value = word.code_v2 || word.text_qpc_hafs || word.text_uthmani || value; glyph = Boolean(word.code_v2); }
-          node.style.fontFamily = `'${fontFamily}',serif`;
-          if (glyph) node.innerHTML = value; else node.textContent = value;
-          if (prefs.copyGlyphs && glyph) node.dataset.woptCopyGlyph = value; else delete node.dataset.woptCopyGlyph;
+
+          if (glyph) node.textContent = value; else node.textContent = value;
+          if (prefs.copyGlyphs && glyph) node.dataset.woptCopyGlyph = value;
         });
       });
     };
