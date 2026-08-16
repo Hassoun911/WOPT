@@ -1,4 +1,4 @@
-name: Build WOPT Android APK
+name: Build Hassoun Android APK
 
 on:
   workflow_dispatch:
@@ -53,13 +53,13 @@ jobs:
         run: ./gradlew assembleRelease
         working-directory: mobile/android
 
-      - name: Rename native Quran APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/WOPT-native-quran-v0.3.7.apk
+      - name: Rename Hassoun APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.4.0.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: wopt-native-quran-v0.3.7-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/WOPT-native-quran-v0.3.7.apk
+          name: hassoun-v0.4.0-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.4.0.apk
           if-no-files-found: error
           retention-days: 14
