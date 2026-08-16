@@ -4,6 +4,7 @@ import "./globals.css";
 import "./mobile-nav-fix.css";
 import "./quran.css";
 import "./direction-fixes.css";
+import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
+        <EmailManageRedirect />
         <NavEnhancer />
         <PrayerAlertAudioEnhancer />
         <PrayerCardInteractionEnhancer />
