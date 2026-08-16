@@ -31,10 +31,10 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
-  const [winSaved, setWinSaved] = useState(false);
+  const [resultStats, setResultStats] = useState<QuizStats | null>(null);
 
   const questions = useMemo(() => dailyQuizQuestions(mode, dateKey), [mode, dateKey]);
-  const question = questions[index];
+  const question = questions[index] ?? questions[0]!;
   const badge = badgeForWins(stats.totalWins);
   const upcoming = nextBadge(stats.totalWins);
   const alreadyDone = completedToday(stats, mode, dateKey);
@@ -44,7 +44,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     setSelected(null);
     setScore(0);
     setFinished(false);
-    setWinSaved(false);
+    setResultStats(null);
   }, [mode, dateKey]);
 
   const copy = locale === "ar" ? {
@@ -59,7 +59,8 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     next: "التالي",
     finish: "إنهاء المسابقة",
     passed: "فزت بمسابقة اليوم!",
-    tryAgain: "حاول مرة أخرى",
+    missed: "قريب جداً — حاول مرة أخرى",
+    retry: "العب مرة أخرى",
     score: "النتيجة",
     streak: "سلسلة الأيام",
     wins: "إجمالي الانتصارات",
@@ -81,7 +82,8 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     next: "Next question",
     finish: "Finish quiz",
     passed: "You won today’s quiz!",
-    tryAgain: "Try again",
+    missed: "So close — try again",
+    retry: "Play again",
     score: "Score",
     streak: "Day streak",
     wins: "Total wins",
@@ -92,6 +94,16 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     moreWins: "more wins",
     source: "Source"
   };
+
+  if (!questions.length) {
+    return (
+      <View style={styles.emptyScreen}>
+        <Text style={styles.resultEmoji}>📚</Text>
+        <Text style={styles.resultTitle}>Quiz unavailable</Text>
+        <Pressable onPress={onBackHome} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{copy.home}</Text></Pressable>
+      </View>
+    );
+  }
 
   const choose = (choiceIndex: number) => {
     if (selected !== null) return;
@@ -104,7 +116,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     setSelected(null);
     setScore(0);
     setFinished(false);
-    setWinSaved(false);
+    setResultStats(null);
   };
 
   const advance = async () => {
@@ -115,24 +127,25 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
       return;
     }
 
-    const finalScore = score;
     setFinished(true);
-    const won = finalScore >= 2;
-    if (won && !alreadyDone && !winSaved) {
+    if (score >= 2 && !alreadyDone) {
       const updated = await recordQuizWin(stats, mode, dateKey);
+      setResultStats(updated);
       onStatsChange(updated);
-      setWinSaved(true);
+    } else {
+      setResultStats(stats);
     }
   };
 
   if (finished) {
+    const shownStats = resultStats ?? stats;
     const won = score >= 2;
-    const resultBadge = badgeForWins(winSaved ? stats.totalWins + 1 : stats.totalWins);
+    const resultBadge = badgeForWins(shownStats.totalWins);
     return (
       <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
         <View style={styles.resultHero}>
           <Text style={styles.resultEmoji}>{won ? "🎉" : "🌱"}</Text>
-          <Text style={styles.resultTitle}>{won ? copy.passed : copy.tryAgain}</Text>
+          <Text style={styles.resultTitle}>{won ? copy.passed : copy.missed}</Text>
           <Text style={styles.resultScore}>{copy.score}: {score}/{questions.length}</Text>
         </View>
 
@@ -143,7 +156,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
             <Text style={styles.badgeName}>{resultBadge.name[locale]}</Text>
           </View>
           <View style={styles.statBubble}>
-            <Text style={styles.statNumber}>{stats.totalWins + (winSaved ? 1 : 0)}</Text>
+            <Text style={styles.statNumber}>{shownStats.totalWins}</Text>
             <Text style={styles.statTiny}>{copy.wins}</Text>
           </View>
         </View>
@@ -151,7 +164,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
         {alreadyDone ? <Text style={styles.completedNote}>{copy.completed}</Text> : null}
 
         <Pressable onPress={restart} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>{copy.tryAgain}</Text>
+          <Text style={styles.primaryButtonText}>{copy.retry}</Text>
         </Pressable>
         <Pressable onPress={onBackHome} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>{copy.home}</Text>
@@ -214,15 +227,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
             const isCorrect = selected !== null && choiceIndex === question.answerIndex;
             const isWrong = isSelected && choiceIndex !== question.answerIndex;
             return (
-              <Pressable
-                key={`${question.id}-${choiceIndex}`}
-                onPress={() => choose(choiceIndex)}
-                style={[
-                  styles.choice,
-                  isCorrect && styles.choiceCorrect,
-                  isWrong && styles.choiceWrong
-                ]}
-              >
+              <Pressable key={`${question.id}-${choiceIndex}`} onPress={() => choose(choiceIndex)} style={[styles.choice, isCorrect && styles.choiceCorrect, isWrong && styles.choiceWrong]}>
                 <View style={[styles.choiceLetter, isCorrect && styles.choiceLetterCorrect, isWrong && styles.choiceLetterWrong]}>
                   <Text style={styles.choiceLetterText}>{String.fromCharCode(65 + choiceIndex)}</Text>
                 </View>
@@ -252,6 +257,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
 
 const styles = StyleSheet.create({
   screen: { padding: 18, paddingBottom: 32, backgroundColor: "#f7f4ec" },
+  emptyScreen: { flex: 1, backgroundColor: "#f7f4ec", alignItems: "center", justifyContent: "center", padding: 24 },
   topRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
   titleWrap: { flex: 1 },
   eyebrow: { color: "#17705b", fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
@@ -297,7 +303,7 @@ const styles = StyleSheet.create({
   explanationTitle: { color: "#174f40", fontSize: 13, fontWeight: "900" },
   explanationText: { color: "#657770", fontSize: 11, lineHeight: 17, marginTop: 4 },
   reference: { color: "#0b7057", fontSize: 10, fontWeight: "800", marginTop: 6 },
-  primaryButton: { minHeight: 55, borderRadius: 17, backgroundColor: "#0b5b47", alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 16 },
+  primaryButton: { minHeight: 55, borderRadius: 17, backgroundColor: "#0b5b47", alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 16, alignSelf: "stretch" },
   primaryButtonDisabled: { opacity: 0.35 },
   primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "900" },
   secondaryButton: { minHeight: 51, borderRadius: 17, backgroundColor: "#fff", borderWidth: 1, borderColor: "#d8ddd8", alignItems: "center", justifyContent: "center", marginTop: 9 },
