@@ -28,3 +28,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Refine Quran reader visuals and night mode"
           git push origin HEAD:main
+
+# hardened retry 2
