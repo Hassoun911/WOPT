@@ -6,17 +6,24 @@ import { Platform } from "react-native";
 import { STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./config";
 import { getInstallationId } from "./installation";
 
+function expoProjectId() {
+  return (
+    Constants.expoConfig?.extra?.eas?.projectId as string | undefined
+  ) || Constants.easConfig?.projectId || undefined;
+}
+
 export async function registerDeviceForServerPush(locale: "en" | "ar") {
   if (!Device.isDevice) return null;
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+  const projectId = expoProjectId();
   const pushApiUrl = Constants.expoConfig?.extra?.pushApiUrl as string | undefined;
   if (!projectId || !pushApiUrl) return null;
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   const installationId = await getInstallationId();
-  const previous = await AsyncStorage.getItem(STORAGE_KEYS.pushToken);
-  if (previous === token) return token;
 
+  // Always refresh the server registration. This is intentionally not skipped
+  // when the token matches local storage because subscriber/device links and
+  // server-side preferences can change after the token was first created.
   const response = await fetch(`${pushApiUrl.replace(/\/$/, "")}/subscriptions/expo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
