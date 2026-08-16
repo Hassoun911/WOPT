@@ -1,5 +1,6 @@
 name: Build WOPT Android APK
 
+# Rebuild marker: include latest locked-screen Adhan fixes.
 on:
   workflow_dispatch:
   push:
