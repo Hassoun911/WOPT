@@ -4,10 +4,16 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
+    "quran:data": "node scripts/fetch-quran-data.mjs",
+    "prestart": "npm run quran:data",
     "start": "expo start --dev-client",
+    "preandroid": "npm run quran:data",
     "android": "expo run:android",
+    "preios": "npm run quran:data",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit"
+    "pretypecheck": "npm run quran:data",
+    "typecheck": "tsc --noEmit",
+    "eas-build-post-install": "npm run quran:data"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
