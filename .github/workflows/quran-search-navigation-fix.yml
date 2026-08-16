@@ -1,0 +1,30 @@
+name: Apply Quran search navigation fix
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Apply Quran search navigation fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply search navigation migration
+        run: python scripts/patch_quran_search_navigation.py
+      - name: Commit search fix
+        run: |
+          rm .github/workflows/quran-search-navigation-fix.yml
+          rm scripts/patch_quran_search_navigation.py
+          git config user.name "WOPT Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Quran search result navigation and back state"
+          git push
