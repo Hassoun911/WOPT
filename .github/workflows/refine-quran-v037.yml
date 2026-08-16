@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply Quran v0.3.7 visual refinements
-        run: node .github/scripts/refine-quran-v037.mjs
+        run: node .github/scripts/refine-quran-v037b.mjs
 
       - name: Commit refinements
         run: |
