@@ -76,7 +76,6 @@ function publicAppUrl(env: Env) {
 export async function requestAdminPasswordReset(request: Request, env: Env) {
   const body = await bodyJson(request);
   const email = validEmail(body.email);
-  // Always return the same result so the endpoint cannot be used to enumerate admins.
   const accepted = json({
     ok: true,
     message: "If that email belongs to an active WOPT admin, a reset link will be sent."
@@ -104,7 +103,7 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
   await env.DB.prepare(
     `INSERT INTO email_outbox (
        recipient_email, locale, kind, template_key, template_data_json, idempotency_key
-     ) VALUES (?, 'en', 'admin_password_reset', NULL, ?, ?)`
+     ) VALUES (?, 'en', 'admin_password_reset', 'admin_password_reset', ?, ?)`
   ).bind(
     admin.email,
     JSON.stringify({ resetUrl }),
