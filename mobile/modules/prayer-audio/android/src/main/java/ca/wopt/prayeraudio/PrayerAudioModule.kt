@@ -1,6 +1,5 @@
 package ca.wopt.prayeraudio
 
-import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -24,6 +23,11 @@ class PrayerAudioModule : Module() {
     AsyncFunction("scheduleExactPrayerAlarms") { eventsJson: String ->
       val result = PrayerAlarmScheduler.replaceSchedule(context, eventsJson)
       mapOf("scheduled" to result.scheduled, "exact" to result.exact)
+    }
+
+    AsyncFunction("scheduleTestPrayerAlarm") { prayer: String, delaySeconds: Int ->
+      val exact = PrayerAlarmScheduler.scheduleTest(context, prayer, delaySeconds)
+      mapOf("exact" to exact)
     }
 
     AsyncFunction("cancelExactPrayerAlarms") {
