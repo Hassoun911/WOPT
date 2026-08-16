@@ -1,0 +1,30 @@
+name: Apply rendered Quran search target fix
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Apply rendered Quran search target fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply rendered-target migration
+        run: python scripts/patch_quran_search_rendered_target.py
+      - name: Commit rendered-target fix
+        run: |
+          rm .github/workflows/quran-search-rendered-target-fix.yml
+          rm scripts/patch_quran_search_rendered_target.py
+          git config user.name "WOPT Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Quran search target scrolling and highlighting"
+          git push
