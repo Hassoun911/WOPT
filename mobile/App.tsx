@@ -457,21 +457,23 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="dark" />
       <View style={styles.flex}>{body}</View>
-      <View style={styles.bottomNav}>
-        {navItems.map((item) => {
-          const active = activeTab === item.tab;
-          return (
-            <Pressable
-              key={item.tab}
-              onPress={() => setActiveTab(item.tab)}
-              style={[styles.navItem, active && styles.navItemActive]}
-            >
-              <Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text>
-              <Text style={[styles.navLabel, active && styles.navLabelActive]}>{locale === "ar" ? item.ar : item.en}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {activeTab !== "quran" ? (
+        <View style={styles.bottomNav}>
+          {navItems.map((item) => {
+            const active = activeTab === item.tab;
+            return (
+              <Pressable
+                key={item.tab}
+                onPress={() => setActiveTab(item.tab)}
+                style={[styles.navItem, active && styles.navItemActive]}
+              >
+                <Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text>
+                <Text style={[styles.navLabel, active && styles.navLabelActive]}>{locale === "ar" ? item.ar : item.en}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

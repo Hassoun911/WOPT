@@ -15,6 +15,7 @@ import type { QuranAyah, QuranLocale } from "./quranData";
 
 export type QuranFontChoice = "qcf-v2" | "qcf-v1" | "qpc-hafs";
 export type QuranPageTheme = "paper" | "white" | "sepia" | "dark";
+export type QuranBookMode = "auto" | "single" | "spread";
 
 export type QuranAppearance = {
   font: QuranFontChoice;
@@ -22,6 +23,7 @@ export type QuranAppearance = {
   lineHeightMultiplier: number;
   textColor: string;
   pageTheme: QuranPageTheme;
+  bookMode: QuranBookMode;
   tajweed: boolean;
 };
 
@@ -31,6 +33,7 @@ export const DEFAULT_QURAN_APPEARANCE: QuranAppearance = {
   lineHeightMultiplier: 1.9,
   textColor: "#111111",
   pageTheme: "paper",
+  bookMode: "auto",
   tajweed: false
 };
 
@@ -337,7 +340,7 @@ export function ReaderSettingsSheet({
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sheetTitle, ar && styles.rtl]}>{t("Qur’an appearance", "مظهر القرآن")}</Text>
-              <Text style={[styles.sheetSubtitle, ar && styles.rtl]}>{t("Font • Tajweed • size • spacing • colors", "الخط • التجويد • الحجم • التباعد • الألوان")}</Text>
+              <Text style={[styles.sheetSubtitle, ar && styles.rtl]}>{t("Font • Tajweed • book layout • size • colors", "الخط • التجويد • شكل الكتاب • الحجم • الألوان")}</Text>
             </View>
             <Pressable onPress={onDone} style={styles.doneTop}><Text style={styles.doneTopText}>✓</Text></Pressable>
           </View>
@@ -396,6 +399,21 @@ export function ReaderSettingsSheet({
               <Pressable onPress={() => setAppearance((previous) => ({ ...previous, lineHeightMultiplier: Math.max(1.35, Math.round((previous.lineHeightMultiplier - 0.1) * 10) / 10) }))} style={styles.stepButton}><Text style={styles.stepButtonText}>−</Text></Pressable>
               <View style={styles.stepValueWrap}><Text style={styles.stepValue}>{appearance.lineHeightMultiplier.toFixed(1)}×</Text><Text style={styles.stepCaption}>{t("Spacing", "التباعد")}</Text></View>
               <Pressable onPress={() => setAppearance((previous) => ({ ...previous, lineHeightMultiplier: Math.min(2.6, Math.round((previous.lineHeightMultiplier + 0.1) * 10) / 10) }))} style={styles.stepButton}><Text style={styles.stepButtonText}>+</Text></Pressable>
+            </View>
+
+            <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE LAYOUT", "شكل الصفحات")}</Text>
+            <View style={styles.layoutRow}>
+              {([
+                ["auto", "◫", t("Auto", "تلقائي"), t("Open book on Fold/tablet", "كتاب مفتوح على الأجهزة القابلة للطي")],
+                ["single", "▯", t("Single", "صفحة"), t("One Mushaf page", "صفحة مصحف واحدة")],
+                ["spread", "▯▯", t("Open book", "كتاب مفتوح"), t("Two pages side by side", "صفحتان جنباً إلى جنب")]
+              ] as Array<[QuranBookMode, string, string, string]>).map(([mode, icon, label, note]) => (
+                <Pressable key={mode} onPress={() => setAppearance((previous) => ({ ...previous, bookMode: mode }))} style={[styles.layoutChoice, appearance.bookMode === mode && styles.layoutChoiceActive]}>
+                  <Text style={[styles.layoutIcon, appearance.bookMode === mode && styles.layoutIconActive]}>{icon}</Text>
+                  <Text style={[styles.layoutLabel, appearance.bookMode === mode && styles.layoutLabelActive]}>{label}</Text>
+                  <Text style={styles.layoutNote}>{note}</Text>
+                </Pressable>
+              ))}
             </View>
 
             <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE STYLE", "لون الصفحة")}</Text>
@@ -473,6 +491,14 @@ const styles = StyleSheet.create({
   stepValueWrap: { alignItems: "center" },
   stepValue: { color: "#173f35", fontSize: 17, fontWeight: "900" },
   stepCaption: { color: "#8a948f", fontSize: 8, marginTop: 1 },
+  layoutRow: { flexDirection: "row", gap: 7, marginBottom: 15 },
+  layoutChoice: { flex: 1, minHeight: 92, borderRadius: 16, borderWidth: 1, borderColor: "#e0ddd6", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 8 },
+  layoutChoiceActive: { borderColor: "#0b7a5d", backgroundColor: "#edf6f2" },
+  layoutIcon: { color: "#6c7974", fontSize: 23, fontWeight: "900" },
+  layoutIconActive: { color: "#0b7a5d" },
+  layoutLabel: { color: "#52635d", fontSize: 9, fontWeight: "900", marginTop: 5, textAlign: "center" },
+  layoutLabelActive: { color: "#0b654f" },
+  layoutNote: { color: "#929a96", fontSize: 7, lineHeight: 10, textAlign: "center", marginTop: 3 },
   themeRow: { flexDirection: "row", gap: 7, marginBottom: 15 },
   themeChoice: { flex: 1, alignItems: "center", gap: 5, padding: 7, borderRadius: 14, borderWidth: 1, borderColor: "#e0ddd6", backgroundColor: "#fff" },
   themeChoiceActive: { borderColor: "#0b7a5d", backgroundColor: "#edf6f2" },
