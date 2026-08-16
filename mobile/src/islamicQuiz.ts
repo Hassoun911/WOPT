@@ -32,7 +32,7 @@ export type QuizBadge = {
 
 const STORAGE_KEY = "wopt:islamic-quiz-stats:v1";
 
-export const BADGES: QuizBadge[] = [
+export const BADGES: readonly [QuizBadge, ...QuizBadge[]] = [
   { key: "explorer", emoji: "🌱", name: { en: "Explorer", ar: "المستكشف" }, minWins: 0 },
   { key: "crescent", emoji: "🌙", name: { en: "Crescent", ar: "الهلال" }, minWins: 1 },
   { key: "lantern", emoji: "🏮", name: { en: "Lantern", ar: "الفانوس" }, minWins: 3 },
@@ -53,35 +53,35 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "Shawwal", ar: "شوال" }
     ],
     answerIndex: 0,
-    explanation: { en: "The Qur’an identifies Ramadan as the month in which the Qur’an was revealed and fasting is prescribed.", ar: "يذكر القرآن أن رمضان هو الشهر الذي أُنزل فيه القرآن وفُرض فيه الصيام." },
+    explanation: { en: "Ramadan is the month of fasting and the month in which the Qur’an was revealed.", ar: "رمضان هو شهر الصيام والشهر الذي أُنزل فيه القرآن." },
     reference: "Qur’an 2:185"
   },
   {
     id: "kids-qibla",
     mode: "kids",
-    prompt: { en: "What do Muslims face when they pray?", ar: "إلى أين يتجه المسلمون عند الصلاة؟" },
+    prompt: { en: "What direction do Muslims face in prayer?", ar: "إلى أين يتجه المسلمون في الصلاة؟" },
     choices: [
-      { en: "The Sacred Mosque in Makkah", ar: "المسجد الحرام في مكة" },
-      { en: "A mountain", ar: "جبل" },
-      { en: "The sunrise", ar: "شروق الشمس" },
+      { en: "Al-Masjid al-Haram in Makkah", ar: "المسجد الحرام في مكة" },
+      { en: "The sunrise", ar: "الشروق" },
+      { en: "Any mountain", ar: "أي جبل" },
       { en: "Any direction", ar: "أي اتجاه" }
     ],
     answerIndex: 0,
-    explanation: { en: "Muslims are directed to face al-Masjid al-Haram in prayer.", ar: "أُمر المسلمون بالتوجه نحو المسجد الحرام في الصلاة." },
+    explanation: { en: "The Qur’an directs Muslims to face al-Masjid al-Haram.", ar: "يوجه القرآن المسلمين نحو المسجد الحرام." },
     reference: "Qur’an 2:144"
   },
   {
-    id: "kids-laylatul-qadr",
+    id: "kids-qadr",
     mode: "kids",
     prompt: { en: "Laylat al-Qadr is better than how many months?", ar: "ليلة القدر خير من كم شهر؟" },
     choices: [
-      { en: "100 months", ar: "١٠٠ شهر" },
-      { en: "500 months", ar: "٥٠٠ شهر" },
-      { en: "1,000 months", ar: "١٠٠٠ شهر" },
-      { en: "10 months", ar: "١٠ أشهر" }
+      { en: "100", ar: "١٠٠" },
+      { en: "500", ar: "٥٠٠" },
+      { en: "1,000", ar: "١٠٠٠" },
+      { en: "10", ar: "١٠" }
     ],
     answerIndex: 2,
-    explanation: { en: "Surah al-Qadr says the Night of Decree is better than a thousand months.", ar: "تقول سورة القدر إن ليلة القدر خير من ألف شهر." },
+    explanation: { en: "Surah al-Qadr says it is better than a thousand months.", ar: "تقول سورة القدر إنها خير من ألف شهر." },
     reference: "Qur’an 97:3"
   },
   {
@@ -89,33 +89,33 @@ const QUESTIONS: QuizQuestion[] = [
     mode: "kids",
     prompt: { en: "Which prophet was swallowed by a great fish?", ar: "أي نبي ابتلعه الحوت؟" },
     choices: [
-      { en: "Yunus (Jonah)", ar: "يونس عليه السلام" },
-      { en: "Nuh (Noah)", ar: "نوح عليه السلام" },
-      { en: "Musa (Moses)", ar: "موسى عليه السلام" },
-      { en: "Ibrahim (Abraham)", ar: "إبراهيم عليه السلام" }
+      { en: "Yunus", ar: "يونس عليه السلام" },
+      { en: "Nuh", ar: "نوح عليه السلام" },
+      { en: "Musa", ar: "موسى عليه السلام" },
+      { en: "Ibrahim", ar: "إبراهيم عليه السلام" }
     ],
     answerIndex: 0,
-    explanation: { en: "The Qur’an describes Prophet Yunus being swallowed by the fish.", ar: "يذكر القرآن أن الحوت ابتلع نبي الله يونس عليه السلام." },
+    explanation: { en: "The Qur’an describes Prophet Yunus being swallowed by the fish.", ar: "يذكر القرآن ابتلاع الحوت لنبي الله يونس عليه السلام." },
     reference: "Qur’an 37:139–142"
   },
   {
-    id: "kids-ark",
+    id: "kids-nuh",
     mode: "kids",
     prompt: { en: "Which prophet was commanded to build the Ark?", ar: "أي نبي أُمر بصنع السفينة؟" },
     choices: [
-      { en: "Nuh (Noah)", ar: "نوح عليه السلام" },
-      { en: "Isa (Jesus)", ar: "عيسى عليه السلام" },
-      { en: "Yusuf (Joseph)", ar: "يوسف عليه السلام" },
-      { en: "Dawud (David)", ar: "داود عليه السلام" }
+      { en: "Nuh", ar: "نوح عليه السلام" },
+      { en: "Isa", ar: "عيسى عليه السلام" },
+      { en: "Yusuf", ar: "يوسف عليه السلام" },
+      { en: "Dawud", ar: "داود عليه السلام" }
     ],
     answerIndex: 0,
-    explanation: { en: "Allah commanded Prophet Nuh to construct the Ark under divine guidance.", ar: "أمر الله نبيه نوحاً عليه السلام بصنع السفينة بوحيه." },
+    explanation: { en: "Allah commanded Prophet Nuh to construct the Ark.", ar: "أمر الله نبيه نوحاً عليه السلام بصنع السفينة." },
     reference: "Qur’an 11:37"
   },
   {
     id: "kids-iqra",
     mode: "kids",
-    prompt: { en: "What does the first word of Surah al-‘Alaq tell us to do?", ar: "ماذا تأمرنا أول كلمة في سورة العلق أن نفعل؟" },
+    prompt: { en: "What does the first word of Surah al-‘Alaq tell us to do?", ar: "ماذا تأمرنا أول كلمة في سورة العلق؟" },
     choices: [
       { en: "Read / Recite", ar: "اقرأ" },
       { en: "Sleep", ar: "نم" },
@@ -123,41 +123,13 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "Eat", ar: "كُل" }
     ],
     answerIndex: 0,
-    explanation: { en: "Surah al-‘Alaq begins with the command ‘Read/Recite in the name of your Lord.’", ar: "تبدأ سورة العلق بالأمر: اقرأ باسم ربك." },
+    explanation: { en: "Surah al-‘Alaq begins with the command to read or recite in the name of your Lord.", ar: "تبدأ سورة العلق بالأمر بالقراءة باسم الله." },
     reference: "Qur’an 96:1"
-  },
-  {
-    id: "kids-patience-prayer",
-    mode: "kids",
-    prompt: { en: "The Qur’an tells believers to seek help through patience and what else?", ar: "يأمر القرآن بالاستعانة بالصبر وبماذا أيضاً؟" },
-    choices: [
-      { en: "Prayer", ar: "الصلاة" },
-      { en: "Money", ar: "المال" },
-      { en: "Travel", ar: "السفر" },
-      { en: "Silence", ar: "الصمت" }
-    ],
-    answerIndex: 0,
-    explanation: { en: "The Qur’an pairs patience with prayer as a means of seeking help.", ar: "يجمع القرآن بين الصبر والصلاة كوسيلة للاستعانة." },
-    reference: "Qur’an 2:45"
-  },
-  {
-    id: "kids-ibrahim-ismail",
-    mode: "kids",
-    prompt: { en: "Which two prophets raised the foundations of the Sacred House?", ar: "أي نبيين رفعا قواعد البيت الحرام؟" },
-    choices: [
-      { en: "Ibrahim and Ismail", ar: "إبراهيم وإسماعيل عليهما السلام" },
-      { en: "Musa and Harun", ar: "موسى وهارون عليهما السلام" },
-      { en: "Dawud and Sulayman", ar: "داود وسليمان عليهما السلام" },
-      { en: "Yusuf and Ya‘qub", ar: "يوسف ويعقوب عليهما السلام" }
-    ],
-    answerIndex: 0,
-    explanation: { en: "Ibrahim and Ismail raised the foundations of the House and prayed for acceptance.", ar: "رفع إبراهيم وإسماعيل عليهما السلام قواعد البيت ودعوا الله أن يتقبل منهما." },
-    reference: "Qur’an 2:127"
   },
   {
     id: "adult-burden",
     mode: "adults",
-    prompt: { en: "Which verse says Allah does not burden a soul beyond what it can bear?", ar: "أي آية تقرر أن الله لا يكلف نفساً إلا وسعها؟" },
+    prompt: { en: "Which verse says Allah does not burden a soul beyond its capacity?", ar: "أي آية تقرر أن الله لا يكلف نفساً إلا وسعها؟" },
     choices: [
       { en: "Al-Baqarah 2:286", ar: "البقرة ٢:٢٨٦" },
       { en: "Al-Fatihah 1:1", ar: "الفاتحة ١:١" },
@@ -165,11 +137,11 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "Al-Kawthar 108:1", ar: "الكوثر ١٠٨:١" }
     ],
     answerIndex: 0,
-    explanation: { en: "The closing verse of Surah al-Baqarah contains this principle.", ar: "تتضمن آخر آية من سورة البقرة هذا المعنى." },
+    explanation: { en: "This principle appears in the closing verse of Surah al-Baqarah.", ar: "يرد هذا المعنى في آخر آية من سورة البقرة." },
     reference: "Qur’an 2:286"
   },
   {
-    id: "adult-ayat-kursi",
+    id: "adult-kursi",
     mode: "adults",
     prompt: { en: "In which surah is Ayat al-Kursi found?", ar: "في أي سورة توجد آية الكرسي؟" },
     choices: [
@@ -183,7 +155,7 @@ const QUESTIONS: QuizQuestion[] = [
     reference: "Qur’an 2:255"
   },
   {
-    id: "adult-no-compulsion",
+    id: "adult-compulsion",
     mode: "adults",
     prompt: { en: "‘There is no compulsion in religion’ appears in which verse?", ar: "في أي آية ورد معنى: لا إكراه في الدين؟" },
     choices: [
@@ -193,7 +165,7 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "55:13", ar: "٥٥:١٣" }
     ],
     answerIndex: 0,
-    explanation: { en: "This statement appears immediately after Ayat al-Kursi in Surah al-Baqarah.", ar: "يرد هذا المعنى بعد آية الكرسي مباشرة في سورة البقرة." },
+    explanation: { en: "This statement appears in Surah al-Baqarah, verse 256.", ar: "يرد هذا المعنى في سورة البقرة، الآية ٢٥٦." },
     reference: "Qur’an 2:256"
   },
   {
@@ -207,11 +179,11 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "Quraysh", ar: "قريش" }
     ],
     answerIndex: 0,
-    explanation: { en: "Surah Ash-Sharh repeats the assurance in consecutive verses.", ar: "تكرر سورة الشرح هذا الوعد في آيتين متتاليتين." },
+    explanation: { en: "Surah Ash-Sharh repeats this reassurance in consecutive verses.", ar: "تكرر سورة الشرح هذا الوعد في آيتين متتاليتين." },
     reference: "Qur’an 94:5–6"
   },
   {
-    id: "adult-first-revelation",
+    id: "adult-revelation",
     mode: "adults",
     prompt: { en: "The opening verses traditionally identified with the first revelation are in which surah?", ar: "الآيات الافتتاحية المرتبطة ببداية الوحي تقع في أي سورة؟" },
     choices: [
@@ -221,13 +193,13 @@ const QUESTIONS: QuizQuestion[] = [
       { en: "At-Tin", ar: "التين" }
     ],
     answerIndex: 0,
-    explanation: { en: "Surah al-‘Alaq opens with ‘Read/Recite in the name of your Lord.’", ar: "تبدأ سورة العلق بقوله تعالى: اقرأ باسم ربك." },
+    explanation: { en: "Surah al-‘Alaq opens with the command to read or recite in the name of your Lord.", ar: "تبدأ سورة العلق بالأمر بالقراءة باسم الله." },
     reference: "Qur’an 96:1–5"
   },
   {
     id: "adult-house",
     mode: "adults",
-    prompt: { en: "Who raised the foundations of the House according to Qur’an 2:127?", ar: "من رفع قواعد البيت بحسب سورة البقرة ٢:١٢٧؟" },
+    prompt: { en: "Who raised the foundations of the Sacred House according to Qur’an 2:127?", ar: "من رفع قواعد البيت بحسب سورة البقرة ٢:١٢٧؟" },
     choices: [
       { en: "Ibrahim and Ismail", ar: "إبراهيم وإسماعيل عليهما السلام" },
       { en: "Musa and Harun", ar: "موسى وهارون عليهما السلام" },
@@ -237,34 +209,6 @@ const QUESTIONS: QuizQuestion[] = [
     answerIndex: 0,
     explanation: { en: "The verse names Ibrahim and Ismail as they raise the foundations of the House.", ar: "تذكر الآية إبراهيم وإسماعيل عليهما السلام وهما يرفعان قواعد البيت." },
     reference: "Qur’an 2:127"
-  },
-  {
-    id: "adult-qadr",
-    mode: "adults",
-    prompt: { en: "What comparison does Surah al-Qadr make about the Night of Decree?", ar: "بماذا تصف سورة القدر ليلة القدر؟" },
-    choices: [
-      { en: "Better than a thousand months", ar: "خير من ألف شهر" },
-      { en: "Equal to one year", ar: "تساوي سنة" },
-      { en: "Better than forty days", ar: "خير من أربعين يوماً" },
-      { en: "Equal to a hundred nights", ar: "تساوي مئة ليلة" }
-    ],
-    answerIndex: 0,
-    explanation: { en: "The Qur’an describes Laylat al-Qadr as better than a thousand months.", ar: "يصف القرآن ليلة القدر بأنها خير من ألف شهر." },
-    reference: "Qur’an 97:3"
-  },
-  {
-    id: "adult-qibla",
-    mode: "adults",
-    prompt: { en: "Qur’an 2:144 directs the Prophet ﷺ to turn toward what?", ar: "إلى أين يأمر القرآن في البقرة ٢:١٤٤ بالتوجه؟" },
-    choices: [
-      { en: "Al-Masjid al-Haram", ar: "المسجد الحرام" },
-      { en: "Mount Sinai", ar: "طور سيناء" },
-      { en: "The east only", ar: "الشرق فقط" },
-      { en: "Madinah", ar: "المدينة" }
-    ],
-    answerIndex: 0,
-    explanation: { en: "The verse directs the prayer direction toward al-Masjid al-Haram.", ar: "توجه الآية القبلة نحو المسجد الحرام." },
-    reference: "Qur’an 2:144"
   }
 ];
 
@@ -285,22 +229,23 @@ function hash(value: string) {
 }
 
 function dayNumber(dateKey: string) {
-  const [year, month, day] = dateKey.split("-").map(Number);
+  const [year = 1970, month = 1, day = 1] = dateKey.split("-").map(Number);
   return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
 }
 
-export function dailyQuizQuestions(mode: QuizMode, dateKey: string, count = 3) {
+export function dailyQuizQuestions(mode: QuizMode, dateKey: string, count = 3): QuizQuestion[] {
   const pool = QUESTIONS.filter((question) => question.mode === mode);
+  if (!pool.length) return [];
   if (pool.length <= count) return pool;
   const start = hash(`${mode}:${dateKey}`) % pool.length;
-  return Array.from({ length: count }, (_unused, index) => pool[(start + index) % pool.length]);
+  return Array.from({ length: count }, (_unused, index) => pool[(start + index) % pool.length] ?? pool[0]!);
 }
 
-export function badgeForWins(totalWins: number) {
+export function badgeForWins(totalWins: number): QuizBadge {
   return [...BADGES].reverse().find((badge) => totalWins >= badge.minWins) ?? BADGES[0];
 }
 
-export function nextBadge(totalWins: number) {
+export function nextBadge(totalWins: number): QuizBadge | null {
   return BADGES.find((badge) => badge.minWins > totalWins) ?? null;
 }
 
