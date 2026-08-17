@@ -15,14 +15,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import IslamicQuiz from "./src/IslamicQuiz";
-import { CITY_LABEL, STORAGE_KEYS } from "./src/config";
+import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { disablePrayerNotifications, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
 import { loadPrayerTimes } from "./src/prayerData";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
-import { formatPrayerTime, timeToMinutes, windsorDateKey, windsorSecondsSinceMidnight } from "./src/time";
+import { addDateDays, formatPrayerTime, timeToMinutes, windsorDateKey, windsorLocalToDate, windsorSecondsSinceMidnight } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
 type AppTab = "home" | "quran" | "quiz" | "alerts" | "more";
@@ -47,12 +47,32 @@ const PRAYER_ICONS: Record<PrayerKey, string> = {
   isha: "🌙"
 };
 
-function nextPrayerFor(day: PrayerTimes[string] | undefined, now = new Date()) {
-  if (!day) return null;
+function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date()) {
+  const currentKey = windsorDateKey(now);
   const currentSeconds = windsorSecondsSinceMidnight(now);
-  for (const prayer of PRAYER_KEYS) {
-    const seconds = timeToMinutes(day[prayer]) * 60;
-    if (seconds > currentSeconds) return { prayer, secondsRemaining: seconds - currentSeconds };
+
+  // Keep looking beyond Isha so the home screen rolls naturally into tomorrow's Fajr.
+  for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+    const dateKey = addDateDays(currentKey, dayOffset);
+    const day = prayerTimes[dateKey];
+    if (!day) continue;
+
+    for (const prayer of PRAYER_KEYS) {
+      const seconds = timeToMinutes(day[prayer]) * 60;
+      if (dayOffset === 0 && seconds <= currentSeconds) continue;
+
+      const target = windsorLocalToDate(dateKey, day[prayer]);
+      const secondsRemaining = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
+      if (target.getTime() <= now.getTime()) continue;
+
+      return {
+        prayer,
+        dateKey,
+        time: day[prayer],
+        secondsRemaining,
+        isTomorrow: dateKey !== currentKey
+      };
+    }
   }
   return null;
 }
@@ -67,10 +87,11 @@ function countdownLabel(seconds: number, locale: "en" | "ar") {
 
 function hijriDateLabel(date: Date, locale: "en" | "ar") {
   try {
-    return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic" : "en-u-ca-islamic", {
+    return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
       day: "numeric",
       month: "long",
-      year: "numeric"
+      year: "numeric",
+      timeZone: WINDSOR_TIME_ZONE
     }).format(date);
   } catch {
     return "";
@@ -91,7 +112,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
   const todayKey = windsorDateKey(now);
   const today = prayerTimes[todayKey];
-  const next = useMemo(() => nextPrayerFor(today, now), [now, today]);
+  const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);
   const badge = badgeForWins(quizStats.totalWins);
   const upcomingBadge = nextBadge(quizStats.totalWins);
 
@@ -222,7 +243,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     );
   }
 
-  const date = new Date(`${todayKey}T12:00:00`);
+  const date = windsorLocalToDate(todayKey, "12:00");
   const shortDate = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", {
     weekday: "short",
     month: "short",
@@ -270,14 +291,14 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         <View style={styles.nextCard}>
           <View style={styles.nextTopRow}>
             <View>
-              <Text style={styles.nextEyebrow}>{locale === "ar" ? "الصلاة القادمة" : "NEXT PRAYER"}</Text>
+              <Text style={styles.nextEyebrow}>{locale === "ar" ? `الصلاة القادمة${next.isTomorrow ? " • غداً" : ""}` : `NEXT PRAYER${next.isTomorrow ? " • TOMORROW" : ""}`}</Text>
               <Text style={styles.nextName}>{NAMES[next.prayer][locale]}</Text>
               <Text style={styles.nextArabic}>{NAMES[next.prayer][locale === "en" ? "ar" : "en"]}</Text>
             </View>
             <View style={styles.nextIconBubble}><Text style={styles.nextIcon}>{PRAYER_ICONS[next.prayer]}</Text></View>
           </View>
           <View style={styles.nextBottomRow}>
-            <Text style={styles.nextTime}>{formatPrayerTime(today[next.prayer], locale)}</Text>
+            <Text style={styles.nextTime}>{formatPrayerTime(next.time, locale)}</Text>
             <View style={styles.countdownPill}>
               <Text style={styles.countdownText}>⏳ {countdownLabel(next.secondsRemaining, locale)} {locale === "ar" ? "متبقي" : "left"}</Text>
             </View>
@@ -302,9 +323,12 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
                   </View>
                   <View style={styles.prayerNameBlock}>
                     <Text style={[styles.prayerName, active && styles.prayerActiveText]}>{NAMES[prayer][locale]}</Text>
-                    <Text style={[styles.prayerOtherName, active && styles.prayerActiveMuted]}>{NAMES[prayer][locale === "en" ? "ar" : "en"]}</Text>
+                    <View style={styles.prayerSubRow}>
+                      <Text style={[styles.prayerOtherName, active && styles.prayerActiveMuted]}>{NAMES[prayer][locale === "en" ? "ar" : "en"]}</Text>
+                      {active && next?.isTomorrow ? <Text style={styles.tomorrowTag}>{locale === "ar" ? "غداً" : "Tomorrow"}</Text> : null}
+                    </View>
                   </View>
-                  <Text style={[styles.prayerTime, active && styles.prayerActiveText]}>{formatPrayerTime(today[prayer], locale)}</Text>
+                  <Text style={[styles.prayerTime, active && styles.prayerActiveText]}>{formatPrayerTime(active && next?.isTomorrow ? next.time : today[prayer], locale)}</Text>
                 </View>
               );
             })
@@ -525,11 +549,13 @@ const styles = StyleSheet.create({
   sectionMeta: { color: "#77837e", fontSize: 10, fontWeight: "700" },
   prayerList: { backgroundColor: "#fff", borderRadius: 22, borderWidth: 1, borderColor: "#dfddd5", overflow: "hidden" },
   prayerRow: { minHeight: 67, flexDirection: "row", alignItems: "center", paddingHorizontal: 13, borderBottomWidth: 1, borderBottomColor: "#efede8" },
-  prayerRowActive: { backgroundColor: "#edf7f2" },
+  prayerRowActive: { backgroundColor: "#dff2e9", borderLeftWidth: 4, borderLeftColor: "#0b654f" },
   prayerIconWrap: { width: 39, height: 39, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#f1f3ef", marginRight: 11 },
   prayerIconWrapActive: { backgroundColor: "#d8eee5" },
   prayerIcon: { fontSize: 20 },
   prayerNameBlock: { flex: 1 },
+  prayerSubRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  tomorrowTag: { color: "#0b654f", backgroundColor: "#cce8dc", borderRadius: 99, paddingHorizontal: 6, paddingVertical: 2, fontSize: 7, fontWeight: "900", overflow: "hidden" },
   prayerName: { color: "#173f35", fontSize: 14, fontWeight: "900" },
   prayerOtherName: { color: "#8a9691", fontSize: 11, marginTop: 1 },
   prayerTime: { color: "#173f35", fontSize: 15, fontWeight: "900" },
