@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import IslamicQuiz from "./src/IslamicQuiz";
+import SettingsHub from "./src/SettingsHub";
+import HassounWidget from "./modules/hassoun-widget";
 import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { disablePrayerNotifications, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
@@ -115,6 +117,12 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);
   const badge = badgeForWins(quizStats.totalWins);
   const upcomingBadge = nextBadge(quizStats.totalWins);
+
+  useEffect(() => {
+    if (Object.keys(prayerTimes).length) {
+      HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);
+    }
+  }, [prayerTimes, locale]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1_000);
@@ -433,33 +441,12 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   );
 
   const moreScreen = (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {header}
-      <Text style={styles.pageEyebrow}>✨ HASSOUN</Text>
-      <Text style={styles.pageTitle}>{locale === "ar" ? "المزيد" : "More"}</Text>
-      <Text style={styles.pageSubtitle}>{locale === "ar" ? "الوصول السريع إلى ميزاتك ومصادر التطبيق." : "Quick access to your features and app sources."}</Text>
-
-      <Pressable onPress={() => setActiveTab("quran")} style={styles.moreRow}>
-        <Text style={styles.moreEmoji}>📖</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "قارئ القرآن" : "Qur’an reader"}</Text><Text style={styles.moreText}>{locale === "ar" ? "قارئ أندرويد أصلي سريع ومحفوظ محلياً" : "Fresh native Android reader with offline verified text"}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
-      <Pressable onPress={() => setActiveTab("quiz")} style={styles.moreRow}>
-        <Text style={styles.moreEmoji}>🧠</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "المسابقة اليومية" : "Daily Islamic Quiz"}</Text><Text style={styles.moreText}>{badge.emoji} {badge.name[locale]} • 🔥 {quizStats.streak} • 🏆 {quizStats.totalWins}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
-      <Pressable onPress={() => setActiveTab("alerts")} style={styles.moreRow}>
-        <Text style={styles.moreEmoji}>🔔</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "التنبيهات" : "Alerts"}</Text><Text style={styles.moreText}>{locale === "ar" ? "الأذان والتنبيهات والبريد" : "Adhan, notifications, and email alerts"}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
-      <Pressable onPress={toggleLocale} style={styles.moreRow}>
-        <Text style={styles.moreEmoji}>🌐</Text><View style={styles.moreCopy}><Text style={styles.moreTitle}>{locale === "ar" ? "اللغة" : "Language"}</Text><Text style={styles.moreText}>{locale === "ar" ? "التبديل إلى الإنجليزية" : "Switch to Arabic"}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
-
-      <View style={styles.sourceCard}>
-        <Text style={styles.sourceEmoji}>✅</Text>
-        <View style={styles.moreCopy}>
-          <Text style={styles.moreTitle}>{locale === "ar" ? "مصدر مواقيت الصلاة" : "Prayer-time source"}</Text>
-          <Text style={styles.moreText}>{locale === "ar" ? "جدول جمعية وندسور الإسلامية الرسمي" : "Official Windsor Islamic Association schedule"}</Text>
-        </View>
-      </View>
-    </ScrollView>
+    <SettingsHub
+      locale={locale}
+      onToggleLocale={toggleLocale}
+      onOpenAlerts={() => setActiveTab("alerts")}
+      onOpenEmailAlerts={onOpenEmailAlerts}
+    />
   );
 
   const body = activeTab === "quran"

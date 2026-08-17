@@ -29,6 +29,7 @@ import {
   updateSubscriberPreferences,
   verifyEmailSubscription
 } from "./subscribers";
+import { submitSupportContact } from "./support";
 import type { Env, Locale, PrayerFile } from "./types";
 
 let cachedSchedule: { expiresAt: number; data: PrayerFile } | null = null;
@@ -223,6 +224,8 @@ export default {
         response = await registerWeb(request, env);
       } else if (request.method === "DELETE" && url.pathname === "/subscriptions") {
         response = await unsubscribe(request, env);
+      } else if (request.method === "POST" && url.pathname === "/support/contact") {
+        response = await submitSupportContact(request, env);
       } else if (request.method === "POST" && url.pathname === "/email/subscribers") {
         response = await subscribeByEmail(request, env);
       } else if (request.method === "GET" && url.pathname === "/email/subscribers/verify") {
