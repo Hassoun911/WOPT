@@ -29,9 +29,10 @@ jobs:
 
       - name: Commit reader fixes
         run: |
+          git checkout -- .github/workflows/android-debug.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/src/quran/QuranV2.tsx mobile/app.config.ts .github/workflows/android-debug.yml
+          git add mobile/src/quran/QuranV2.tsx mobile/app.config.ts
           git diff --cached --quiet && exit 0
           git commit -m "Fix Qur'an page scrolling and audio controls"
           git push origin HEAD:main
