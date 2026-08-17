@@ -30,6 +30,11 @@ async function disableSubscription(env: Env, subscriptionId: number) {
 }
 
 function wantsEvent(subscription: SubscriptionRow, event: DuePrayerEvent) {
+  // Android schedules its 20/10-minute reminders locally and uses the native
+  // exact-alarm service for the Adhan. A second server prayer push would create
+  // duplicate notifications for the same prayer event. Keep the Expo token
+  // active for Hassoun announcements/admin pushes, but not scheduled prayers.
+  if (subscription.provider === "expo" && subscription.platform === "android") return false;
   if (event.kind === "twenty") return subscription.notify_twenty === 1;
   if (event.kind === "ten") return subscription.notify_ten === 1;
   return subscription.notify_athan === 1;
@@ -48,14 +53,7 @@ async function sendExpo(env: Env, subscription: SubscriptionRow, event: DuePraye
       to: subscription.address,
       title: message.title,
       body: message.body,
-      // Android's exact alarm service plays the full Adhan and dua. Keep the
-      // corresponding server push silent there so two sounds never overlap.
-      sound:
-        subscription.platform === "android" && event.kind === "athan"
-          ? null
-          : subscription.platform === "ios"
-            ? message.sound
-            : "default",
+      sound: subscription.platform === "ios" ? message.sound : "default",
       channelId: subscription.platform === "android" ? message.channelId : undefined,
       priority: "high",
       data: {
