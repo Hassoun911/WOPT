@@ -1,3 +1,4 @@
+# Rebuild after Quran Radio duplicate-menu cleanup
 name: Build Hassoun Android APK
 
 on:
