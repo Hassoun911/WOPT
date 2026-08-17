@@ -9,147 +9,26 @@ def replace_once(path: str, old: str, new: str, label: str) -> None:
     p.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
-rendering = "mobile/src/quran/quranRendering.tsx"
 quran = "mobile/src/quran/QuranV3.tsx"
+rendering = "mobile/src/quran/quranRendering.tsx"
 config = "mobile/app.config.ts"
+icon = "mobile/assets/hassoun-app-icon.svg"
 
-# Appearance: persist the user's preferred page-browsing direction.
-replace_once(
-    rendering,
-    'export type QuranBookMode = "auto" | "single" | "spread";\n',
-    'export type QuranBookMode = "auto" | "single" | "spread";\nexport type QuranBrowseMode = "vertical" | "horizontal";\n',
-    "browse mode type",
-)
-replace_once(
-    rendering,
-    '  bookMode: QuranBookMode;\n  tajweed: boolean;\n',
-    '  bookMode: QuranBookMode;\n  browseMode: QuranBrowseMode;\n  tajweed: boolean;\n',
-    "appearance browse field",
-)
-replace_once(
-    rendering,
-    '  bookMode: "auto",\n  tajweed: false\n',
-    '  bookMode: "auto",\n  browseMode: "vertical",\n  tajweed: false\n',
-    "default browse mode",
-)
-replace_once(
-    rendering,
-    '{t("Font • Tajweed • book layout • size • colors", "الخط • التجويد • شكل الكتاب • الحجم • الألوان")}',
-    '{t("Font • Tajweed • navigation • layout • size • colors", "الخط • التجويد • التنقل • شكل الكتاب • الحجم • الألوان")}',
-    "appearance subtitle",
-)
-
-# QCF fonts include the ayah marker as the final glyph. Split that glyph so the marker is green.
-replace_once(
-    rendering,
-    '''          if ((appearance.font === "qcf-v1" || appearance.font === "qcf-v2") && raw) {
-            return (
-              <Text key={key} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
-                {decodeNumericEntities(raw)}{" "}
-              </Text>
-            );
-          }
-''',
-    '''          if ((appearance.font === "qcf-v1" || appearance.font === "qcf-v2") && raw) {
-            const decoded = decodeNumericEntities(raw).trimEnd();
-            const glyphs = Array.from(decoded);
-            const markerGlyph = glyphs.pop() ?? "";
-            const verseGlyphs = glyphs.join("");
-            return (
-              <Text key={key} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
-                {verseGlyphs}
-                {markerGlyph ? <Text style={{ color: "#0b8b69", fontFamily }}>{markerGlyph}</Text> : null}{" "}
-              </Text>
-            );
-          }
-''',
-    "green qcf ayah marker",
-)
-
-browse_section = '''
-            <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE BROWSING", "طريقة التنقل")}</Text>
-            <View style={styles.browseRow}>
-              {([
-                ["vertical", "↕", t("Vertical", "رأسي"), t("Scroll up/down. At the page edge, keep swiping to turn the page.", "مرّر لأعلى وأسفل، وعند نهاية الصفحة تابع السحب للانتقال.")],
-                ["horizontal", "↔", t("Horizontal", "أفقي"), t("Swipe left/right to move between Mushaf pages.", "اسحب يميناً ويساراً للتنقل بين صفحات المصحف.")]
-              ] as Array<[QuranBrowseMode, string, string, string]>).map(([mode, icon, label, note]) => (
-                <Pressable key={mode} onPress={() => setAppearance((previous) => ({ ...previous, browseMode: mode }))} style={[styles.browseChoice, appearance.browseMode === mode && styles.browseChoiceActive]}>
-                  <Text style={[styles.browseIcon, appearance.browseMode === mode && styles.browseIconActive]}>{icon}</Text>
-                  <View style={{ flex: 1 }}><Text style={[styles.browseLabel, ar && styles.rtl]}>{label}</Text><Text style={[styles.browseNote, ar && styles.rtl]}>{note}</Text></View>
-                  <View style={[styles.radio, appearance.browseMode === mode && styles.radioSelected]}>{appearance.browseMode === mode ? <View style={styles.radioDot} /> : null}</View>
-                </Pressable>
-              ))}
-            </View>
-
-'''
-replace_once(
-    rendering,
-    '            <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE STYLE", "لون الصفحة")}</Text>\n',
-    browse_section + '            <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE STYLE", "لون الصفحة")}</Text>\n',
-    "browse settings UI",
-)
-replace_once(
-    rendering,
-    '  themeRow: { flexDirection: "row", gap: 7, marginBottom: 15 },\n',
-    '  browseRow: { gap: 8, marginBottom: 15 },\n'
-    '  browseChoice: { minHeight: 76, borderRadius: 18, borderWidth: 1, borderColor: "#e0ddd6", backgroundColor: "#fff", flexDirection: "row", alignItems: "center", gap: 11, padding: 12 },\n'
-    '  browseChoiceActive: { borderColor: "#0b7a5d", backgroundColor: "#edf6f2" },\n'
-    '  browseIcon: { width: 38, height: 38, textAlign: "center", textAlignVertical: "center", borderRadius: 13, backgroundColor: "#f1f3f0", color: "#65726d", fontSize: 21, fontWeight: "900" },\n'
-    '  browseIconActive: { backgroundColor: "#dff0e8", color: "#0b7057" },\n'
-    '  browseLabel: { color: "#233f38", fontSize: 12, fontWeight: "900" },\n'
-    '  browseNote: { color: "#7f8b86", fontSize: 8, lineHeight: 12, marginTop: 3 },\n'
-    '  themeRow: { flexDirection: "row", gap: 7, marginBottom: 15 },\n',
-    "browse styles",
-)
-
-# Reader gesture tracking and player context.
+# Use a real responder that captures horizontal drags before the vertical ScrollView.
 replace_once(
     quran,
-    '  const completionRef = useRef<string | null>(null);\n  const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n',
-    '  const completionRef = useRef<string | null>(null);\n  const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const readerGestureStart = useRef<{ x: number; y: number } | null>(null);\n  const readerAtTop = useRef(true);\n  const readerAtBottom = useRef(false);\n',
-    "reader gesture refs",
+    "  Modal,\n  Pressable,\n",
+    "  Modal,\n  PanResponder,\n  Pressable,\n",
+    "PanResponder import",
 )
 replace_once(
     quran,
-    '  const activeAyah = audioIndex >= 0 ? audioQueue[audioIndex] : undefined;\n  const activeReciter = reciterInfo(audioPrefs.reciter);\n  const autoSpread = width >= 700;\n',
-    '  const activeAyah = audioIndex >= 0 ? audioQueue[audioIndex] : undefined;\n  const activeReciter = reciterInfo(audioPrefs.reciter);\n  const playerAyah = activeAyah ?? (screen === "reader" ? getAyah(position.surah, position.ayah) : undefined);\n  const playerSurah = playerAyah ? getSurah(playerAyah.surah) : undefined;\n  const autoSpread = width >= 700;\n',
-    "player reader context",
+    "  const readerGestureStart = useRef<{ x: number; y: number } | null>(null);\n  const readerAtTop = useRef(true);\n  const readerAtBottom = useRef(false);\n",
+    "  const verticalGestureStartY = useRef<number | null>(null);\n  const readerAtTop = useRef(true);\n  const readerAtBottom = useRef(false);\n",
+    "reader gesture ref",
 )
 
-replace_once(
-    quran,
-    '''  const openPage = (page: number) => {
-    const safe = clamp(page, 1, 604);
-    const start = pages[safe - 1];
-    if (!start) return;
-    const next = { surah: start.surah, ayah: start.ayah };
-    setPosition(next);
-    setSelectedAyah(null);
-    persistLast(next);
-  };
-''',
-    '''  const openPage = (page: number) => {
-    const safe = clamp(page, 1, 604);
-    const start = pages[safe - 1];
-    if (!start) return;
-    const next = { surah: start.surah, ayah: start.ayah };
-    readerAtTop.current = true;
-    readerAtBottom.current = false;
-    setPosition(next);
-    setSelectedAyah(null);
-    persistLast(next);
-  };
-
-  const turnReaderPage = (direction: -1 | 1) => {
-    if (spreadMode) {
-      const left = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
-      openPage(direction > 0 ? Math.min(604, left + 2) : Math.max(1, left - 2));
-      return;
-    }
-    openPage(clamp(currentPage + direction, 1, 604));
-  };
-
-  const handleReaderTouchStart = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+old_gestures = '''  const handleReaderTouchStart = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
     readerGestureStart.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
   };
 
@@ -168,82 +47,74 @@ replace_once(
     if (dy < 0 && readerAtBottom.current) turnReaderPage(1);
     else if (dy > 0 && readerAtTop.current) turnReaderPage(-1);
   };
-''',
-    "reader page gestures",
-)
-
-replace_once(
-    quran,
-    '  const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);\n  const playSurah = (surah: number, repeat = false) => playQueue(getSurahAyahs(surah), repeat);\n',
-    '  const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);\n  const playSurah = (surah: number, repeat = false) => playQueue(getSurahAyahs(surah), repeat);\n\n  const togglePlayerPlayback = () => {\n    if (!activeAyah) { playSurah(position.surah, false); return; }\n    if (audioStatus.state === "playing") QuranAudio?.pause();\n    else QuranAudio?.resume();\n  };\n',
-    "player toggle",
-)
-
-replace_once(
-    quran,
-    '''  useEffect(() => {
-    if (!activeAyah) return;
-    persistLast({ surah: activeAyah.surah, ayah: activeAyah.ayah });
-  }, [audioIndex]);
-''',
-    '''  useEffect(() => {
-    if (!activeAyah) return;
-    persistLast({ surah: activeAyah.surah, ayah: activeAyah.ayah });
-  }, [audioIndex]);
-
-  useEffect(() => {
-    if (screen !== "reader" || !activeAyah || activeAyah.surah === position.surah) return;
-    QuranAudio?.stop();
-    setAudioQueue([]);
-    setAudioIndex(-1);
-    setRepeatQueue(false);
-    setAudioStatus({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: audioPrefs.speed });
-  }, [screen, position.surah, activeAyah?.surah]);
-''',
-    "sync player to opened surah",
-)
-
-old_player = '''  const miniPlayer = activeAyah ? (
-    <View style={styles.miniPlayer}>
-      <Pressable onPress={() => setMenuOpen(true)} style={styles.miniCopy}>
-        <Text style={styles.miniEyebrow}>🎧 {ar ? activeReciter.ar : activeReciter.en}</Text>
-        <Text style={styles.miniTitle}>{ar ? getSurah(activeAyah.surah)?.nameArabic : getSurah(activeAyah.surah)?.nameTransliterated} {num(activeAyah.surah)}:{num(activeAyah.ayah)}</Text>
-        <Text style={styles.miniMeta}>{formatTime(audioStatus.positionMs)} / {formatTime(audioStatus.durationMs)} · {audioPrefs.speed.toFixed(1)}×</Text>
-      </Pressable>
-      <Pressable onPress={previousAudio} style={styles.playerButton}><Text>⏮️</Text></Pressable>
-      <Pressable onPress={() => audioStatus.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()} style={styles.playerMain}><Text>{audioStatus.state === "playing" ? "⏸️" : "▶️"}</Text></Pressable>
-      <Pressable onPress={nextAudio} style={styles.playerButton}><Text>⏭️</Text></Pressable>
-    </View>
-  ) : null;
 '''
-new_player = '''  const miniPlayer = playerAyah ? (
-    <View style={styles.miniPlayer}>
-      <View style={styles.playerHeader}>
-        <View style={styles.playerBadge}><Text style={styles.playerBadgeText}>🎧</Text></View>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.miniCopy}>
-          <Text style={styles.miniEyebrow}>{ar ? activeReciter.ar : activeReciter.en}</Text>
-          <Text style={styles.miniTitle}>{ar ? playerSurah?.nameArabic : playerSurah?.nameTransliterated} · {tr("Ayah", "الآية")} {num(playerAyah.ayah)}</Text>
-          <Text style={styles.miniMeta}>{activeAyah ? `${formatTime(audioStatus.positionMs)} / ${formatTime(audioStatus.durationMs)}` : tr("Ready to play this Surah", "جاهز لتشغيل هذه السورة")}</Text>
-        </Pressable>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerMore}><Text style={styles.playerMoreText}>•••</Text></Pressable>
-      </View>
-      <View style={styles.playerTransport}>
-        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={previousAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>‹</Text></Pressable>
-        <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={nextAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>›</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerSpeedPill}><Text style={styles.playerSpeedText}>{audioPrefs.speed.toFixed(1)}×</Text></Pressable>
-      </View>
-    </View>
-  ) : null;
+new_gestures = '''  const readerPanResponder = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_event, gestureState) => {
+        if (appearance.browseMode !== "horizontal") return false;
+        const horizontal = Math.abs(gestureState.dx);
+        const vertical = Math.abs(gestureState.dy);
+        return horizontal > 12 && horizontal > vertical * 1.15;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_event, gestureState) => {
+        if (appearance.browseMode !== "horizontal") return;
+        const distance = Math.abs(gestureState.dx);
+        const speed = Math.abs(gestureState.vx);
+        if (distance < 48 && speed < 0.35) return;
+        // Swipe left = next Mushaf page, swipe right = previous page.
+        turnReaderPage(gestureState.dx < 0 ? 1 : -1);
+      }
+    }),
+    [appearance.browseMode, currentPage, spreadMode]
+  );
+
+  const handleVerticalTouchStart = (event: { nativeEvent: { pageY: number } }) => {
+    if (appearance.browseMode !== "vertical") return;
+    verticalGestureStartY.current = event.nativeEvent.pageY;
+  };
+
+  const handleVerticalTouchEnd = (event: { nativeEvent: { pageY: number } }) => {
+    if (appearance.browseMode !== "vertical") {
+      verticalGestureStartY.current = null;
+      return;
+    }
+    const start = verticalGestureStartY.current;
+    verticalGestureStartY.current = null;
+    if (start == null) return;
+    const dy = event.nativeEvent.pageY - start;
+    if (Math.abs(dy) < 60) return;
+    if (dy < 0 && readerAtBottom.current) turnReaderPage(1);
+    else if (dy > 0 && readerAtTop.current) turnReaderPage(-1);
+  };
 '''
-replace_once(quran, old_player, new_player, "mini player redesign")
+replace_once(quran, old_gestures, new_gestures, "real horizontal pan responder")
 
 replace_once(
     quran,
-    '              {beginsSurah ? <View style={styles.surahFrame}><Text style={styles.surahFrameText}>۞ {segmentSurah?.nameArabic} ۞</Text></View> : null}\n',
-    '''              {beginsSurah ? (
+    '<View style={styles.readerBody} onTouchStart={handleReaderTouchStart} onTouchEnd={handleReaderTouchEnd}>',
+    '<View style={styles.readerBody} {...readerPanResponder.panHandlers}>',
+    "reader pan handlers",
+)
+replace_once(
+    quran,
+    '''            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={({ nativeEvent }) => {
+''',
+    '''            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onTouchStart={handleVerticalTouchStart}
+            onTouchEnd={handleVerticalTouchEnd}
+            onScroll={({ nativeEvent }) => {
+''',
+    "vertical page-edge gesture handlers",
+)
+
+# Build the surah heading like a Mushaf title strip: full Arabic name, no clipping,
+# green geometric ornaments, and a centered single-line title.
+old_title = '''              {beginsSurah ? (
                 <View style={styles.surahFrame}>
                   <View style={styles.surahFrameInner}>
                     <Text style={styles.surahFrameOrnament}>۞</Text>
@@ -252,70 +123,54 @@ replace_once(
                   </View>
                 </View>
               ) : null}
-''',
-    "surah Islamic frame",
-)
+'''
+new_title = '''              {beginsSurah ? (
+                <View style={styles.surahFrame}>
+                  <View style={styles.surahFrameInner}>
+                    <View style={styles.surahFrameSide}>
+                      <View style={styles.surahFrameDiamond} />
+                      <View style={styles.surahFrameLine} />
+                      <View style={styles.surahFrameDiamondSmall} />
+                    </View>
+                    <Text
+                      style={styles.surahFrameText}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.72}
+                    >{`سورة ${segmentSurah?.nameArabic ?? ""}`}</Text>
+                    <View style={styles.surahFrameSide}>
+                      <View style={styles.surahFrameDiamondSmall} />
+                      <View style={styles.surahFrameLine} />
+                      <View style={styles.surahFrameDiamond} />
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+'''
+replace_once(quran, old_title, new_title, "full Islamic surah title")
 
+old_styles = '  readerBody: { flex: 1, backgroundColor: "#e9e5dc" }, bookCanvas: { padding: 8, paddingBottom: 12 }, bookCanvasSpread: { flexGrow: 1, justifyContent: "center" }, bookSpread: { flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: 0 }, bookPageSlot: { flex: 1, minWidth: 0 }, blankBookPage: { backgroundColor: "#e0d9ca", borderRadius: 14, opacity: .55, margin: 3 }, bookGutter: { width: 12, backgroundColor: "#d2cab9", borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#c4bba8" }, mushafPage: { minHeight: 650, borderRadius: 13, borderWidth: 1, borderColor: "#d8d0c0", paddingHorizontal: 14, paddingTop: 11, paddingBottom: 12, shadowColor: "#342d23", shadowOpacity: .08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }, pageTopLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24, borderBottomWidth: 1, borderBottomColor: "#e2dbc9", marginBottom: 8 }, pageMeta: { color: "#70736e", fontSize: 8, fontWeight: "800" }, surahFrame: { marginVertical: 9, padding: 4, borderRadius: 8, borderWidth: 1, borderColor: "#b79a58", backgroundColor: "rgba(190,161,93,.11)" }, surahFrameInner: { minHeight: 48, borderRadius: 6, borderWidth: 1, borderColor: "#d2bd87", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 16 }, surahFrameOrnament: { color: "#a47c28", fontSize: 20 }, surahFrameText: { color: "#0b654f", fontSize: 21, fontWeight: "900", writingDirection: "rtl" }, basmala: { textAlign: "center", writingDirection: "rtl", marginVertical: 7 }, pageBottom: { alignItems: "center", marginTop: 8 }, pageNumber: { color: "#6b706d", fontSize: 10, fontWeight: "800" }, bookNav: { minHeight: 55, flexDirection: "row", alignItems: "center", gap: 7, padding: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ded9cf" }, bookNavButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 }, bookNavArrow: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, bookNavText: { color: "#0b654f", fontSize: 8, fontWeight: "900", textAlign: "center" }, pageCenterPill: { minWidth: 72, minHeight: 42, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, pageCenterText: { color: "#fff", fontSize: 9, fontWeight: "900" },\n'
+new_styles = '  readerBody: { flex: 1, backgroundColor: "#e9e5dc" }, bookCanvas: { padding: 8, paddingBottom: 12 }, bookCanvasSpread: { flexGrow: 1, justifyContent: "center" }, bookSpread: { flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: 0 }, bookPageSlot: { flex: 1, minWidth: 0 }, blankBookPage: { backgroundColor: "#e0d9ca", borderRadius: 14, opacity: .55, margin: 3 }, bookGutter: { width: 12, backgroundColor: "#d2cab9", borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#c4bba8" }, mushafPage: { minHeight: 650, borderRadius: 13, borderWidth: 1, borderColor: "#d8d0c0", paddingHorizontal: 14, paddingTop: 11, paddingBottom: 12, shadowColor: "#342d23", shadowOpacity: .08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }, pageTopLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24, borderBottomWidth: 1, borderBottomColor: "#e2dbc9", marginBottom: 8 }, pageMeta: { color: "#70736e", fontSize: 8, fontWeight: "800" }, surahFrame: { marginVertical: 12, paddingVertical: 3, paddingHorizontal: 3, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#0b7a5d", backgroundColor: "rgba(11,122,93,.025)" }, surahFrameInner: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingHorizontal: 6 }, surahFrameSide: { flex: 1, minWidth: 34, flexDirection: "row", alignItems: "center", gap: 4 }, surahFrameLine: { flex: 1, height: 1, backgroundColor: "#0b7a5d", opacity: .8 }, surahFrameDiamond: { width: 10, height: 10, borderWidth: 1.5, borderColor: "#0b7a5d", transform: [{ rotate: "45deg" }] }, surahFrameDiamondSmall: { width: 6, height: 6, borderWidth: 1, borderColor: "#0b7a5d", transform: [{ rotate: "45deg" }] }, surahFrameText: { minWidth: 118, maxWidth: "60%", flexShrink: 1, color: "#173f35", fontSize: 22, lineHeight: 32, fontWeight: "700", textAlign: "center", writingDirection: "rtl", includeFontPadding: false }, basmala: { textAlign: "center", writingDirection: "rtl", marginVertical: 9 }, pageBottom: { alignItems: "center", marginTop: 8 }, pageNumber: { color: "#6b706d", fontSize: 10, fontWeight: "800" }, bookNav: { minHeight: 55, flexDirection: "row", alignItems: "center", gap: 7, padding: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ded9cf" }, bookNavButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 }, bookNavArrow: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, bookNavText: { color: "#0b654f", fontSize: 8, fontWeight: "900", textAlign: "center" }, pageCenterPill: { minWidth: 72, minHeight: 42, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, pageCenterText: { color: "#fff", fontSize: 9, fontWeight: "900" },\n'
+replace_once(quran, old_styles, new_styles, "Mushaf title styles")
+
+# Clarify that horizontal mode is a real touch gesture anywhere on the Mushaf page.
 replace_once(
-    quran,
-    '        <View style={styles.readerBody}>\n          <ScrollView style={styles.flex} contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]} showsVerticalScrollIndicator={false}>\n',
-    '''        <View style={styles.readerBody} onTouchStart={handleReaderTouchStart} onTouchEnd={handleReaderTouchEnd}>
-          <ScrollView
-            key={`mushaf-${currentPage}-${appearance.browseMode}`}
-            style={styles.flex}
-            contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]}
-            showsVerticalScrollIndicator={false}
-            scrollEventThrottle={16}
-            onScroll={({ nativeEvent }) => {
-              readerAtTop.current = nativeEvent.contentOffset.y <= 8;
-              readerAtBottom.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
-            }}
-          >
-''',
-    "reader gesture container",
+    rendering,
+    't("Swipe left/right to move between Mushaf pages.", "اسحب يميناً ويساراً للتنقل بين صفحات المصحف.")',
+    't("Swipe left/right anywhere on the Mushaf page to turn pages.", "اسحب يميناً ويساراً في أي مكان على صفحة المصحف للتنقل بين الصفحات.")',
+    "horizontal browsing help",
 )
 
+# Give the launcher art more safe area so Android masks never crop the Hassoun wordmark or mosque.
 replace_once(
-    quran,
-    '      {(screen === "reader" || screen === "radio") ? quranDock : null}\n',
-    '      {screen === "radio" ? quranDock : null}\n',
-    "remove duplicate reader menu dock",
+    icon,
+    '<g transform="translate(112 112) scale(.78)">',
+    '<g transform="translate(154 154) scale(.70)">',
+    "launcher icon safe area",
 )
 
-replace_once(
-    quran,
-    '{appearance.fontSize} · {appearance.tajweed ? tr("Tajweed on", "التجويد مفعّل") : tr("Tajweed off", "التجويد متوقف")} · {spreadMode ? tr("Open book", "كتاب مفتوح") : tr("Single page", "صفحة واحدة")}',
-    '{appearance.fontSize} · {appearance.tajweed ? tr("Tajweed on", "التجويد مفعّل") : tr("Tajweed off", "التجويد متوقف")} · {spreadMode ? tr("Open book", "كتاب مفتوح") : tr("Single page", "صفحة واحدة")} · {appearance.browseMode === "horizontal" ? tr("Swipe", "سحب أفقي") : tr("Scroll", "تمرير رأسي")}',
-    "menu browse summary",
-)
+# New installable build version for this reader fix pass.
+replace_once(config, 'version: "0.4.2",', 'version: "0.4.3",', "app version")
+replace_once(config, 'versionCode: 14,', 'versionCode: 15,', "Android versionCode")
 
-replace_once(
-    quran,
-    'surahFrame: { minHeight: 40, alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#a89362", marginVertical: 8, backgroundColor: "rgba(193,170,115,.08)" }, surahFrameText: { color: "#20493e", fontSize: 19, fontWeight: "900", writingDirection: "rtl" },',
-    'surahFrame: { marginVertical: 9, padding: 4, borderRadius: 8, borderWidth: 1, borderColor: "#b79a58", backgroundColor: "rgba(190,161,93,.11)" }, surahFrameInner: { minHeight: 48, borderRadius: 6, borderWidth: 1, borderColor: "#d2bd87", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 16 }, surahFrameOrnament: { color: "#a47c28", fontSize: 20 }, surahFrameText: { color: "#0b654f", fontSize: 21, fontWeight: "900", writingDirection: "rtl" },',
-    "surah frame styles",
-)
-
-replace_once(
-    quran,
-    '  miniPlayer: { minHeight: 63, backgroundColor: "#153f36", paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 6, borderTopWidth: 1, borderTopColor: "#315b51" }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#bcd7cf", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 10, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#b9d1c9", fontSize: 7, marginTop: 2 }, playerButton: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,.09)" }, playerMain: { width: 39, height: 39, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },\n',
-    '  miniPlayer: { minHeight: 96, backgroundColor: "#103f35", paddingHorizontal: 12, paddingTop: 9, paddingBottom: 10, borderTopWidth: 1, borderTopColor: "#2c5c50" }, playerHeader: { flexDirection: "row", alignItems: "center", gap: 9 }, playerBadge: { width: 36, height: 36, borderRadius: 13, backgroundColor: "rgba(255,255,255,.1)", alignItems: "center", justifyContent: "center" }, playerBadgeText: { fontSize: 17 }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#b8d7ce", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 11, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#a9c7be", fontSize: 7, marginTop: 2 }, playerMore: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" }, playerMoreText: { color: "#d5e5df", fontSize: 13, fontWeight: "900" }, playerTransport: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 8 }, playerControl: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" }, playerControlDisabled: { opacity: .35 }, playerControlText: { color: "#d8e7e2", fontSize: 8, fontWeight: "900" }, playerControlArrow: { color: "#fff", fontSize: 25, lineHeight: 27, fontWeight: "700" }, playerMain: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }, playerMainText: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, playerSpeedPill: { minWidth: 40, height: 34, borderRadius: 12, backgroundColor: "#dcebe5", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }, playerSpeedText: { color: "#17483c", fontSize: 8, fontWeight: "900" },\n',
-    "player styles",
-)
-
-# Version this reader polish release.
-replace_once(config, '  version: "0.4.1",\n', '  version: "0.4.2",\n', "version bump")
-replace_once(config, '    versionCode: 13,\n', '    versionCode: 14,\n', "version code bump")
-
-# Generate a dedicated launcher/adaptive icon SVG with a safe area around the artwork.
-brand_path = Path("mobile/assets/hassoun-brand.svg")
-src = brand_path.read_text(encoding="utf-8")
-marker = '  <g filter="url(#shadow)"'
-start = src.find(marker)
-end = src.rfind("</svg>")
-if start < 0 or end < 0:
-    raise SystemExit("Unable to create padded Hassoun app icon")
-padded = src[:start] + '  <g transform="translate(112 112) scale(.78)">\n' + src[start:end] + '  </g>\n</svg>\n'
-Path("mobile/assets/hassoun-app-icon.svg").write_text(padded, encoding="utf-8")
-
-print("Quran reader polish patches applied")
+print("Quran reader v0.4.3 fixes applied")
