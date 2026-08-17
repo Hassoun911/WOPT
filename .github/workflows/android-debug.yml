@@ -1,4 +1,4 @@
-# Build Hassoun v0.5.2 persistent Quran audio + rich Radio release
+# Build Hassoun v0.5.3 single-player Quran audio + premium widget release
 name: Build Hassoun Android APK
 
 on:
@@ -65,7 +65,7 @@ jobs:
           echo "Expo project ID is configured for native server push registration."
 
       - name: Typecheck mobile app
-        run: npm run typecheck
+        run: npx tsc --noEmit
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
@@ -75,12 +75,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.2.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.3.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.2-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.2.apk
+          name: hassoun-v0.5.3-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.3.apk
           if-no-files-found: error
           retention-days: 14
