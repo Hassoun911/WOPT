@@ -131,8 +131,7 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
   return {
     ...common,
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
-    body: `${time} • ${CITY_LABEL}`,
-    sound: null
+    body: `${time} • ${CITY_LABEL}`
   };
 }
 
