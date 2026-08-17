@@ -523,14 +523,6 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     </View>
   ) : null;
 
-  const quranDock = (
-    <Pressable onPress={() => setMenuOpen(true)} style={styles.quranDock}>
-      <View style={styles.quranDockIcon}><Text style={styles.quranDockIconText}>☰</Text></View>
-      <Text style={styles.quranDockText}>{tr("Qur’an Menu", "قائمة القرآن")}</Text>
-      <Text style={styles.quranDockArrow}>{ar ? "‹" : "›"}</Text>
-    </Pressable>
-  );
-
   const home = (
     <ScrollView style={styles.flex} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.heroHeader}>
@@ -717,7 +709,6 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
       {screen === "reader" && playerVisible ? miniPlayer : null}
-      {screen === "radio" ? quranDock : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
     </View>
