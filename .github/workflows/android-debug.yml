@@ -1,4 +1,4 @@
-# Build Hassoun v0.5.0 settings/widgets release
+# Build Hassoun v0.5.1 rich Quran toolbar release
 name: Build Hassoun Android APK
 
 on:
@@ -75,12 +75,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.0.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.1.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.0-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.0.apk
+          name: hassoun-v0.5.1-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.1.apk
           if-no-files-found: error
           retention-days: 14
