@@ -13,40 +13,81 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical">
+
     <TextView
-      android:id="@+id/widget_header"
+      android:layout_width="34dp"
+      android:layout_height="34dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_brand_badge"
+      android:text="☾"
+      android:textColor="#F0D27A"
+      android:textStyle="bold"
+      android:textSize="22sp" />
+
+    <LinearLayout
       android:layout_width="0dp"
       android:layout_height="wrap_content"
       android:layout_weight="1"
-      android:text="Hassoun"
-      android:textColor="#D8EFE7"
-      android:textStyle="bold"
-      android:textSize="12sp"
-      android:maxLines="1" />
-    <TextView
-      android:id="@+id/widget_date"
+      android:layout_marginStart="9dp"
+      android:orientation="vertical">
+      <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="HASSOUN"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:maxLines="1" />
+      <TextView
+        android:id="@+id/widget_brand_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:textColor="#BFDCD2"
+        android:textStyle="bold"
+        android:textSize="7sp"
+        android:maxLines="1" />
+    </LinearLayout>
+
+    <LinearLayout
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:textColor="#C5E1D7"
-      android:textSize="10sp"
-      android:maxLines="1" />
+      android:gravity="end"
+      android:orientation="vertical">
+      <TextView
+        android:id="@+id/widget_date"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#F7F1DE"
+        android:textStyle="bold"
+        android:textSize="9sp"
+        android:maxLines="1" />
+      <TextView
+        android:id="@+id/widget_hijri"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#D8C17A"
+        android:textSize="8sp"
+        android:maxLines="1" />
+    </LinearLayout>
   </LinearLayout>
 
   <TextView
-    android:id="@+id/widget_hijri"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="2dp"
-    android:textColor="#BBD8CE"
-    android:textSize="10sp"
-    android:maxLines="1" />
+    android:layout_height="1dp"
+    android:layout_marginTop="9dp"
+    android:background="#2DFFFFFF"
+    android:text="" />
 
   <LinearLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
+    android:layout_marginTop="9dp"
     android:orientation="horizontal"
     android:gravity="center_vertical">
+
     <LinearLayout
       android:layout_width="0dp"
       android:layout_height="wrap_content"
@@ -57,9 +98,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="NEXT PRAYER"
-        android:textColor="#A9D1C4"
+        android:textColor="#E5C76E"
         android:textStyle="bold"
-        android:textSize="9sp" />
+        android:textSize="8sp" />
       <TextView
         android:id="@+id/widget_next_name"
         android:layout_width="wrap_content"
@@ -67,9 +108,18 @@
         android:layout_marginTop="1dp"
         android:textColor="#FFFFFF"
         android:textStyle="bold"
-        android:textSize="22sp"
+        android:textSize="25sp"
+        android:maxLines="1" />
+      <TextView
+        android:id="@+id/widget_next_secondary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:textColor="#BFD9D1"
+        android:textSize="10sp"
         android:maxLines="1" />
     </LinearLayout>
+
     <LinearLayout
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
@@ -81,35 +131,109 @@
         android:layout_height="wrap_content"
         android:textColor="#FFFFFF"
         android:textStyle="bold"
-        android:textSize="17sp" />
+        android:textSize="18sp"
+        android:maxLines="1" />
       <Chronometer
         android:id="@+id/widget_countdown"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textColor="#E3F0EB"
+        android:layout_marginTop="5dp"
+        android:gravity="center"
+        android:background="@drawable/hassoun_widget_countdown"
+        android:paddingLeft="9dp"
+        android:paddingTop="4dp"
+        android:paddingRight="9dp"
+        android:paddingBottom="4dp"
+        android:textColor="#17483C"
         android:textStyle="bold"
-        android:textSize="10sp" />
+        android:textSize="8sp" />
     </LinearLayout>
   </LinearLayout>
 
-  <TextView
-    android:id="@+id/widget_prayer_list"
+  <LinearLayout
+    android:id="@+id/widget_prayer_strip"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="9dp"
-    android:textColor="#E9F4F0"
-    android:textSize="10sp"
-    android:lineSpacingExtra="2dp"
-    android:maxLines="5" />
+    android:layout_marginTop="10dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+
+    <TextView
+      android:id="@+id/widget_prayer_fajr"
+      android:layout_width="0dp"
+      android:layout_height="42dp"
+      android:layout_weight="1"
+      android:layout_marginEnd="2dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_prayer_chip"
+      android:textColor="#E7F3EF"
+      android:textStyle="bold"
+      android:textSize="7.5sp"
+      android:lineSpacingExtra="1dp"
+      android:maxLines="2" />
+    <TextView
+      android:id="@+id/widget_prayer_dhuhr"
+      android:layout_width="0dp"
+      android:layout_height="42dp"
+      android:layout_weight="1"
+      android:layout_marginStart="2dp"
+      android:layout_marginEnd="2dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_prayer_chip"
+      android:textColor="#E7F3EF"
+      android:textStyle="bold"
+      android:textSize="7.5sp"
+      android:lineSpacingExtra="1dp"
+      android:maxLines="2" />
+    <TextView
+      android:id="@+id/widget_prayer_asr"
+      android:layout_width="0dp"
+      android:layout_height="42dp"
+      android:layout_weight="1"
+      android:layout_marginStart="2dp"
+      android:layout_marginEnd="2dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_prayer_chip"
+      android:textColor="#E7F3EF"
+      android:textStyle="bold"
+      android:textSize="7.5sp"
+      android:lineSpacingExtra="1dp"
+      android:maxLines="2" />
+    <TextView
+      android:id="@+id/widget_prayer_maghrib"
+      android:layout_width="0dp"
+      android:layout_height="42dp"
+      android:layout_weight="1"
+      android:layout_marginStart="2dp"
+      android:layout_marginEnd="2dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_prayer_chip"
+      android:textColor="#E7F3EF"
+      android:textStyle="bold"
+      android:textSize="7.5sp"
+      android:lineSpacingExtra="1dp"
+      android:maxLines="2" />
+    <TextView
+      android:id="@+id/widget_prayer_isha"
+      android:layout_width="0dp"
+      android:layout_height="42dp"
+      android:layout_weight="1"
+      android:layout_marginStart="2dp"
+      android:gravity="center"
+      android:background="@drawable/hassoun_widget_prayer_chip"
+      android:textColor="#E7F3EF"
+      android:textStyle="bold"
+      android:textSize="7.5sp"
+      android:lineSpacingExtra="1dp"
+      android:maxLines="2" />
+  </LinearLayout>
 
   <TextView
     android:id="@+id/widget_location"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="5dp"
-    android:text="Windsor, Ontario"
-    android:textColor="#B8D5CB"
-    android:textSize="9sp"
+    android:layout_marginTop="7dp"
+    android:textColor="#AFCFC5"
+    android:textSize="8sp"
     android:maxLines="1" />
 </LinearLayout>

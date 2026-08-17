@@ -7,6 +7,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.SystemClock
 import android.view.View
@@ -81,17 +82,20 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val next = schedule?.let { findNextPrayer(it, locale) }
 
       bindLaunchIntent(context, views)
-      views.setTextViewText(R.id.widget_header, if (locale == "ar") "Hassoun • مواقيت الصلاة" else "Hassoun • Prayer Times")
+      views.setTextViewText(R.id.widget_header, "HASSOUN")
+      views.setTextViewText(R.id.widget_brand_subtitle, if (locale == "ar") "مواقيت الصلاة • وندسور" else "PRAYER TIMES • WINDSOR")
 
       if (next == null) {
         views.setTextViewText(R.id.widget_next_label, if (locale == "ar") "مواقيت الصلاة" else "PRAYER TIMES")
-        views.setTextViewText(R.id.widget_next_name, if (locale == "ar") "افتح Hassoun للمزامنة" else "Open Hassoun to sync")
+        views.setTextViewText(R.id.widget_next_name, if (locale == "ar") "افتح Hassoun" else "Open Hassoun")
+        views.setTextViewText(R.id.widget_next_secondary, if (locale == "ar") "للمزامنة" else "to sync prayer times")
         views.setTextViewText(R.id.widget_next_time, "")
         views.setViewVisibility(R.id.widget_countdown, View.GONE)
-        views.setViewVisibility(R.id.widget_prayer_list, View.GONE)
+        views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
       } else {
         views.setTextViewText(R.id.widget_next_label, if (locale == "ar") "الصلاة القادمة" else "NEXT PRAYER")
         views.setTextViewText(R.id.widget_next_name, next.name)
+        views.setTextViewText(R.id.widget_next_secondary, if (locale == "ar") englishNames[next.key] ?: next.key else arabicNames[next.key] ?: next.key)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
 
         val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
@@ -107,10 +111,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
 
         val fullLayout = layout == "full"
         if (fullLayout && showAllPrayers) {
-          views.setViewVisibility(R.id.widget_prayer_list, View.VISIBLE)
-          views.setTextViewText(R.id.widget_prayer_list, prayerList(next.day, locale))
+          views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
+          bindPrayerStrip(views, next.day, locale, next.key)
         } else {
-          views.setViewVisibility(R.id.widget_prayer_list, View.GONE)
+          views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
         }
         scheduleNextRefresh(context, next.targetMillis + 15_000L)
       }
@@ -131,7 +135,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       }
       if (!compact && showLocation) {
         views.setViewVisibility(R.id.widget_location, View.VISIBLE)
-        views.setTextViewText(R.id.widget_location, if (locale == "ar") "وندسور، أونتاريو" else "Windsor, Ontario")
+        views.setTextViewText(R.id.widget_location, if (locale == "ar") "⌖ وندسور، أونتاريو • الجدول الرسمي" else "⌖ Windsor, Ontario • Official schedule")
       } else {
         views.setViewVisibility(R.id.widget_location, View.GONE)
       }
@@ -199,6 +203,24 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val hour12 = when (val h = hour24 % 12) { 0 -> 12; else -> h }
       val suffix = if (hour24 < 12) "a.m." else "p.m."
       return if (locale == "ar") "$hour12:${minute.toString().padStart(2, '0')} ${if (hour24 < 12) "ص" else "م"}" else "$hour12:${minute.toString().padStart(2, '0')} $suffix"
+    }
+
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String) {
+      val ids = mapOf(
+        "fajr" to R.id.widget_prayer_fajr,
+        "dhuhr" to R.id.widget_prayer_dhuhr,
+        "asr" to R.id.widget_prayer_asr,
+        "maghrib" to R.id.widget_prayer_maghrib,
+        "isha" to R.id.widget_prayer_isha
+      )
+      prayerKeys.forEach { key ->
+        val id = ids[key] ?: return@forEach
+        val name = if (locale == "ar") arabicNames[key] ?: key else englishNames[key] ?: key
+        val time = formatClock(day.optString(key, "--:--"), locale)
+        val active = key == nextKey
+        views.setTextViewText(id, "${if (active) "● " else ""}$name\n$time")
+        views.setTextColor(id, Color.parseColor(if (active) "#F3D98B" else "#E7F3EF"))
+      }
     }
 
     private fun prayerList(day: JSONObject, locale: String): String {

@@ -111,6 +111,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [quranAppNavVisible, setQuranAppNavVisible] = useState(true);
+  const [quranOwnsAudioSurface, setQuranOwnsAudioSurface] = useState(false);
   const [globalQuranAudio, setGlobalQuranAudio] = useState<QuranAudioStatus>({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: 1 });
   const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
 
@@ -462,7 +463,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   );
 
   const body = activeTab === "quran"
-    ? <Quran locale={locale} onBackHome={() => { setQuranAppNavVisible(true); setActiveTab("home"); }} onAppNavVisibilityChange={setQuranAppNavVisible} />
+    ? <Quran locale={locale} onBackHome={() => { setQuranAppNavVisible(true); setQuranOwnsAudioSurface(false); setActiveTab("home"); }} onAppNavVisibilityChange={setQuranAppNavVisible} onLocalAudioSurfaceChange={setQuranOwnsAudioSurface} />
     : activeTab === "quiz"
       ? <IslamicQuiz locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
       : activeTab === "alerts"
@@ -483,7 +484,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="dark" />
       <View style={styles.flex}>{body}</View>
-      {globalQuranAudio.state !== "idle" && globalQuranAudio.state !== "error" ? (
+      {(activeTab !== "quran" || !quranOwnsAudioSurface) && globalQuranAudio.state !== "idle" && globalQuranAudio.state !== "error" ? (
         <View style={styles.globalAudioBar}>
           <View style={styles.globalAudioCopy}>
             <Text style={styles.globalAudioEyebrow}>{locale === "ar" ? "تشغيل القرآن" : "QUR’AN AUDIO"}</Text>

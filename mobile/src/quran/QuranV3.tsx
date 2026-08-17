@@ -45,6 +45,7 @@ type Props = {
   locale: QuranLocale;
   onBackHome: () => void;
   onAppNavVisibilityChange?: (visible: boolean) => void;
+  onLocalAudioSurfaceChange?: (visible: boolean) => void;
 };
 type Screen = "home" | "surahs" | "search" | "bookmarks" | "reader" | "memorize" | "radio";
 type Position = { surah: number; ayah: number };
@@ -144,7 +145,7 @@ function buildSurahQueue(startSurah: number, endSurah: number) {
   return queue;
 }
 
-export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }: Props) {
+export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, onLocalAudioSurfaceChange }: Props) {
   const { width } = useWindowDimensions();
   const ar = locale === "ar";
   const tr = (en: string, arabic: string) => ar ? arabic : en;
@@ -208,6 +209,16 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   const selectedIsLooping = selectedIsActive && repeatQueue && audioQueue.length === 1;
   const autoSpread = width >= 700;
   const spreadMode = appearance.bookMode === "spread" || (appearance.bookMode === "auto" && autoSpread);
+
+  // Reader, Radio and the Quran menu own the audio controls while they are visible.
+  // Everywhere else, App.tsx may show the single global persistent player.
+  useEffect(() => {
+    onLocalAudioSurfaceChange?.(screen === "reader" || screen === "radio" || menuOpen);
+  }, [screen, menuOpen, onLocalAudioSurfaceChange]);
+
+  useEffect(() => () => {
+    onLocalAudioSurfaceChange?.(false);
+  }, [onLocalAudioSurfaceChange]);
 
   useEffect(() => {
     void (async () => {
@@ -855,7 +866,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   return (
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
-      {screen === "reader" && playerVisible ? miniPlayer : null}
+      {screen === "reader" && playerVisible && !selectedAyah && !menuOpen && !appearanceOpen ? miniPlayer : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
     </View>
