@@ -87,15 +87,12 @@ function countdownLabel(seconds: number, locale: "en" | "ar") {
 
 function hijriDateLabel(date: Date, locale: "en" | "ar") {
   try {
-    // Align the displayed Hijri date with the verified Umm al-Qura date
-    // used for the Windsor calendar on Android.
-    const correctedDate = new Date(date.getTime() - 24 * 60 * 60 * 1000);
     return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
       day: "numeric",
       month: "long",
       year: "numeric",
       timeZone: WINDSOR_TIME_ZONE
-    }).format(correctedDate);
+    }).format(date);
   } catch {
     return "";
   }
