@@ -1,3 +1,4 @@
+# Rich Quran Radio + persistent background playback integration
 name: Integrate native Quran background queue
 
 on:
