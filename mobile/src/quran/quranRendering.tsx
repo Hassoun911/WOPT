@@ -210,6 +210,7 @@ export function QuranPageText({
   locale,
   selectedKey,
   highlightedKey,
+  bookmarkedKeys,
   onPressAyah
 }: {
   page: number;
@@ -218,6 +219,7 @@ export function QuranPageText({
   locale: QuranLocale;
   selectedKey?: string | null;
   highlightedKey?: string | null;
+  bookmarkedKeys?: string[];
   onPressAyah: (ayah: QuranAyah) => void;
 }) {
   const [remoteText, setRemoteText] = useState<Record<string, string>>({});
@@ -270,6 +272,7 @@ export function QuranPageText({
           const key = ayahKey(ayah);
           const selected = selectedKey === key;
           const highlighted = highlightedKey === key;
+          const bookmarked = bookmarkedKeys?.includes(key) ?? false;
           const raw = remoteText[key];
           const highlightStyle = highlighted
             ? { backgroundColor: appearance.pageTheme === "dark" ? "#715b20" : "#f8e7a4" }
@@ -286,6 +289,7 @@ export function QuranPageText({
                 ) : (
                   <Text key={`${key}-t-${index}`} style={piece.rule ? { color: TAJWEED_COLORS[piece.rule] ?? effectiveColor } : { color: effectiveColor }}>{piece.text}</Text>
                 ))}
+                {bookmarked ? <Text style={{ fontFamily: undefined, fontSize: Math.max(14, appearance.fontSize * 0.52) }}> 🔖 </Text> : null}
                 {" "}
               </Text>
             );
@@ -299,7 +303,7 @@ export function QuranPageText({
             return (
               <Text key={key} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
                 {verseGlyphs}
-                {markerGlyph ? <Text style={{ color: "#0b8b69", fontFamily }}>{markerGlyph}</Text> : null}{" "}
+                {markerGlyph ? <Text style={{ color: "#0b8b69", fontFamily }}>{markerGlyph}</Text> : null}{bookmarked ? <Text style={{ fontFamily: undefined, fontSize: Math.max(14, appearance.fontSize * 0.52) }}> 🔖 </Text> : null}{" "}
               </Text>
             );
           }
@@ -307,7 +311,7 @@ export function QuranPageText({
           const text = raw ? decodeNumericEntities(raw).replace(/<[^>]+>/g, "") : ayah.text;
           return (
             <Text key={key} onPress={() => onPressAyah(ayah)} style={highlightStyle}>
-              {text}<Text style={{ color: "#0b8b69", fontFamily }}> ﴿{numberForLocale(ayah.ayah, locale)}﴾ </Text>
+              {text}<Text style={{ color: "#0b8b69", fontFamily }}> ﴿{numberForLocale(ayah.ayah, locale)}﴾ </Text>{bookmarked ? <Text style={{ fontFamily: undefined, fontSize: Math.max(14, appearance.fontSize * 0.52) }}>🔖 </Text> : null}
             </Text>
           );
         })}

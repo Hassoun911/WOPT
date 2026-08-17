@@ -156,6 +156,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const [position, setPosition] = useState<Position>({ surah: 1, ayah: 1 });
   const [lastPosition, setLastPosition] = useState<Position | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
+  const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(DEFAULT_AUDIO_PREFS);
   const [selectedAyah, setSelectedAyah] = useState<QuranAyah | null>(null);
   const [memorizeRange, setMemorizeRange] = useState<Range | null>(null);
@@ -207,6 +208,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const selectedIsPlaying = selectedIsActive && audioStatus.state === "playing";
   const selectedIsPaused = selectedIsActive && audioStatus.state === "paused";
   const selectedIsLooping = selectedIsActive && repeatQueue && audioQueue.length === 1;
+  const selectedIsBookmarked = Boolean(selectedAyah && bookmarks.includes(refKey(selectedAyah)));
   const autoSpread = width >= 700;
   const spreadMode = appearance.bookMode === "spread" || (appearance.bookMode === "auto" && autoSpread);
 
@@ -400,10 +402,21 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
   const toggleBookmark = (ayah: QuranAyah) => {
     const key = refKey(ayah);
-    const next = bookmarks.includes(key) ? bookmarks.filter((item) => item !== key) : [key, ...bookmarks];
+    const alreadySaved = bookmarks.includes(key);
+    const next = alreadySaved ? bookmarks.filter((item) => item !== key) : [key, ...bookmarks];
     setBookmarks(next);
     void AsyncStorage.setItem(KEYS.bookmarks, JSON.stringify(next));
+    const surahName = ar ? getSurah(ayah.surah)?.nameArabic : getSurah(ayah.surah)?.nameTransliterated;
+    setBookmarkNotice(alreadySaved
+      ? tr(`Bookmark removed • ${surahName ?? "Qur’an"} ${ayah.surah}:${ayah.ayah}`, `تمت إزالة العلامة • ${surahName ?? "القرآن"} ${num(ayah.surah)}:${num(ayah.ayah)}`)
+      : tr(`Bookmarked • ${surahName ?? "Qur’an"} ${ayah.surah}:${ayah.ayah}`, `تم الحفظ في العلامات • ${surahName ?? "القرآن"} ${num(ayah.surah)}:${num(ayah.ayah)}`));
   };
+
+  useEffect(() => {
+    if (!bookmarkNotice) return;
+    const timer = setTimeout(() => setBookmarkNotice(null), 1800);
+    return () => clearTimeout(timer);
+  }, [bookmarkNotice]);
 
   const startMemorizing = (ayah: QuranAyah) => {
     const next = { surah: ayah.surah, start: ayah.ayah, end: ayah.ayah };
@@ -758,7 +771,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
                 </View>
               ) : null}
               {showStandaloneBasmala ? <Text style={[styles.basmala, { color: textColor, fontSize: Math.max(21, appearance.fontSize - 3), lineHeight: Math.round(Math.max(21, appearance.fontSize - 3) * appearance.lineHeightMultiplier) }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
-              <QuranPageText page={page} ayahs={segment.ayahs} appearance={appearance} locale={locale} selectedKey={selectedAyah ? refKey(selectedAyah) : null} highlightedKey={audioPrefs.highlightAudio && activeAyah ? refKey(activeAyah) : null} onPressAyah={(ayah) => { setSelectedAyah((current) => current?.surah === ayah.surah && current?.ayah === ayah.ayah ? null : ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} />
+              <QuranPageText page={page} ayahs={segment.ayahs} appearance={appearance} locale={locale} selectedKey={selectedAyah ? refKey(selectedAyah) : null} highlightedKey={audioPrefs.highlightAudio && activeAyah ? refKey(activeAyah) : null} bookmarkedKeys={bookmarks} onPressAyah={(ayah) => { setSelectedAyah((current) => current?.surah === ayah.surah && current?.ayah === ayah.ayah ? null : ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} />
             </View>
           );
         })}
@@ -794,7 +807,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
           </ScrollView>
         </View>
       ) : (
-        <ScrollView style={styles.flex} contentContainerStyle={styles.studyWrap} showsVerticalScrollIndicator={false}><View style={styles.studySurahHeader}><Text style={styles.studySurahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.studySurahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>{readerAyahs.map((ayah) => { const playing = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && audioPrefs.highlightAudio; return <Pressable key={refKey(ayah)} onPress={() => { setSelectedAyah(ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} style={[styles.studyAyah, playing && styles.studyPlaying]}><View style={styles.studyTop}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontSize: appearance.fontSize, lineHeight: Math.round(appearance.fontSize * appearance.lineHeightMultiplier) }]}>{ayah.text}</Text></Pressable>; })}</ScrollView>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.studyWrap} showsVerticalScrollIndicator={false}><View style={styles.studySurahHeader}><Text style={styles.studySurahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.studySurahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>{readerAyahs.map((ayah) => { const playing = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && audioPrefs.highlightAudio; return <Pressable key={refKey(ayah)} onPress={() => { setSelectedAyah(ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} style={[styles.studyAyah, playing && styles.studyPlaying]}><View style={styles.studyTop}><View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text>{bookmarks.includes(refKey(ayah)) ? <Text style={{ fontSize: 16 }}>🔖</Text> : null}</View><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontSize: appearance.fontSize, lineHeight: Math.round(appearance.fontSize * appearance.lineHeightMultiplier) }]}>{ayah.text}</Text></Pressable>; })}</ScrollView>
       )}
       {selectedAyah ? (
         <View style={styles.ayahActions}>
@@ -821,7 +834,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionTools}>
             <Pressable onPress={() => translateSelectedText(selectedAyah)} style={styles.actionTool}><Text style={styles.actionToolIcon}>文</Text><Text style={styles.actionToolLabel}>{tr("Translate", "ترجمة")}</Text></Pressable>
             <Pressable onPress={() => copySelectedText(selectedAyah)} style={[styles.actionTool, copiedSelection && styles.actionToolActive]}><Text style={styles.actionToolIcon}>⧉</Text><Text style={[styles.actionToolLabel, copiedSelection && styles.actionToolLabelActive]}>{copiedSelection ? tr("Copied", "تم النسخ") : tr("Copy", "نسخ")}</Text></Pressable>
-            <Pressable onPress={() => toggleBookmark(selectedAyah)} style={styles.actionTool}><Text style={styles.actionToolIcon}>🔖</Text><Text style={styles.actionToolLabel}>{tr("Save", "حفظ")}</Text></Pressable>
+            <Pressable onPress={() => toggleBookmark(selectedAyah)} style={[styles.actionTool, selectedIsBookmarked && styles.actionToolActive]}><Text style={styles.actionToolIcon}>{selectedIsBookmarked ? "🔖" : "♡"}</Text><Text style={[styles.actionToolLabel, selectedIsBookmarked && styles.actionToolLabelActive]}>{selectedIsBookmarked ? tr("Saved", "محفوظ") : tr("Bookmark", "علامة")}</Text></Pressable>
             <Pressable onPress={() => startMemorizing(selectedAyah)} style={styles.actionTool}><Text style={styles.actionToolIcon}>◌</Text><Text style={styles.actionToolLabel}>{tr("Memorize", "حفظ")}</Text></Pressable>
           </ScrollView>
         </View>
@@ -866,6 +879,13 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   return (
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
+      {bookmarkNotice ? (
+        <View pointerEvents="none" style={{ position: "absolute", top: 88, left: 20, right: 20, alignItems: "center", zIndex: 80 }}>
+          <View style={{ maxWidth: 440, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: "rgba(13,86,69,.97)", borderWidth: 1, borderColor: "#d9bd70", shadowColor: "#000", shadowOpacity: .2, shadowRadius: 8, elevation: 12 }}>
+            <Text style={{ color: "#fff", fontWeight: "800", textAlign: "center" }}>🔖 {bookmarkNotice}</Text>
+          </View>
+        </View>
+      ) : null}
       {screen === "reader" && playerVisible && !selectedAyah && !menuOpen && !appearanceOpen ? miniPlayer : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
