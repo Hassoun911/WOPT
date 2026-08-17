@@ -510,14 +510,14 @@ async function verificationSuccessPage(env: Env, subscriber: SubscriberRow, alre
     : (rtl ? "تم تفعيل تنبيهات البريد" : "Prayer email alerts are active");
   const intro = rtl
     ? "تم تأكيد بريدك. ستصلك التنبيهات حسب موقع الصلاة والمنطقة الزمنية أدناه."
-    : "Your email is confirmed. WOPT will use the prayer location and time zone below for your alerts.";
+    : "Your email is confirmed. Hassoun will use the prayer location and time zone below for your alerts.";
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WOPT Email Alerts</title></head>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hassoun Email Alerts</title></head>
   <body style="margin:0;background:#f6f0e5;font-family:Arial,Helvetica,sans-serif;color:#173f35" dir="${rtl ? "rtl" : "ltr"}">
     <main style="max-width:560px;margin:0 auto;padding:34px 16px 48px">
       <section style="background:#fffdf8;border:1px solid #e3dac9;border-radius:26px;padding:26px;box-shadow:0 12px 36px rgba(70,60,45,.08)">
         <div style="width:58px;height:58px;line-height:58px;text-align:center;border-radius:50%;background:#dcefe5;color:#087052;font-size:30px;font-weight:900;margin-bottom:18px">✓</div>
-        <div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">WOPT EMAIL ALERTS</div>
+        <div style="font-size:10px;letter-spacing:2px;color:#9a8a70;font-weight:800">HASSOUN EMAIL ALERTS</div>
         <h1 style="margin:8px 0 12px;font-size:30px;line-height:1.15;color:#153f35">${escapeHtml(title)}</h1>
         <p style="font-size:15px;line-height:1.65;color:#6f746c;margin:0">${escapeHtml(intro)}</p>
         <div style="margin-top:22px;background:#f8f3e9;border:1px solid #e6dccb;border-radius:17px;padding:14px 16px">
@@ -526,7 +526,7 @@ async function verificationSuccessPage(env: Env, subscriber: SubscriberRow, alre
           <p style="margin:0 0 10px"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "المنطقة الزمنية" : "Time zone"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(subscriber.timezone)}</strong></p>
           <p style="margin:0"><span style="color:#8a806f;font-size:12px;font-weight:700">${rtl ? "التنبيهات" : "Alerts"}</span><br><strong style="font-size:14px;color:#214d42">${escapeHtml(timing)}</strong></p>
         </div>
-        <a href="${escapeHtml(destination)}" style="display:block;margin-top:20px;background:#0b5b47;color:#fff;text-decoration:none;text-align:center;font-size:15px;font-weight:800;padding:15px 18px;border-radius:14px">${rtl ? "العودة إلى مواقيت الصلاة" : "Go to Windsor Prayer Times"}</a>
+        <a href="${escapeHtml(destination)}" style="display:block;margin-top:20px;background:#0b5b47;color:#fff;text-decoration:none;text-align:center;font-size:15px;font-weight:800;padding:15px 18px;border-radius:14px">${rtl ? "العودة إلى مواقيت الصلاة" : "Go to Hassoun"}</a>
         <p style="margin:14px 0 0;color:#938b7f;font-size:11px;line-height:1.5;text-align:center">${rtl ? "سيتم تحويلك تلقائياً خلال لحظات." : "You’ll return to Prayer Times automatically in a few seconds."}</p>
       </section>
     </main>

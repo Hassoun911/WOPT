@@ -61,7 +61,7 @@ export default function QuranReferenceLayoutEnhancer() {
     shell.className = "wopt-ref-safe";
     shell.innerHTML = `
       <div class="wopt-ref-safe-head">
-        <button class="wopt-ref-safe-brand" data-ref="home" type="button">WOPT Qur’an</button>
+        <button class="wopt-ref-safe-brand" data-ref="home" type="button">Hassoun Qur’an</button>
         <div class="wopt-ref-safe-icons"><button data-ref="search" type="button" aria-label="Search">⌕</button><button data-ref="menu" type="button" aria-label="Menu">☰</button></div>
       </div>
       <div class="wopt-ref-safe-surah"><button class="chooser" data-ref="surahs" type="button"><span data-ref-surah>Qur’an</span>⌄</button><button class="gear" data-ref="settings" type="button" aria-label="Reader settings">⚙</button></div>

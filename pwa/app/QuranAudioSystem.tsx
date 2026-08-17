@@ -513,7 +513,7 @@ export default function QuranAudioSystem() {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: `${chapterName(parseKey(key).surah)} · Ayah ${key}`,
           artist: reciterName(),
-          album: "Windsor Prayer Times",
+          album: "Hassoun",
           artwork: [{ src: `${window.location.origin}${base}/icon-512.png`, sizes: "512x512", type: "image/png" }],
         });
         navigator.mediaSession.playbackState = audio.paused ? "paused" : "playing";

@@ -16,7 +16,7 @@ export async function detectPrayerLocation(): Promise<DetectedPrayerLocation | n
     PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
     {
       title: "Use your location for prayer times",
-      message: "WOPT uses your current location to automatically select the correct local prayer times and email alert time zone.",
+      message: "Hassoun uses your current location to automatically select the correct local prayer times and email alert time zone.",
       buttonPositive: "Allow",
       buttonNegative: "Not now"
     }

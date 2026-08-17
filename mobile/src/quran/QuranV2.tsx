@@ -459,7 +459,7 @@ export default function QuranV2({ locale, onBackHome }: Props) {
     <ScrollView style={styles.flex} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.homeHeader}>
         <Pressable onPress={onBackHome} style={styles.iconButton}><Text style={styles.back}>{ar ? "›" : "‹"}</Text></Pressable>
-        <View style={styles.topCopy}><Text style={styles.eyebrow}>🌙 {tr("WOPT QUR’AN", "قرآن ووبت")}</Text><Text style={[styles.heroTitle, ar && styles.rtl]}>{tr("The Noble Qur’an", "القرآن الكريم")}</Text><Text style={[styles.heroSub, ar && styles.rtl]}>{tr("Read • listen • memorize", "اقرأ • استمع • احفظ")}</Text></View>
+        <View style={styles.topCopy}><Text style={styles.eyebrow}>🌙 {tr("HASSOUN QUR’AN", "قرآن Hassoun")}</Text><Text style={[styles.heroTitle, ar && styles.rtl]}>{tr("The Noble Qur’an", "القرآن الكريم")}</Text><Text style={[styles.heroSub, ar && styles.rtl]}>{tr("Read • listen • memorize", "اقرأ • استمع • احفظ")}</Text></View>
         <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton}><Text style={styles.menuIcon}>☰</Text></Pressable>
       </View>
 

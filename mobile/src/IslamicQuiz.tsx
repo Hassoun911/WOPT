@@ -177,7 +177,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <View style={styles.topRow}>
         <View style={styles.titleWrap}>
-          <Text style={styles.eyebrow}>🧠 WOPT QUIZ</Text>
+          <Text style={styles.eyebrow}>🧠 HASSOUN QUIZ</Text>
           <Text style={styles.title}>{copy.title}</Text>
           <Text style={styles.subtitle}>{copy.subtitle}</Text>
         </View>

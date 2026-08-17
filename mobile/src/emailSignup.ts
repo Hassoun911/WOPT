@@ -31,7 +31,7 @@ function apiBase() {
 
 export async function getEmailBackendStatus() {
   const response = await fetch(`${apiBase()}/config`);
-  if (!response.ok) throw new Error(`WOPT service unavailable (${response.status})`);
+  if (!response.ok) throw new Error(`Hassoun service unavailable (${response.status})`);
   return await response.json() as {
     emailSignup?: boolean;
     emailDeliveryConfigured?: boolean;
@@ -46,7 +46,7 @@ export async function subscribeToPrayerEmails(
   detectedLocation?: DetectedPrayerLocation | null
 ) {
   const location = detectedLocation ?? await detectPrayerLocation();
-  if (!location) throw new Error("Location permission is required so WOPT can use your local prayer times.");
+  if (!location) throw new Error("Location permission is required so Hassoun can use your local prayer times.");
 
   const installationId = await getInstallationId();
   const prayers = Object.fromEntries(
