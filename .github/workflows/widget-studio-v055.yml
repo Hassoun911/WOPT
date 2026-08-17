@@ -1,4 +1,4 @@
-# Widget studio integration trigger v3
+# Widget studio integration trigger v4
 name: Hassoun widget studio v0.5.5
 
 on:
@@ -21,6 +21,13 @@ jobs:
 
       - name: Apply widget studio
         run: python .github/scripts/widget-studio-v055.py
+
+      - name: Use bundled native Hassoun logo
+        run: |
+          sed -i 's#@mipmap/ic_launcher#@drawable/hassoun_widget_logo#g' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
+          sed -i 's#@mipmap/ic_launcher#@drawable/hassoun_widget_logo#g' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_lockscreen.xml
+          sed -i 's#@mipmap/ic_launcher#@drawable/hassoun_widget_logo#g' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_vertical.xml
+          test -s mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
       - name: Fix preview asset and migrate legacy layouts
         run: |
