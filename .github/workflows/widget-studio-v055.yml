@@ -1,4 +1,4 @@
-# Widget studio integration trigger
+# Widget studio integration trigger v3
 name: Hassoun widget studio v0.5.5
 
 on:
@@ -21,6 +21,30 @@ jobs:
 
       - name: Apply widget studio
         run: python .github/scripts/widget-studio-v055.py
+
+      - name: Fix preview asset and migrate legacy layouts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/src/SettingsHub.tsx')
+          s = p.read_text()
+          s = s.replace('require("../assets/hassoun-logo.png")', 'require("../assets/icon.png")')
+          old = '''  useEffect(() => {
+            const next = { ...HassounWidget.getPreferences(), locale };
+            setWidgetPrefs(next);
+            HassounWidget.setPreferences(next);
+          }, [locale]);'''
+          new = '''  useEffect(() => {
+            const stored = HassounWidget.getPreferences();
+            const migratedLayout = stored.layout === "next" ? "square" : stored.layout === "compact" ? "slim" : stored.layout;
+            const next = { ...stored, layout: migratedLayout, theme: stored.theme || "emerald", locale };
+            setWidgetPrefs(next);
+            HassounWidget.setPreferences(next);
+          }, [locale]);'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -47,9 +71,9 @@ jobs:
         working-directory: mobile
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Validate native widget resources and Kotlin
+      - name: Validate widget resources and Kotlin
         working-directory: mobile/android
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :wopt-hassoun-widget:assembleRelease :app:mergeReleaseResources
 
       - name: Commit widget studio
         run: |
