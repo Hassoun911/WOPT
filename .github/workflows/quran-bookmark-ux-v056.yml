@@ -1,0 +1,46 @@
+name: Quran bookmark UX v0.5.6
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/quran-bookmark-ux-v056.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply bookmark UX patch
+        run: python .github/scripts/quran-bookmark-ux-v056.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+      - name: Commit bookmark UX
+        run: |
+          git config user.name "Hassoun911"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/src/quran/QuranV3.tsx mobile/src/quran/quranRendering.tsx mobile/app.config.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "Add visible Quran bookmark confirmations and markers"
+          git push origin main
