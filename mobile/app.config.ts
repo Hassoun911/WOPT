@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "0.4.8",
+  version: "0.4.9",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
@@ -19,7 +19,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 20,
+    versionCode: 21,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#003d33"
