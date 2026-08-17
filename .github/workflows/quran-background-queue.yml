@@ -1,4 +1,4 @@
-# Rich Quran Radio + persistent background playback integration
+# Rich Quran Radio + persistent background playback integration - idempotent retry
 name: Integrate native Quran background queue
 
 on:
