@@ -1,3 +1,4 @@
+# Redeploy Hassoun Worker with Settings & Support contact endpoint
 name: Deploy Hassoun Push Worker
 
 on:
