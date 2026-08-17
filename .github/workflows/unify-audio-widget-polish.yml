@@ -32,9 +32,9 @@ jobs:
         working-directory: mobile
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Validate mobile TypeScript
+      - name: Validate mobile TypeScript without network refresh
         working-directory: mobile
-        run: npm run typecheck
+        run: npx tsc --noEmit
 
       - name: Commit Hassoun v0.5.3 polish
         run: |
