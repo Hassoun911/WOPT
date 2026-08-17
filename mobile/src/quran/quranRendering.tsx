@@ -11,6 +11,7 @@ import {
   Text,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuranAyah, QuranLocale } from "./quranData";
 
 export type QuranFontChoice = "qcf-v2" | "qcf-v1" | "qpc-hafs";
@@ -339,6 +340,7 @@ export function ReaderSettingsSheet({
   const ar = locale === "ar";
   const t = (en: string, arabic: string) => ar ? arabic : en;
   const effectiveColor = appearance.pageTheme === "dark" && appearance.textColor === "#111111" ? "#f2efe7" : appearance.textColor;
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDone}>
@@ -469,7 +471,7 @@ export function ReaderSettingsSheet({
             </View>
           </ScrollView>
 
-          <View style={styles.sheetFooter}>
+          <View style={[styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, 12), minHeight: 72 + Math.max(insets.bottom, 12) }]}>
             <Pressable onPress={reset} style={styles.resetButton}><Text style={styles.resetText}>{t("Reset", "إعادة ضبط")}</Text></Pressable>
             <Pressable onPress={onDone} style={styles.doneButton}><Text style={styles.doneText}>{t("Done", "تم")}</Text></Pressable>
           </View>
@@ -491,7 +493,7 @@ const styles = StyleSheet.create({
   sheetSubtitle: { color: "#7c8782", fontSize: 9, marginTop: 3 },
   doneTop: { width: 38, height: 38, borderRadius: 15, backgroundColor: "#e6f2ed", alignItems: "center", justifyContent: "center" },
   doneTopText: { color: "#0b7057", fontSize: 18, fontWeight: "900" },
-  sheetScroll: { padding: 18, paddingBottom: 24 },
+  sheetScroll: { padding: 18, paddingBottom: 36 },
   sectionLabel: { color: "#8d743d", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginTop: 5, marginBottom: 8 },
   optionCard: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#e3dfd7", overflow: "hidden", marginBottom: 16 },
   fontOption: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 15, paddingVertical: 10 },
