@@ -229,8 +229,8 @@ export default function AdminPage() {
         <form onSubmit={signIn} style={styles.loginCard}>
           <div style={styles.brand}>و</div>
           <div>
-            <p style={styles.eyebrow}>WOPT ADMIN</p>
-            <h1 style={styles.loginTitle}>Windsor Prayer Times CMS</h1>
+            <p style={styles.eyebrow}>Hassoun ADMIN</p>
+            <h1 style={styles.loginTitle}>Hassoun CMS</h1>
             <p style={styles.muted}>Admin access only. Public subscribers never need an account or password.</p>
           </div>
           <label style={styles.label}>Username or email</label>
@@ -239,7 +239,7 @@ export default function AdminPage() {
           <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" style={styles.input} />
           {error ? <p style={styles.error}>{error}</p> : null}
           <button disabled={busy || !login || !password} style={styles.primaryButton}>{busy ? "Signing in…" : "Sign in"}</button>
-          <a href="../" style={styles.backLink}>← Back to Windsor Prayer Times</a>
+          <a href="../" style={styles.backLink}>← Back to Hassoun</a>
         </form>
       </main>
     );
@@ -250,7 +250,7 @@ export default function AdminPage() {
       <header style={styles.header}>
         <div style={styles.headerBrand}>
           <div style={styles.brandSmall}>و</div>
-          <div><p style={styles.eyebrow}>WOPT ADMIN</p><strong>Control Center</strong></div>
+          <div><p style={styles.eyebrow}>Hassoun ADMIN</p><strong>Control Center</strong></div>
         </div>
         <div style={styles.headerRight}><span style={styles.muted}>{admin.display_name || admin.username} • {admin.role}</span><button onClick={signOut} style={styles.secondaryButton}>Sign out</button></div>
       </header>
@@ -267,7 +267,7 @@ export default function AdminPage() {
 
       {view === "dashboard" ? (
         <section>
-          <div style={styles.titleRow}><div><p style={styles.eyebrow}>OVERVIEW</p><h1 style={styles.title}>WOPT at a glance</h1></div><button onClick={() => token && void loadDashboard(token)} style={styles.secondaryButton}>Refresh</button></div>
+          <div style={styles.titleRow}><div><p style={styles.eyebrow}>OVERVIEW</p><h1 style={styles.title}>Hassoun at a glance</h1></div><button onClick={() => token && void loadDashboard(token)} style={styles.secondaryButton}>Refresh</button></div>
           <div style={styles.statsGrid}>
             <Stat label="Active email subscribers" value={subscriberSummary.active || 0} />
             <Stat label="Pending verification" value={subscriberSummary.pending || 0} />

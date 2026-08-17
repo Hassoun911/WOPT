@@ -72,7 +72,7 @@ export default function AdminResetPage() {
     return (
       <main style={s.page}>
         <section style={s.card}>
-          <p style={s.eyebrow}>WOPT ADMIN</p>
+          <p style={s.eyebrow}>Hassoun ADMIN</p>
           <h1 style={s.h1}>Password changed</h1>
           <p style={s.muted}>All previous admin sessions were revoked. Sign in again with your new password.</p>
           <a href="../" style={s.primaryLink}>Return to admin sign in</a>
@@ -84,12 +84,12 @@ export default function AdminResetPage() {
   return (
     <main style={s.page}>
       <form onSubmit={token ? resetPassword : requestReset} style={s.card}>
-        <p style={s.eyebrow}>WOPT ADMIN</p>
+        <p style={s.eyebrow}>Hassoun ADMIN</p>
         <h1 style={s.h1}>{token ? "Set a new password" : "Forgot password"}</h1>
         <p style={s.muted}>
           {token
             ? "Choose a new admin password. Using this link will sign out every existing admin session for this account."
-            : "Enter the email address on the admin account. If it matches an active admin, WOPT will send a secure one-hour reset link."}
+            : "Enter the email address on the admin account. If it matches an active admin, Hassoun will send a secure one-hour reset link."}
         </p>
 
         {token ? (

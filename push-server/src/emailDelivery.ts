@@ -95,7 +95,7 @@ function brandedEmail(options: {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:24px;overflow:hidden">
           <tr><td style="padding:24px 24px 18px;text-align:${textAlign}" dir="${direction}">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-              <td style="vertical-align:middle"><img src="https://hassoun911.github.io/WOPT/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33" /></td>
+              <td style="vertical-align:middle"><img src="https://hassoun911.github.io/Hassoun/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33" /></td>
               <td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px;width:100%"><div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div></td>
             </tr></table>
           </td></tr>

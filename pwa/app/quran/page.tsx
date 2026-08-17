@@ -524,7 +524,7 @@ export default function QuranPage() {
             })}
           </div>
         )}
-        <div className="mushaf-page-foot"><span>Juz {verses[0]?.juz_number || "—"}</span><span>{lastRead?.page ? `Page ${lastRead.page}` : "WOPT Qur’an Reader"}</span></div>
+        <div className="mushaf-page-foot"><span>Juz {verses[0]?.juz_number || "—"}</span><span>{lastRead?.page ? `Page ${lastRead.page}` : "Hassoun Qur’an Reader"}</span></div>
       </section>
 
       {selectedVerse && currentTranslation && (

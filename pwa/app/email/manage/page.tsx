@@ -138,7 +138,7 @@ export default function ManageEmailPage() {
   };
 
   const unsubscribe = async () => {
-    if (!id || !token || !window.confirm(locale === "ar" ? "هل تريد إيقاف جميع رسائل WOPT؟" : "Stop all WOPT emails for this address?")) return;
+    if (!id || !token || !window.confirm(locale === "ar" ? "هل تريد إيقاف جميع رسائل Hassoun؟" : "Stop all Hassoun emails for this address?")) return;
     setBusy(true);
     setError("");
     try {
@@ -156,13 +156,13 @@ export default function ManageEmailPage() {
   };
 
   if (busy && !subscription) return <main style={s.center}><div style={s.card}><p>Loading email settings…</p></div></main>;
-  if (error && !subscription) return <main style={s.center}><div style={s.card}><h1 style={s.h1}>WOPT Email Alerts</h1><p style={s.error}>{error}</p><a href="../../" style={s.link}>Return to Windsor Prayer Times</a></div></main>;
-  if (unsubscribed) return <main style={s.center}><div style={s.card}><h1 style={s.h1}>{locale === "ar" ? "تم إلغاء الاشتراك" : "Unsubscribed"}</h1><p style={s.muted}>{locale === "ar" ? "لن يتم إرسال رسائل WOPT إلى هذا البريد بعد الآن." : "WOPT will no longer send email to this address."}</p><a href="../../" style={s.link}>Return to Windsor Prayer Times</a></div></main>;
+  if (error && !subscription) return <main style={s.center}><div style={s.card}><h1 style={s.h1}>Hassoun Email Alerts</h1><p style={s.error}>{error}</p><a href="../../" style={s.link}>Return to Hassoun</a></div></main>;
+  if (unsubscribed) return <main style={s.center}><div style={s.card}><h1 style={s.h1}>{locale === "ar" ? "تم إلغاء الاشتراك" : "Unsubscribed"}</h1><p style={s.muted}>{locale === "ar" ? "لن يتم إرسال رسائل Hassoun إلى هذا البريد بعد الآن." : "Hassoun will no longer send email to this address."}</p><a href="../../" style={s.link}>Return to Hassoun</a></div></main>;
 
   return (
     <main style={s.page} dir={locale === "ar" ? "rtl" : "ltr"}>
       <div style={s.shell}>
-        <header style={s.header}><div><p style={s.eyebrow}>WOPT</p><h1 style={s.h1}>{locale === "ar" ? "إدارة تنبيهات البريد" : "Manage email alerts"}</h1><p style={s.muted}>{subscription?.email}</p></div><a href="../../" style={s.link}>{locale === "ar" ? "العودة" : "Back"}</a></header>
+        <header style={s.header}><div><p style={s.eyebrow}>Hassoun</p><h1 style={s.h1}>{locale === "ar" ? "إدارة تنبيهات البريد" : "Manage email alerts"}</h1><p style={s.muted}>{subscription?.email}</p></div><a href="../../" style={s.link}>{locale === "ar" ? "العودة" : "Back"}</a></header>
         <section style={s.location}><strong>📍 {location}</strong><span style={s.small}>{subscription?.timezone}</span></section>
 
         <section style={s.card}>
@@ -175,7 +175,7 @@ export default function ManageEmailPage() {
           <p style={s.eyebrow}>{locale === "ar" ? "رسائل أخرى" : "OTHER EMAILS"}</p><h2 style={s.h2}>{locale === "ar" ? "اختيارات المحتوى" : "Content preferences"}</h2>
           {([
             ["religiousOccasions", locale === "ar" ? "المناسبات الإسلامية" : "Islamic occasions"],
-            ["announcements", locale === "ar" ? "إعلانات WOPT" : "WOPT announcements"],
+            ["announcements", locale === "ar" ? "إعلانات Hassoun" : "Hassoun announcements"],
             ["communityEvents", locale === "ar" ? "فعاليات المجتمع" : "Community events"],
             ["dailyContent", locale === "ar" ? "المحتوى الإسلامي اليومي" : "Daily Islamic content"],
             ["marketing", locale === "ar" ? "العروض والرعاة" : "Offers and sponsors"]

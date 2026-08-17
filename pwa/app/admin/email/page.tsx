@@ -135,12 +135,12 @@ export default function AdminEmailPage() {
   };
 
   if (!token || !admin) {
-    return <main style={s.page}><form onSubmit={signIn} style={s.login}><p style={s.eyebrow}>WOPT ADMIN</p><h1 style={s.h1}>Email Campaigns</h1><p style={s.muted}>Admin access only.</p><label style={s.label}>Username or email</label><input value={login} onChange={(e) => setLogin(e.target.value)} style={s.input} /><label style={s.label}>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} />{error ? <p style={s.error}>{error}</p> : null}<button style={s.primary} disabled={busy || !login || !password}>{busy ? "Signing in…" : "Sign in"}</button><a href="../" style={s.link}>← Main admin dashboard</a></form></main>;
+    return <main style={s.page}><form onSubmit={signIn} style={s.login}><p style={s.eyebrow}>Hassoun ADMIN</p><h1 style={s.h1}>Email Campaigns</h1><p style={s.muted}>Admin access only.</p><label style={s.label}>Username or email</label><input value={login} onChange={(e) => setLogin(e.target.value)} style={s.input} /><label style={s.label}>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} />{error ? <p style={s.error}>{error}</p> : null}<button style={s.primary} disabled={busy || !login || !password}>{busy ? "Signing in…" : "Sign in"}</button><a href="../" style={s.link}>← Main admin dashboard</a></form></main>;
   }
 
   return (
     <main style={s.page}>
-      <header style={s.header}><div><p style={s.eyebrow}>WOPT ADMIN</p><h1 style={{ margin: 0 }}>Email Campaigns</h1></div><div style={s.headerActions}><span style={s.muted}>{admin.display_name || admin.username}</span><a href="../" style={s.secondary}>Dashboard</a></div></header>
+      <header style={s.header}><div><p style={s.eyebrow}>Hassoun ADMIN</p><h1 style={{ margin: 0 }}>Email Campaigns</h1></div><div style={s.headerActions}><span style={s.muted}>{admin.display_name || admin.username}</span><a href="../" style={s.secondary}>Dashboard</a></div></header>
       {error ? <div style={s.error}>{error}</div> : null}
       <div style={s.grid}>
         <form onSubmit={schedule} style={s.card}>

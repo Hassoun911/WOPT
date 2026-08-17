@@ -49,14 +49,14 @@ export default function AdminSetupPage() {
   };
 
   if (done) {
-    return <main style={s.page}><section style={s.card}><p style={s.eyebrow}>WOPT ADMIN</p><h1 style={s.h1}>Owner account created</h1><p style={s.muted}>The one-time admin bootstrap is complete. The bootstrap endpoint will refuse to create another first admin.</p><a href="../" style={s.primaryLink}>Open admin dashboard</a></section></main>;
+    return <main style={s.page}><section style={s.card}><p style={s.eyebrow}>Hassoun ADMIN</p><h1 style={s.h1}>Owner account created</h1><p style={s.muted}>The one-time admin bootstrap is complete. The bootstrap endpoint will refuse to create another first admin.</p><a href="../" style={s.primaryLink}>Open admin dashboard</a></section></main>;
   }
 
   return (
     <main style={s.page}>
       <form onSubmit={submit} style={s.card}>
         <p style={s.eyebrow}>ONE-TIME SETUP</p>
-        <h1 style={s.h1}>Create WOPT owner</h1>
+        <h1 style={s.h1}>Create Hassoun owner</h1>
         <p style={s.muted}>Use this only after the private ADMIN_BOOTSTRAP_KEY has been installed on the Worker. This page cannot create a second owner after bootstrap is complete.</p>
         <label style={s.label}>Private bootstrap key</label><input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" style={s.input} required />
         <label style={s.label}>Username</label><input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} autoComplete="username" style={s.input} placeholder="admin" required />

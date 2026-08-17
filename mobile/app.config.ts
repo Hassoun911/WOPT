@@ -14,7 +14,7 @@ const config: ExpoConfig = {
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
-      NSLocationWhenInUseUsageDescription: "WOPT uses your location to automatically select the correct local prayer times and email alert time zone."
+      NSLocationWhenInUseUsageDescription: "Hassoun uses your location to automatically select the correct local prayer times and email alert time zone."
     }
   },
   android: {
