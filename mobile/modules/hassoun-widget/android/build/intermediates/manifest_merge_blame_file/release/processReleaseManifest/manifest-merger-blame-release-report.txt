@@ -1,0 +1,83 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="ca.wopt.hassounwidget" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <application>
+7-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:2:3-33:17
+8        <receiver
+8-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:3:5-18:16
+9            android:name="ca.wopt.hassounwidget.HassounPrayerWidgetProvider"
+9-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:4:7-50
+10            android:enabled="true"
+10-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:5:7-29
+11            android:exported="false"
+11-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:6:7-31
+12            android:label="Hassoun Prayer Times" >
+12-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:7:7-43
+13            <intent-filter>
+13-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:8:7-14:23
+14                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+14-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:9:9-76
+14-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:9:17-73
+15                <action android:name="android.intent.action.BOOT_COMPLETED" />
+15-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:10:9-71
+15-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:10:17-68
+16                <action android:name="android.intent.action.TIME_SET" />
+16-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:11:9-65
+16-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:11:17-62
+17                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+17-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:12:9-73
+17-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:12:17-70
+18                <action android:name="ca.wopt.hassounwidget.REFRESH" />
+18-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:13:9-64
+18-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:13:17-61
+19            </intent-filter>
+20
+21            <meta-data
+21-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:15:7-17:62
+22                android:name="android.appwidget.provider"
+22-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:16:9-50
+23                android:resource="@xml/hassoun_prayer_widget_info" />
+23-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:17:9-59
+24        </receiver>
+25        <receiver
+25-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:19:5-32:16
+26            android:name="ca.wopt.hassounwidget.HassounLockScreenWidgetProvider"
+26-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:20:7-54
+27            android:enabled="true"
+27-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:21:7-29
+28            android:exported="false"
+28-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:22:7-31
+29            android:label="Hassoun Lock Screen — Transparent" >
+29-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:23:7-56
+30            <intent-filter>
+30-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:8:7-14:23
+31                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+31-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:9:9-76
+31-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:9:17-73
+32                <action android:name="android.intent.action.BOOT_COMPLETED" />
+32-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:10:9-71
+32-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:10:17-68
+33                <action android:name="android.intent.action.TIME_SET" />
+33-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:11:9-65
+33-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:11:17-62
+34                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+34-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:12:9-73
+34-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:12:17-70
+35                <action android:name="ca.wopt.hassounwidget.REFRESH" />
+35-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:13:9-64
+35-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:13:17-61
+36            </intent-filter>
+37
+38            <meta-data
+38-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:15:7-17:62
+39                android:name="android.appwidget.provider"
+39-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:16:9-50
+40                android:resource="@xml/hassoun_lock_widget_info" />
+40-->/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml:17:9-59
+41        </receiver>
+42    </application>
+43
+44</manifest>

@@ -1,0 +1,54 @@
+[
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_lock_countdown.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_lock_countdown.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_prayer_chip_light.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_prayer_chip_light.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_background_ivory.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_background_ivory.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_lock_prayer_idle.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_lock_prayer_idle.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_logo.png",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_logo.png"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_brand_badge.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_brand_badge.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_prayer_chip.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_prayer_chip.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_lock_prayer_active.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_lock_prayer_active.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_countdown.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_countdown.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_background_sunset.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_background_sunset.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_background_ocean.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_background_ocean.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_background_midnight.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_background_midnight.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/drawable/hassoun_widget_background.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/drawable/hassoun_widget_background.xml"
+    }
+]

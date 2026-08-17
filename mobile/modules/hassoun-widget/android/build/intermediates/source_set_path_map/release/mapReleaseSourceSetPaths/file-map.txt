@@ -1,0 +1,7 @@
+ca.wopt.hassounwidget.wopt-hassoun-widget-pngs-0 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/generated/res/pngs/release
+ca.wopt.hassounwidget.wopt-hassoun-widget-resValues-1 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/generated/res/resValues/release
+ca.wopt.hassounwidget.wopt-hassoun-widget-mergeReleaseResources-2 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+ca.wopt.hassounwidget.wopt-hassoun-widget-mergeReleaseResources-3 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+ca.wopt.hassounwidget.wopt-hassoun-widget-release-4 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/intermediates/merged_res/release/mergeReleaseResources
+ca.wopt.hassounwidget.wopt-hassoun-widget-main-5 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/res
+ca.wopt.hassounwidget.wopt-hassoun-widget-release-6 /home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/release/res

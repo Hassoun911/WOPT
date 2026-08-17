@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -13,7 +14,7 @@ import {
   TextInput,
   View
 } from "react-native";
-import HassounWidget, { type HassounWidgetLayout, type HassounWidgetPreferences } from "../modules/hassoun-widget";
+import HassounWidget, { type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme } from "../modules/hassoun-widget";
 import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering";
 import { submitSupportMessage } from "./support";
 
@@ -27,6 +28,14 @@ type Props = {
 };
 
 const PUBLIC_BASE = "https://hassoun911.github.io/WOPT";
+
+const WIDGET_THEME_META: Record<HassounWidgetTheme, { bg: string; fg: string; muted: string; accent: string; border: string }> = {
+  emerald: { bg: "#0B654F", fg: "#FFFFFF", muted: "#C7DDD6", accent: "#F0D27A", border: "#D2B25A" },
+  ivory: { bg: "#FFF7E8", fg: "#173F35", muted: "#7D725F", accent: "#B27A23", border: "#D8B875" },
+  ocean: { bg: "#3B7EAB", fg: "#FFFFFF", muted: "#D8ECF8", accent: "#F5D784", border: "#9FD1EE" },
+  sunset: { bg: "#CB8291", fg: "#FFFFFF", muted: "#F9E4E1", accent: "#FFE29C", border: "#F2C9A2" },
+  midnight: { bg: "#10294A", fg: "#FFFFFF", muted: "#CAD7E7", accent: "#F3D083", border: "#7186A2" }
+};
 
 function Row({ emoji, title, text, onPress }: { emoji: string; title: string; text: string; onPress: () => void }) {
   return (
@@ -114,31 +123,87 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
   if (page === "root") return root;
 
   if (page === "widgets") {
+    const previewTheme = WIDGET_THEME_META[widgetPrefs.theme || "emerald"];
+    const widgetLogo = require("../assets/icon.png");
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BackHeader title={t("Widgets", "الويدجت")} onBack={() => setPage("root")} />
         <Text style={styles.subtitle}>{t("Choose a default Hassoun widget layout. The same responsive widget can be resized on phones, tablets and foldables.", "اختر التصميم الافتراضي لويدجت Hassoun. يمكن تغيير حجمه على الهواتف والأجهزة اللوحية والقابلة للطي.")}</Text>
 
+        <Text style={styles.sectionLabel}>{t("WIDGET STYLE", "نمط الويدجت")}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScrollContent}>
+          {([
+            ["emerald", t("Emerald", "زمردي")],
+            ["ivory", t("Ivory", "عاجي")],
+            ["ocean", t("Ocean", "أزرق")],
+            ["sunset", t("Sunset", "غروب")],
+            ["midnight", t("Midnight", "ليلي")]
+          ] as Array<[HassounWidgetTheme, string]>).map(([theme, label]) => {
+            const meta = WIDGET_THEME_META[theme];
+            return (
+              <Pressable key={theme} onPress={() => updateWidget({ theme })} style={[styles.themeChoice, widgetPrefs.theme === theme && styles.themeChoiceActive]}>
+                <View style={[styles.themeSwatch, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                  <Image source={widgetLogo} style={styles.themeLogo} resizeMode="contain" />
+                  <Text style={[styles.themePrayer, { color: meta.fg }]}>Dhuhr</Text>
+                  <Text style={[styles.themeTime, { color: meta.accent }]}>1:36</Text>
+                </View>
+                <Text style={styles.themeLabel}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         <Text style={styles.sectionLabel}>{t("WIDGET LAYOUT", "تصميم الويدجت")}</Text>
         <View style={styles.layoutGrid}>
           {([
-            ["compact", "◼", t("Compact", "مصغر"), t("Next prayer + countdown", "الصلاة القادمة والعد التنازلي")],
-            ["next", "▰", t("Prayer card", "بطاقة الصلاة"), t("Dates + next prayer", "التاريخ والصلاة القادمة")],
-            ["full", "▦", t("Full day", "اليوم كامل"), t("Next prayer + all five", "الصلاة القادمة والصلوات الخمس")]
-          ] as Array<[HassounWidgetLayout, string, string, string]>).map(([layout, icon, label, note]) => (
+            ["full", t("Large", "كبير"), t("Next prayer + all five", "الصلاة القادمة والخمس")],
+            ["square", t("Square", "مربع"), t("Next prayer focus", "تركيز على القادمة")],
+            ["vertical", t("Vertical", "طولي"), t("Tall prayer list", "قائمة طولية")],
+            ["slim", t("Slim", "رفيع"), t("Logo + next prayer", "الشعار والصلاة القادمة")]
+          ] as Array<[HassounWidgetLayout, string, string]>).map(([layout, label, note]) => (
             <Pressable key={layout} onPress={() => updateWidget({ layout })} style={[styles.layoutChoice, widgetPrefs.layout === layout && styles.layoutChoiceActive]}>
-              <Text style={styles.layoutIcon}>{icon}</Text><Text style={styles.layoutTitle}>{label}</Text><Text style={styles.layoutNote}>{note}</Text>
+              <View style={[
+                styles.layoutMock,
+                layout === "full" && styles.layoutMockWide,
+                layout === "square" && styles.layoutMockSquare,
+                layout === "vertical" && styles.layoutMockVertical,
+                layout === "slim" && styles.layoutMockSlim
+              ]}><View style={styles.layoutMockLine} /></View>
+              <Text style={styles.layoutTitle}>{label}</Text><Text style={styles.layoutNote}>{note}</Text>
             </Pressable>
           ))}
         </View>
 
-        <View style={styles.widgetPreview}>
-          <Text style={styles.widgetPreviewBrand}>HASSOUN • {t("NEXT PRAYER", "الصلاة القادمة")}</Text>
-          <View style={styles.widgetPreviewRow}><Text style={styles.widgetPreviewPrayer}>{t("Fajr", "الفجر")}</Text><Text style={styles.widgetPreviewTime}>5:06 a.m.</Text></View>
-          {widgetPrefs.showCountdown ? <Text style={styles.widgetPreviewCountdown}>⏳ 3h 46m left</Text> : null}
-          {widgetPrefs.layout !== "compact" && widgetPrefs.showHijri ? <Text style={styles.widgetPreviewMeta}>🌙 Rabiʿ I 4, 1448 AH</Text> : null}
-          {widgetPrefs.layout === "full" && widgetPrefs.showAllPrayers ? <Text style={styles.widgetPreviewList}>Fajr 5:06  •  Dhuhr 1:36  •  Asr 5:26{`\n`}Maghrib 8:32  •  Isha 9:55</Text> : null}
+        <Text style={styles.sectionLabel}>{t("LIVE PREVIEW", "معاينة مباشرة")}</Text>
+        <View style={styles.previewStage}>
+          <View style={[
+            styles.widgetRichPreview,
+            widgetPrefs.layout === "vertical" && styles.widgetRichPreviewVertical,
+            widgetPrefs.layout === "square" && styles.widgetRichPreviewSquare,
+            widgetPrefs.layout === "slim" && styles.widgetRichPreviewSlim,
+            { backgroundColor: previewTheme.bg, borderColor: previewTheme.border }
+          ]}>
+            <View style={styles.previewHeaderRow}>
+              <Image source={widgetLogo} style={styles.previewLogo} resizeMode="contain" />
+              <View style={styles.previewBrandBlock}><Text style={[styles.previewBrand, { color: previewTheme.fg }]}>HASSOUN</Text><Text style={[styles.previewTiny, { color: previewTheme.muted }]}>PRAYER TIMES • WINDSOR</Text></View>
+              {widgetPrefs.layout !== "slim" && <Text style={[styles.previewTiny, { color: previewTheme.muted }]}>Mon, Aug 17</Text>}
+            </View>
+            {widgetPrefs.layout === "slim" ? (
+              <View style={styles.slimPreviewRow}><Text style={[styles.slimPrayer, { color: previewTheme.fg }]}>Dhuhr</Text><Text style={[styles.slimTime, { color: previewTheme.accent }]}>1:36 p.m.</Text><Text style={[styles.slimCountdown, { color: previewTheme.fg }]}>50:34</Text></View>
+            ) : (
+              <>
+                <View style={styles.previewPrayerRow}><View><Text style={[styles.previewTiny, { color: previewTheme.accent }]}>NEXT PRAYER</Text><Text style={[styles.previewPrayer, { color: previewTheme.fg }]}>Dhuhr</Text><Text style={[styles.previewArabic, { color: previewTheme.muted }]}>الظهر</Text></View><View style={styles.previewTimeBlock}><Text style={[styles.previewTime, { color: previewTheme.fg }]}>1:36 p.m.</Text>{widgetPrefs.showCountdown && <Text style={[styles.previewCountdown, { color: previewTheme.accent }]}>⏳ 50:34 left</Text>}</View></View>
+                {widgetPrefs.showHijri && <Text style={[styles.previewMeta, { color: previewTheme.muted }]}>Rabiʿ I 4, 1448 AH</Text>}
+                {(widgetPrefs.layout === "full" || widgetPrefs.layout === "vertical") && widgetPrefs.showAllPrayers && (
+                  <View style={widgetPrefs.layout === "vertical" ? styles.previewPrayerListVertical : styles.previewPrayerList}>
+                    {["Fajr 5:06", "● Dhuhr 1:36", "Asr 5:26", "Maghrib 8:32", "Isha 9:55"].map((item) => <Text key={item} style={[styles.previewPrayerChip, { color: item.startsWith("●") ? previewTheme.accent : previewTheme.fg, borderColor: previewTheme.muted }]}>{item}</Text>)}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
         </View>
+        <Text style={styles.previewHint}>{t("The preview changes immediately. After adding the widget, resize it on your Home screen to match the selected shape.", "تتغير المعاينة فوراً. بعد إضافة الويدجت غيّر حجمه على الشاشة الرئيسية ليتناسب مع الشكل المختار.")}</Text>
 
         <Text style={styles.sectionLabel}>{t("SHOW ON WIDGET", "إظهار على الويدجت")}</Text>
         {([
@@ -160,9 +225,14 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
         <Pressable onPress={() => HassounWidget.refresh()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>↻ {t("Refresh widgets", "تحديث الويدجت")}</Text></Pressable>
 
         <LegalCard title={t("🔒 Lock-screen widget", "🔒 ويدجت شاشة القفل") }>
-          <Text style={styles.legalText}>{widgetCapabilities.lockScreenEligible
-            ? t("On supported Android lock screens, Hassoun automatically switches to a transparent Prayer Times layout: no solid card background, the next prayer is highlighted, and all five prayer times stay visible. Your Home Screen widget keeps its selected style. Add it from your phone’s Lock screen customization screen; Samsung/other manufacturers decide where third-party lock-screen widgets are offered.", "على شاشات القفل المدعومة يتحول Hassoun تلقائياً إلى تصميم شفاف لمواقيت الصلاة بدون خلفية صلبة، مع تمييز الصلاة القادمة وإظهار الصلوات الخمس. يبقى تصميم الشاشة الرئيسية كما اخترته. أضفه من إعدادات تخصيص شاشة القفل؛ تحدد Samsung والشركات الأخرى مكان توفر ويدجت الطرف الثالث.")
-            : t("Your current Android version does not expose the new lock-screen widget host. The same Hassoun widget will still work on the Home screen.", "إصدار Android الحالي لا يوفر نظام ويدجت شاشة القفل الجديد. سيعمل نفس ويدجت Hassoun على الشاشة الرئيسية.")}</Text>
+          <View style={styles.lockPreview}>
+            <View style={styles.lockPreviewTop}><Image source={widgetLogo} style={styles.lockPreviewLogo} resizeMode="contain" /><View><Text style={styles.lockPreviewBrand}>HASSOUN</Text><Text style={styles.lockPreviewSub}>NEXT PRAYER</Text></View><Text style={styles.lockPreviewTime}>Dhuhr  •  1:36</Text></View>
+            <View style={styles.lockPrayerRow}>{["Fajr 5:06", "● Dhuhr 1:36", "Asr 5:26", "Maghrib 8:32", "Isha 9:55"].map((item) => <Text key={item} style={[styles.lockPrayerText, item.startsWith("●") && styles.lockPrayerActive]}>{item}</Text>)}</View>
+          </View>
+          <Text style={styles.legalText}>{t("Hassoun now includes a second widget named ‘Hassoun Lock Screen — Transparent’. It has no solid background and is designed specifically for LockStar / compatible lock-screen widget hosts.", "يتضمن Hassoun الآن ويدجت ثانياً باسم «Hassoun Lock Screen — Transparent» بدون خلفية صلبة ومصمم خصيصاً لـ LockStar وشاشات القفل المتوافقة.")}</Text>
+          <Text style={styles.legalText}>{t("Samsung’s built-in Brief widget list does not show every third-party app. On Samsung, install Good Lock, open LockStar, edit the Lock screen, choose Add widget, then select Hassoun Lock Screen — Transparent.", "قائمة Brief Widgets في Samsung لا تعرض كل تطبيقات الطرف الثالث. على Samsung ثبّت Good Lock ثم افتح LockStar وعدّل شاشة القفل واختر Add widget ثم Hassoun Lock Screen — Transparent.")}</Text>
+          <Pressable onPress={() => Linking.openURL("samsungapps://ProductDetail/com.samsung.android.goodlock").catch(() => Linking.openURL("https://galaxystore.samsung.com/detail/com.samsung.android.goodlock"))} style={styles.inlineButton}><Text style={styles.inlineButtonText}>Samsung Good Lock / LockStar ›</Text></Pressable>
+          {widgetCapabilities.lockScreenEligible ? <Text style={styles.legalText}>{t("Your Android version also reports native lock-screen widget eligibility.", "إصدار Android لديك يعلن أيضاً دعم ويدجت شاشة القفل الأصلي.")}</Text> : null}
         </LegalCard>
       </ScrollView>
     );
@@ -296,20 +366,59 @@ const styles = StyleSheet.create({
   aboutTitle: { color: "#fff", fontSize: 28, fontWeight: "900", marginTop: 3 },
   aboutTagline: { color: "#c8e1d8", fontSize: 11, marginTop: 3 },
   version: { color: "#f1d58c", fontSize: 10, fontWeight: "800", marginTop: 10 },
-  layoutGrid: { flexDirection: "row", gap: 7, marginBottom: 12 },
-  layoutChoice: { flex: 1, minHeight: 105, borderRadius: 17, borderWidth: 1, borderColor: "#dfddd5", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 8 },
+  themeScrollContent: { gap: 9, paddingBottom: 10 },
+  themeChoice: { width: 112, borderRadius: 18, borderWidth: 1, borderColor: "#e0ddd5", backgroundColor: "#fff", padding: 7 },
+  themeChoiceActive: { borderColor: "#0b7057", borderWidth: 2 },
+  themeSwatch: { height: 82, borderRadius: 14, borderWidth: 1, padding: 8, justifyContent: "center" },
+  themeLogo: { width: 30, height: 30, position: "absolute", top: 6, left: 6 },
+  themePrayer: { fontSize: 13, fontWeight: "900", marginTop: 22 },
+  themeTime: { fontSize: 11, fontWeight: "900", marginTop: 2 },
+  themeLabel: { color: "#264b41", fontSize: 9, fontWeight: "900", textAlign: "center", marginTop: 6 },
+  layoutGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  layoutChoice: { width: "48.5%", minHeight: 110, borderRadius: 17, borderWidth: 1, borderColor: "#dfddd5", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 8 },
   layoutChoiceActive: { borderColor: "#0b7057", backgroundColor: "#eaf5f0" },
-  layoutIcon: { color: "#0b7057", fontSize: 23, fontWeight: "900" },
+  layoutMock: { borderRadius: 6, borderWidth: 2, borderColor: "#0b7057", alignItems: "center", justifyContent: "center" },
+  layoutMockWide: { width: 67, height: 38 },
+  layoutMockSquare: { width: 48, height: 48 },
+  layoutMockVertical: { width: 32, height: 60 },
+  layoutMockSlim: { width: 72, height: 22 },
+  layoutMockLine: { width: "65%", height: 3, borderRadius: 2, backgroundColor: "#0b7057" },
   layoutTitle: { color: "#173f35", fontSize: 10, fontWeight: "900", marginTop: 7, textAlign: "center" },
   layoutNote: { color: "#8a948f", fontSize: 7, lineHeight: 10, textAlign: "center", marginTop: 3 },
-  widgetPreview: { backgroundColor: "#0b654f", borderRadius: 25, padding: 16, marginBottom: 14 },
-  widgetPreviewBrand: { color: "#b9d8ce", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  widgetPreviewRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6 },
-  widgetPreviewPrayer: { color: "#fff", fontSize: 24, fontWeight: "900" },
-  widgetPreviewTime: { color: "#fff", fontSize: 17, fontWeight: "900" },
-  widgetPreviewCountdown: { color: "#e4f1ed", fontSize: 10, fontWeight: "800", textAlign: "right", marginTop: 3 },
-  widgetPreviewMeta: { color: "#bedbd1", fontSize: 9, marginTop: 8 },
-  widgetPreviewList: { color: "#e9f4f0", fontSize: 9, lineHeight: 15, marginTop: 7 },
+  previewStage: { alignItems: "center", marginBottom: 6 },
+  widgetRichPreview: { width: "100%", minHeight: 184, borderRadius: 25, borderWidth: 1, padding: 14 },
+  widgetRichPreviewSquare: { width: 250, minHeight: 250 },
+  widgetRichPreviewVertical: { width: 220, minHeight: 350 },
+  widgetRichPreviewSlim: { width: "100%", minHeight: 88, paddingVertical: 10 },
+  previewHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  previewLogo: { width: 42, height: 42 },
+  previewBrandBlock: { flex: 1 },
+  previewBrand: { fontSize: 11, fontWeight: "900" },
+  previewTiny: { fontSize: 7, fontWeight: "800" },
+  previewPrayerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12 },
+  previewPrayer: { fontSize: 27, fontWeight: "900" },
+  previewArabic: { fontSize: 10, marginTop: 1 },
+  previewTimeBlock: { alignItems: "flex-end" },
+  previewTime: { fontSize: 18, fontWeight: "900" },
+  previewCountdown: { fontSize: 9, fontWeight: "900", marginTop: 4 },
+  previewMeta: { fontSize: 8, marginTop: 6 },
+  previewPrayerList: { flexDirection: "row", gap: 4, marginTop: 12 },
+  previewPrayerListVertical: { gap: 5, marginTop: 12 },
+  previewPrayerChip: { flex: 1, borderWidth: 1, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 4, textAlign: "center", fontSize: 7, fontWeight: "900" },
+  slimPreviewRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 7 },
+  slimPrayer: { fontSize: 18, fontWeight: "900" },
+  slimTime: { fontSize: 15, fontWeight: "900" },
+  slimCountdown: { fontSize: 11, fontWeight: "900" },
+  previewHint: { color: "#7e8a85", fontSize: 9, lineHeight: 14, marginBottom: 8 },
+  lockPreview: { borderRadius: 18, backgroundColor: "#566A79", padding: 11, marginBottom: 5 },
+  lockPreviewTop: { flexDirection: "row", alignItems: "center", gap: 7 },
+  lockPreviewLogo: { width: 32, height: 32 },
+  lockPreviewBrand: { color: "#F4D26F", fontSize: 9, fontWeight: "900" },
+  lockPreviewSub: { color: "#fff", fontSize: 6, fontWeight: "800" },
+  lockPreviewTime: { color: "#fff", fontSize: 10, fontWeight: "900", marginLeft: "auto" },
+  lockPrayerRow: { flexDirection: "row", gap: 4, marginTop: 9 },
+  lockPrayerText: { flex: 1, color: "#fff", borderWidth: 1, borderColor: "#55FFFFFF", borderRadius: 7, paddingVertical: 5, textAlign: "center", fontSize: 5.5, fontWeight: "900" },
+  lockPrayerActive: { color: "#F4D26F", borderColor: "#F4D26F" },
   toggleRow: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#e2dfd7", paddingHorizontal: 14, marginBottom: 7 },
   toggleLabel: { color: "#264b41", fontSize: 12, fontWeight: "800" },
   primaryButton: { minHeight: 52, backgroundColor: "#0b654f", borderRadius: 17, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, marginTop: 10 },

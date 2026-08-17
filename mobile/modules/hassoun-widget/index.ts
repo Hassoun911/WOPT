@@ -1,9 +1,11 @@
 import { Platform } from "react-native";
 import { requireNativeModule } from "expo-modules-core";
 
-export type HassounWidgetLayout = "compact" | "next" | "full";
+export type HassounWidgetLayout = "compact" | "next" | "full" | "square" | "vertical" | "slim";
+export type HassounWidgetTheme = "emerald" | "ivory" | "ocean" | "sunset" | "midnight";
 export type HassounWidgetPreferences = {
   layout: HassounWidgetLayout;
+  theme: HassounWidgetTheme;
   showCountdown: boolean;
   showHijri: boolean;
   showGregorian: boolean;
@@ -22,6 +24,7 @@ export type HassounWidgetCapabilities = {
 type NativeWidget = {
   setPreferences: (
     layout: HassounWidgetLayout,
+    theme: HassounWidgetTheme,
     showCountdown: boolean,
     showHijri: boolean,
     showGregorian: boolean,
@@ -46,7 +49,8 @@ if (Platform.OS === "android") {
 }
 
 const defaults: HassounWidgetPreferences = {
-  layout: "next",
+  layout: "full",
+  theme: "emerald",
   showCountdown: true,
   showHijri: true,
   showGregorian: true,
@@ -60,6 +64,7 @@ const HassounWidget = {
   setPreferences(preferences: HassounWidgetPreferences) {
     native?.setPreferences(
       preferences.layout,
+      preferences.theme,
       preferences.showCountdown,
       preferences.showHijri,
       preferences.showGregorian,

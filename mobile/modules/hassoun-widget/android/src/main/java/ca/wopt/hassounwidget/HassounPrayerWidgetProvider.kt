@@ -65,24 +65,33 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
 
     fun updateAll(context: Context) {
       val manager = AppWidgetManager.getInstance(context)
-      val component = ComponentName(context, HassounPrayerWidgetProvider::class.java)
-      manager.getAppWidgetIds(component).forEach { updateWidget(context, manager, it) }
+      val home = ComponentName(context, HassounPrayerWidgetProvider::class.java)
+      manager.getAppWidgetIds(home).forEach { updateWidget(context, manager, it, false) }
+      val lock = ComponentName(context, HassounLockScreenWidgetProvider::class.java)
+      manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, true) }
     }
 
-    private fun updateWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
+    fun updateTransparentWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
+      updateWidget(context, manager, appWidgetId, true)
+    }
+
+    private fun updateWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int, forceLockScreen: Boolean = false) {
       val widgetOptions = manager.getAppWidgetOptions(appWidgetId)
       val hostCategory = widgetOptions.getInt(
         AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY,
         AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN
       )
-      val isLockScreen = (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
+      val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
+      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
+      val layout = prefs.getString("layout", "full") ?: "full"
       val views = RemoteViews(
         context.packageName,
-        if (isLockScreen) R.layout.hassoun_prayer_widget_lockscreen else R.layout.hassoun_prayer_widget
+        if (isLockScreen) R.layout.hassoun_prayer_widget_lockscreen
+        else if (layout == "vertical") R.layout.hassoun_prayer_widget_vertical
+        else R.layout.hassoun_prayer_widget
       )
-      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
       val locale = prefs.getString("locale", "en") ?: "en"
-      val layout = prefs.getString("layout", "next") ?: "next"
+      val theme = prefs.getString("theme", "emerald") ?: "emerald"
       val showCountdown = prefs.getBoolean("showCountdown", true)
       val showHijri = prefs.getBoolean("showHijri", true)
       val showGregorian = prefs.getBoolean("showGregorian", true)
@@ -92,6 +101,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val next = schedule?.let { findNextPrayer(it, locale) }
 
       bindLaunchIntent(context, views)
+      if (!isLockScreen) applyTheme(views, theme)
       views.setTextViewText(R.id.widget_header, "HASSOUN")
       views.setTextViewText(R.id.widget_brand_subtitle, if (locale == "ar") "مواقيت الصلاة • وندسور" else "PRAYER TIMES • WINDSOR")
 
@@ -119,17 +129,17 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
           views.setViewVisibility(R.id.widget_countdown, View.GONE)
         }
 
-        val fullLayout = isLockScreen || layout == "full"
+        val fullLayout = isLockScreen || layout == "full" || layout == "vertical"
         if (fullLayout && (showAllPrayers || isLockScreen)) {
           views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
-          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen)
+          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme)
         } else {
           views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
         }
         scheduleNextRefresh(context, next.targetMillis + 15_000L)
       }
 
-      val compact = !isLockScreen && layout == "compact"
+      val compact = !isLockScreen && (layout == "compact" || layout == "slim")
       val now = Date()
       if (!compact && showGregorian) {
         views.setViewVisibility(R.id.widget_date, View.VISIBLE)
@@ -215,7 +225,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       return if (locale == "ar") "$hour12:${minute.toString().padStart(2, '0')} ${if (hour24 < 12) "ص" else "م"}" else "$hour12:${minute.toString().padStart(2, '0')} $suffix"
     }
 
-    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false) {
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false, theme: String = "emerald") {
       val ids = mapOf(
         "fajr" to R.id.widget_prayer_fajr,
         "dhuhr" to R.id.widget_prayer_dhuhr,
@@ -229,18 +239,45 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         val time = formatClock(day.optString(key, "--:--"), locale)
         val active = key == nextKey
         views.setTextViewText(id, "${if (active) "● " else ""}$name\n$time")
-        views.setTextColor(
+        val lightTheme = theme == "ivory"
+        val inactive = if (lockScreen) "#FFFFFF" else if (lightTheme) "#214A40" else "#E7F3EF"
+        views.setTextColor(id, Color.parseColor(if (active) "#F4D26F" else inactive))
+        views.setInt(
           id,
-          Color.parseColor(if (active) "#F4D26F" else if (lockScreen) "#FFFFFF" else "#E7F3EF")
-        )
-        if (lockScreen) {
-          views.setInt(
-            id,
-            "setBackgroundResource",
+          "setBackgroundResource",
+          if (lockScreen) {
             if (active) R.drawable.hassoun_widget_lock_prayer_active else R.drawable.hassoun_widget_lock_prayer_idle
-          )
-        }
+          } else if (lightTheme) {
+            R.drawable.hassoun_widget_prayer_chip_light
+          } else {
+            R.drawable.hassoun_widget_prayer_chip
+          }
+        )
       }
+    }
+
+    private fun applyTheme(views: RemoteViews, theme: String) {
+      val light = theme == "ivory"
+      val background = when (theme) {
+        "ivory" -> R.drawable.hassoun_widget_background_ivory
+        "ocean" -> R.drawable.hassoun_widget_background_ocean
+        "sunset" -> R.drawable.hassoun_widget_background_sunset
+        "midnight" -> R.drawable.hassoun_widget_background_midnight
+        else -> R.drawable.hassoun_widget_background
+      }
+      val primary = Color.parseColor(if (light) "#173F35" else "#FFFFFF")
+      val muted = Color.parseColor(if (light) "#776B57" else "#C7DDD6")
+      val accent = Color.parseColor(if (light) "#A8711D" else "#F0D27A")
+      views.setInt(R.id.widget_root, "setBackgroundResource", background)
+      views.setTextColor(R.id.widget_header, primary)
+      views.setTextColor(R.id.widget_brand_subtitle, muted)
+      views.setTextColor(R.id.widget_date, primary)
+      views.setTextColor(R.id.widget_hijri, accent)
+      views.setTextColor(R.id.widget_next_label, accent)
+      views.setTextColor(R.id.widget_next_name, primary)
+      views.setTextColor(R.id.widget_next_secondary, muted)
+      views.setTextColor(R.id.widget_next_time, primary)
+      views.setTextColor(R.id.widget_location, muted)
     }
 
     private fun prayerList(day: JSONObject, locale: String): String {
@@ -286,6 +323,24 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       } else {
         alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
       }
+    }
+  }
+}
+
+
+class HassounLockScreenWidgetProvider : AppWidgetProvider() {
+  override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+    appWidgetIds.forEach { HassounPrayerWidgetProvider.updateTransparentWidget(context, appWidgetManager, it) }
+  }
+
+  override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle) {
+    HassounPrayerWidgetProvider.updateTransparentWidget(context, appWidgetManager, appWidgetId)
+  }
+
+  override fun onReceive(context: Context, intent: Intent) {
+    super.onReceive(context, intent)
+    if (intent.action == HassounWidgetStore.ACTION_REFRESH || intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_TIME_CHANGED || intent.action == Intent.ACTION_TIMEZONE_CHANGED) {
+      HassounPrayerWidgetProvider.updateAll(context)
     }
   }
 }

@@ -14,6 +14,7 @@ class HassounWidgetModule : Module() {
 
     Function("setPreferences") {
       layout: String,
+      theme: String,
       showCountdown: Boolean,
       showHijri: Boolean,
       showGregorian: Boolean,
@@ -23,7 +24,8 @@ class HassounWidgetModule : Module() {
       val context = appContext.reactContext ?: return@Function null
       context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
         .edit()
-        .putString("layout", layout.takeIf { it in setOf("compact", "next", "full") } ?: "next")
+        .putString("layout", layout.takeIf { it in setOf("compact", "next", "full", "square", "vertical", "slim") } ?: "full")
+        .putString("theme", theme.takeIf { it in setOf("emerald", "ivory", "ocean", "sunset", "midnight") } ?: "emerald")
         .putBoolean("showCountdown", showCountdown)
         .putBoolean("showHijri", showHijri)
         .putBoolean("showGregorian", showGregorian)
@@ -39,7 +41,8 @@ class HassounWidgetModule : Module() {
       val context = appContext.reactContext
       if (context == null) {
         return@Function mapOf(
-          "layout" to "next",
+          "layout" to "full",
+          "theme" to "emerald",
           "showCountdown" to true,
           "showHijri" to true,
           "showGregorian" to true,
@@ -50,7 +53,8 @@ class HassounWidgetModule : Module() {
       }
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
       mapOf(
-        "layout" to (prefs.getString("layout", "next") ?: "next"),
+        "layout" to (prefs.getString("layout", "full") ?: "full"),
+        "theme" to (prefs.getString("theme", "emerald") ?: "emerald"),
         "showCountdown" to prefs.getBoolean("showCountdown", true),
         "showHijri" to prefs.getBoolean("showHijri", true),
         "showGregorian" to prefs.getBoolean("showGregorian", true),
