@@ -5,10 +5,15 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "0.4.0",
+  version: "0.4.1",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
+  splash: {
+    image: "./assets/splash-logo.png",
+    resizeMode: "contain",
+    backgroundColor: "#003d33"
+  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
@@ -19,10 +24,10 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 12,
+    versionCode: 13,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#0b5b47"
+      backgroundColor: "#003d33"
     },
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
