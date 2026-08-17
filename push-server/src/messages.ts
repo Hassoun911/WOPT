@@ -40,7 +40,7 @@ export function notificationMessage(event: DuePrayerEvent, locale: Locale) {
   return {
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
     body,
-    sound: "default",
+    sound: null,
     channelId: "prayer-time-v2"
   };
 }
