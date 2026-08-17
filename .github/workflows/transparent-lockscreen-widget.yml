@@ -1,0 +1,46 @@
+name: Transparent lock-screen prayer widget
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/transparent-lockscreen-widget.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply transparent lock-screen widget
+        run: python .github/scripts/transparent-lockscreen-widget.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate TypeScript without network refresh
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+      - name: Commit Hassoun v0.5.4 lock-screen widget
+        run: |
+          git config user.name "Hassoun911"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/modules/hassoun-widget mobile/src/SettingsHub.tsx mobile/app.config.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "Add transparent lock-screen prayer widget"
+          git push origin main
