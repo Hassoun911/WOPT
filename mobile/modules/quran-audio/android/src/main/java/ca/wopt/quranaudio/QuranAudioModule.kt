@@ -1,123 +1,67 @@
 package ca.wopt.quranaudio
 
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.os.Build
+import android.content.Context
+import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import org.json.JSONArray
+import org.json.JSONObject
 
 class QuranAudioModule : Module() {
-  private var player: MediaPlayer? = null
-  private var state: String = "idle"
-  private var speed: Float = 1.0f
-  private var currentUrl: String? = null
+  private val context: Context
+    get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
   override fun definition() = ModuleDefinition {
     Name("QuranAudio")
 
     AsyncFunction("play") { url: String, requestedSpeed: Double ->
-      stopInternal()
-      speed = requestedSpeed.toFloat().coerceIn(0.5f, 2.0f)
-      currentUrl = url
-      state = "loading"
-
-      val next = MediaPlayer()
-      player = next
-      next.setAudioAttributes(
-        AudioAttributes.Builder()
-          .setUsage(AudioAttributes.USAGE_MEDIA)
-          .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-          .build()
+      val item = JSONArray().put(
+        JSONObject()
+          .put("url", url)
+          .put("title", "Qur’an")
+          .put("subtitle", "Hassoun")
       )
-      next.setDataSource(url)
-      next.setOnPreparedListener { mediaPlayer ->
-        applySpeed(mediaPlayer)
-        mediaPlayer.start()
-        state = "playing"
-      }
-      next.setOnCompletionListener {
-        state = "completed"
-      }
-      next.setOnErrorListener { _, _, _ ->
-        state = "error"
-        true
-      }
-      next.prepareAsync()
+      QuranAudioService.playQueue(context, item.toString(), 0, false, requestedSpeed.toFloat())
+    }
+
+    Function("playQueue") { itemsJson: String, startIndex: Int, repeat: Boolean, requestedSpeed: Double ->
+      QuranAudioService.playQueue(context, itemsJson, startIndex, repeat, requestedSpeed.toFloat())
     }
 
     Function("pause") {
-      player?.let {
-        if (it.isPlaying) {
-          it.pause()
-          state = "paused"
-        }
-      }
+      QuranAudioService.pause(context)
     }
 
     Function("resume") {
-      player?.let {
-        if (state == "paused" || state == "completed") {
-          if (state == "completed") it.seekTo(0)
-          it.start()
-          state = "playing"
-        }
-      }
+      QuranAudioService.resume(context)
     }
 
     Function("stop") {
-      stopInternal()
+      QuranAudioService.stop(context)
+    }
+
+    Function("next") {
+      QuranAudioService.next(context)
+    }
+
+    Function("previous") {
+      QuranAudioService.previous(context)
     }
 
     Function("seekBy") { deltaMs: Int ->
-      player?.let {
-        runCatching {
-          val duration = if (it.duration > 0) it.duration else Int.MAX_VALUE
-          val target = (it.currentPosition + deltaMs).coerceIn(0, duration)
-          it.seekTo(target)
-        }
-      }
+      QuranAudioService.seekBy(context, deltaMs)
     }
 
     Function("setSpeed") { requestedSpeed: Double ->
-      speed = requestedSpeed.toFloat().coerceIn(0.5f, 2.0f)
-      player?.let(::applySpeed)
+      QuranAudioService.setSpeed(context, requestedSpeed.toFloat().coerceIn(0.5f, 2.0f))
+    }
+
+    Function("setRepeat") { repeat: Boolean ->
+      QuranAudioService.setRepeat(context, repeat)
     }
 
     Function("getStatus") {
-      val current = player
-      val position = runCatching { current?.currentPosition ?: 0 }.getOrDefault(0)
-      val duration = runCatching { current?.duration ?: 0 }.getOrDefault(0)
-      mapOf(
-        "available" to true,
-        "state" to state,
-        "positionMs" to position,
-        "durationMs" to duration,
-        "speed" to speed.toDouble(),
-        "url" to currentUrl
-      )
+      QuranAudioService.snapshot
     }
-
-    OnDestroy {
-      stopInternal()
-    }
-  }
-
-  private fun applySpeed(mediaPlayer: MediaPlayer) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      runCatching {
-        mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
-      }
-    }
-  }
-
-  private fun stopInternal() {
-    player?.let { mediaPlayer ->
-      runCatching { mediaPlayer.stop() }
-      runCatching { mediaPlayer.reset() }
-      runCatching { mediaPlayer.release() }
-    }
-    player = null
-    currentUrl = null
-    state = "idle"
   }
 }
