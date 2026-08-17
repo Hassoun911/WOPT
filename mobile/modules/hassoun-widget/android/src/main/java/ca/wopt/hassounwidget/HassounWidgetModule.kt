@@ -20,7 +20,7 @@ class HassounWidgetModule : Module() {
       showAllPrayers: Boolean,
       showLocation: Boolean,
       locale: String ->
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
         .edit()
         .putString("layout", layout.takeIf { it in setOf("compact", "next", "full") } ?: "next")
@@ -32,6 +32,7 @@ class HassounWidgetModule : Module() {
         .putString("locale", if (locale == "ar") "ar" else "en")
         .apply()
       HassounPrayerWidgetProvider.updateAll(context)
+      null
     }
 
     Function("getPreferences") {
@@ -60,18 +61,20 @@ class HassounWidgetModule : Module() {
     }
 
     Function("syncPrayerSchedule") { scheduleJson: String, locale: String ->
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       File(context.filesDir, HassounWidgetStore.SCHEDULE_FILE).writeText(scheduleJson)
       context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
         .edit()
         .putString("locale", if (locale == "ar") "ar" else "en")
         .apply()
       HassounPrayerWidgetProvider.updateAll(context)
+      null
     }
 
     Function("refresh") {
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       HassounPrayerWidgetProvider.updateAll(context)
+      null
     }
 
     Function("requestPin") {
