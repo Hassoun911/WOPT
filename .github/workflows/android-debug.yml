@@ -63,3 +63,5 @@ jobs:
           path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.4.0.apk
           if-no-files-found: error
           retention-days: 14
+
+# rebuild after complete Hassoun visible-brand audit
