@@ -43,7 +43,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile/src/quran/QuranV3.tsx mobile/src/quran/quranRendering.tsx mobile/app.config.ts mobile/assets/hassoun-app-icon.svg mobile/assets/icon.png mobile/assets/adaptive-icon.png
           git diff --cached --quiet && exit 0
-          git commit -m "Fix Quran title swipe navigation and icon"
+          git commit -m "Fix Quran Arabic book paging and floating player"
           git push origin HEAD:main
 
-# v0.4.3: full Mushaf surah title + reliable horizontal page swiping
+# v0.4.4: Arabic-book page order + compact floating tap-to-hide audio controls
