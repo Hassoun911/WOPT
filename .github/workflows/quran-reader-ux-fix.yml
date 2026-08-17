@@ -1,0 +1,37 @@
+name: Apply Qur'an Reader UX Fix
+
+on:
+  push:
+    paths:
+      - ".github/workflows/quran-reader-ux-fix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-reader:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply reader UX fixes
+        run: python .github/scripts/quran-reader-ux-fix.py
+
+      - name: Validate mobile TypeScript
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+
+      - name: Commit reader fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/src/quran/QuranV2.tsx mobile/app.config.ts .github/workflows/android-debug.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Qur'an page scrolling and audio controls"
+          git push origin HEAD:main
