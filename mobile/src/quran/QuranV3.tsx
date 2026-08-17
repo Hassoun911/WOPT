@@ -180,6 +180,9 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   });
   const completionRef = useRef<string | null>(null);
   const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readerGestureStart = useRef<{ x: number; y: number } | null>(null);
+  const readerAtTop = useRef(true);
+  const readerAtBottom = useRef(false);
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
   const surahs = allSurahs();
@@ -191,6 +194,8 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   const currentJuz = juzForAyah(position.surah, position.ayah) ?? 1;
   const activeAyah = audioIndex >= 0 ? audioQueue[audioIndex] : undefined;
   const activeReciter = reciterInfo(audioPrefs.reciter);
+  const playerAyah = activeAyah ?? (screen === "reader" ? getAyah(position.surah, position.ayah) : undefined);
+  const playerSurah = playerAyah ? getSurah(playerAyah.surah) : undefined;
   const autoSpread = width >= 700;
   const spreadMode = appearance.bookMode === "spread" || (appearance.bookMode === "auto" && autoSpread);
 
@@ -246,9 +251,40 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     const start = pages[safe - 1];
     if (!start) return;
     const next = { surah: start.surah, ayah: start.ayah };
+    readerAtTop.current = true;
+    readerAtBottom.current = false;
     setPosition(next);
     setSelectedAyah(null);
     persistLast(next);
+  };
+
+  const turnReaderPage = (direction: -1 | 1) => {
+    if (spreadMode) {
+      const left = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
+      openPage(direction > 0 ? Math.min(604, left + 2) : Math.max(1, left - 2));
+      return;
+    }
+    openPage(clamp(currentPage + direction, 1, 604));
+  };
+
+  const handleReaderTouchStart = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+    readerGestureStart.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
+  };
+
+  const handleReaderTouchEnd = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+    const start = readerGestureStart.current;
+    readerGestureStart.current = null;
+    if (!start) return;
+    const dx = event.nativeEvent.pageX - start.x;
+    const dy = event.nativeEvent.pageY - start.y;
+    if (appearance.browseMode === "horizontal") {
+      if (Math.abs(dx) < 70 || Math.abs(dx) <= Math.abs(dy)) return;
+      turnReaderPage(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (Math.abs(dy) < 70 || Math.abs(dy) <= Math.abs(dx)) return;
+    if (dy < 0 && readerAtBottom.current) turnReaderPage(1);
+    else if (dy > 0 && readerAtTop.current) turnReaderPage(-1);
   };
 
   const handleBack = () => {
@@ -335,6 +371,12 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);
   const playSurah = (surah: number, repeat = false) => playQueue(getSurahAyahs(surah), repeat);
 
+  const togglePlayerPlayback = () => {
+    if (!activeAyah) { playSurah(position.surah, false); return; }
+    if (audioStatus.state === "playing") QuranAudio?.pause();
+    else QuranAudio?.resume();
+  };
+
   const playPlaylist = (repeat = false) => {
     const queue: QuranAyah[] = [];
     for (const surah of radioPlaylist) queue.push(...getSurahAyahs(surah));
@@ -397,6 +439,15 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     persistLast({ surah: activeAyah.surah, ayah: activeAyah.ayah });
   }, [audioIndex]);
 
+  useEffect(() => {
+    if (screen !== "reader" || !activeAyah || activeAyah.surah === position.surah) return;
+    QuranAudio?.stop();
+    setAudioQueue([]);
+    setAudioIndex(-1);
+    setRepeatQueue(false);
+    setAudioStatus({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: audioPrefs.speed });
+  }, [screen, position.surah, activeAyah?.surah]);
+
   const updateReciter = (id: string) => {
     persistAudioPrefs({ reciter: id });
     if (activeAyah) setTimeout(() => playNativeAyah(activeAyah, id), 20);
@@ -421,16 +472,25 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     </View>
   );
 
-  const miniPlayer = activeAyah ? (
+  const miniPlayer = playerAyah ? (
     <View style={styles.miniPlayer}>
-      <Pressable onPress={() => setMenuOpen(true)} style={styles.miniCopy}>
-        <Text style={styles.miniEyebrow}>🎧 {ar ? activeReciter.ar : activeReciter.en}</Text>
-        <Text style={styles.miniTitle}>{ar ? getSurah(activeAyah.surah)?.nameArabic : getSurah(activeAyah.surah)?.nameTransliterated} {num(activeAyah.surah)}:{num(activeAyah.ayah)}</Text>
-        <Text style={styles.miniMeta}>{formatTime(audioStatus.positionMs)} / {formatTime(audioStatus.durationMs)} · {audioPrefs.speed.toFixed(1)}×</Text>
-      </Pressable>
-      <Pressable onPress={previousAudio} style={styles.playerButton}><Text>⏮️</Text></Pressable>
-      <Pressable onPress={() => audioStatus.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()} style={styles.playerMain}><Text>{audioStatus.state === "playing" ? "⏸️" : "▶️"}</Text></Pressable>
-      <Pressable onPress={nextAudio} style={styles.playerButton}><Text>⏭️</Text></Pressable>
+      <View style={styles.playerHeader}>
+        <View style={styles.playerBadge}><Text style={styles.playerBadgeText}>🎧</Text></View>
+        <Pressable onPress={() => setMenuOpen(true)} style={styles.miniCopy}>
+          <Text style={styles.miniEyebrow}>{ar ? activeReciter.ar : activeReciter.en}</Text>
+          <Text style={styles.miniTitle}>{ar ? playerSurah?.nameArabic : playerSurah?.nameTransliterated} · {tr("Ayah", "الآية")} {num(playerAyah.ayah)}</Text>
+          <Text style={styles.miniMeta}>{activeAyah ? `${formatTime(audioStatus.positionMs)} / ${formatTime(audioStatus.durationMs)}` : tr("Ready to play this Surah", "جاهز لتشغيل هذه السورة")}</Text>
+        </Pressable>
+        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerMore}><Text style={styles.playerMoreText}>•••</Text></Pressable>
+      </View>
+      <View style={styles.playerTransport}>
+        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
+        <Pressable disabled={!activeAyah} onPress={previousAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>‹</Text></Pressable>
+        <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable>
+        <Pressable disabled={!activeAyah} onPress={nextAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>›</Text></Pressable>
+        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
+        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerSpeedPill}><Text style={styles.playerSpeedText}>{audioPrefs.speed.toFixed(1)}×</Text></Pressable>
+      </View>
     </View>
   ) : null;
 
@@ -525,7 +585,15 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
           const textColor = appearance.pageTheme === "dark" && appearance.textColor === "#111111" ? "#f2efe7" : appearance.textColor;
           return (
             <View key={`${page}-${segment.surah}`}>
-              {beginsSurah ? <View style={styles.surahFrame}><Text style={styles.surahFrameText}>۞ {segmentSurah?.nameArabic} ۞</Text></View> : null}
+              {beginsSurah ? (
+                <View style={styles.surahFrame}>
+                  <View style={styles.surahFrameInner}>
+                    <Text style={styles.surahFrameOrnament}>۞</Text>
+                    <Text style={styles.surahFrameText}>{segmentSurah?.nameArabic}</Text>
+                    <Text style={styles.surahFrameOrnament}>۞</Text>
+                  </View>
+                </View>
+              ) : null}
               {showStandaloneBasmala ? <Text style={[styles.basmala, { color: textColor, fontSize: Math.max(21, appearance.fontSize - 3), lineHeight: Math.round(Math.max(21, appearance.fontSize - 3) * appearance.lineHeightMultiplier) }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
               <QuranPageText page={page} ayahs={segment.ayahs} appearance={appearance} locale={locale} selectedKey={selectedAyah ? refKey(selectedAyah) : null} highlightedKey={audioPrefs.highlightAudio && activeAyah ? refKey(activeAyah) : null} onPressAyah={(ayah) => { setSelectedAyah((current) => current?.surah === ayah.surah && current?.ayah === ayah.ayah ? null : ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} />
             </View>
@@ -545,8 +613,18 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     <View style={styles.flex}>
       {topBar(ar ? readerSurah.nameArabic : readerSurah.nameTransliterated, tr(`Page ${currentPage} • Juz ${currentJuz}`, `الصفحة ${num(currentPage)} • الجزء ${num(currentJuz)}`))}
       {audioPrefs.readerMode === "mushaf" ? (
-        <View style={styles.readerBody}>
-          <ScrollView style={styles.flex} contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]} showsVerticalScrollIndicator={false}>
+        <View style={styles.readerBody} onTouchStart={handleReaderTouchStart} onTouchEnd={handleReaderTouchEnd}>
+          <ScrollView
+            key={`mushaf-${currentPage}-${appearance.browseMode}`}
+            style={styles.flex}
+            contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={({ nativeEvent }) => {
+              readerAtTop.current = nativeEvent.contentOffset.y <= 8;
+              readerAtBottom.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
+            }}
+          >
             {spreadMode ? <View style={styles.bookSpread}>{spreadLeftPage ? <View style={styles.bookPageSlot}>{renderMushafPage(spreadLeftPage)}</View> : <View style={[styles.bookPageSlot, styles.blankBookPage]} /> }<View style={styles.bookGutter} /><View style={styles.bookPageSlot}>{renderMushafPage(spreadRightPage)}</View></View> : renderMushafPage(currentPage)}
           </ScrollView>
           <View style={styles.bookNav}><Pressable disabled={currentPage <= 1} onPress={() => openPage(previousBookPage)} style={[styles.bookNavButton, currentPage <= 1 && styles.disabled]}><Text style={styles.bookNavArrow}>{ar ? "›" : "‹"}</Text><Text style={styles.bookNavText}>{spreadMode ? tr("Previous pages", "الصفحات السابقة") : tr("Previous", "السابق")}</Text></Pressable><Pressable onPress={() => setAppearanceOpen(true)} style={styles.pageCenterPill}><Text style={styles.pageCenterText}>{spreadMode ? `📖 ${spreadLeftPage ?? 1}–${spreadRightPage}` : `📖 ${currentPage}`}</Text></Pressable><Pressable disabled={currentPage >= 604 || (spreadMode && spreadRightPage >= 604)} onPress={() => openPage(nextBookPage)} style={[styles.bookNavButton, (currentPage >= 604 || (spreadMode && spreadRightPage >= 604)) && styles.disabled]}><Text style={styles.bookNavText}>{spreadMode ? tr("Next pages", "الصفحات التالية") : tr("Next", "التالي")}</Text><Text style={styles.bookNavArrow}>{ar ? "‹" : "›"}</Text></Pressable></View>
@@ -573,7 +651,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
 
             <View style={styles.menuElegantCard}><View style={styles.menuCardHeader}><View style={styles.menuCardIcon}><Text>🎧</Text></View><View style={styles.topCopy}><Text style={styles.menuCardTitle}>{tr("Listening", "الاستماع")}</Text><Text style={styles.menuCardSubtitle}>{ar ? activeReciter.ar : activeReciter.en} · {audioPrefs.speed.toFixed(1)}×</Text></View></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reciterRow}>{RECITERS.map((item) => <Pressable key={item.id} onPress={() => updateReciter(item.id)} style={[styles.reciterChip, audioPrefs.reciter === item.id && styles.reciterChipActive]}><Text style={[styles.reciterChipText, audioPrefs.reciter === item.id && styles.reciterChipTextActive]}>{ar ? item.ar : item.en}</Text></Pressable>)}</ScrollView><View style={styles.speedRow}><Text style={styles.speedLabel}>{tr("Speed", "السرعة")}</Text><Pressable onPress={() => updateSpeed(audioPrefs.speed - 0.1)} style={styles.speedButton}><Text style={styles.speedButtonText}>−</Text></Pressable><Text style={styles.speedValue}>{audioPrefs.speed.toFixed(1)}×</Text><Pressable onPress={() => updateSpeed(audioPrefs.speed + 0.1)} style={styles.speedButton}><Text style={styles.speedButtonText}>+</Text></Pressable></View>{activeAyah ? <View style={styles.transport}><Pressable onPress={() => QuranAudio?.seekBy(-10000)} style={styles.transportButton}><Text>↩ 10</Text></Pressable><Pressable onPress={() => audioStatus.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()} style={styles.transportMain}><Text>{audioStatus.state === "playing" ? "⏸" : "▶"}</Text></Pressable><Pressable onPress={() => QuranAudio?.seekBy(10000)} style={styles.transportButton}><Text>10 ↪</Text></Pressable><Pressable onPress={stopAudio} style={styles.transportButton}><Text>⏹</Text></Pressable></View> : null}</View>
 
-            <View style={styles.menuElegantCard}><View style={styles.menuCardHeader}><View style={styles.menuCardIcon}><Text>📖</Text></View><View style={styles.topCopy}><Text style={styles.menuCardTitle}>{tr("Reading", "القراءة")}</Text><Text style={styles.menuCardSubtitle}>{appearance.font === "qcf-v2" ? "King Fahad Complex V2" : appearance.font === "qcf-v1" ? "King Fahad Complex V1" : "QPC Uthmani Hafs"}</Text></View></View><Pressable onPress={() => { setMenuOpen(false); setTimeout(() => setAppearanceOpen(true), 100); }} style={styles.menuSettingRow}><View style={styles.settingGlyph}><Text style={styles.settingGlyphText}>Aa</Text></View><View style={styles.topCopy}><Text style={styles.menuSettingTitle}>{tr("Font, Tajweed & page style", "الخط والتجويد وشكل الصفحة")}</Text><Text style={styles.menuSettingMeta}>{appearance.fontSize} · {appearance.tajweed ? tr("Tajweed on", "التجويد مفعّل") : tr("Tajweed off", "التجويد متوقف")} · {spreadMode ? tr("Open book", "كتاب مفتوح") : tr("Single page", "صفحة واحدة")}</Text></View><Text style={styles.menuChevron}>{ar ? "‹" : "›"}</Text></Pressable><View style={styles.readerModeRow}><Pressable onPress={() => persistAudioPrefs({ readerMode: "mushaf" })} style={[styles.readerModeButton, audioPrefs.readerMode === "mushaf" && styles.readerModeButtonActive]}><Text style={[styles.readerModeText, audioPrefs.readerMode === "mushaf" && styles.readerModeTextActive]}>📖 {tr("Mushaf", "المصحف")}</Text></Pressable><Pressable onPress={() => persistAudioPrefs({ readerMode: "study" })} style={[styles.readerModeButton, audioPrefs.readerMode === "study" && styles.readerModeButtonActive]}><Text style={[styles.readerModeText, audioPrefs.readerMode === "study" && styles.readerModeTextActive]}>📿 {tr("Study", "الدراسة")}</Text></Pressable></View><View style={styles.highlightRow}><View style={styles.topCopy}><Text style={styles.highlightTitle}>{tr("Follow recitation", "متابعة التلاوة")}</Text><Text style={styles.highlightMeta}>{tr("Highlight the ayah being recited", "تمييز الآية التي تتم تلاوتها")}</Text></View><Switch value={audioPrefs.highlightAudio} onValueChange={(value) => persistAudioPrefs({ highlightAudio: value })} /></View></View>
+            <View style={styles.menuElegantCard}><View style={styles.menuCardHeader}><View style={styles.menuCardIcon}><Text>📖</Text></View><View style={styles.topCopy}><Text style={styles.menuCardTitle}>{tr("Reading", "القراءة")}</Text><Text style={styles.menuCardSubtitle}>{appearance.font === "qcf-v2" ? "King Fahad Complex V2" : appearance.font === "qcf-v1" ? "King Fahad Complex V1" : "QPC Uthmani Hafs"}</Text></View></View><Pressable onPress={() => { setMenuOpen(false); setTimeout(() => setAppearanceOpen(true), 100); }} style={styles.menuSettingRow}><View style={styles.settingGlyph}><Text style={styles.settingGlyphText}>Aa</Text></View><View style={styles.topCopy}><Text style={styles.menuSettingTitle}>{tr("Font, Tajweed & page style", "الخط والتجويد وشكل الصفحة")}</Text><Text style={styles.menuSettingMeta}>{appearance.fontSize} · {appearance.tajweed ? tr("Tajweed on", "التجويد مفعّل") : tr("Tajweed off", "التجويد متوقف")} · {spreadMode ? tr("Open book", "كتاب مفتوح") : tr("Single page", "صفحة واحدة")} · {appearance.browseMode === "horizontal" ? tr("Swipe", "سحب أفقي") : tr("Scroll", "تمرير رأسي")}</Text></View><Text style={styles.menuChevron}>{ar ? "‹" : "›"}</Text></Pressable><View style={styles.readerModeRow}><Pressable onPress={() => persistAudioPrefs({ readerMode: "mushaf" })} style={[styles.readerModeButton, audioPrefs.readerMode === "mushaf" && styles.readerModeButtonActive]}><Text style={[styles.readerModeText, audioPrefs.readerMode === "mushaf" && styles.readerModeTextActive]}>📖 {tr("Mushaf", "المصحف")}</Text></Pressable><Pressable onPress={() => persistAudioPrefs({ readerMode: "study" })} style={[styles.readerModeButton, audioPrefs.readerMode === "study" && styles.readerModeButtonActive]}><Text style={[styles.readerModeText, audioPrefs.readerMode === "study" && styles.readerModeTextActive]}>📿 {tr("Study", "الدراسة")}</Text></Pressable></View><View style={styles.highlightRow}><View style={styles.topCopy}><Text style={styles.highlightTitle}>{tr("Follow recitation", "متابعة التلاوة")}</Text><Text style={styles.highlightMeta}>{tr("Highlight the ayah being recited", "تمييز الآية التي تتم تلاوتها")}</Text></View><Switch value={audioPrefs.highlightAudio} onValueChange={(value) => persistAudioPrefs({ highlightAudio: value })} /></View></View>
 
             <View style={styles.menuElegantCard}><Text style={styles.menuCardTitle}>🧭 {tr("Go to Mushaf page", "الذهاب إلى صفحة المصحف")}</Text><View style={styles.jumpRow}><TextInput value={pageJump} onChangeText={setPageJump} keyboardType="number-pad" placeholder="1–604" style={styles.pageInput} /><Pressable onPress={() => { const page = clamp(Number(pageJump) || 1, 1, 604); const start = pages[page - 1]; if (start) openReader(start.surah, start.ayah, screen); setMenuOpen(false); }} style={styles.jumpButton}><Text style={styles.jumpButtonText}>{tr("Go", "اذهب")}</Text></Pressable></View></View>
 
@@ -596,7 +674,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
       {miniPlayer}
-      {(screen === "reader" || screen === "radio") ? quranDock : null}
+      {screen === "radio" ? quranDock : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
     </View>
@@ -623,11 +701,11 @@ const styles = StyleSheet.create({
   bookmarkCard: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#e1ddd4", padding: 14, marginBottom: 8 }, bookmarkRef: { color: "#9a7838", fontSize: 9, fontWeight: "900" }, bookmarkArabic: { fontSize: 23, lineHeight: 38, color: "#183e34", textAlign: "right", writingDirection: "rtl", marginTop: 8 },
   radioContent: { paddingBottom: 28 }, radioHero: { margin: 14, marginBottom: 5, padding: 16, borderRadius: 24, backgroundColor: "#0a634d", flexDirection: "row", alignItems: "center", gap: 12 }, radioHeroIcon: { width: 58, height: 58, borderRadius: 19, backgroundColor: "rgba(255,255,255,.13)", alignItems: "center", justifyContent: "center" }, radioHeroEmoji: { fontSize: 29 }, radioHeroTitle: { color: "#fff", fontSize: 18, fontWeight: "900" }, radioHeroText: { color: "#cee2da", fontSize: 9, lineHeight: 14, marginTop: 4 }, radioSectionLabel: { color: "#97783d", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginHorizontal: 16, marginTop: 14, marginBottom: 8 }, reciterRow: { gap: 7, paddingHorizontal: 14, paddingBottom: 3 }, reciterChip: { borderRadius: 99, borderWidth: 1, borderColor: "#d8d3c9", backgroundColor: "#fff", paddingHorizontal: 11, paddingVertical: 9 }, reciterChipActive: { backgroundColor: "#0b654f", borderColor: "#0b654f" }, reciterChipText: { color: "#53645e", fontSize: 9, fontWeight: "800" }, reciterChipTextActive: { color: "#fff" },
   radioCard: { marginHorizontal: 14, marginTop: 12, borderRadius: 23, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 15 }, radioCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 }, radioCardTitle: { color: "#173f35", fontSize: 15, fontWeight: "900" }, radioCardHint: { color: "#7b8782", fontSize: 9, lineHeight: 14, marginTop: 4 }, radioFieldLabel: { color: "#8d743d", fontSize: 8, fontWeight: "900", letterSpacing: .7, marginTop: 14, marginBottom: 7 }, surahStepper: { minHeight: 68, borderRadius: 18, backgroundColor: "#f6f5f0", flexDirection: "row", alignItems: "center", gap: 9, padding: 9, marginTop: 12 }, stepperButton: { width: 46, height: 46, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#e7f2ed" }, stepperButtonText: { color: "#0b654f", fontSize: 26, fontWeight: "700" }, surahStepperCopy: { flex: 1, alignItems: "center" }, surahStepperNumber: { color: "#8a918e", fontSize: 8, fontWeight: "800" }, surahStepperName: { color: "#173f35", fontSize: 15, fontWeight: "900", marginTop: 2 }, radioActionRow: { flexDirection: "row", gap: 7, marginTop: 11 }, radioAction: { flex: 1, minHeight: 66, borderRadius: 16, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center", padding: 6 }, radioActionIcon: { fontSize: 18 }, radioActionText: { color: "#31564b", fontSize: 8, fontWeight: "900", textAlign: "center", marginTop: 3 }, clearPill: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: "#f2eee5" }, clearPillText: { color: "#7a6950", fontSize: 8, fontWeight: "900" }, playlistWrap: { marginTop: 10, gap: 6 }, playlistItem: { minHeight: 58, borderRadius: 16, backgroundColor: "#f8f7f3", flexDirection: "row", alignItems: "center", gap: 9, padding: 9 }, playlistNumber: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#e7f2ed", alignItems: "center", justifyContent: "center" }, playlistNumberText: { color: "#0b654f", fontSize: 9, fontWeight: "900" }, playlistTitle: { color: "#173f35", fontSize: 11, fontWeight: "900" }, playlistMeta: { color: "#8a938f", fontSize: 8, marginTop: 2 }, removePlaylist: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#f1ece6" }, removePlaylistText: { color: "#8a5d55", fontSize: 20 }, emptyPlaylist: { minHeight: 62, marginTop: 10, borderRadius: 16, backgroundColor: "#f8f7f3", alignItems: "center", justifyContent: "center", padding: 12 }, emptyPlaylistText: { color: "#8a938f", fontSize: 9, textAlign: "center" }, twoActionRow: { flexDirection: "row", gap: 8, marginTop: 11 }, radioPrimary: { flex: 1, minHeight: 47, borderRadius: 15, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center", paddingHorizontal: 10 }, radioPrimaryText: { color: "#fff", fontSize: 9, fontWeight: "900", textAlign: "center" }, radioSecondary: { flex: 1, minHeight: 47, borderRadius: 15, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center", paddingHorizontal: 10 }, radioSecondaryText: { color: "#0b654f", fontSize: 9, fontWeight: "900", textAlign: "center" }, ongoingRow: { marginTop: 12, borderRadius: 17, backgroundColor: "#f3f6f4", padding: 12, flexDirection: "row", alignItems: "center", gap: 10 }, ongoingTitle: { color: "#244b40", fontSize: 10, fontWeight: "900" }, ongoingText: { color: "#83908a", fontSize: 8, marginTop: 2 },
-  readerBody: { flex: 1, backgroundColor: "#e9e5dc" }, bookCanvas: { padding: 8, paddingBottom: 12 }, bookCanvasSpread: { flexGrow: 1, justifyContent: "center" }, bookSpread: { flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: 0 }, bookPageSlot: { flex: 1, minWidth: 0 }, blankBookPage: { backgroundColor: "#e0d9ca", borderRadius: 14, opacity: .55, margin: 3 }, bookGutter: { width: 12, backgroundColor: "#d2cab9", borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#c4bba8" }, mushafPage: { minHeight: 650, borderRadius: 13, borderWidth: 1, borderColor: "#d8d0c0", paddingHorizontal: 14, paddingTop: 11, paddingBottom: 12, shadowColor: "#342d23", shadowOpacity: .08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }, pageTopLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24, borderBottomWidth: 1, borderBottomColor: "#e2dbc9", marginBottom: 8 }, pageMeta: { color: "#70736e", fontSize: 8, fontWeight: "800" }, surahFrame: { minHeight: 40, alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#a89362", marginVertical: 8, backgroundColor: "rgba(193,170,115,.08)" }, surahFrameText: { color: "#20493e", fontSize: 19, fontWeight: "900", writingDirection: "rtl" }, basmala: { textAlign: "center", writingDirection: "rtl", marginVertical: 7 }, pageBottom: { alignItems: "center", marginTop: 8 }, pageNumber: { color: "#6b706d", fontSize: 10, fontWeight: "800" }, bookNav: { minHeight: 55, flexDirection: "row", alignItems: "center", gap: 7, padding: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ded9cf" }, bookNavButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 }, bookNavArrow: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, bookNavText: { color: "#0b654f", fontSize: 8, fontWeight: "900", textAlign: "center" }, pageCenterPill: { minWidth: 72, minHeight: 42, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, pageCenterText: { color: "#fff", fontSize: 9, fontWeight: "900" },
+  readerBody: { flex: 1, backgroundColor: "#e9e5dc" }, bookCanvas: { padding: 8, paddingBottom: 12 }, bookCanvasSpread: { flexGrow: 1, justifyContent: "center" }, bookSpread: { flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: 0 }, bookPageSlot: { flex: 1, minWidth: 0 }, blankBookPage: { backgroundColor: "#e0d9ca", borderRadius: 14, opacity: .55, margin: 3 }, bookGutter: { width: 12, backgroundColor: "#d2cab9", borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#c4bba8" }, mushafPage: { minHeight: 650, borderRadius: 13, borderWidth: 1, borderColor: "#d8d0c0", paddingHorizontal: 14, paddingTop: 11, paddingBottom: 12, shadowColor: "#342d23", shadowOpacity: .08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }, pageTopLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24, borderBottomWidth: 1, borderBottomColor: "#e2dbc9", marginBottom: 8 }, pageMeta: { color: "#70736e", fontSize: 8, fontWeight: "800" }, surahFrame: { marginVertical: 9, padding: 4, borderRadius: 8, borderWidth: 1, borderColor: "#b79a58", backgroundColor: "rgba(190,161,93,.11)" }, surahFrameInner: { minHeight: 48, borderRadius: 6, borderWidth: 1, borderColor: "#d2bd87", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 16 }, surahFrameOrnament: { color: "#a47c28", fontSize: 20 }, surahFrameText: { color: "#0b654f", fontSize: 21, fontWeight: "900", writingDirection: "rtl" }, basmala: { textAlign: "center", writingDirection: "rtl", marginVertical: 7 }, pageBottom: { alignItems: "center", marginTop: 8 }, pageNumber: { color: "#6b706d", fontSize: 10, fontWeight: "800" }, bookNav: { minHeight: 55, flexDirection: "row", alignItems: "center", gap: 7, padding: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ded9cf" }, bookNavButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 }, bookNavArrow: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, bookNavText: { color: "#0b654f", fontSize: 8, fontWeight: "900", textAlign: "center" }, pageCenterPill: { minWidth: 72, minHeight: 42, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, pageCenterText: { color: "#fff", fontSize: 9, fontWeight: "900" },
   studyWrap: { padding: 11, paddingBottom: 20 }, studySurahHeader: { borderRadius: 20, backgroundColor: "#efe8d9", borderWidth: 1, borderColor: "#dfd2bb", padding: 16, alignItems: "center", marginBottom: 10 }, studySurahArabic: { color: "#173f35", fontSize: 28, fontWeight: "900", writingDirection: "rtl" }, studySurahEnglish: { color: "#7d776d", fontSize: 9, marginTop: 3 }, studyAyah: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#e1ddd4", padding: 15, marginBottom: 9 }, studyPlaying: { borderColor: "#0b8b69", borderWidth: 2, backgroundColor: "#f5fff9" }, studyTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, ayahPill: { minWidth: 34, textAlign: "center", backgroundColor: "#edf5f1", color: "#0b654f", padding: 7, borderRadius: 11, fontWeight: "900" }, smallPlay: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, studyArabic: { color: "#173f35", textAlign: "right", writingDirection: "rtl", marginTop: 9 },
   ayahActions: { backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e1ddd4", padding: 8 }, actionRef: { color: "#17483c", fontSize: 8, fontWeight: "900", marginBottom: 6 }, actionRow: { flexDirection: "row", gap: 6 }, actionButton: { flex: 1, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#f0f5f2" }, actionIcon: { fontSize: 16 }, actionLabel: { color: "#31564b", fontSize: 7, fontWeight: "900", marginTop: 2 },
   memoryWrap: { paddingBottom: 22 }, memoryControls: { flexDirection: "row", gap: 8, margin: 12 }, memoryButton: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, memoryButtonText: { color: "#31564b", fontSize: 9, fontWeight: "900" }, memoryCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#e0ddd4", padding: 15, marginHorizontal: 12, marginBottom: 8 }, memoryArabic: { color: "#183e34", fontSize: 28, lineHeight: 48, textAlign: "right", writingDirection: "rtl", marginTop: 7 }, hidden: { color: "#9ca6a1", textAlign: "center", letterSpacing: 3 },
-  miniPlayer: { minHeight: 63, backgroundColor: "#153f36", paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 6, borderTopWidth: 1, borderTopColor: "#315b51" }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#bcd7cf", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 10, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#b9d1c9", fontSize: 7, marginTop: 2 }, playerButton: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,.09)" }, playerMain: { width: 39, height: 39, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
+  miniPlayer: { minHeight: 96, backgroundColor: "#103f35", paddingHorizontal: 12, paddingTop: 9, paddingBottom: 10, borderTopWidth: 1, borderTopColor: "#2c5c50" }, playerHeader: { flexDirection: "row", alignItems: "center", gap: 9 }, playerBadge: { width: 36, height: 36, borderRadius: 13, backgroundColor: "rgba(255,255,255,.1)", alignItems: "center", justifyContent: "center" }, playerBadgeText: { fontSize: 17 }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#b8d7ce", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 11, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#a9c7be", fontSize: 7, marginTop: 2 }, playerMore: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" }, playerMoreText: { color: "#d5e5df", fontSize: 13, fontWeight: "900" }, playerTransport: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 8 }, playerControl: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" }, playerControlDisabled: { opacity: .35 }, playerControlText: { color: "#d8e7e2", fontSize: 8, fontWeight: "900" }, playerControlArrow: { color: "#fff", fontSize: 25, lineHeight: 27, fontWeight: "700" }, playerMain: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }, playerMainText: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, playerSpeedPill: { minWidth: 40, height: 34, borderRadius: 12, backgroundColor: "#dcebe5", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }, playerSpeedText: { color: "#17483c", fontSize: 8, fontWeight: "900" },
   quranDock: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ddd9d0" }, quranDockIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, quranDockIconText: { color: "#fff", fontSize: 17, fontWeight: "900" }, quranDockText: { flex: 1, color: "#173f35", fontSize: 12, fontWeight: "900" }, quranDockArrow: { color: "#0b654f", fontSize: 25 },
   menuBackdrop: { flex: 1, backgroundColor: "rgba(20,29,26,.48)", justifyContent: "flex-end" }, menuSheet: { maxHeight: "90%", backgroundColor: "#f8f6f0", borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: "hidden" }, menuHero: { minHeight: 82, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, backgroundColor: "#0b654f" }, menuMoon: { width: 48, height: 48, borderRadius: 17, backgroundColor: "rgba(255,255,255,.12)", alignItems: "center", justifyContent: "center" }, menuMoonText: { color: "#f1d58d", fontSize: 29 }, menuTitle: { color: "#fff", fontSize: 21, fontWeight: "900" }, menuSubtitle: { color: "#c8e0d8", fontSize: 9, marginTop: 3 }, menuClose: { width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(255,255,255,.12)", alignItems: "center", justifyContent: "center" }, menuCloseText: { color: "#fff", fontSize: 24, lineHeight: 26 }, menuContent: { padding: 15, paddingBottom: 28 }, menuSectionLabel: { color: "#997b43", fontSize: 8, fontWeight: "900", letterSpacing: 1, marginBottom: 8 }, menuQuickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, menuQuickCard: { width: "48%", minHeight: 78, borderRadius: 18, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 12, justifyContent: "center" }, menuQuickRadio: { backgroundColor: "#f4efe2", borderColor: "#e1d5bd" }, menuQuickIcon: { fontSize: 21 }, menuQuickTitle: { color: "#173f35", fontSize: 11, fontWeight: "900", marginTop: 5 }, menuElegantCard: { marginTop: 10, borderRadius: 21, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 13 }, menuCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 }, menuCardIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" }, menuCardTitle: { color: "#173f35", fontSize: 13, fontWeight: "900" }, menuCardSubtitle: { color: "#83908a", fontSize: 8, marginTop: 2 }, speedRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 11 }, speedLabel: { flex: 1, color: "#53645e", fontSize: 9, fontWeight: "900" }, speedButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" }, speedButtonText: { color: "#0b654f", fontSize: 20, fontWeight: "900" }, speedValue: { minWidth: 46, textAlign: "center", color: "#173f35", fontSize: 10, fontWeight: "900" }, transport: { flexDirection: "row", gap: 6, marginTop: 10 }, transportButton: { flex: 1, minHeight: 41, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, transportMain: { width: 50, minHeight: 41, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, menuSettingRow: { minHeight: 64, marginTop: 10, borderRadius: 16, backgroundColor: "#f5f5f1", flexDirection: "row", alignItems: "center", gap: 10, padding: 10 }, settingGlyph: { width: 41, height: 41, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, settingGlyphText: { color: "#fff", fontSize: 13, fontWeight: "900" }, menuSettingTitle: { color: "#173f35", fontSize: 10, fontWeight: "900" }, menuSettingMeta: { color: "#84908b", fontSize: 8, marginTop: 2 }, menuChevron: { color: "#0b654f", fontSize: 23 }, readerModeRow: { flexDirection: "row", gap: 7, marginTop: 9 }, readerModeButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#f4f4f0", alignItems: "center", justifyContent: "center" }, readerModeButtonActive: { backgroundColor: "#0b654f" }, readerModeText: { color: "#53645e", fontSize: 9, fontWeight: "900" }, readerModeTextActive: { color: "#fff" }, highlightRow: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#ece8df" }, highlightTitle: { color: "#244b40", fontSize: 9, fontWeight: "900" }, highlightMeta: { color: "#84908b", fontSize: 7, marginTop: 2 }, jumpRow: { flexDirection: "row", gap: 8, marginTop: 9 }, pageInput: { flex: 1, height: 45, borderRadius: 13, borderWidth: 1, borderColor: "#ded9cf", backgroundColor: "#f9f8f5", paddingHorizontal: 12 }, jumpButton: { width: 80, height: 45, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, jumpButtonText: { color: "#fff", fontWeight: "900" }, returnWopt: { minHeight: 48, marginTop: 12, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#ebe7dd" }, returnWoptText: { color: "#53645e", fontSize: 10, fontWeight: "900" },
   disabled: { opacity: .35 }

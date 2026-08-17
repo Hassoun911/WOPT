@@ -16,6 +16,7 @@ import type { QuranAyah, QuranLocale } from "./quranData";
 export type QuranFontChoice = "qcf-v2" | "qcf-v1" | "qpc-hafs";
 export type QuranPageTheme = "paper" | "white" | "sepia" | "dark";
 export type QuranBookMode = "auto" | "single" | "spread";
+export type QuranBrowseMode = "vertical" | "horizontal";
 
 export type QuranAppearance = {
   font: QuranFontChoice;
@@ -24,6 +25,7 @@ export type QuranAppearance = {
   textColor: string;
   pageTheme: QuranPageTheme;
   bookMode: QuranBookMode;
+  browseMode: QuranBrowseMode;
   tajweed: boolean;
 };
 
@@ -34,6 +36,7 @@ export const DEFAULT_QURAN_APPEARANCE: QuranAppearance = {
   textColor: "#111111",
   pageTheme: "paper",
   bookMode: "auto",
+  browseMode: "vertical",
   tajweed: false
 };
 
@@ -288,9 +291,14 @@ export function QuranPageText({
           }
 
           if ((appearance.font === "qcf-v1" || appearance.font === "qcf-v2") && raw) {
+            const decoded = decodeNumericEntities(raw).trimEnd();
+            const glyphs = Array.from(decoded);
+            const markerGlyph = glyphs.pop() ?? "";
+            const verseGlyphs = glyphs.join("");
             return (
               <Text key={key} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
-                {decodeNumericEntities(raw)}{" "}
+                {verseGlyphs}
+                {markerGlyph ? <Text style={{ color: "#0b8b69", fontFamily }}>{markerGlyph}</Text> : null}{" "}
               </Text>
             );
           }
@@ -340,7 +348,7 @@ export function ReaderSettingsSheet({
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sheetTitle, ar && styles.rtl]}>{t("Qur’an appearance", "مظهر القرآن")}</Text>
-              <Text style={[styles.sheetSubtitle, ar && styles.rtl]}>{t("Font • Tajweed • book layout • size • colors", "الخط • التجويد • شكل الكتاب • الحجم • الألوان")}</Text>
+              <Text style={[styles.sheetSubtitle, ar && styles.rtl]}>{t("Font • Tajweed • navigation • layout • size • colors", "الخط • التجويد • التنقل • شكل الكتاب • الحجم • الألوان")}</Text>
             </View>
             <Pressable onPress={onDone} style={styles.doneTop}><Text style={styles.doneTopText}>✓</Text></Pressable>
           </View>
@@ -412,6 +420,21 @@ export function ReaderSettingsSheet({
                   <Text style={[styles.layoutIcon, appearance.bookMode === mode && styles.layoutIconActive]}>{icon}</Text>
                   <Text style={[styles.layoutLabel, appearance.bookMode === mode && styles.layoutLabelActive]}>{label}</Text>
                   <Text style={styles.layoutNote}>{note}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+
+            <Text style={[styles.sectionLabel, ar && styles.rtl]}>{t("PAGE BROWSING", "طريقة التنقل")}</Text>
+            <View style={styles.browseRow}>
+              {([
+                ["vertical", "↕", t("Vertical", "رأسي"), t("Scroll up/down. At the page edge, keep swiping to turn the page.", "مرّر لأعلى وأسفل، وعند نهاية الصفحة تابع السحب للانتقال.")],
+                ["horizontal", "↔", t("Horizontal", "أفقي"), t("Swipe left/right to move between Mushaf pages.", "اسحب يميناً ويساراً للتنقل بين صفحات المصحف.")]
+              ] as Array<[QuranBrowseMode, string, string, string]>).map(([mode, icon, label, note]) => (
+                <Pressable key={mode} onPress={() => setAppearance((previous) => ({ ...previous, browseMode: mode }))} style={[styles.browseChoice, appearance.browseMode === mode && styles.browseChoiceActive]}>
+                  <Text style={[styles.browseIcon, appearance.browseMode === mode && styles.browseIconActive]}>{icon}</Text>
+                  <View style={{ flex: 1 }}><Text style={[styles.browseLabel, ar && styles.rtl]}>{label}</Text><Text style={[styles.browseNote, ar && styles.rtl]}>{note}</Text></View>
+                  <View style={[styles.radio, appearance.browseMode === mode && styles.radioSelected]}>{appearance.browseMode === mode ? <View style={styles.radioDot} /> : null}</View>
                 </Pressable>
               ))}
             </View>
@@ -499,6 +522,13 @@ const styles = StyleSheet.create({
   layoutLabel: { color: "#52635d", fontSize: 9, fontWeight: "900", marginTop: 5, textAlign: "center" },
   layoutLabelActive: { color: "#0b654f" },
   layoutNote: { color: "#929a96", fontSize: 7, lineHeight: 10, textAlign: "center", marginTop: 3 },
+  browseRow: { gap: 8, marginBottom: 15 },
+  browseChoice: { minHeight: 76, borderRadius: 18, borderWidth: 1, borderColor: "#e0ddd6", backgroundColor: "#fff", flexDirection: "row", alignItems: "center", gap: 11, padding: 12 },
+  browseChoiceActive: { borderColor: "#0b7a5d", backgroundColor: "#edf6f2" },
+  browseIcon: { width: 38, height: 38, textAlign: "center", textAlignVertical: "center", borderRadius: 13, backgroundColor: "#f1f3f0", color: "#65726d", fontSize: 21, fontWeight: "900" },
+  browseIconActive: { backgroundColor: "#dff0e8", color: "#0b7057" },
+  browseLabel: { color: "#233f38", fontSize: 12, fontWeight: "900" },
+  browseNote: { color: "#7f8b86", fontSize: 8, lineHeight: 12, marginTop: 3 },
   themeRow: { flexDirection: "row", gap: 7, marginBottom: 15 },
   themeChoice: { flex: 1, alignItems: "center", gap: 5, padding: 7, borderRadius: 14, borderWidth: 1, borderColor: "#e0ddd6", backgroundColor: "#fff" },
   themeChoiceActive: { borderColor: "#0b7a5d", backgroundColor: "#edf6f2" },
