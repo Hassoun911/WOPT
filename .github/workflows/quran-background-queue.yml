@@ -21,6 +21,10 @@ jobs:
         run: python .github/scripts/quran-background-queue.py
       - name: Apply global audio controls patch
         run: python .github/scripts/global-quran-audio-controls.py
+      - name: Apply rich Quran Radio layout
+        run: python .github/scripts/rich-quran-radio.py
+      - name: Apply rich Quran Radio styles
+        run: python .github/scripts/rich-quran-radio-styles.py
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -33,11 +37,11 @@ jobs:
       - name: Validate mobile TypeScript
         working-directory: mobile
         run: npm run typecheck
-      - name: Commit persistent Quran playback
+      - name: Commit persistent Quran playback and Radio
         run: |
           git config user.name "Hassoun911"
           git config user.email "65694110+Hassoun911@users.noreply.github.com"
           git add mobile/src/quran/QuranV3.tsx mobile/App.tsx
           git diff --cached --quiet && exit 0
-          git commit -m "Make Quran playback persistent across Hassoun"
+          git commit -m "Upgrade Quran Radio and persistent playback"
           git push origin main
