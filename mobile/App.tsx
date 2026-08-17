@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import IslamicQuiz from "./src/IslamicQuiz";
 import SettingsHub from "./src/SettingsHub";
 import HassounWidget from "./modules/hassoun-widget";
+import QuranAudio, { type QuranAudioStatus } from "./modules/quran-audio";
 import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { disablePrayerNotifications, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
@@ -110,6 +111,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [quranAppNavVisible, setQuranAppNavVisible] = useState(true);
+  const [globalQuranAudio, setGlobalQuranAudio] = useState<QuranAudioStatus>({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: 1 });
   const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
 
   const todayKey = windsorDateKey(now);
@@ -147,6 +149,16 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
       }
     })();
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => {
+      if (!QuranAudio) return;
+      setGlobalQuranAudio(QuranAudio.getStatus());
+    };
+    sync();
+    const timer = setInterval(sync, 700);
     return () => clearInterval(timer);
   }, []);
 
@@ -471,6 +483,24 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="dark" />
       <View style={styles.flex}>{body}</View>
+      {globalQuranAudio.state !== "idle" && globalQuranAudio.state !== "error" ? (
+        <View style={styles.globalAudioBar}>
+          <View style={styles.globalAudioCopy}>
+            <Text style={styles.globalAudioEyebrow}>{locale === "ar" ? "تشغيل القرآن" : "QUR’AN AUDIO"}</Text>
+            <Text numberOfLines={1} style={styles.globalAudioTitle}>{globalQuranAudio.title || (locale === "ar" ? "القرآن الكريم" : "Qur’an playback")}</Text>
+            {globalQuranAudio.subtitle ? <Text numberOfLines={1} style={styles.globalAudioMeta}>{globalQuranAudio.subtitle}</Text> : null}
+          </View>
+          <Pressable onPress={() => QuranAudio?.previous()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>‹</Text></Pressable>
+          <Pressable
+            onPress={() => globalQuranAudio.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()}
+            style={styles.globalAudioMain}
+          >
+            <Text style={styles.globalAudioMainText}>{globalQuranAudio.state === "playing" ? "Ⅱ" : "▶"}</Text>
+          </Pressable>
+          <Pressable onPress={() => QuranAudio?.next()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>›</Text></Pressable>
+          <Pressable onPress={() => QuranAudio?.stop()} style={styles.globalAudioStop}><Text style={styles.globalAudioStopText}>■</Text></Pressable>
+        </View>
+      ) : null}
       {(activeTab !== "quran" || quranAppNavVisible) ? (
         <View style={styles.bottomNav}>
           {navItems.map((item) => {
@@ -609,6 +639,17 @@ const styles = StyleSheet.create({
   moreText: { color: "#85908c", fontSize: 10, lineHeight: 14, marginTop: 2 },
   sourceCard: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 72, backgroundColor: "#edf6f1", borderRadius: 20, paddingHorizontal: 14, marginTop: 4 },
   sourceEmoji: { fontSize: 24 },
+  globalAudioBar: { minHeight: 62, flexDirection: "row", alignItems: "center", gap: 7, marginHorizontal: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 22, backgroundColor: "#113f35", shadowColor: "#000", shadowOpacity: .18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 10 },
+  globalAudioCopy: { flex: 1, minWidth: 0 },
+  globalAudioEyebrow: { color: "#b9d7ce", fontSize: 7, fontWeight: "900", letterSpacing: .8 },
+  globalAudioTitle: { color: "#fff", fontSize: 10, fontWeight: "900", marginTop: 2 },
+  globalAudioMeta: { color: "#b9d0c8", fontSize: 7, marginTop: 1 },
+  globalAudioButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" },
+  globalAudioButtonText: { color: "#fff", fontSize: 24, lineHeight: 26, fontWeight: "700" },
+  globalAudioMain: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  globalAudioMainText: { color: "#0b654f", fontSize: 16, fontWeight: "900" },
+  globalAudioStop: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" },
+  globalAudioStopText: { color: "#f0d7cf", fontSize: 11, fontWeight: "900" },
   bottomNav: { minHeight: 68, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e4e1d9", paddingHorizontal: 8, paddingTop: 5 },
   navItem: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", borderRadius: 16 },
   navItemActive: { backgroundColor: "#edf5f1" },

@@ -402,10 +402,22 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     setScreen("memorize");
   };
 
+  const nativeQueuePayload = (queue: QuranAyah[], reciterId = audioPrefs.reciter) => JSON.stringify(
+    queue.map((ayah) => {
+      const surah = getSurah(ayah.surah);
+      const reciter = reciterInfo(reciterId);
+      return {
+        url: audioUrl(ayah, reciterId),
+        title: `${ar ? surah?.nameArabic : surah?.nameTransliterated ?? `Surah ${ayah.surah}`} • ${tr("Ayah", "الآية")} ${num(ayah.ayah)}`,
+        subtitle: `${ar ? reciter.ar : reciter.en} • Hassoun`
+      };
+    })
+  );
+
   const playNativeAyah = (ayah: QuranAyah, reciterId = audioPrefs.reciter) => {
     if (!QuranAudio) return;
     completionRef.current = null;
-    void QuranAudio.play(audioUrl(ayah, reciterId), audioPrefs.speed);
+    QuranAudio.playQueue(nativeQueuePayload([ayah], reciterId), 0, false, audioPrefs.speed);
   };
 
   const playQueue = (queue: QuranAyah[], repeat = false) => {
@@ -414,7 +426,8 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     setAudioQueue(queue);
     setAudioIndex(0);
     setRepeatQueue(repeat);
-    playNativeAyah(first);
+    completionRef.current = null;
+    QuranAudio.playQueue(nativeQueuePayload(queue), 0, repeat, audioPrefs.speed);
   };
 
   const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);
@@ -449,8 +462,10 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
       playAyah(ayah, true);
       return;
     }
-    setRepeatQueue((current) => !current);
-    if (audioStatus.state === "completed" || audioStatus.state === "idle") playAyah(ayah, !repeatQueue);
+    const nextRepeat = !repeatQueue;
+    setRepeatQueue(nextRepeat);
+    QuranAudio?.setRepeat(nextRepeat);
+    if (audioStatus.state === "completed" || audioStatus.state === "idle") playAyah(ayah, nextRepeat);
   };
 
   const copySelectedText = async (ayah: QuranAyah) => {
@@ -474,9 +489,10 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   };
 
   const togglePlayerPlayback = () => {
+    if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
+    if (audioStatus.state === "paused" || audioStatus.state === "completed") { QuranAudio?.resume(); return; }
     if (!activeAyah) { playSurah(position.surah, false); return; }
-    if (audioStatus.state === "playing") QuranAudio?.pause();
-    else QuranAudio?.resume();
+    QuranAudio?.resume();
   };
 
   const playPlaylist = (repeat = false) => {
@@ -499,28 +515,11 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   };
 
   const nextAudio = () => {
-    if (!audioQueue.length) return;
-    const nextIndex = audioIndex + 1;
-    if (nextIndex < audioQueue.length) {
-      const nextAyah = audioQueue[nextIndex];
-      if (!nextAyah) return;
-      setAudioIndex(nextIndex);
-      playNativeAyah(nextAyah);
-    } else if (repeatQueue) {
-      const first = audioQueue[0];
-      if (!first) return;
-      setAudioIndex(0);
-      playNativeAyah(first);
-    } else stopAudio();
+    QuranAudio?.next();
   };
 
   const previousAudio = () => {
-    if (!audioQueue.length) return;
-    const previousIndex = Math.max(0, audioIndex - 1);
-    const previousAyah = audioQueue[previousIndex];
-    if (!previousAyah) return;
-    setAudioIndex(previousIndex);
-    playNativeAyah(previousAyah);
+    QuranAudio?.previous();
   };
 
   useEffect(() => {
@@ -528,31 +527,30 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
       if (!QuranAudio) return;
       const status = QuranAudio.getStatus();
       setAudioStatus(status);
-      if (status.state === "completed" && status.url && completionRef.current !== status.url) {
-        completionRef.current = status.url;
-        nextAudio();
+      if (typeof status.queueIndex === "number" && status.queueIndex >= 0 && status.queueIndex < audioQueue.length) {
+        setAudioIndex((current) => current === status.queueIndex ? current : status.queueIndex!);
+      }
+      if (typeof status.repeat === "boolean") setRepeatQueue(status.repeat);
+      if (status.state === "idle" && audioQueue.length) {
+        setAudioQueue([]);
+        setAudioIndex(-1);
+        setRepeatQueue(false);
       }
     }, 450);
     return () => clearInterval(timer);
-  }, [audioQueue, audioIndex, repeatQueue, audioPrefs.reciter, audioPrefs.speed]);
+  }, [audioQueue.length]);
 
   useEffect(() => {
     if (!activeAyah) return;
     persistLast({ surah: activeAyah.surah, ayah: activeAyah.ayah });
   }, [audioIndex]);
 
-  useEffect(() => {
-    if (screen !== "reader" || !activeAyah || activeAyah.surah === position.surah) return;
-    QuranAudio?.stop();
-    setAudioQueue([]);
-    setAudioIndex(-1);
-    setRepeatQueue(false);
-    setAudioStatus({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: audioPrefs.speed });
-  }, [screen, position.surah, activeAyah?.surah]);
-
   const updateReciter = (id: string) => {
     persistAudioPrefs({ reciter: id });
-    if (activeAyah) setTimeout(() => playNativeAyah(activeAyah, id), 20);
+    if (audioQueue.length) {
+      const startIndex = Math.max(0, audioIndex);
+      setTimeout(() => QuranAudio?.playQueue(nativeQueuePayload(audioQueue, id), startIndex, repeatQueue, audioPrefs.speed), 20);
+    }
   };
 
   const updateSpeed = (speed: number) => {
@@ -560,6 +558,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     persistAudioPrefs({ speed: safe });
     QuranAudio?.setSpeed(safe);
   };
+
 
   if (!quranReady()) {
     return <View style={styles.centered}><Text style={styles.big}>📖</Text><Text style={styles.centerTitle}>{tr("Qur’an data unavailable", "بيانات القرآن غير متاحة")}</Text><Pressable onPress={onBackHome} style={styles.primary}><Text style={styles.primaryText}>{tr("Back", "رجوع")}</Text></Pressable></View>;
