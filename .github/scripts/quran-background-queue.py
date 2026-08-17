@@ -2,7 +2,8 @@ from pathlib import Path
 
 path = Path('mobile/src/quran/QuranV3.tsx')
 text = path.read_text()
-start = text.index('  const playNativeAyah =')
+native_marker = '  const nativeQueuePayload ='
+start = text.index(native_marker) if native_marker in text else text.index('  const playNativeAyah =')
 end = text.index('  if (!quranReady()) {', start)
 replacement = r'''  const nativeQueuePayload = (queue: QuranAyah[], reciterId = audioPrefs.reciter) => JSON.stringify(
     queue.map((ayah) => {
