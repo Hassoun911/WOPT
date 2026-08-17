@@ -84,17 +84,33 @@ async function registerExpo(request: Request, env: Env) {
   }
   if (platform !== "android" && platform !== "ios") return json({ error: "Invalid platform" }, 400);
   const locale = validLocale(body.locale) ? body.locale : "en";
+  const prayerPushEnabled = platform === "android" ? 0 : 1;
   await env.DB.prepare(
-    `INSERT INTO subscriptions (installation_id, provider, platform, locale, address, app_version)
-     VALUES (?, 'expo', ?, ?, ?, ?)
+    `INSERT INTO subscriptions (
+       installation_id, provider, platform, locale, address, app_version,
+       notify_twenty, notify_ten, notify_athan
+     )
+     VALUES (?, 'expo', ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(provider, address) DO UPDATE SET
        installation_id = excluded.installation_id,
        platform = excluded.platform,
        locale = excluded.locale,
        app_version = excluded.app_version,
+       notify_twenty = excluded.notify_twenty,
+       notify_ten = excluded.notify_ten,
+       notify_athan = excluded.notify_athan,
        enabled = 1,
        updated_at = CURRENT_TIMESTAMP`
-  ).bind(body.installationId, platform, locale, token, body.appVersion ?? null).run();
+  ).bind(
+    body.installationId,
+    platform,
+    locale,
+    token,
+    body.appVersion ?? null,
+    prayerPushEnabled,
+    prayerPushEnabled,
+    prayerPushEnabled
+  ).run();
   return json({ ok: true });
 }
 
