@@ -9,11 +9,6 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
-  splash: {
-    image: "./assets/splash-logo.png",
-    resizeMode: "contain",
-    backgroundColor: "#003d33"
-  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
