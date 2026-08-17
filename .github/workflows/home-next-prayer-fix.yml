@@ -33,5 +33,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile/App.tsx mobile/app.config.ts
           git diff --cached --quiet && exit 0
-          git commit -m "Fix next prayer countdown highlight and Hijri date"
+          git commit -m "Finalize next prayer countdown highlight and Hijri date"
           git push origin HEAD:main
+
+# final: always-visible next-prayer countdown + verified Hijri date
