@@ -7,15 +7,24 @@ export type QuranAudioStatus = {
   durationMs: number;
   speed: number;
   url?: string | null;
+  title?: string | null;
+  subtitle?: string | null;
+  queueIndex?: number;
+  queueSize?: number;
+  repeat?: boolean;
 };
 
 export type QuranAudioNativeModule = {
   play(url: string, speed: number): Promise<void>;
+  playQueue(itemsJson: string, startIndex: number, repeat: boolean, speed: number): void;
   pause(): void;
   resume(): void;
   stop(): void;
+  next(): void;
+  previous(): void;
   seekBy(deltaMs: number): void;
   setSpeed(speed: number): void;
+  setRepeat(repeat: boolean): void;
   getStatus(): QuranAudioStatus;
 };
 
