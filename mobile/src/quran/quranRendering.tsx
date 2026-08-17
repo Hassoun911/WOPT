@@ -429,7 +429,7 @@ export function ReaderSettingsSheet({
             <View style={styles.browseRow}>
               {([
                 ["vertical", "↕", t("Vertical", "رأسي"), t("Scroll up/down. At the page edge, keep swiping to turn the page.", "مرّر لأعلى وأسفل، وعند نهاية الصفحة تابع السحب للانتقال.")],
-                ["horizontal", "↔", t("Horizontal", "أفقي"), t("Swipe left/right to move between Mushaf pages.", "اسحب يميناً ويساراً للتنقل بين صفحات المصحف.")]
+                ["horizontal", "↔", t("Horizontal", "أفقي"), t("Swipe left/right anywhere on the Mushaf page to turn pages.", "اسحب يميناً ويساراً في أي مكان على صفحة المصحف للتنقل بين الصفحات.")]
               ] as Array<[QuranBrowseMode, string, string, string]>).map(([mode, icon, label, note]) => (
                 <Pressable key={mode} onPress={() => setAppearance((previous) => ({ ...previous, browseMode: mode }))} style={[styles.browseChoice, appearance.browseMode === mode && styles.browseChoiceActive]}>
                   <Text style={[styles.browseIcon, appearance.browseMode === mode && styles.browseIconActive]}>{icon}</Text>
