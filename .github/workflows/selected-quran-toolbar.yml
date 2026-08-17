@@ -1,0 +1,52 @@
+name: Integrate rich selected Quran toolbar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/selected-quran-toolbar.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Apply selected Quran toolbar patch
+        run: python3 .github/scripts/selected-quran-toolbar.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install compatible clipboard support
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx expo install expo-clipboard --npm
+
+      - name: Validate mobile TypeScript
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Commit rich selected Quran toolbar
+        run: |
+          git config user.name "Hassoun911"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/src/quran/QuranV3.tsx mobile/package.json mobile/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No toolbar changes to commit"
+          else
+            git commit -m "Upgrade selected Quran audio and text toolbar"
+            git push origin HEAD:main
+          fi
