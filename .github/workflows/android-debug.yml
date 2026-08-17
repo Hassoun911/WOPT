@@ -1,4 +1,4 @@
-# Rebuild after Hijri date correction
+# Rebuild after Hijri and Quran appearance safe-area corrections
 name: Build Hassoun Android APK
 
 on:
@@ -75,12 +75,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.4.8.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.4.9.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.4.8-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.4.8.apk
+          name: hassoun-v0.4.9-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.4.9.apk
           if-no-files-found: error
           retention-days: 14
