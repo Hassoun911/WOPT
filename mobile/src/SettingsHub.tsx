@@ -161,7 +161,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
 
         <LegalCard title={t("🔒 Lock-screen widget", "🔒 ويدجت شاشة القفل") }>
           <Text style={styles.legalText}>{widgetCapabilities.lockScreenEligible
-            ? t("This Hassoun widget is marked as lock-screen eligible on supported Android 16+/17 devices. Add it from your phone’s Lock screen customization screen. Samsung/other manufacturers decide where lock-screen widgets are offered.", "تم تجهيز ويدجت Hassoun للعمل على شاشة القفل في أجهزة Android 16+/17 المدعومة. أضفه من إعدادات تخصيص شاشة القفل. تحدد Samsung والشركات الأخرى مكان توفر ويدجت شاشة القفل.")
+            ? t("On supported Android lock screens, Hassoun automatically switches to a transparent Prayer Times layout: no solid card background, the next prayer is highlighted, and all five prayer times stay visible. Your Home Screen widget keeps its selected style. Add it from your phone’s Lock screen customization screen; Samsung/other manufacturers decide where third-party lock-screen widgets are offered.", "على شاشات القفل المدعومة يتحول Hassoun تلقائياً إلى تصميم شفاف لمواقيت الصلاة بدون خلفية صلبة، مع تمييز الصلاة القادمة وإظهار الصلوات الخمس. يبقى تصميم الشاشة الرئيسية كما اخترته. أضفه من إعدادات تخصيص شاشة القفل؛ تحدد Samsung والشركات الأخرى مكان توفر ويدجت الطرف الثالث.")
             : t("Your current Android version does not expose the new lock-screen widget host. The same Hassoun widget will still work on the Home screen.", "إصدار Android الحالي لا يوفر نظام ويدجت شاشة القفل الجديد. سيعمل نفس ويدجت Hassoun على الشاشة الرئيسية.")}</Text>
         </LegalCard>
       </ScrollView>

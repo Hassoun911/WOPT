@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -69,7 +70,16 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     }
 
     private fun updateWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
-      val views = RemoteViews(context.packageName, R.layout.hassoun_prayer_widget)
+      val widgetOptions = manager.getAppWidgetOptions(appWidgetId)
+      val hostCategory = widgetOptions.getInt(
+        AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY,
+        AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN
+      )
+      val isLockScreen = (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
+      val views = RemoteViews(
+        context.packageName,
+        if (isLockScreen) R.layout.hassoun_prayer_widget_lockscreen else R.layout.hassoun_prayer_widget
+      )
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
       val locale = prefs.getString("locale", "en") ?: "en"
       val layout = prefs.getString("layout", "next") ?: "next"
@@ -109,17 +119,17 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
           views.setViewVisibility(R.id.widget_countdown, View.GONE)
         }
 
-        val fullLayout = layout == "full"
-        if (fullLayout && showAllPrayers) {
+        val fullLayout = isLockScreen || layout == "full"
+        if (fullLayout && (showAllPrayers || isLockScreen)) {
           views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
-          bindPrayerStrip(views, next.day, locale, next.key)
+          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen)
         } else {
           views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
         }
         scheduleNextRefresh(context, next.targetMillis + 15_000L)
       }
 
-      val compact = layout == "compact"
+      val compact = !isLockScreen && layout == "compact"
       val now = Date()
       if (!compact && showGregorian) {
         views.setViewVisibility(R.id.widget_date, View.VISIBLE)
@@ -133,7 +143,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       } else {
         views.setViewVisibility(R.id.widget_hijri, View.GONE)
       }
-      if (!compact && showLocation) {
+      if (!isLockScreen && !compact && showLocation) {
         views.setViewVisibility(R.id.widget_location, View.VISIBLE)
         views.setTextViewText(R.id.widget_location, if (locale == "ar") "⌖ وندسور، أونتاريو • الجدول الرسمي" else "⌖ Windsor, Ontario • Official schedule")
       } else {
@@ -205,7 +215,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       return if (locale == "ar") "$hour12:${minute.toString().padStart(2, '0')} ${if (hour24 < 12) "ص" else "م"}" else "$hour12:${minute.toString().padStart(2, '0')} $suffix"
     }
 
-    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String) {
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false) {
       val ids = mapOf(
         "fajr" to R.id.widget_prayer_fajr,
         "dhuhr" to R.id.widget_prayer_dhuhr,
@@ -219,7 +229,17 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         val time = formatClock(day.optString(key, "--:--"), locale)
         val active = key == nextKey
         views.setTextViewText(id, "${if (active) "● " else ""}$name\n$time")
-        views.setTextColor(id, Color.parseColor(if (active) "#F3D98B" else "#E7F3EF"))
+        views.setTextColor(
+          id,
+          Color.parseColor(if (active) "#F4D26F" else if (lockScreen) "#FFFFFF" else "#E7F3EF")
+        )
+        if (lockScreen) {
+          views.setInt(
+            id,
+            "setBackgroundResource",
+            if (active) R.drawable.hassoun_widget_lock_prayer_active else R.drawable.hassoun_widget_lock_prayer_idle
+          )
+        }
       }
     }
 
