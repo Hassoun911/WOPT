@@ -59,8 +59,29 @@ jobs:
                "Hassoun uses your location to automatically select the correct local prayer times and email alert time zone."),
           ])
 
+          replace("mobile/src/IslamicQuiz.tsx", [
+              ("WOPT QUIZ", "HASSOUN QUIZ"),
+          ])
+          replace("mobile/src/emailSignup.ts", [
+              ("WOPT service unavailable", "Hassoun service unavailable"),
+              ("so WOPT can use your local prayer times", "so Hassoun can use your local prayer times"),
+          ])
+          replace("mobile/src/deviceLocation.ts", [
+              ("WOPT uses your current location", "Hassoun uses your current location"),
+          ])
+          replace("mobile/src/quran/QuranV2.tsx", [
+              ("WOPT QUR’AN", "HASSOUN QUR’AN"),
+              ("قرآن ووبت", "قرآن Hassoun"),
+          ])
+
           replace("pwa/app/quran/page.tsx", [
               ("WOPT Qur’an Reader", "Hassoun Qur’an Reader"),
+          ])
+          replace("pwa/app/QuranAudioSystem.tsx", [
+              ('album: "Windsor Prayer Times"', 'album: "Hassoun"'),
+          ])
+          replace("pwa/app/QuranReferenceLayoutEnhancer.tsx", [
+              (">WOPT Qur’an</button>", ">Hassoun Qur’an</button>"),
           ])
 
           for path in [
@@ -77,6 +98,14 @@ jobs:
 
           replace("pwa/package.json", [
               ('"displayName": "Windsor Prayer Times"', '"displayName": "Hassoun"'),
+          ])
+
+          replace("push-server/src/subscribers.ts", [
+              ("Your email is confirmed. WOPT will use the prayer location and time zone below for your alerts.",
+               "Your email is confirmed. Hassoun will use the prayer location and time zone below for your alerts."),
+              ("<title>WOPT Email Alerts</title>", "<title>Hassoun Email Alerts</title>"),
+              (">WOPT EMAIL ALERTS</div>", ">HASSOUN EMAIL ALERTS</div>"),
+              ("Go to Windsor Prayer Times", "Go to Hassoun"),
           ])
           PY
 
@@ -116,7 +145,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile push-server pwa .github/scripts/apply-hassoun-brand.mjs
           git diff --cached --quiet && exit 0
-          git commit -m "Finish Hassoun visible branding cleanup"
+          git commit -m "Complete Hassoun visible branding audit"
           git push origin HEAD:main
 
-# re-run extended visible-brand cleanup
+# re-run complete visible-brand audit
