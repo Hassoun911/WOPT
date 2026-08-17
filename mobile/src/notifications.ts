@@ -21,9 +21,18 @@ const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
   isha: { en: "Isha", ar: "العشاء" }
 };
 
+const PRAYER_EVENT_KINDS = new Set(["twenty", "ten", "athan"]);
+let notificationScheduleQueue: Promise<void> = Promise.resolve();
+
+function withNotificationScheduleLock<T>(operation: () => Promise<T>): Promise<T> {
+  const run = notificationScheduleQueue.then(operation, operation);
+  notificationScheduleQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
+  handleNotification: async (notification) => ({
+    shouldPlaySound: notification.request.content.data?.kind !== "athan",
     shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true
@@ -123,13 +132,33 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
     ...common,
     title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`,
     body: `${time} • ${CITY_LABEL}`,
-    sound: "default"
+    sound: null
   };
 }
 
-export async function cancelPrayerNotifications() {
+async function cancelPrayerNotificationsUnlocked() {
   const saved = await AsyncStorage.getItem(STORAGE_KEYS.scheduledNotificationIds);
-  const identifiers = saved ? (JSON.parse(saved) as string[]) : [];
+  let savedIdentifiers: string[] = [];
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as unknown;
+      if (Array.isArray(parsed)) {
+        savedIdentifiers = parsed.filter((value): value is string => typeof value === "string");
+      }
+    } catch {
+      // A bad legacy value must never stop prayer-alert cleanup.
+    }
+  }
+
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const discoveredPrayerIdentifiers = scheduled
+    .filter((request) => {
+      const data = request.content.data as Record<string, unknown> | null | undefined;
+      return typeof data?.eventId === "string" && PRAYER_EVENT_KINDS.has(String(data.kind ?? ""));
+    })
+    .map((request) => request.identifier);
+
+  const identifiers = Array.from(new Set([...savedIdentifiers, ...discoveredPrayerIdentifiers]));
   await Promise.all(identifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
   await Promise.all([
     AsyncStorage.removeItem(STORAGE_KEYS.scheduledNotificationIds),
@@ -137,14 +166,18 @@ export async function cancelPrayerNotifications() {
   ]);
 }
 
-export async function schedulePrayerNotifications(
+export function cancelPrayerNotifications() {
+  return withNotificationScheduleLock(cancelPrayerNotificationsUnlocked);
+}
+
+async function schedulePrayerNotificationsUnlocked(
   prayerTimes: PrayerTimes,
   locale: "en" | "ar"
 ) {
   const granted = await requestNotificationPermission();
   if (!granted) return { granted: false, count: 0 };
 
-  await cancelPrayerNotifications();
+  await cancelPrayerNotificationsUnlocked();
   const days = Platform.OS === "ios" ? 4 : 14;
   const events = buildPrayerEvents(prayerTimes, days).filter(
     (event) => Platform.OS !== "android" || event.kind !== "athan"
@@ -176,6 +209,13 @@ export async function schedulePrayerNotifications(
     audioCount: androidAudio.count,
     exactAlarmGranted: Platform.OS !== "android" || androidAudio.exact
   };
+}
+
+export function schedulePrayerNotifications(
+  prayerTimes: PrayerTimes,
+  locale: "en" | "ar"
+) {
+  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale));
 }
 
 export async function disablePrayerNotifications() {
