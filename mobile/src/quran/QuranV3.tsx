@@ -161,6 +161,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   const [pageJump, setPageJump] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [playerVisible, setPlayerVisible] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
   const [radioSurah, setRadioSurah] = useState(1);
@@ -182,6 +183,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   const completionRef = useRef<string | null>(null);
   const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const verticalGestureStartY = useRef<number | null>(null);
+  const readerTapStart = useRef<{ x: number; y: number; time: number } | null>(null);
   const readerAtTop = useRef(true);
   const readerAtBottom = useRef(false);
 
@@ -283,8 +285,9 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
         const distance = Math.abs(gestureState.dx);
         const speed = Math.abs(gestureState.vx);
         if (distance < 48 && speed < 0.35) return;
-        // Swipe left = next Mushaf page, swipe right = previous page.
-        turnReaderPage(gestureState.dx < 0 ? 1 : -1);
+        // Arabic-book direction: higher / next pages live to the left.
+        // Swipe right to advance to the next page; swipe left to go back.
+        turnReaderPage(gestureState.dx > 0 ? 1 : -1);
       }
     }),
     [appearance.browseMode, currentPage, spreadMode]
@@ -307,6 +310,23 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     if (Math.abs(dy) < 60) return;
     if (dy < 0 && readerAtBottom.current) turnReaderPage(1);
     else if (dy > 0 && readerAtTop.current) turnReaderPage(-1);
+  };
+
+
+  const handleReaderSurfaceTouchStart = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+    readerTapStart.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, time: Date.now() };
+  };
+
+  const handleReaderSurfaceTouchEnd = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+    const start = readerTapStart.current;
+    readerTapStart.current = null;
+    if (!start) return;
+    const dx = event.nativeEvent.pageX - start.x;
+    const dy = event.nativeEvent.pageY - start.y;
+    const elapsed = Date.now() - start.time;
+    if (Math.abs(dx) <= 10 && Math.abs(dy) <= 10 && elapsed <= 350) {
+      setPlayerVisible((visible) => !visible);
+    }
   };
 
   const handleBack = () => {
@@ -496,23 +516,10 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
 
   const miniPlayer = playerAyah ? (
     <View style={styles.miniPlayer}>
-      <View style={styles.playerHeader}>
-        <View style={styles.playerBadge}><Text style={styles.playerBadgeText}>🎧</Text></View>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.miniCopy}>
-          <Text style={styles.miniEyebrow}>{ar ? activeReciter.ar : activeReciter.en}</Text>
-          <Text style={styles.miniTitle}>{ar ? playerSurah?.nameArabic : playerSurah?.nameTransliterated} · {tr("Ayah", "الآية")} {num(playerAyah.ayah)}</Text>
-          <Text style={styles.miniMeta}>{activeAyah ? `${formatTime(audioStatus.positionMs)} / ${formatTime(audioStatus.durationMs)}` : tr("Ready to play this Surah", "جاهز لتشغيل هذه السورة")}</Text>
-        </Pressable>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerMore}><Text style={styles.playerMoreText}>•••</Text></Pressable>
-      </View>
-      <View style={styles.playerTransport}>
-        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={previousAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>‹</Text></Pressable>
-        <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={nextAudio} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlArrow}>›</Text></Pressable>
-        <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
-        <Pressable onPress={() => setMenuOpen(true)} style={styles.playerSpeedPill}><Text style={styles.playerSpeedText}>{audioPrefs.speed.toFixed(1)}×</Text></Pressable>
-      </View>
+      <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
+      <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable>
+      <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
+      <Pressable onPress={() => updateSpeed(audioPrefs.speed >= 2 ? 0.5 : audioPrefs.speed + 0.1)} style={styles.playerSpeedPill}><Text style={styles.playerSpeedText}>{audioPrefs.speed.toFixed(1)}×</Text></Pressable>
     </View>
   ) : null;
 
@@ -648,7 +655,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
     <View style={styles.flex}>
       {topBar(ar ? readerSurah.nameArabic : readerSurah.nameTransliterated, tr(`Page ${currentPage} • Juz ${currentJuz}`, `الصفحة ${num(currentPage)} • الجزء ${num(currentJuz)}`))}
       {audioPrefs.readerMode === "mushaf" ? (
-        <View style={styles.readerBody} {...readerPanResponder.panHandlers}>
+        <View style={styles.readerBody} onTouchStart={handleReaderSurfaceTouchStart} onTouchEnd={handleReaderSurfaceTouchEnd} {...readerPanResponder.panHandlers}>
           <ScrollView
             key={`mushaf-${currentPage}-${appearance.browseMode}`}
             style={styles.flex}
@@ -664,7 +671,6 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
           >
             {spreadMode ? <View style={styles.bookSpread}>{spreadLeftPage ? <View style={styles.bookPageSlot}>{renderMushafPage(spreadLeftPage)}</View> : <View style={[styles.bookPageSlot, styles.blankBookPage]} /> }<View style={styles.bookGutter} /><View style={styles.bookPageSlot}>{renderMushafPage(spreadRightPage)}</View></View> : renderMushafPage(currentPage)}
           </ScrollView>
-          <View style={styles.bookNav}><Pressable disabled={currentPage <= 1} onPress={() => openPage(previousBookPage)} style={[styles.bookNavButton, currentPage <= 1 && styles.disabled]}><Text style={styles.bookNavArrow}>{ar ? "›" : "‹"}</Text><Text style={styles.bookNavText}>{spreadMode ? tr("Previous pages", "الصفحات السابقة") : tr("Previous", "السابق")}</Text></Pressable><Pressable onPress={() => setAppearanceOpen(true)} style={styles.pageCenterPill}><Text style={styles.pageCenterText}>{spreadMode ? `📖 ${spreadLeftPage ?? 1}–${spreadRightPage}` : `📖 ${currentPage}`}</Text></Pressable><Pressable disabled={currentPage >= 604 || (spreadMode && spreadRightPage >= 604)} onPress={() => openPage(nextBookPage)} style={[styles.bookNavButton, (currentPage >= 604 || (spreadMode && spreadRightPage >= 604)) && styles.disabled]}><Text style={styles.bookNavText}>{spreadMode ? tr("Next pages", "الصفحات التالية") : tr("Next", "التالي")}</Text><Text style={styles.bookNavArrow}>{ar ? "‹" : "›"}</Text></Pressable></View>
         </View>
       ) : (
         <ScrollView style={styles.flex} contentContainerStyle={styles.studyWrap} showsVerticalScrollIndicator={false}><View style={styles.studySurahHeader}><Text style={styles.studySurahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.studySurahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>{readerAyahs.map((ayah) => { const playing = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && audioPrefs.highlightAudio; return <Pressable key={refKey(ayah)} onPress={() => { setSelectedAyah(ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} style={[styles.studyAyah, playing && styles.studyPlaying]}><View style={styles.studyTop}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontSize: appearance.fontSize, lineHeight: Math.round(appearance.fontSize * appearance.lineHeightMultiplier) }]}>{ayah.text}</Text></Pressable>; })}</ScrollView>
@@ -710,7 +716,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange }
   return (
     <View style={styles.flex} onTouchStart={revealAppNav} onTouchMove={revealAppNav}>
       {body}
-      {miniPlayer}
+      {screen === "reader" && playerVisible ? miniPlayer : null}
       {screen === "radio" ? quranDock : null}
       {menu}
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
@@ -742,7 +748,7 @@ const styles = StyleSheet.create({
   studyWrap: { padding: 11, paddingBottom: 20 }, studySurahHeader: { borderRadius: 20, backgroundColor: "#efe8d9", borderWidth: 1, borderColor: "#dfd2bb", padding: 16, alignItems: "center", marginBottom: 10 }, studySurahArabic: { color: "#173f35", fontSize: 28, fontWeight: "900", writingDirection: "rtl" }, studySurahEnglish: { color: "#7d776d", fontSize: 9, marginTop: 3 }, studyAyah: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#e1ddd4", padding: 15, marginBottom: 9 }, studyPlaying: { borderColor: "#0b8b69", borderWidth: 2, backgroundColor: "#f5fff9" }, studyTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, ayahPill: { minWidth: 34, textAlign: "center", backgroundColor: "#edf5f1", color: "#0b654f", padding: 7, borderRadius: 11, fontWeight: "900" }, smallPlay: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, studyArabic: { color: "#173f35", textAlign: "right", writingDirection: "rtl", marginTop: 9 },
   ayahActions: { backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e1ddd4", padding: 8 }, actionRef: { color: "#17483c", fontSize: 8, fontWeight: "900", marginBottom: 6 }, actionRow: { flexDirection: "row", gap: 6 }, actionButton: { flex: 1, minHeight: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#f0f5f2" }, actionIcon: { fontSize: 16 }, actionLabel: { color: "#31564b", fontSize: 7, fontWeight: "900", marginTop: 2 },
   memoryWrap: { paddingBottom: 22 }, memoryControls: { flexDirection: "row", gap: 8, margin: 12 }, memoryButton: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, memoryButtonText: { color: "#31564b", fontSize: 9, fontWeight: "900" }, memoryCard: { backgroundColor: "#fff", borderRadius: 19, borderWidth: 1, borderColor: "#e0ddd4", padding: 15, marginHorizontal: 12, marginBottom: 8 }, memoryArabic: { color: "#183e34", fontSize: 28, lineHeight: 48, textAlign: "right", writingDirection: "rtl", marginTop: 7 }, hidden: { color: "#9ca6a1", textAlign: "center", letterSpacing: 3 },
-  miniPlayer: { minHeight: 96, backgroundColor: "#103f35", paddingHorizontal: 12, paddingTop: 9, paddingBottom: 10, borderTopWidth: 1, borderTopColor: "#2c5c50" }, playerHeader: { flexDirection: "row", alignItems: "center", gap: 9 }, playerBadge: { width: 36, height: 36, borderRadius: 13, backgroundColor: "rgba(255,255,255,.1)", alignItems: "center", justifyContent: "center" }, playerBadgeText: { fontSize: 17 }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#b8d7ce", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 11, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#a9c7be", fontSize: 7, marginTop: 2 }, playerMore: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" }, playerMoreText: { color: "#d5e5df", fontSize: 13, fontWeight: "900" }, playerTransport: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 8 }, playerControl: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" }, playerControlDisabled: { opacity: .35 }, playerControlText: { color: "#d8e7e2", fontSize: 8, fontWeight: "900" }, playerControlArrow: { color: "#fff", fontSize: 25, lineHeight: 27, fontWeight: "700" }, playerMain: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }, playerMainText: { color: "#0b654f", fontSize: 18, fontWeight: "900" }, playerSpeedPill: { minWidth: 40, height: 34, borderRadius: 12, backgroundColor: "#dcebe5", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }, playerSpeedText: { color: "#17483c", fontSize: 8, fontWeight: "900" },
+  miniPlayer: { position: "absolute", left: 48, right: 48, bottom: 18, minHeight: 56, borderRadius: 28, backgroundColor: "rgba(16,63,53,.96)", paddingHorizontal: 9, paddingVertical: 6, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: "rgba(255,255,255,.12)", shadowColor: "#000", shadowOpacity: .22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 }, elevation: 12, zIndex: 50 }, playerHeader: { flexDirection: "row", alignItems: "center", gap: 9 }, playerBadge: { width: 36, height: 36, borderRadius: 13, backgroundColor: "rgba(255,255,255,.1)", alignItems: "center", justifyContent: "center" }, playerBadgeText: { fontSize: 17 }, miniCopy: { flex: 1 }, miniEyebrow: { color: "#b8d7ce", fontSize: 7, fontWeight: "900" }, miniTitle: { color: "#fff", fontSize: 11, fontWeight: "900", marginTop: 2 }, miniMeta: { color: "#a9c7be", fontSize: 7, marginTop: 2 }, playerMore: { width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" }, playerMoreText: { color: "#d5e5df", fontSize: 13, fontWeight: "900" }, playerTransport: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, playerControl: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.09)", alignItems: "center", justifyContent: "center" }, playerControlDisabled: { opacity: .35 }, playerControlText: { color: "#e4efeb", fontSize: 9, fontWeight: "900" }, playerControlArrow: { color: "#fff", fontSize: 25, lineHeight: 27, fontWeight: "700" }, playerMain: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }, playerMainText: { color: "#0b654f", fontSize: 17, fontWeight: "900" }, playerSpeedPill: { minWidth: 42, height: 38, borderRadius: 19, backgroundColor: "#dcebe5", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }, playerSpeedText: { color: "#17483c", fontSize: 8, fontWeight: "900" },
   quranDock: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#ddd9d0" }, quranDockIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, quranDockIconText: { color: "#fff", fontSize: 17, fontWeight: "900" }, quranDockText: { flex: 1, color: "#173f35", fontSize: 12, fontWeight: "900" }, quranDockArrow: { color: "#0b654f", fontSize: 25 },
   menuBackdrop: { flex: 1, backgroundColor: "rgba(20,29,26,.48)", justifyContent: "flex-end" }, menuSheet: { maxHeight: "90%", backgroundColor: "#f8f6f0", borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: "hidden" }, menuHero: { minHeight: 82, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, backgroundColor: "#0b654f" }, menuMoon: { width: 48, height: 48, borderRadius: 17, backgroundColor: "rgba(255,255,255,.12)", alignItems: "center", justifyContent: "center" }, menuMoonText: { color: "#f1d58d", fontSize: 29 }, menuTitle: { color: "#fff", fontSize: 21, fontWeight: "900" }, menuSubtitle: { color: "#c8e0d8", fontSize: 9, marginTop: 3 }, menuClose: { width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(255,255,255,.12)", alignItems: "center", justifyContent: "center" }, menuCloseText: { color: "#fff", fontSize: 24, lineHeight: 26 }, menuContent: { padding: 15, paddingBottom: 28 }, menuSectionLabel: { color: "#997b43", fontSize: 8, fontWeight: "900", letterSpacing: 1, marginBottom: 8 }, menuQuickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, menuQuickCard: { width: "48%", minHeight: 78, borderRadius: 18, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 12, justifyContent: "center" }, menuQuickRadio: { backgroundColor: "#f4efe2", borderColor: "#e1d5bd" }, menuQuickIcon: { fontSize: 21 }, menuQuickTitle: { color: "#173f35", fontSize: 11, fontWeight: "900", marginTop: 5 }, menuElegantCard: { marginTop: 10, borderRadius: 21, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 13 }, menuCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 }, menuCardIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" }, menuCardTitle: { color: "#173f35", fontSize: 13, fontWeight: "900" }, menuCardSubtitle: { color: "#83908a", fontSize: 8, marginTop: 2 }, speedRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 11 }, speedLabel: { flex: 1, color: "#53645e", fontSize: 9, fontWeight: "900" }, speedButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" }, speedButtonText: { color: "#0b654f", fontSize: 20, fontWeight: "900" }, speedValue: { minWidth: 46, textAlign: "center", color: "#173f35", fontSize: 10, fontWeight: "900" }, transport: { flexDirection: "row", gap: 6, marginTop: 10 }, transportButton: { flex: 1, minHeight: 41, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#edf5f1" }, transportMain: { width: 50, minHeight: 41, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, menuSettingRow: { minHeight: 64, marginTop: 10, borderRadius: 16, backgroundColor: "#f5f5f1", flexDirection: "row", alignItems: "center", gap: 10, padding: 10 }, settingGlyph: { width: 41, height: 41, borderRadius: 13, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, settingGlyphText: { color: "#fff", fontSize: 13, fontWeight: "900" }, menuSettingTitle: { color: "#173f35", fontSize: 10, fontWeight: "900" }, menuSettingMeta: { color: "#84908b", fontSize: 8, marginTop: 2 }, menuChevron: { color: "#0b654f", fontSize: 23 }, readerModeRow: { flexDirection: "row", gap: 7, marginTop: 9 }, readerModeButton: { flex: 1, minHeight: 42, borderRadius: 13, backgroundColor: "#f4f4f0", alignItems: "center", justifyContent: "center" }, readerModeButtonActive: { backgroundColor: "#0b654f" }, readerModeText: { color: "#53645e", fontSize: 9, fontWeight: "900" }, readerModeTextActive: { color: "#fff" }, highlightRow: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#ece8df" }, highlightTitle: { color: "#244b40", fontSize: 9, fontWeight: "900" }, highlightMeta: { color: "#84908b", fontSize: 7, marginTop: 2 }, jumpRow: { flexDirection: "row", gap: 8, marginTop: 9 }, pageInput: { flex: 1, height: 45, borderRadius: 13, borderWidth: 1, borderColor: "#ded9cf", backgroundColor: "#f9f8f5", paddingHorizontal: 12 }, jumpButton: { width: 80, height: 45, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#0b654f" }, jumpButtonText: { color: "#fff", fontWeight: "900" }, returnWopt: { minHeight: 48, marginTop: 12, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#ebe7dd" }, returnWoptText: { color: "#53645e", fontSize: 10, fontWeight: "900" },
   disabled: { opacity: .35 }
