@@ -2,9 +2,9 @@ from pathlib import Path
 
 path = Path('mobile/src/quran/QuranV3.tsx')
 text = path.read_text()
-anchor = '  radioContent: { paddingBottom: 28 },\n'
-if anchor not in text:
-    raise SystemExit('radioContent style anchor missing')
+marker = '  radioContent: {'
+start = text.index(marker)
+end = text.index('},', start) + 2
 styles = '''  radioContent: { paddingBottom: 34 },
   radioStudioHero: { margin: 14, marginBottom: 8, padding: 16, borderRadius: 28, backgroundColor: "#103f35", borderWidth: 1, borderColor: "#285b4e", shadowColor: "#000", shadowOpacity: .16, shadowRadius: 9, shadowOffset: { width: 0, height: 5 }, elevation: 8 },
   radioStudioTop: { flexDirection: "row", alignItems: "center", gap: 11 },
@@ -52,8 +52,7 @@ styles = '''  radioContent: { paddingBottom: 34 },
   radioGlassPillText: { color: "#245044", fontSize: 8, fontWeight: "900", textAlign: "center" },
   radioEmptyQueue: { minHeight: 88, marginTop: 10, borderRadius: 18, backgroundColor: "#f7f6f2", borderWidth: 1, borderColor: "#eeebe4", alignItems: "center", justifyContent: "center" },
   radioEmptyQueueIcon: { fontSize: 22, opacity: .65 },
-  radioEmptyQueueText: { color: "#8c9691", fontSize: 8, fontWeight: "800", marginTop: 4 },
-'''
-text = text.replace(anchor, styles, 1)
+  radioEmptyQueueText: { color: "#8c9691", fontSize: 8, fontWeight: "800", marginTop: 4 },'''
+text = text[:start] + styles + text[end:]
 path.write_text(text)
 print('Rich Quran Radio styles integrated')
