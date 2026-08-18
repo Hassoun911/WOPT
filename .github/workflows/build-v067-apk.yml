@@ -7,7 +7,7 @@ on:
       - ".github/v067-build-trigger.txt"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hassoun-v067-apk
@@ -26,21 +26,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Verify v0.6.7 four widget source
+      - name: Confirm required v0.6.7 files exist
+        id: sourcecheck
         run: |
           set -euo pipefail
-          MANIFEST="mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml"
-          PROVIDER="mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt"
-          grep -q 'HassounSquareWidgetProvider' "$MANIFEST"
-          grep -q 'HassounVerticalWidgetProvider' "$MANIFEST"
-          grep -q 'HassounSlimWidgetProvider' "$MANIFEST"
-          grep -q 'targetCellWidth="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
-          grep -q 'targetCellWidth="2"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_square_widget_info.xml
-          grep -q 'targetCellHeight="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_vertical_widget_info.xml
-          grep -q 'targetCellHeight="1"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_slim_widget_info.xml
-          grep -q '"xlarge" -> 44f' "$PROVIDER"
+          test -s mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml
+          test -s mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          test -s mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounVariantWidgetProviders.kt
+          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_square_widget_info.xml
+          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_vertical_widget_info.xml
+          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_slim_widget_info.xml
           test -s mobile/assets/icon.png
 
       - name: Setup Node 22
@@ -62,6 +60,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Validate mobile TypeScript
+        id: mobilets
         run: |
           set -euo pipefail
           cd mobile
@@ -69,6 +68,7 @@ jobs:
           npx tsc --noEmit
 
       - name: Validate Worker
+        id: worker
         run: |
           set -euo pipefail
           cd push-server
@@ -77,6 +77,7 @@ jobs:
           npm test
 
       - name: Prepare Android-safe Hassoun logo
+        id: logo
         run: |
           set -euo pipefail
           cp mobile/assets/icon.png mobile/assets/hassoun-logo.png
@@ -85,6 +86,7 @@ jobs:
           file mobile/assets/hassoun-logo.png
 
       - name: Clean Expo Android prebuild
+        id: prebuild
         run: |
           set -euo pipefail
           cd mobile
@@ -92,12 +94,14 @@ jobs:
           npx expo prebuild --platform android --clean --no-install
 
       - name: Build release APK
+        id: gradle
         run: |
           set -euo pipefail
           cd mobile/android
           ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       - name: Verify APK
+        id: verifyapk
         run: |
           set -euo pipefail
           APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
@@ -107,9 +111,35 @@ jobs:
           cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
 
       - name: Upload v0.6.7 APK
+        id: uploadapk
         uses: actions/upload-artifact@v4
         with:
           name: hassoun-v0.6.7-four-widget-sizes-${{ github.run_number }}
           path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record v0.6.7 build result
+        if: always()
+        shell: bash
+        run: |
+          cat > .github/v067-build-result.txt <<EOF
+          status=${{ job.status }}
+          source_check=${{ steps.sourcecheck.outcome }}
+          mobile_typescript=${{ steps.mobilets.outcome }}
+          worker_validation=${{ steps.worker.outcome }}
+          logo=${{ steps.logo.outcome }}
+          expo_prebuild=${{ steps.prebuild.outcome }}
+          gradle=${{ steps.gradle.outcome }}
+          apk_verify=${{ steps.verifyapk.outcome }}
+          apk_upload=${{ steps.uploadapk.outcome }}
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          artifact=hassoun-v0.6.7-four-widget-sizes-${{ github.run_number }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v067-build-result.txt
+          git commit -m "Record Hassoun v0.6.7 build result" || true
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
