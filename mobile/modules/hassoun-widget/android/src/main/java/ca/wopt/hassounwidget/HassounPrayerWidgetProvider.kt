@@ -66,8 +66,16 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
 
     fun updateAll(context: Context) {
       val manager = AppWidgetManager.getInstance(context)
-      val home = ComponentName(context, HassounPrayerWidgetProvider::class.java)
-      manager.getAppWidgetIds(home).forEach { updateWidget(context, manager, it, false) }
+      val providers = listOf(
+        HassounPrayerWidgetProvider::class.java,
+        HassounSquareWidgetProvider::class.java,
+        HassounVerticalWidgetProvider::class.java,
+        HassounSlimWidgetProvider::class.java
+      )
+      providers.forEach { providerClass ->
+        val component = ComponentName(context, providerClass)
+        manager.getAppWidgetIds(component).forEach { updateWidget(context, manager, it, false) }
+      }
       val lock = ComponentName(context, HassounLockScreenWidgetProvider::class.java)
       manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }
     }
@@ -85,13 +93,21 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
       val requestedLayout = prefs.getString("layout", "full") ?: "full"
+      val providerClassName = manager.getAppWidgetInfo(appWidgetId)?.provider?.className.orEmpty()
+      val providerLayout = when {
+        providerClassName.endsWith("HassounSquareWidgetProvider") -> "square"
+        providerClassName.endsWith("HassounVerticalWidgetProvider") -> "vertical"
+        providerClassName.endsWith("HassounSlimWidgetProvider") -> "slim"
+        providerClassName.endsWith("HassounPrayerWidgetProvider") -> "full"
+        else -> null
+      }
       val minWidth = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
       val minHeight = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
       // Samsung may call onUpdate before it reports a usable widget size. Keep
       // that first render on the same lightweight RemoteViews used by the
       // launcher preview. Once real dimensions arrive, switch to the responsive
       // full/square/vertical/slim renderer below.
-      val layout = if (isLockScreen) requestedLayout else when {
+      val layout = if (isLockScreen) requestedLayout else providerLayout ?: when {
         minWidth <= 0 || minHeight <= 0 -> "slim"
         minHeight >= minWidth * 1.35 -> "vertical"
         minWidth <= 220 && minHeight >= 150 -> "square"
@@ -154,15 +170,17 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_next_secondary, if (showArabicNames) secondaryName else "")
         views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
-        val timeSp = if (layout == "vertical") {
-          when (timeSize) { "small" -> 15f; "medium" -> 17f; "xlarge" -> 21f; else -> 19f }
-        } else {
-          when (timeSize) { "small" -> 20f; "medium" -> 25f; "xlarge" -> 35f; else -> 30f }
+        val timeSp = when (layout) {
+          "vertical" -> when (timeSize) { "small" -> 21f; "medium" -> 25f; "xlarge" -> 34f; else -> 29f }
+          "square" -> when (timeSize) { "small" -> 20f; "medium" -> 24f; "xlarge" -> 32f; else -> 28f }
+          "slim", "compact", "next" -> when (timeSize) { "small" -> 24f; "medium" -> 29f; "xlarge" -> 40f; else -> 34f }
+          else -> when (timeSize) { "small" -> 25f; "medium" -> 31f; "xlarge" -> 44f; else -> 37f }
         }
-        val prayerNameSp = if (layout == "vertical") {
-          when (focus) { "all" -> 15f; "balanced" -> 17f; else -> 19f }
-        } else {
-          when (focus) { "all" -> 20f; "balanced" -> 23f; else -> 26f }
+        val prayerNameSp = when (layout) {
+          "vertical" -> when (focus) { "all" -> 21f; "balanced" -> 25f; else -> 30f }
+          "square" -> when (focus) { "all" -> 20f; "balanced" -> 24f; else -> 29f }
+          "slim", "compact", "next" -> when (focus) { "all" -> 20f; "balanced" -> 25f; else -> 31f }
+          else -> when (focus) { "all" -> 22f; "balanced" -> 27f; else -> 34f }
         }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
@@ -242,10 +260,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
         views.setTextViewText(id, "$title\n${formatClock(time, locale)}")
         views.setTextColor(id, if (highlightNext && key == nextKey) accent else baseText)
-        val stripSp = if (lockScreen) 9f else when (timeSize) {
-          "small" -> 8f
-          "xlarge" -> 10f
-          else -> 9f
+        val stripSp = if (lockScreen) 10f else when (timeSize) {
+          "small" -> 9.5f
+          "medium" -> 11f
+          "xlarge" -> 14f
+          else -> 12.5f
         }
         views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
       }
