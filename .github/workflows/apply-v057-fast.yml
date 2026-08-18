@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-        
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
@@ -70,24 +70,11 @@ jobs:
           python .github/scripts/post-v057-responsive.py
           python .github/scripts/fix-v057-widget-bridge.py
 
-      - name: Update release naming
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('.github/workflows/android-debug.yml')
-          s = p.read_text()
-          s = s.replace('# Build Hassoun v0.5.5 widget studio + Samsung LockStar release', '# Build Hassoun v0.5.7 Quran + widgets + multiplayer games release')
-          s = s.replace('Hassoun-v0.5.5.apk', 'Hassoun-v0.5.7.apk')
-          s = s.replace('hassoun-v0.5.5-${{ github.run_number }}', 'hassoun-v0.5.7-${{ github.run_number }}')
-          p.write_text(s)
-          PY
-
       - name: Commit v0.5.7 source immediately
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f .github/v057-last-error.log
-          git add -f mobile push-server .github/workflows/android-debug.yml .github/v057-last-error.log 2>/dev/null || true
+          git add -f mobile push-server
           git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games"
           git push origin HEAD:main
 
