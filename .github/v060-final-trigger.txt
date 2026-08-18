@@ -1,1 +1,1 @@
-Trigger final clean Hassoun v0.6.0 release after direct app/events/email/native-audio fixes. Run finishing pass, validate every required fix, commit generated source, then clean standalone APK build. Triggered 2026-08-18 07:17 America/Toronto.
+Trigger diagnostic clean Hassoun v0.6.0 build after pipeline hardening. Commit remaining source first, validate mobile and Worker separately, clean prebuild, clean Gradle release, verify embedded JS, upload APK, and always record exact outcomes. Triggered 2026-08-18 09:52 America/Toronto.
