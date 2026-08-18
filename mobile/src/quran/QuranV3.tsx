@@ -230,6 +230,14 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const selectedIsBookmarked = Boolean(selectedAyah && bookmarks.includes(refKey(selectedAyah)));
   const autoSpread = width >= 700;
   const spreadMode = appearance.bookMode === "spread" || (appearance.bookMode === "auto" && autoSpread);
+  const visibleReaderPages = (() => {
+    if (!spreadMode) return [currentPage];
+    const left = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
+    return left >= 604 ? [604] : [left, left + 1];
+  })();
+  const activeAyahOnVisiblePage = Boolean(
+    activeAyah && visibleReaderPages.includes(pageForAyah(activeAyah.surah, activeAyah.ayah) ?? -1)
+  );
 
   // Reader, Radio and the Quran menu own the audio controls while they are visible.
   // Everywhere else, App.tsx may show the single global persistent player.
@@ -487,6 +495,10 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
   const playAyah = (ayah: QuranAyah, repeat = false) => playQueue([ayah], repeat);
   const playSurah = (surah: number, repeat = false) => playQueue(getSurahAyahs(surah), repeat);
+  const playVisibleReaderPages = (repeat = false) => {
+    const queue = visibleReaderPages.flatMap((page) => pageAyahsFor(page, pages));
+    playQueue(queue, repeat);
+  };
 
   const toggleSelectedPlayback = (ayah: QuranAyah) => {
     const sameAyah = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah;
@@ -544,8 +556,22 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   };
 
   const togglePlayerPlayback = () => {
+    if (screen === "reader") {
+      // Reader playback always belongs to what is visible now. If the native
+      // session is playing/paused on another page, replace it with the current
+      // page (or current two-page spread) instead of resuming unrelated audio.
+      if (!activeAyahOnVisiblePage) {
+        playVisibleReaderPages(false);
+        return;
+      }
+      if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
+      if (audioStatus.state === "paused") { QuranAudio?.resume(); return; }
+      // A completed visible-page queue should replay that page from its first ayah.
+      playVisibleReaderPages(false);
+      return;
+    }
     if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
-    if (audioStatus.state === "paused" || audioStatus.state === "completed") { QuranAudio?.resume(); return; }
+    if (audioStatus.state === "paused") { QuranAudio?.resume(); return; }
     if (!activeAyah) { playSurah(position.surah, false); return; }
     QuranAudio?.resume();
   };
@@ -630,9 +656,9 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
   const miniPlayer = playerAyah ? (
     <View style={styles.miniPlayer}>
-      <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
-      <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable>
-      <Pressable disabled={!activeAyah} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyah && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
+      <Pressable disabled={!activeAyahOnVisiblePage} onPress={() => QuranAudio?.seekBy(-10000)} style={[styles.playerControl, !activeAyahOnVisiblePage && styles.playerControlDisabled]}><Text style={styles.playerControlText}>−10</Text></Pressable>
+      <Pressable onPress={togglePlayerPlayback} style={styles.playerMain}><Text style={styles.playerMainText}>{audioStatus.state === "playing" && activeAyahOnVisiblePage ? "Ⅱ" : "▶"}</Text></Pressable>
+      <Pressable disabled={!activeAyahOnVisiblePage} onPress={() => QuranAudio?.seekBy(10000)} style={[styles.playerControl, !activeAyahOnVisiblePage && styles.playerControlDisabled]}><Text style={styles.playerControlText}>+10</Text></Pressable>
       <Pressable onPress={() => updateSpeed(audioPrefs.speed >= 2 ? 0.5 : audioPrefs.speed + 0.1)} style={styles.playerSpeedPill}><Text style={styles.playerSpeedText}>{audioPrefs.speed.toFixed(1)}×</Text></Pressable>
     </View>
   ) : null;
