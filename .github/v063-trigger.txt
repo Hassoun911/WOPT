@@ -1,2 +1,2 @@
-trigger=2026-08-18T11:25:00-04:00
-reason=rerun-full-validation-after-android16-widget-recovery
+trigger=2026-08-18T12:15:00-04:00
+reason=rerun-full-validation-after-idempotent-smart-alert-check
