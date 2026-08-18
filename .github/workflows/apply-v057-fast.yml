@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".github/workflows/apply-v057-fast.yml"
+      - ".github/v057-trigger.txt"
 
 permissions:
   contents: write
@@ -31,11 +31,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            mobile/package-lock.json
-            push-server/package-lock.json
-
+        
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
