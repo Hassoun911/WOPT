@@ -65,7 +65,7 @@ jobs:
           set -euo pipefail
           cd mobile
           npm ci --no-audit --no-fund
-          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
           npx tsc --noEmit
 
       - name: Validate Worker
