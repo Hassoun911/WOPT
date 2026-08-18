@@ -1,0 +1,2 @@
+trigger=2026-08-18T00:35:00-04:00
+reason=build standalone v0.5.8 after Quran visible-page playback and Samsung widget fixes
