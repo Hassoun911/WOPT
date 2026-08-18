@@ -1,2 +1,2 @@
-trigger=2026-08-18T15:45:00-04:00
-reason=fix-samsung-widget-islamic-events-exact-logo-all-pages
+trigger=2026-08-18T17:23:00-04:00
+reason=fix-islamic-events-typescript-export-and-rebuild-apk
