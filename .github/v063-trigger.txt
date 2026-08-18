@@ -1,2 +1,2 @@
-trigger=2026-08-18T18:24:30Z
-reason=build-apk-after-responsive-widget-v064-repair
+trigger=2026-08-18T19:43:42Z
+reason=compact-vertical-widget-v065
