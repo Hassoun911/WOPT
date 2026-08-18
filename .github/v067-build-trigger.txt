@@ -1,2 +1,2 @@
-trigger=2026-08-18T23:47:00Z
-reason=retry-after-typescript-linux-package-fix
+trigger=2026-08-18T23:50:00Z
+reason=retry-after-expo-font-dependency-fix
