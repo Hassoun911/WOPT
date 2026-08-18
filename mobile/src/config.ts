@@ -16,5 +16,6 @@ export const STORAGE_KEYS = {
   pushToken: "wopt:push-token:v1",
   installationId: "wopt:installation-id:v1",
   locale: "wopt:locale:v1",
-  prayerAudioMuted: "hassoun:prayer-audio-muted:v1"
+  prayerAudioMuted: "hassoun:prayer-audio-muted:v1",
+  phonePrayerAlerts: "hassoun:phone-prayer-alerts:v1"
 } as const;
