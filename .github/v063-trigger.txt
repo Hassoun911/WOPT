@@ -1,2 +1,2 @@
-trigger=2026-08-18T15:12:00-04:00
-reason=retry-full-test-with-retained-fixes-verified-not-reapplied
+trigger=2026-08-18T11:25:00-04:00
+reason=rerun-full-validation-after-android16-widget-recovery
