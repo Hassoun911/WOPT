@@ -1,5 +1,5 @@
 Hassoun v0.5.7 integration failed
-patch=0 harden=0 responsive=0 mobile=0 worker=0 native=1
+patch=0 harden=0 responsive=0 mobile=0 worker=0 logo=0 native=1
 
 ===== patch =====
 Applied Hassoun v0.5.7: widgets, Noble Qur'an navigation, and multiplayer games.
@@ -12,7 +12,7 @@ Applied responsive Square/Slim widgets and Islamic Widget Studio preview.
 ===== mobile =====
 npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 488 packages in 10s
+added 488 packages in 9s
 
 ===== worker =====
 
@@ -28,92 +28,166 @@ added 106 packages in 4s
 
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/WOPT/WOPT/push-server[39m
 
- [32m✓[39m tests/schedule.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/schedule.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 21[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
 [2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
-[2m   Start at [22m 00:28:15
-[2m   Duration [22m 189ms[2m (transform 30ms, setup 0ms, import 43ms, tests 22ms, environment 0ms)[22m
+[2m   Start at [22m 00:33:08
+[2m   Duration [22m 186ms[2m (transform 31ms, setup 0ms, import 44ms, tests 21ms, environment 0ms)[22m
 
+
+===== logo =====
+Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+Get:6 https://packages.microsoft.com/repos/azure-cli noble InRelease [3564 B]
+Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [2548 B]
+Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1208 kB]
+Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [284 kB]
+Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [181 kB]
+Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1683 kB]
+Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [336 kB]
+Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1452 kB]
+Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [330 kB]
+Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [12.6 kB]
+Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:19 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5744 B]
+Get:20 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [12.6 kB]
+Get:21 https://packages.microsoft.com/repos/azure-cli noble/main amd64 Packages [2452 B]
+Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [934 kB]
+Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [202 kB]
+Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
+Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1201 kB]
+Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [240 kB]
+Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.2 kB]
+Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1330 kB]
+Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [304 kB]
+Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [10.9 kB]
+Get:31 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [329 kB]
+Get:32 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [12.4 kB]
+Get:33 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [288 kB]
+Get:34 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1416 B]
+Fetched 11.3 MB in 1s (8865 kB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  librsvg2-2 librsvg2-common
+The following NEW packages will be installed:
+  librsvg2-2 librsvg2-bin librsvg2-common pngcrush
+0 upgraded, 4 newly installed, 0 to remove and 12 not upgraded.
+Need to get 4496 kB of archives.
+After this operation, 14.6 MB of additional disk space will be used.
+Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Get:2 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 librsvg2-2 amd64 2.58.0+dfsg-1build1 [2135 kB]
+Get:3 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 librsvg2-bin amd64 2.58.0+dfsg-1build1 [2299 kB]
+Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 librsvg2-common amd64 2.58.0+dfsg-1build1 [11.8 kB]
+Get:5 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 pngcrush amd64 1.8.13-1build2 [49.5 kB]
+Fetched 4496 kB in 1s (6952 kB/s)
+Selecting previously unselected package librsvg2-2:amd64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 203139 files and directories currently installed.)
+Preparing to unpack .../librsvg2-2_2.58.0+dfsg-1build1_amd64.deb ...
+Unpacking librsvg2-2:amd64 (2.58.0+dfsg-1build1) ...
+Selecting previously unselected package librsvg2-bin.
+Preparing to unpack .../librsvg2-bin_2.58.0+dfsg-1build1_amd64.deb ...
+Unpacking librsvg2-bin (2.58.0+dfsg-1build1) ...
+Selecting previously unselected package librsvg2-common:amd64.
+Preparing to unpack .../librsvg2-common_2.58.0+dfsg-1build1_amd64.deb ...
+Unpacking librsvg2-common:amd64 (2.58.0+dfsg-1build1) ...
+Selecting previously unselected package pngcrush.
+Preparing to unpack .../pngcrush_1.8.13-1build2_amd64.deb ...
+Unpacking pngcrush (1.8.13-1build2) ...
+Setting up pngcrush (1.8.13-1build2) ...
+Setting up librsvg2-2:amd64 (2.58.0+dfsg-1build1) ...
+Setting up librsvg2-common:amd64 (2.58.0+dfsg-1build1) ...
+Setting up librsvg2-bin (2.58.0+dfsg-1build1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Not building database; man-db/auto-update is not 'true'.
+Processing triggers for libgdk-pixbuf-2.0-0:amd64 (2.42.10+dfsg-3ubuntu3.3) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.8) ...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+  Recompressing IDAT chunks in /tmp/hassoun-widget-logo.png
+   Total length of data found in critical chunks            =    125329
+   Best pngcrush method        =   7 (ws 15 fm 0 zl 9 zs 0) =    112816
+CPU time decode 0.023332, encode 0.138420, other 0.001781, total 0.166379 sec
+mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png: PNG image data, 512 x 512, 8-bit/color RGBA, non-interlaced
 
 ===== native =====
-
-> Task :expo-constants:processReleaseManifest
-> Task :wopt-hassoun-widget:extractDeepLinksRelease
-> Task :wopt-prayer-audio:extractDeepLinksRelease
-
-> Task :react-native-safe-area-context:processReleaseManifest
-package="com.th3rdwave.safeareacontext" found in source AndroidManifest.xml: /home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/AndroidManifest.xml.
-Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
-Recommendation: remove package="com.th3rdwave.safeareacontext" from the source AndroidManifest.xml: /home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/AndroidManifest.xml.
-
-> Task :wopt-quran-audio:extractDeepLinksRelease
-> Task :wopt-quran-audio:processReleaseManifest
-> Task :wopt-prayer-audio:processReleaseManifest
-> Task :wopt-hassoun-widget:processReleaseManifest
-> Task :wopt-quran-speech:extractDeepLinksRelease
-> Task :wopt-quran-speech:processReleaseManifest
-> Task :expo-constants:compileReleaseLibraryResources
-> Task :expo:compileReleaseLibraryResources
-> Task :expo-log-box:compileReleaseLibraryResources
+> Task :expo:javaPreCompileRelease
+> Task :react-native-async-storage_async-storage:generateReleaseBuildConfig
+> Task :react-native-async-storage_async-storage:javaPreCompileRelease
+> Task :wopt-hassoun-widget:compileReleaseLibraryResources
+> Task :react-native-safe-area-context:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-safe-area-context:generateReleaseBuildConfig
 
 > Task :app:createBundleReleaseJsAndAssets
-(node:3207) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-Starting Metro Bundler
-
-
-> Task :expo:parseReleaseLocalResources
-> Task :expo-constants:parseReleaseLocalResources
-> Task :expo-log-box:parseReleaseLocalResources
-> Task :expo-constants:generateReleaseRFile
-> Task :expo-log-box:generateReleaseRFile
-> Task :expo:generateReleaseRFile
-> Task :expo-modules-core:compileReleaseLibraryResources
-> Task :react-native-async-storage_async-storage:compileReleaseLibraryResources
-> Task :react-native-safe-area-context:compileReleaseLibraryResources
-> Task :react-native-safe-area-context:parseReleaseLocalResources
-> Task :expo-modules-core:parseReleaseLocalResources
-> Task :react-native-async-storage_async-storage:parseReleaseLocalResources
-> Task :react-native-safe-area-context:generateReleaseRFile
-> Task :expo-modules-core:generateReleaseRFile
-> Task :react-native-async-storage_async-storage:generateReleaseRFile
-> Task :wopt-quran-audio:compileReleaseLibraryResources
-> Task :wopt-hassoun-widget:parseReleaseLocalResources
-> Task :wopt-prayer-audio:compileReleaseLibraryResources
-> Task :wopt-hassoun-widget:generateReleaseRFile
-> Task :wopt-prayer-audio:parseReleaseLocalResources
-> Task :wopt-quran-audio:parseReleaseLocalResources
-> Task :wopt-prayer-audio:generateReleaseRFile
-> Task :wopt-quran-audio:generateReleaseRFile
-> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :wopt-quran-speech:compileReleaseLibraryResources
-> Task :expo:generateReleaseBuildConfig
-> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :wopt-quran-speech:parseReleaseLocalResources
-> Task :expo-constants:generateReleaseBuildConfig
-> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-modules-core:generateReleaseBuildConfig
-> Task :wopt-quran-speech:generateReleaseRFile
-> Task :expo-constants:javaPreCompileRelease
-> Task :expo-log-box:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-log-box:generateReleaseBuildConfig
-> Task :expo-log-box:javaPreCompileRelease
-> Task :wopt-hassoun-widget:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :wopt-hassoun-widget:generateReleaseBuildConfig
-> Task :wopt-hassoun-widget:compileReleaseLibraryResources FAILED
-> Task :wopt-hassoun-widget:javaPreCompileRelease
-> Task :wopt-prayer-audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :wopt-prayer-audio:generateReleaseBuildConfig
-> Task :wopt-prayer-audio:javaPreCompileRelease
-
-> Task :app:createBundleReleaseJsAndAssets
-Android Bundled 14393ms index.ts (713 modules)
+Android Bundled 15535ms index.ts (713 modules)
 Writing bundle output to: /home/runner/work/WOPT/WOPT/mobile/android/app/build/generated/assets/react/release/index.android.bundle
 Writing sourcemap output to: /home/runner/work/WOPT/WOPT/mobile/android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map
 Copying 2 asset files
 Done writing bundle output
 Done writing sourcemap output
+
+> Task :react-native-safe-area-context:compileReleaseKotlin
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaProviderManager.kt:39:19 'fun getEventDispatcherForReactTag(context: ReactContext, reactTag: Int): EventDispatcher?' is deprecated. reactTag is no longer needed.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt:9:8 'class UIManagerModule : ReactContextBaseJavaModule, LifecycleEventListener, UIManager' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt:50:54 'class UIManagerModule : ReactContextBaseJavaModule, LifecycleEventListener, UIManager' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt:59:23 'val uiImplementation: UIImplementation!' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaViewShadowNode.kt:9:32 'class LayoutShadowNode : ReactShadowNodeImpl' is deprecated. This class is part of Legacy Architecture and will be removed in a future release.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaViewShadowNode.kt:110:61 'class NativeViewHierarchyOptimizer : Any' is deprecated. This class is part of Legacy Architecture and will be removed in a future release.
+
+> Task :react-native-async-storage_async-storage:compileReleaseJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/runner/work/WOPT/WOPT/mobile/node_modules/@react-native-async-storage/async-storage/android/src/javaPackage/java/com/reactnativecommunity/asyncstorage/AsyncStoragePackage.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :expo-modules-core:javaPreCompileRelease
+> Task :react-native-safe-area-context:javaPreCompileRelease
+> Task :react-native-async-storage_async-storage:bundleLibCompileToJarRelease
+> Task :react-native-safe-area-context:compileReleaseJavaWithJavac
+> Task :react-native-safe-area-context:bundleLibCompileToJarRelease
+> Task :app:preBuild
+> Task :app:preReleaseBuild
+> Task :expo-modules-core:compileReleaseKotlin
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+
+> Task :app:processReleaseMainManifest
+/home/runner/work/WOPT/WOPT/mobile/android/app/src/main/AndroidManifest.xml Warning:
+	provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged at AndroidManifest.xml:0 to replace other declarations but no other declaration present
+
+> Task :app:expoReleaseOverrideMaxSdkConflicts
+[33m---------- Expo Max Sdk Override Plugin ----------[0m
+[32m>>> No 'android:maxSdkVersion' conflicts found[0m
+[33m--------------------------------------------------[0m
+
+> Task :app:processReleaseManifest
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseBuildConfig
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseResources
 
 > Task :expo-modules-core:compileReleaseKotlin
 w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/apploader/AppLoaderProvider.kt:34:52 Unchecked cast of 'Class<*>!' to 'Class<out HeadlessAppLoader>'.
@@ -131,17 +205,33 @@ w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/andr
 w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
 w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
 
+> Task :expo-modules-core:compileReleaseJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :expo-modules-core:bundleLibCompileToJarRelease
+
+> Task :expo-constants:compileReleaseKotlin
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-constants/android/src/main/java/expo/modules/constants/ConstantsModule.kt:13:5 'fun Constants(legacyConstantsProvider: () -> Map<String, Any?>): Unit' is deprecated. Use `Constant` or `Property` instead.
+
+> Task :wopt-hassoun-widget:compileReleaseKotlin
+e: file:///home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounWidgetModule.kt:15:32 Argument type mismatch: actual type is 'Function14<String, String, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, String, String, String, String, Any?>', but 'Function0<Any?>' was expected.
+
+> Task :wopt-hassoun-widget:compileReleaseKotlin FAILED
+> Task :expo-constants:compileReleaseJavaWithJavac
+> Task :expo-log-box:compileReleaseKotlin
+
+> Task :wopt-prayer-audio:compileReleaseKotlin
+w: file:///home/runner/work/WOPT/WOPT/mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt:167:8 'fun addAction(p0: Int, p1: CharSequence!, p2: PendingIntent!): Notification.Builder!' is deprecated. Deprecated in Java.
+
 [Incubating] Problems report is available at: file:///home/runner/work/WOPT/WOPT/mobile/android/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':wopt-hassoun-widget:compileReleaseLibraryResources'.
-> A failure occurred while executing com.android.build.gradle.tasks.CompileLibraryResourcesTask$CompileLibraryResourcesAction
-   > There was a failure while executing work items
-      > A failure occurred while executing com.android.build.gradle.internal.res.Aapt2CompileRunnable
-         > AAPT2 aapt2-8.12.0-13700139-linux Daemon #0: Unexpected error during compile '/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/intermediates/packaged_res/release/packageReleaseResources/drawable/hassoun_widget_logo.png', attempting to stop daemon.
-           This should not happen under normal circumstances, please file an issue if it does.
+Execution failed for task ':wopt-hassoun-widget:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -155,5 +245,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 3m 34s
-139 actionable tasks: 139 executed
+BUILD FAILED in 3m 51s
+176 actionable tasks: 176 executed
