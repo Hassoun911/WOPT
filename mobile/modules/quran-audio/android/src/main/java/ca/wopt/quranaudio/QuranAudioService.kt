@@ -27,6 +27,14 @@ class QuranAudioService : Service() {
   private var state = "idle"
   private var mediaSession: MediaSession? = null
 
+  // Continuous Qur’an mode is lazy: only the absolute ayah range is passed
+  // through the Intent. This avoids Android Binder crashes from huge JSON queues.
+  private var rangeActive = false
+  private var rangeStartAbsolute = 1
+  private var rangeEndAbsolute = 0
+  private var rangeReciterBase = ""
+  private var rangeReciterName = "Hassoun"
+
   override fun onCreate() {
     super.onCreate()
     createChannel()
@@ -49,11 +57,25 @@ class QuranAudioService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       ACTION_PLAY_QUEUE -> {
+        rangeActive = false
+        rangeEndAbsolute = 0
         queue = parseQueue(intent.getStringExtra(EXTRA_ITEMS).orEmpty())
         queueIndex = intent.getIntExtra(EXTRA_INDEX, 0).coerceIn(0, (queue.size - 1).coerceAtLeast(0))
         repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)
         speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)
         if (queue.isNotEmpty()) playCurrent() else stopPlayback(true)
+      }
+      ACTION_PLAY_RANGE -> {
+        queue = emptyList()
+        rangeStartAbsolute = intent.getIntExtra(EXTRA_RANGE_START, 1).coerceAtLeast(1)
+        rangeEndAbsolute = intent.getIntExtra(EXTRA_RANGE_END, rangeStartAbsolute).coerceAtLeast(rangeStartAbsolute)
+        rangeReciterBase = intent.getStringExtra(EXTRA_RECITER_BASE).orEmpty().trimEnd('/')
+        rangeReciterName = intent.getStringExtra(EXTRA_RECITER_NAME).orEmpty().ifBlank { "Hassoun" }
+        rangeActive = rangeReciterBase.isNotBlank() && rangeEndAbsolute >= rangeStartAbsolute
+        queueIndex = 0
+        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)
+        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)
+        if (rangeActive) playCurrent() else stopPlayback(true)
       }
       ACTION_PAUSE -> pausePlayback()
       ACTION_RESUME -> resumePlayback()
@@ -89,8 +111,24 @@ class QuranAudioService : Service() {
     super.onDestroy()
   }
 
+  private fun currentQueueSize(): Int = if (rangeActive) {
+    (rangeEndAbsolute - rangeStartAbsolute + 1).coerceAtLeast(0)
+  } else queue.size
+
+  private fun currentItem(): QueueItem? {
+    if (!rangeActive) return queue.getOrNull(queueIndex)
+    val absolute = rangeStartAbsolute + queueIndex
+    if (absolute !in rangeStartAbsolute..rangeEndAbsolute) return null
+    val (surah, ayah) = surahAyahForAbsolute(absolute)
+    return QueueItem(
+      url = "$rangeReciterBase/$absolute.mp3",
+      title = "Surah $surah • Ayah $ayah",
+      subtitle = "$rangeReciterName • Hassoun"
+    )
+  }
+
   private fun playCurrent() {
-    val item = queue.getOrNull(queueIndex) ?: run {
+    val item = currentItem() ?: run {
       stopPlayback(true)
       return
     }
@@ -117,10 +155,10 @@ class QuranAudioService : Service() {
       updateNotification()
     }
     next.setOnCompletionListener {
-      if (queueIndex + 1 < queue.size) {
+      if (queueIndex + 1 < currentQueueSize()) {
         queueIndex += 1
         playCurrent()
-      } else if (repeatQueue && queue.isNotEmpty()) {
+      } else if (repeatQueue && currentQueueSize() > 0) {
         queueIndex = 0
         playCurrent()
       } else {
@@ -130,9 +168,16 @@ class QuranAudioService : Service() {
       }
     }
     next.setOnErrorListener { _, _, _ ->
-      state = "error"
-      publishSnapshot()
-      updateNotification()
+      // A failed network item should not kill a long continuous range. Skip it
+      // when another ayah remains; surface an error only at the end.
+      if (queueIndex + 1 < currentQueueSize()) {
+        queueIndex += 1
+        playCurrent()
+      } else {
+        state = "error"
+        publishSnapshot()
+        updateNotification()
+      }
       true
     }
     next.prepareAsync()
@@ -152,7 +197,7 @@ class QuranAudioService : Service() {
   private fun resumePlayback() {
     val current = player
     if (current == null) {
-      if (queue.isNotEmpty()) playCurrent()
+      if (currentQueueSize() > 0) playCurrent()
       return
     }
     if (state == "completed") runCatching { current.seekTo(0) }
@@ -163,15 +208,16 @@ class QuranAudioService : Service() {
   }
 
   private fun skipNext() {
-    if (queue.isEmpty()) return
-    if (queueIndex + 1 < queue.size) queueIndex += 1
+    val size = currentQueueSize()
+    if (size <= 0) return
+    if (queueIndex + 1 < size) queueIndex += 1
     else if (repeatQueue) queueIndex = 0
     else return
     playCurrent()
   }
 
   private fun skipPrevious() {
-    if (queue.isEmpty()) return
+    if (currentQueueSize() <= 0) return
     val position = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
     if (position > 5000) {
       runCatching { player?.seekTo(0) }
@@ -197,6 +243,11 @@ class QuranAudioService : Service() {
     queue = emptyList()
     queueIndex = 0
     repeatQueue = false
+    rangeActive = false
+    rangeStartAbsolute = 1
+    rangeEndAbsolute = 0
+    rangeReciterBase = ""
+    rangeReciterName = "Hassoun"
     state = "idle"
     publishSnapshot()
     if (removeNotification) {
@@ -222,7 +273,7 @@ class QuranAudioService : Service() {
   }
 
   private fun publishSnapshot() {
-    val item = queue.getOrNull(queueIndex)
+    val item = currentItem()
     val current = player
     val position = runCatching { current?.currentPosition ?: 0 }.getOrDefault(0)
     val duration = runCatching { current?.duration ?: 0 }.getOrDefault(0)
@@ -236,8 +287,9 @@ class QuranAudioService : Service() {
       "title" to item?.title,
       "subtitle" to item?.subtitle,
       "queueIndex" to queueIndex,
-      "queueSize" to queue.size,
-      "repeat" to repeatQueue
+      "queueSize" to currentQueueSize(),
+      "repeat" to repeatQueue,
+      "mode" to if (rangeActive) "range" else "queue"
     )
     updateMediaSession(position.toLong(), duration.toLong())
   }
@@ -251,44 +303,35 @@ class QuranAudioService : Service() {
       "error" -> PlaybackState.STATE_ERROR
       else -> PlaybackState.STATE_NONE
     }
-    val actions = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_STOP or
-      PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_SEEK_TO
-    mediaSession?.setPlaybackState(
-      PlaybackState.Builder()
-        .setActions(actions)
-        .setState(playbackState, position, speed)
-        .build()
-    )
-    val item = queue.getOrNull(queueIndex)
-    if (item != null) {
-      val metadata = android.media.MediaMetadata.Builder()
-        .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, item.title.ifBlank { "Qur’an" })
-        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, item.subtitle.ifBlank { "Hassoun" })
-        .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, duration.coerceAtLeast(0))
-        .build()
-      mediaSession?.setMetadata(metadata)
+    val actions = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_STOP or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_SEEK_TO
+    mediaSession?.setPlaybackState(PlaybackState.Builder().setActions(actions).setState(playbackState, position, speed).build())
+    currentItem()?.let { item ->
+      mediaSession?.setMetadata(
+        android.media.MediaMetadata.Builder()
+          .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, item.title.ifBlank { "Qur’an" })
+          .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, item.subtitle.ifBlank { "Hassoun" })
+          .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, duration.coerceAtLeast(0))
+          .build()
+      )
     }
   }
 
   private fun updateNotification() {
     if (state == "idle") return
-    val manager = getSystemService(NotificationManager::class.java)
-    manager.notify(NOTIFICATION_ID, buildNotification())
+    getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
   }
 
   private fun buildNotification(): Notification {
-    val item = queue.getOrNull(queueIndex)
+    val item = currentItem()
     val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-    val contentIntent = launchIntent?.let {
-      PendingIntent.getActivity(this, 100, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-    }
+    val contentIntent = launchIntent?.let { PendingIntent.getActivity(this, 100, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) }
     val playPauseAction = if (state == "playing") ACTION_PAUSE else ACTION_RESUME
     val playPauseIcon = if (state == "playing") android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
     val playPauseLabel = if (state == "playing") "Pause" else "Play"
-
+    val smallIcon = resources.getIdentifier("notification_icon", "drawable", packageName).takeIf { it != 0 } ?: applicationInfo.icon
     val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, CHANNEL_ID) else @Suppress("DEPRECATION") Notification.Builder(this)
     builder
-      .setSmallIcon(android.R.drawable.ic_media_play)
+      .setSmallIcon(smallIcon)
       .setContentTitle(item?.title?.ifBlank { "Qur’an" } ?: "Qur’an")
       .setContentText(item?.subtitle?.ifBlank { "Hassoun" } ?: "Hassoun")
       .setContentIntent(contentIntent)
@@ -299,13 +342,8 @@ class QuranAudioService : Service() {
       .addAction(playPauseIcon, playPauseLabel, actionIntent(playPauseAction, 2))
       .addAction(android.R.drawable.ic_media_next, "Next", actionIntent(ACTION_NEXT, 3))
       .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", actionIntent(ACTION_STOP, 4))
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-      builder.setStyle(
-        Notification.MediaStyle()
-          .setMediaSession(mediaSession?.sessionToken)
-          .setShowActionsInCompactView(0, 1, 2)
-      )
+      builder.setStyle(Notification.MediaStyle().setMediaSession(mediaSession?.sessionToken).setShowActionsInCompactView(0, 1, 2))
     }
     return builder.build()
   }
@@ -318,12 +356,20 @@ class QuranAudioService : Service() {
   private fun createChannel() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val manager = getSystemService(NotificationManager::class.java)
-    val channel = NotificationChannel(CHANNEL_ID, "Qur’an audio", NotificationManager.IMPORTANCE_LOW).apply {
-      description = "Background Qur’an playback controls"
+    manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Qur’an audio", NotificationManager.IMPORTANCE_LOW).apply {
+      description = "Hassoun background Qur’an playback controls"
       setSound(null, null)
       enableVibration(false)
+    })
+  }
+
+  private fun surahAyahForAbsolute(absolute: Int): Pair<Int, Int> {
+    var remaining = absolute.coerceAtLeast(1)
+    AYAH_COUNTS.forEachIndexed { index, count ->
+      if (remaining <= count) return Pair(index + 1, remaining)
+      remaining -= count
     }
-    manager.createNotificationChannel(channel)
+    return Pair(114, AYAH_COUNTS.last())
   }
 
   private fun parseQueue(json: String): List<QueueItem> {
@@ -342,6 +388,7 @@ class QuranAudioService : Service() {
     private const val CHANNEL_ID = "hassoun-quran-audio"
     private const val NOTIFICATION_ID = 4821
     private const val ACTION_PLAY_QUEUE = "ca.wopt.quranaudio.PLAY_QUEUE"
+    private const val ACTION_PLAY_RANGE = "ca.wopt.quranaudio.PLAY_RANGE"
     private const val ACTION_PAUSE = "ca.wopt.quranaudio.PAUSE"
     private const val ACTION_RESUME = "ca.wopt.quranaudio.RESUME"
     private const val ACTION_STOP = "ca.wopt.quranaudio.STOP"
@@ -352,23 +399,25 @@ class QuranAudioService : Service() {
     private const val ACTION_REPEAT = "ca.wopt.quranaudio.REPEAT"
     private const val EXTRA_ITEMS = "items"
     private const val EXTRA_INDEX = "index"
+    private const val EXTRA_RANGE_START = "rangeStart"
+    private const val EXTRA_RANGE_END = "rangeEnd"
+    private const val EXTRA_RECITER_BASE = "reciterBase"
+    private const val EXTRA_RECITER_NAME = "reciterName"
     private const val EXTRA_REPEAT = "repeat"
     private const val EXTRA_SPEED = "speed"
     private const val EXTRA_DELTA = "delta"
 
+    private val AYAH_COUNTS = intArrayOf(
+      7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,227,93,88,69,60,
+      34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,
+      14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,40,46,42,29,19,36,25,22,17,19,26,30,20,
+      15,21,11,8,8,19,5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6
+    )
+
     @Volatile
     var snapshot: Map<String, Any?> = mapOf(
-      "available" to true,
-      "state" to "idle",
-      "positionMs" to 0,
-      "durationMs" to 0,
-      "speed" to 1.0,
-      "url" to null,
-      "title" to null,
-      "subtitle" to null,
-      "queueIndex" to 0,
-      "queueSize" to 0,
-      "repeat" to false
+      "available" to true, "state" to "idle", "positionMs" to 0, "durationMs" to 0, "speed" to 1.0,
+      "url" to null, "title" to null, "subtitle" to null, "queueIndex" to 0, "queueSize" to 0, "repeat" to false, "mode" to "queue"
     )
       private set
 
@@ -383,6 +432,21 @@ class QuranAudioService : Service() {
         .setAction(ACTION_PLAY_QUEUE)
         .putExtra(EXTRA_ITEMS, itemsJson)
         .putExtra(EXTRA_INDEX, startIndex)
+        .putExtra(EXTRA_REPEAT, repeat)
+        .putExtra(EXTRA_SPEED, speed)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+    }
+
+    fun playRange(context: Context, startAbsolute: Int, endAbsolute: Int, reciterId: String, bitrate: Int, reciterName: String, repeat: Boolean, speed: Float) {
+      val safeStart = startAbsolute.coerceAtLeast(1)
+      val safeEnd = endAbsolute.coerceAtLeast(safeStart)
+      val base = "https://cdn.islamic.network/quran/audio/${bitrate.coerceAtLeast(32)}/${reciterId.trim()}"
+      val intent = Intent(context, QuranAudioService::class.java)
+        .setAction(ACTION_PLAY_RANGE)
+        .putExtra(EXTRA_RANGE_START, safeStart)
+        .putExtra(EXTRA_RANGE_END, safeEnd)
+        .putExtra(EXTRA_RECITER_BASE, base)
+        .putExtra(EXTRA_RECITER_NAME, reciterName)
         .putExtra(EXTRA_REPEAT, repeat)
         .putExtra(EXTRA_SPEED, speed)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
