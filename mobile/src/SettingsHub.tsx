@@ -82,6 +82,12 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
     HassounWidget.setPreferences(next);
   }, [locale]);
 
+  useEffect(() => {
+    if (page !== "widgets") return;
+    setWidgetPrefs({ ...HassounWidget.getPreferences(), locale });
+    HassounWidget.refresh();
+  }, [page, locale]);
+
   const updateWidget = (patch: Partial<HassounWidgetPreferences>) => {
     setWidgetPrefs((previous) => {
       const next = { ...previous, ...patch, locale };
@@ -132,7 +138,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BackHeader title={t("Widgets", "الويدجت")} onBack={() => setPage("root")} />
-        <Text style={styles.subtitle}>{t("Choose a default Hassoun widget layout. The same responsive widget can be resized on phones, tablets and foldables.", "اختر التصميم الافتراضي لويدجت Hassoun. يمكن تغيير حجمه على الهواتف والأجهزة اللوحية والقابلة للطي.")}</Text>
+        <Text style={styles.subtitle}>{t("Choose your preferred layout, then resize the widget on your Home screen. Hassoun automatically uses the best design for the actual width and height Android gives it.", "اختر التصميم المفضل ثم غيّر حجم الويدجت على الشاشة الرئيسية. يختار Hassoun تلقائياً أفضل تصميم حسب العرض والارتفاع الفعليين.")}</Text>
 
         <Text style={styles.sectionLabel}>{t("WIDGET STYLE", "نمط الويدجت")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScrollContent}>
@@ -166,6 +172,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
             ["slim", t("Slim", "رفيع"), t("Logo + next prayer", "الشعار والصلاة القادمة")]
           ] as Array<[HassounWidgetLayout, string, string]>).map(([layout, label, note]) => (
             <Pressable key={layout} onPress={() => updateWidget({ layout })} style={[styles.layoutChoice, widgetPrefs.layout === layout && styles.layoutChoiceActive]}>
+              {widgetPrefs.layout === layout ? <View style={{ position: "absolute", top: 10, right: 10, zIndex: 3, backgroundColor: "#0B654F", borderRadius: 14, paddingHorizontal: 9, paddingVertical: 4 }}><Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "900" }}>✓ {t("SELECTED", "محدد")}</Text></View> : null}
               <View style={[
                 styles.layoutMock,
                 layout === "full" && styles.layoutMockWide,

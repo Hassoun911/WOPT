@@ -87,7 +87,22 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       )
       val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
-      val layout = prefs.getString("layout", "full") ?: "full"
+      val requestedLayout = prefs.getString("layout", "full") ?: "full"
+      val minWidth = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+      val minHeight = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+      // Android launchers own the physical widget cell size. A selected vertical
+      // design cannot safely be forced into a wide 4x1 cell (and vice versa).
+      // Pick the renderer that matches the real host dimensions, while using the
+      // selected layout as the preference when the current shape can support it.
+      val layout = if (isLockScreen) requestedLayout else when {
+        minWidth <= 0 || minHeight <= 0 -> if (requestedLayout == "vertical") "slim" else requestedLayout
+        minHeight >= minWidth * 1.35 -> "vertical"
+        minWidth <= 220 && minHeight >= 150 -> "square"
+        minHeight <= 125 || minWidth >= minHeight * 2.15 -> "slim"
+        requestedLayout == "square" -> "square"
+        requestedLayout == "slim" || requestedLayout == "compact" || requestedLayout == "next" -> "slim"
+        else -> "full"
+      }
       val views = RemoteViews(
         context.packageName,
         if (isLockScreen) R.layout.hassoun_prayer_widget_lockscreen

@@ -92,15 +92,20 @@ class HassounWidgetModule : Module() {
       val manager = AppWidgetManager.getInstance(context)
       if (!manager.isRequestPinAppWidgetSupported) return@Function false
 
-      // Samsung / Android 16 is most reliable when a newly pinned widget starts
-      // from the shallow slim RemoteViews layout. This is only the initial add.
-      // After it is on the Home screen, setPreferences() can immediately switch
-      // it to Large / Square / Vertical / Slim without being forced back here.
-      if (Build.VERSION.SDK_INT >= 36) {
-        context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
-          .edit().putString("layout", "slim").putBoolean("android16WidgetSafeMode", true).apply()
+      // The provider metadata already uses the shallow slim initialLayout,
+      // which is the Samsung-safe shell. Do not overwrite the user's saved layout.
+      // Ask Android to send us a success broadcast after the widget is actually
+      // placed, then populate it immediately so it never remains an empty shell.
+      val refreshIntent = android.content.Intent(context, HassounPrayerWidgetProvider::class.java).apply {
+        action = HassounWidgetStore.ACTION_REFRESH
       }
-      manager.requestPinAppWidget(ComponentName(context, HassounPrayerWidgetProvider::class.java), null, null)
+      val successCallback = android.app.PendingIntent.getBroadcast(
+        context,
+        7610,
+        refreshIntent,
+        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+      )
+      manager.requestPinAppWidget(ComponentName(context, HassounPrayerWidgetProvider::class.java), null, successCallback)
     }
 
     Function("getCapabilities") {
