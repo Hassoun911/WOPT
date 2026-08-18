@@ -23,45 +23,43 @@ const EVENTS: IslamicEvent[] = [
   { id: "eid-adha", month: 12, day: 10, emoji: "🕌", name: { en: "Eid al-Adha", ar: "عيد الأضحى" }, description: { en: "The Festival of Sacrifice on the 10th of Dhul-Hijjah.", ar: "عيد الأضحى في العاشر من ذي الحجة." } }
 ];
 
+const HIJRI_EPOCH = 1948439.5;
+const HIJRI_DAY_OFFSET = 1;
 const cache = new Map<number, IslamicEventOccurrence[]>();
 const pad = (value: number) => String(value).padStart(2, "0");
+const dateKey = (date: Date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+
+function gregorianToJulianDay(year: number, month: number, day: number) {
+  let y = year;
+  let m = month;
+  if (m <= 2) { y -= 1; m += 12; }
+  const a = Math.floor(y / 100);
+  const b = 2 - a + Math.floor(a / 4);
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524.5;
+}
 
 function islamicToJulianDay(year: number, month: number, day: number) {
-  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + 1948439.5 - 1;
+  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + HIJRI_EPOCH - 1;
 }
 
-function julianDayToGregorian(jd: number) {
-  const z = Math.floor(jd + 0.5);
-  const f = jd + 0.5 - z;
-  let a = z;
-  if (z >= 2299161) {
-    const alpha = Math.floor((z - 1867216.25) / 36524.25);
-    a = z + 1 + alpha - Math.floor(alpha / 4);
-  }
-  const b = a + 1524;
-  const c = Math.floor((b - 122.1) / 365.25);
-  const d = Math.floor(365.25 * c);
-  const e = Math.floor((b - d) / 30.6001);
-  const day = Math.floor(b - d - Math.floor(30.6001 * e) + f);
-  const month = e < 14 ? e - 1 : e - 13;
-  const year = month > 2 ? c - 4716 : c - 4715;
-  return { year, month, day };
-}
-
-function approximateHijriYear(gregorianYear: number) {
-  return Math.floor((gregorianYear - 622) * 33 / 32);
+function hijriParts(year: number, month: number, day: number) {
+  const jd = Math.floor(gregorianToJulianDay(year, month, day) + HIJRI_DAY_OFFSET) + 0.5;
+  const hijriYear = Math.floor((30 * (jd - HIJRI_EPOCH) + 10646) / 10631);
+  const hijriMonth = Math.min(12, Math.max(1, Math.ceil((jd - (29 + islamicToJulianDay(hijriYear, 1, 1))) / 29.5) + 1));
+  const hijriDay = Math.max(1, Math.floor(jd - islamicToJulianDay(hijriYear, hijriMonth, 1) + 1));
+  return { year: hijriYear, month: hijriMonth, day: hijriDay };
 }
 
 export function eventsForGregorianYear(year: number) {
   const cached = cache.get(year);
   if (cached) return cached;
   const found: IslamicEventOccurrence[] = [];
-  const center = approximateHijriYear(year);
-  for (let hijriYear = center - 2; hijriYear <= center + 2; hijriYear += 1) {
+  for (let ms = Date.UTC(year, 0, 1, 12); ms < Date.UTC(year + 1, 0, 1, 12); ms += 86_400_000) {
+    const date = new Date(ms);
+    const key = dateKey(date);
+    const hijri = hijriParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
     for (const event of EVENTS) {
-      const gregorian = julianDayToGregorian(islamicToJulianDay(hijriYear, event.month, event.day));
-      if (gregorian.year !== year) continue;
-      found.push({ ...event, dateKey: `${gregorian.year}-${pad(gregorian.month)}-${pad(gregorian.day)}`, hijriYear });
+      if (event.month === hijri.month && event.day === hijri.day) found.push({ ...event, dateKey: key, hijriYear: hijri.year });
     }
   }
   found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
