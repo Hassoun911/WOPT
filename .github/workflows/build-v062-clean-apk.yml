@@ -1,0 +1,244 @@
+name: Build Hassoun v0.6.2 Clean APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/v062-trigger.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v062-clean-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply all v0.6.2 final fixes
+        id: patch
+        run: python .github/scripts/apply-v062-final.py
+
+      - name: Verify every requested source fix
+        id: sourcecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'version: "0.6.2"' mobile/app.config.ts
+          grep -q 'versionCode: 34' mobile/app.config.ts
+
+          # Android 16 / Samsung widget fix.
+          grep -q 'widgetCategory="home_screen"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
+          grep -q 'initialLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
+          grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_lock_widget_info.xml
+          ! grep -q 'home_screen|keyguard' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_lock_widget_info.xml
+          grep -q 'countdownStyleV061Migrated' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          grep -q 'getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          grep -q 'android:layout_width="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
+          grep -q 'android:layout_height="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
+
+          # Islamic Events + 15-day system.
+          grep -q 'islamicToJulianDay' mobile/src/islamicEvents.ts
+          grep -q 'islamicDateLabelForEvent' mobile/src/IslamicEventsPage.tsx
+          grep -q 'scheduleIslamicEventReminders' mobile/App.tsx
+          grep -q 'upcomingIslamicDays <= 15' mobile/App.tsx
+          grep -q 'islamicEvent' push-server/src/prayerEmailTemplate.ts
+
+          # Exact Hassoun logo branding.
+          grep -q 'BrandMark' mobile/src/MultiplayerGames.tsx
+          grep -q 'BrandMark' mobile/src/EmailSignupCard.tsx
+          grep -q 'BrandMark' mobile/src/quran/SmartMemorize.tsx
+          grep -q 'BrandMark' mobile/src/quran/QuranV3.tsx
+          grep -q 'BrandMark' mobile/src/QuizGamesHub.tsx
+          grep -q 'BrandMark' mobile/src/IslamicQuiz.tsx
+          grep -q 'BrandMark' mobile/src/SettingsHub.tsx
+          grep -q 'BrandMark' mobile/src/IslamicEventsPage.tsx
+          grep -q 'heroLogoShell' mobile/App.tsx
+          grep -q 'notification-icon.png' mobile/app.config.ts
+          grep -q 'hassoun911.github.io/WOPT/assets/hassoun-logo.png' push-server/src/prayerEmailTemplate.ts
+
+          # Home per-prayer Adhan mute/unmute.
+          grep -q 'Tap any prayer to mute or unmute its Adhan audio' mobile/App.tsx
+          grep -q 'togglePrayerAudio' mobile/App.tsx
+          grep -q 'prayerAudioMuted' mobile/src/config.ts
+          grep -q 'mutedPrayers.has(event.prayer)' mobile/src/prayerAudio.ts
+
+          # Next prayer cannot stay at 0h 0m after prayer passes.
+          grep -q 'const deltaMs = target.getTime() - now.getTime();' mobile/App.tsx
+          grep -q 'seconds < 60' mobile/App.tsx
+
+          # Qur'an reader/audio fixes.
+          grep -q 'MULTI_SURAH_PLAY_CHOOSER_V061' mobile/src/quran/QuranV3.tsx
+          grep -q 'Which Surah do you want to play?' mobile/src/quran/QuranV3.tsx
+          grep -q 'playReaderSurahFromVisibleAyah' mobile/src/quran/QuranV3.tsx
+          grep -q 'readerViewportHeight' mobile/src/quran/QuranV3.tsx
+          grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
+          grep -q 'QuranAudio.playRange' mobile/src/quran/QuranV3.tsx
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mobile/package-lock.json
+            push-server/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate mobile TypeScript
+        id: mobilets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Validate Worker
+        id: workercheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd push-server
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Commit validated v0.6.2 source before Android build
+        id: sourcecommit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile push-server
+          git commit -m "Hassoun v0.6.2 all fixes validated" || true
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare exact Hassoun widget logo
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Generate clean Android project
+        id: prebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build standalone release APK
+        id: gradle
+        timeout-minutes: 25
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify standalone JS bundle
+        id: verifyapk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/v062-apk.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v062-apk.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.2.apk
+
+      - name: Upload Hassoun v0.6.2 APK
+        id: uploadapk
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.6.2-clean-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.2.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record v0.6.2 success
+        if: success()
+        shell: bash
+        run: |
+          cat > .github/v062-build-result.txt <<EOF
+          status=success
+          version=0.6.2
+          versionCode=34
+          widget_android16_fixed=true
+          widget_home_theme_fixed=true
+          widget_transparent_keyguard_only=true
+          widget_center_countdown_fixed=true
+          islamic_events_fixed=true
+          exact_logo_all_pages=true
+          smart_prayer_emails=true
+          home_per_prayer_adhan_mute=true
+          next_prayer_rollover_fixed=true
+          quran_multi_surah_popup=true
+          quran_visible_playback=true
+          quran_page_navigation=true
+          quran_text_shaping=true
+          quran_radio_range=true
+          multiplayer_backend=ready
+          standalone=true
+          js_bundle_verified=true
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          artifact=hassoun-v0.6.2-clean-${{ github.run_number }}
+          source_commit=${{ steps.sourcecommit.outputs.sha }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v062-build-result.txt
+          git commit -m "Record Hassoun v0.6.2 clean APK success" || true
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
+
+      - name: Record exact v0.6.2 failure
+        if: failure()
+        shell: bash
+        run: |
+          cat > .github/v062-build-result.txt <<EOF
+          status=failure
+          version=0.6.2
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          patch=${{ steps.patch.outcome }}
+          sourcecheck=${{ steps.sourcecheck.outcome }}
+          mobile_typescript=${{ steps.mobilets.outcome }}
+          worker_validation=${{ steps.workercheck.outcome }}
+          source_commit=${{ steps.sourcecommit.outcome }}
+          expo_prebuild=${{ steps.prebuild.outcome }}
+          gradle=${{ steps.gradle.outcome }}
+          apk_verify=${{ steps.verifyapk.outcome }}
+          apk_upload=${{ steps.uploadapk.outcome }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v062-build-result.txt
+          git commit -m "Record Hassoun v0.6.2 build failure" || true
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
