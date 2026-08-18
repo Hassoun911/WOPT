@@ -14,13 +14,7 @@ class HassounWidgetModule : Module() {
 
     Function("setPreferences") { preferences: Map<String, Any?> ->
       val context = appContext.reactContext ?: return@Function null
-      val requestedLayout = (preferences["layout"] as? String).takeIf { it in setOf("compact", "next", "full", "square", "vertical", "slim") } ?: "full"
-      // Android 16 / API 36 launchers (especially Samsung One UI) can reject the
-      // heavier RemoteViews variants after pinning even though the APK compiles.
-      // Keep the same widget data/features but persist the shallow launcher-safe
-      // layout so the provider never immediately replaces its safe initial view
-      // with a layout the host may fail to inflate.
-      val layout = if (Build.VERSION.SDK_INT >= 36) "slim" else requestedLayout
+      val layout = (preferences["layout"] as? String).takeIf { it in setOf("compact", "next", "full", "square", "vertical", "slim") } ?: "full"
       val theme = (preferences["theme"] as? String).takeIf { it in setOf("emerald", "ivory", "ocean", "sunset", "midnight") } ?: "emerald"
       val timeSize = (preferences["timeSize"] as? String).takeIf { it in setOf("small", "medium", "large", "xlarge") } ?: "large"
       val countdownStyle = (preferences["countdownStyle"] as? String).takeIf { it in setOf("circle", "pill", "minimal") } ?: "circle"
@@ -30,7 +24,7 @@ class HassounWidgetModule : Module() {
       context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
         .edit()
         .putString("layout", layout)
-        .putBoolean("android16WidgetSafeMode", Build.VERSION.SDK_INT >= 36)
+        .putBoolean("android16WidgetSafeMode", false)
         .putString("theme", theme)
         .putBoolean("showCountdown", preferences["showCountdown"] as? Boolean ?: true)
         .putBoolean("showHijri", preferences["showHijri"] as? Boolean ?: true)
@@ -46,6 +40,8 @@ class HassounWidgetModule : Module() {
         .putString("locale", locale)
         .apply()
 
+      // A user changing Widget settings is an explicit action. Honor it on every
+      // Android version, including Android 16, and refresh existing widgets now.
       HassounPrayerWidgetProvider.updateAll(context)
       null
     }
@@ -54,10 +50,8 @@ class HassounWidgetModule : Module() {
       val context = appContext.reactContext
       if (context == null) return@Function defaults()
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
-      val storedLayout = prefs.getString("layout", "full") ?: "full"
-      val layout = if (Build.VERSION.SDK_INT >= 36) "slim" else storedLayout
       mapOf(
-        "layout" to layout,
+        "layout" to (prefs.getString("layout", if (Build.VERSION.SDK_INT >= 36) "slim" else "full") ?: if (Build.VERSION.SDK_INT >= 36) "slim" else "full"),
         "theme" to (prefs.getString("theme", "emerald") ?: "emerald"),
         "showCountdown" to prefs.getBoolean("showCountdown", true),
         "showHijri" to prefs.getBoolean("showHijri", true),
@@ -77,25 +71,17 @@ class HassounWidgetModule : Module() {
     Function("syncPrayerSchedule") { scheduleJson: String, locale: String ->
       val context = appContext.reactContext ?: return@Function null
       File(context.filesDir, HassounWidgetStore.SCHEDULE_FILE).writeText(scheduleJson)
-      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
-      val editor = prefs.edit().putString("locale", if (locale == "ar") "ar" else "en")
-      if (Build.VERSION.SDK_INT >= 36) {
-        // Migrate widgets created by older builds before refreshing them. Without
-        // this, an existing saved "full" preference can immediately reproduce
-        // the launcher failure after an app upgrade.
-        editor.putString("layout", "slim").putBoolean("android16WidgetSafeMode", true)
-      }
-      editor.apply()
+      // Sync prayer data and language only. Never overwrite the user's chosen
+      // widget layout/theme/options during a normal app refresh.
+      context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
+        .edit().putString("locale", if (locale == "ar") "ar" else "en").apply()
       HassounPrayerWidgetProvider.updateAll(context)
       null
     }
 
     Function("refresh") {
       val context = appContext.reactContext ?: return@Function null
-      if (Build.VERSION.SDK_INT >= 36) {
-        context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
-          .edit().putString("layout", "slim").putBoolean("android16WidgetSafeMode", true).apply()
-      }
+      // Refresh must preserve every Widget Studio preference.
       HassounPrayerWidgetProvider.updateAll(context)
       null
     }
@@ -105,6 +91,11 @@ class HassounWidgetModule : Module() {
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return@Function false
       val manager = AppWidgetManager.getInstance(context)
       if (!manager.isRequestPinAppWidgetSupported) return@Function false
+
+      // Samsung / Android 16 is most reliable when a newly pinned widget starts
+      // from the shallow slim RemoteViews layout. This is only the initial add.
+      // After it is on the Home screen, setPreferences() can immediately switch
+      // it to Large / Square / Vertical / Slim without being forced back here.
       if (Build.VERSION.SDK_INT >= 36) {
         context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
           .edit().putString("layout", "slim").putBoolean("android16WidgetSafeMode", true).apply()
