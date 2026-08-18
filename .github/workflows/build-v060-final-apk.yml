@@ -32,18 +32,15 @@ jobs:
           set +e
           {
             if [ ! -f mobile/src/IslamicEventsPage.tsx ] || ! grep -q 'version: "0.6.0"' mobile/app.config.ts; then
-              echo "Applying complete v0.6.0 app/events/branding/email/widget patch"
+              echo "Applying complete v0.6.0 base update"
               python .github/scripts/apply-v060-complete.py
             else
-              echo "Complete v0.6.0 source already present; skipping base patch"
+              echo "v0.6.0 base source already present"
             fi
 
-            if ! grep -q 'playRange' mobile/modules/quran-audio/index.ts || ! grep -q 'ACTION_PLAY_RANGE' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt; then
-              echo "Applying native-safe continuous Quran Radio range patch"
-              python .github/scripts/fix-v060-radio-continuous.py
-            else
-              echo "Continuous Quran Radio range fix already present; skipping radio patch"
-            fi
+            # Always run the idempotent finishing pass. It patches only the remaining
+            # Qur'an Radio UI, exact-logo surfaces and widget countdown geometry.
+            python .github/scripts/finish-v060-remaining.py
           } > /tmp/v060-patch.log 2>&1
           code=$?
           cat /tmp/v060-patch.log
@@ -82,16 +79,27 @@ jobs:
             grep -q 'IslamicEventsPage' mobile/App.tsx
             grep -q 'upcomingIslamicDays <= 15' mobile/App.tsx
             grep -q 'scheduleIslamicEventReminders' mobile/src/notifications.ts
+            test -f push-server/src/prayerEmailTemplate.ts
             grep -q 'prayerDashboardEmail' push-server/src/emailDelivery.ts
             grep -q 'prayerTimes:' push-server/src/globalPrayerEmail.ts
-            grep -q 'upcomingEvent' push-server/src/emailDelivery.ts
+            grep -q 'upcomingEvent' push-server/src/globalPrayerEmail.ts
+            grep -q 'UPCOMING ISLAMIC EVENT' push-server/src/prayerEmailTemplate.ts
+            grep -q 'hassoun911.github.io/WOPT/assets/hassoun-logo.png' push-server/src/prayerEmailTemplate.ts
             grep -q 'readerViewportHeight' mobile/src/quran/QuranV3.tsx
             grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
             grep -q 'playVisibleReaderPages' mobile/src/quran/QuranV3.tsx
-            grep -q 'updateWidget(context, manager, appWidgetId, false)' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+            grep -q 'Do not build thousands of JS objects' mobile/src/quran/QuranV3.tsx
+            grep -q 'QuranAudio.playRange' mobile/src/quran/QuranV3.tsx
             grep -q 'playRange' mobile/modules/quran-audio/index.ts
             grep -q 'ACTION_PLAY_RANGE' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
-            grep -q 'Do not build thousands of JS objects' mobile/src/quran/QuranV3.tsx
+            grep -q 'notification_icon' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+            grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_lock_widget_info.xml
+            grep -q 'updateWidget(context, manager, appWidgetId, false)' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+            grep -q 'countdownStyleV060Migrated' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+            grep -q 'layout_width="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
+            grep -q 'BrandMark size={42}' mobile/src/quran/QuranV3.tsx
+            grep -q 'BrandMark size={44}' mobile/src/QuizGamesHub.tsx
+            grep -q 'BrandMark size={46}' mobile/src/IslamicQuiz.tsx
             grep -q 'hassoun-logo.png' mobile/App.tsx
             grep -q 'notification-icon.png' mobile/app.config.ts
             cd mobile
@@ -223,7 +231,7 @@ jobs:
             echo
             for f in /tmp/v060-patch.log /tmp/v060-validate.log /tmp/v060-prebuild.log /tmp/v060-gradle.log; do
               echo "===== $f ====="
-              if [ -f "$f" ]; then tail -n 320 "$f"; else echo "not reached"; fi
+              if [ -f "$f" ]; then tail -n 360 "$f"; else echo "not reached"; fi
               echo
             done
           } > .github/v060-last-build-error.log
