@@ -1,0 +1,12 @@
+status=failure
+source_check=success
+mobile_typescript=failure
+worker_validation=skipped
+logo=skipped
+expo_prebuild=skipped
+gradle=skipped
+apk_verify=skipped
+apk_upload=skipped
+run_id=32198327297
+run_number=4
+artifact=hassoun-v0.6.7-four-widget-sizes-4
