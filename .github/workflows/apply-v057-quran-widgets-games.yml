@@ -14,7 +14,7 @@ permissions:
 jobs:
   integrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,11 +35,25 @@ jobs:
           PY
 
       - name: Apply v0.5.7 patch
-        run: python .github/scripts/apply-v057-quran-widgets-games.py
-
-      - name: Harden generated multiplayer TypeScript
+        shell: bash
         run: |
-          python - <<'PY'
+          set +e
+          python .github/scripts/apply-v057-quran-widgets-games.py > /tmp/v057-patch.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-patch.status
+          cat /tmp/v057-patch.log
+          exit 0
+
+      - name: Harden generated code
+        shell: bash
+        run: |
+          if [ "$(cat /tmp/v057-patch.status)" != "0" ]; then
+            echo 99 > /tmp/v057-harden.status
+            echo "Skipped because patch stage failed" > /tmp/v057-harden.log
+            exit 0
+          fi
+          set +e
+          python - <<'PY' > /tmp/v057-harden.log 2>&1
           from pathlib import Path
           p = Path("push-server/src/games.ts")
           s = p.read_text()
@@ -56,9 +70,25 @@ jobs:
           s = s.replace('  const me = room?.players.find((p) => p.id === playerId);\n', '')
           p.write_text(s)
           PY
+          code=$?
+          echo "$code" > /tmp/v057-harden.status
+          cat /tmp/v057-harden.log
+          exit 0
 
       - name: Apply responsive widget finishing pass
-        run: python .github/scripts/post-v057-responsive.py
+        shell: bash
+        run: |
+          if [ "$(cat /tmp/v057-patch.status)" != "0" ] || [ "$(cat /tmp/v057-harden.status)" != "0" ]; then
+            echo 99 > /tmp/v057-responsive.status
+            echo "Skipped because an earlier generation stage failed" > /tmp/v057-responsive.log
+            exit 0
+          fi
+          set +e
+          python .github/scripts/post-v057-responsive.py > /tmp/v057-responsive.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-responsive.status
+          cat /tmp/v057-responsive.log
+          exit 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -70,31 +100,98 @@ jobs:
             push-server/package-lock.json
 
       - name: Validate mobile
-        working-directory: mobile
+        shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx tsc --noEmit
+          if [ "$(cat /tmp/v057-responsive.status)" != "0" ]; then
+            echo 99 > /tmp/v057-mobile.status
+            echo "Skipped because generation failed" > /tmp/v057-mobile.log
+            exit 0
+          fi
+          set +e
+          (
+            cd mobile
+            npm ci --ignore-scripts --no-audit --no-fund
+            npx tsc --noEmit
+          ) > /tmp/v057-mobile.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-mobile.status
+          tail -n 160 /tmp/v057-mobile.log
+          exit 0
 
       - name: Validate Worker
-        working-directory: push-server
+        shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-          npm test
+          if [ "$(cat /tmp/v057-responsive.status)" != "0" ]; then
+            echo 99 > /tmp/v057-worker.status
+            echo "Skipped because generation failed" > /tmp/v057-worker.log
+            exit 0
+          fi
+          set +e
+          (
+            cd push-server
+            npm ci --ignore-scripts --no-audit --no-fund
+            npm run typecheck
+            npm test
+          ) > /tmp/v057-worker.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-worker.status
+          tail -n 160 /tmp/v057-worker.log
+          exit 0
 
-      - name: Validate Android native widget generation
-        working-directory: mobile
+      - name: Validate Android native widgets
+        shell: bash
         run: |
-          npx expo prebuild --platform android --clean --no-install
-          cd android
-          ./gradlew :app:processReleaseResources :app:compileReleaseKotlin
+          if [ "$(cat /tmp/v057-mobile.status)" != "0" ]; then
+            echo 99 > /tmp/v057-native.status
+            echo "Skipped because mobile validation failed" > /tmp/v057-native.log
+            exit 0
+          fi
+          set +e
+          (
+            cd mobile
+            npx expo prebuild --platform android --clean --no-install
+            cd android
+            ./gradlew :app:processReleaseResources :app:compileReleaseKotlin
+          ) > /tmp/v057-native.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-native.status
+          tail -n 160 /tmp/v057-native.log
+          exit 0
         env:
           EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
 
-      - name: Commit integrated update
+      - name: Commit success or diagnostics
+        shell: bash
         run: |
+          patch="$(cat /tmp/v057-patch.status)"
+          harden="$(cat /tmp/v057-harden.status)"
+          responsive="$(cat /tmp/v057-responsive.status)"
+          mobile="$(cat /tmp/v057-mobile.status)"
+          worker="$(cat /tmp/v057-worker.status)"
+          native="$(cat /tmp/v057-native.status)"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f mobile push-server
-          git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games" || exit 0
+
+          if [ "$patch" = 0 ] && [ "$harden" = 0 ] && [ "$responsive" = 0 ] && [ "$mobile" = 0 ] && [ "$worker" = 0 ] && [ "$native" = 0 ]; then
+            rm -f .github/v057-last-error.log
+            git add -f mobile push-server .github/v057-last-error.log 2>/dev/null || true
+            git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games" || exit 0
+            git push origin HEAD:main
+            exit 0
+          fi
+
+          {
+            echo "Hassoun v0.5.7 integration failed"
+            echo "patch=$patch harden=$harden responsive=$responsive mobile=$mobile worker=$worker native=$native"
+            for name in patch harden responsive mobile worker native; do
+              echo
+              echo "===== $name ====="
+              tail -n 120 "/tmp/v057-$name.log" 2>/dev/null || true
+            done
+          } > .github/v057-last-error.log
+
+          git add -f .github/v057-last-error.log
+          git commit -m "Record v0.5.7 integration failure"
           git push origin HEAD:main
+          exit 1
