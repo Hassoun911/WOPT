@@ -1,2 +1,2 @@
-trigger=2026-08-18T10:14:00-04:00
-reason=android16-widget-events-branding-clean-apk
+trigger=2026-08-18T10:18:00-04:00
+reason=android16-widget-events-all-pages-logo-final-clean-apk
