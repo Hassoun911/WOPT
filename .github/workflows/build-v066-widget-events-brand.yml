@@ -25,17 +25,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply exact Hassoun logo and final widget repair
+      - name: Apply widget repair and known-good Hassoun branding
         id: sourcefix
         shell: bash
         run: |
           set -euo pipefail
           python .github/scripts/fix-widget-and-brand-final.py
-          cat .github/logo-exact/part0.b64 .github/logo-exact/part1.b64 .github/logo-exact/part2.b64 .github/logo-exact/part3.b64 | base64 -d > mobile/assets/hassoun-logo.png
+          # The staged logo-exact base64 is corrupted. Use the existing, proven
+          # Android-safe Hassoun app icon instead so Metro/AAPT2 receives a valid PNG.
+          cp mobile/assets/icon.png mobile/assets/hassoun-logo.png
           mkdir -p pwa/public/assets
-          cp mobile/assets/hassoun-logo.png pwa/public/assets/hassoun-logo.png
+          cp mobile/assets/icon.png pwa/public/assets/hassoun-logo.png
           mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
-          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
           file mobile/assets/hassoun-logo.png
           test -s mobile/assets/hassoun-logo.png
 
@@ -88,32 +90,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Normalize Hassoun PNG for Android AAPT2
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > /tmp/ReencodePng.java <<'EOF'
-          import javax.imageio.ImageIO;
-          import java.awt.image.BufferedImage;
-          import java.io.File;
-          public class ReencodePng {
-            public static void main(String[] args) throws Exception {
-              File f = new File(args[0]);
-              BufferedImage image = ImageIO.read(f);
-              if (image == null) throw new IllegalStateException("Could not decode PNG: " + f);
-              File tmp = new File(f.getParentFile(), f.getName() + ".normalized.png");
-              if (!ImageIO.write(image, "png", tmp)) throw new IllegalStateException("Could not encode PNG");
-              if (!f.delete() || !tmp.renameTo(f)) throw new IllegalStateException("Could not replace PNG");
-            }
-          }
-          EOF
-          javac /tmp/ReencodePng.java
-          java -cp /tmp ReencodePng mobile/assets/hassoun-logo.png
-          cp mobile/assets/hassoun-logo.png pwa/public/assets/hassoun-logo.png
-          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-          file mobile/assets/hassoun-logo.png
-          test -s mobile/assets/hassoun-logo.png
-
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
@@ -142,7 +118,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile push-server pwa/public/assets/hassoun-logo.png
-          git commit -m "Hassoun v0.6.6 normalize Android logo resource" || true
+          git commit -m "Hassoun v0.6.6 use Android-safe Hassoun branding" || true
           git pull --rebase origin main
           git push origin HEAD:main
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -204,7 +180,7 @@ jobs:
           samsung_home_widget_full_initial=true
           samsung_api36_widget_fixed=true
           islamic_events_android_intl_dependency_removed=true
-          exact_hassoun_logo_all_pages=true
+          android_safe_hassoun_logo=true
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
           artifact=hassoun-v0.6.6-widget-events-brand-${{ github.run_number }}
