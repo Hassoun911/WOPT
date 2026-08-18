@@ -1,0 +1,115 @@
+name: Build Hassoun v0.6.7 Four Widget Sizes APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/v067-build-trigger.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v067-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify v0.6.7 four widget source
+        run: |
+          set -euo pipefail
+          MANIFEST="mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml"
+          PROVIDER="mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt"
+          grep -q 'HassounSquareWidgetProvider' "$MANIFEST"
+          grep -q 'HassounVerticalWidgetProvider' "$MANIFEST"
+          grep -q 'HassounSlimWidgetProvider' "$MANIFEST"
+          grep -q 'targetCellWidth="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+          grep -q 'targetCellWidth="2"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_square_widget_info.xml
+          grep -q 'targetCellHeight="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_vertical_widget_info.xml
+          grep -q 'targetCellHeight="1"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_slim_widget_info.xml
+          grep -q '"xlarge" -> 44f' "$PROVIDER"
+          test -s mobile/assets/icon.png
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mobile/package-lock.json
+            push-server/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate mobile TypeScript
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Validate Worker
+        run: |
+          set -euo pipefail
+          cd push-server
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Prepare Android-safe Hassoun logo
+        run: |
+          set -euo pipefail
+          cp mobile/assets/icon.png mobile/assets/hassoun-logo.png
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          file mobile/assets/hassoun-logo.png
+
+      - name: Clean Expo Android prebuild
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify APK
+        run: |
+          set -euo pipefail
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/v067-apk.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v067-apk.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
+
+      - name: Upload v0.6.7 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.6.7-four-widget-sizes-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
+          if-no-files-found: error
+          retention-days: 14
