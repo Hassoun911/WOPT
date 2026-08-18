@@ -25,14 +25,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply complete v0.6.0 update
+      - name: Apply only missing v0.6.0 source updates
         id: patch
         shell: bash
         run: |
           set +e
           {
-            python .github/scripts/apply-v060-complete.py
-            python .github/scripts/fix-v060-radio-continuous.py
+            if [ ! -f mobile/src/IslamicEventsPage.tsx ] || ! grep -q 'version: "0.6.0"' mobile/app.config.ts; then
+              echo "Applying complete v0.6.0 app/events/branding/email/widget patch"
+              python .github/scripts/apply-v060-complete.py
+            else
+              echo "Complete v0.6.0 source already present; skipping base patch"
+            fi
+
+            if ! grep -q 'playRange' mobile/modules/quran-audio/index.ts || ! grep -q 'ACTION_PLAY_RANGE' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt; then
+              echo "Applying native-safe continuous Quran Radio range patch"
+              python .github/scripts/fix-v060-radio-continuous.py
+            else
+              echo "Continuous Quran Radio range fix already present; skipping radio patch"
+            fi
           } > /tmp/v060-patch.log 2>&1
           code=$?
           cat /tmp/v060-patch.log
@@ -57,7 +68,7 @@ jobs:
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Validate complete source
+      - name: Validate every required fix before committing
         id: validate
         shell: bash
         run: |
@@ -65,17 +76,24 @@ jobs:
           (
             grep -q 'version: "0.6.0"' mobile/app.config.ts
             grep -q 'versionCode: 32' mobile/app.config.ts
+            test -f mobile/src/BrandMark.tsx
+            test -f mobile/src/islamicEvents.ts
+            test -f mobile/src/IslamicEventsPage.tsx
             grep -q 'IslamicEventsPage' mobile/App.tsx
             grep -q 'upcomingIslamicDays <= 15' mobile/App.tsx
             grep -q 'scheduleIslamicEventReminders' mobile/src/notifications.ts
             grep -q 'prayerDashboardEmail' push-server/src/emailDelivery.ts
             grep -q 'prayerTimes:' push-server/src/globalPrayerEmail.ts
+            grep -q 'upcomingEvent' push-server/src/emailDelivery.ts
             grep -q 'readerViewportHeight' mobile/src/quran/QuranV3.tsx
             grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
+            grep -q 'playVisibleReaderPages' mobile/src/quran/QuranV3.tsx
             grep -q 'updateWidget(context, manager, appWidgetId, false)' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
             grep -q 'playRange' mobile/modules/quran-audio/index.ts
             grep -q 'ACTION_PLAY_RANGE' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
             grep -q 'Do not build thousands of JS objects' mobile/src/quran/QuranV3.tsx
+            grep -q 'hassoun-logo.png' mobile/App.tsx
+            grep -q 'notification-icon.png' mobile/app.config.ts
             cd mobile
             npm ci --ignore-scripts --no-audit --no-fund
             npx tsc --noEmit
@@ -89,13 +107,13 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit $code
 
-      - name: Commit v0.6.0 source before Android build
+      - name: Commit validated v0.6.0 source to main before Android build
         if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f mobile push-server
-          git commit -m "Hassoun v0.6.0 complete app events branding email and Quran Radio update" || true
+          git commit -m "Hassoun v0.6.0 complete validated source" || true
           git pull --rebase origin main
           git push origin HEAD:main
 
@@ -105,7 +123,7 @@ jobs:
           mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
           cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Generate Android project
+      - name: Generate clean Android project
         id: prebuild
         if: success()
         shell: bash
@@ -113,6 +131,7 @@ jobs:
           set +e
           (
             cd mobile
+            rm -rf android
             npx expo prebuild --platform android --clean --no-install
           ) > /tmp/v060-prebuild.log 2>&1
           code=$?
@@ -120,7 +139,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit $code
 
-      - name: Build standalone release APK
+      - name: Build clean standalone release APK
         id: gradle
         if: success()
         shell: bash
@@ -129,14 +148,14 @@ jobs:
           set +e
           (
             cd mobile/android
-            ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+            ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
           ) > /tmp/v060-gradle.log 2>&1
           code=$?
-          tail -n 300 /tmp/v060-gradle.log
+          tail -n 320 /tmp/v060-gradle.log
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit $code
 
-      - name: Verify standalone APK
+      - name: Verify standalone APK contains production JavaScript
         if: success()
         shell: bash
         run: |
@@ -145,13 +164,13 @@ jobs:
           unzip -l "$APK" > /tmp/v060-apk-contents.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v060-apk-contents.txt
           cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.0.apk
-          echo "Hassoun v0.6.0 standalone APK verified with embedded JavaScript."
+          echo "Hassoun v0.6.0 standalone APK verified with embedded production JavaScript."
 
-      - name: Upload v0.6.0 APK
+      - name: Upload clean v0.6.0 APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.6.0-final-${{ github.run_number }}
+          name: hassoun-v0.6.0-clean-${{ github.run_number }}
           path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.0.apk
           if-no-files-found: error
           retention-days: 14
@@ -161,6 +180,7 @@ jobs:
         run: |
           cat > .github/v060-apk-status.txt <<EOF
           status=success
+          clean_build=true
           standalone=true
           js_bundle_verified=true
           quran_page_navigation_fixed=true
@@ -181,14 +201,14 @@ jobs:
           versionCode=32
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
-          artifact=hassoun-v0.6.0-final-${{ github.run_number }}
+          artifact=hassoun-v0.6.0-clean-${{ github.run_number }}
           source_commit=$(git rev-parse HEAD)
           EOF
           rm -f .github/v060-last-build-error.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A .github/v060-apk-status.txt .github/v060-last-build-error.log 2>/dev/null || true
-          git commit -m "Record Hassoun v0.6.0 APK success" || true
+          git commit -m "Record Hassoun v0.6.0 clean APK success" || true
           git pull --rebase origin main || true
           git push origin HEAD:main || true
 
@@ -197,19 +217,19 @@ jobs:
         shell: bash
         run: |
           {
-            echo "Hassoun v0.6.0 final APK build failed"
+            echo "Hassoun v0.6.0 clean APK build failed"
             echo "run_id=${{ github.run_id }}"
             echo "source_commit=$(git rev-parse HEAD)"
             echo
             for f in /tmp/v060-patch.log /tmp/v060-validate.log /tmp/v060-prebuild.log /tmp/v060-gradle.log; do
               echo "===== $f ====="
-              if [ -f "$f" ]; then tail -n 260 "$f"; else echo "not reached"; fi
+              if [ -f "$f" ]; then tail -n 320 "$f"; else echo "not reached"; fi
               echo
             done
           } > .github/v060-last-build-error.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v060-last-build-error.log
-          git commit -m "Record Hassoun v0.6.0 build failure" || true
+          git commit -m "Record Hassoun v0.6.0 clean build failure" || true
           git pull --rebase origin main || true
           git push origin HEAD:main || true
