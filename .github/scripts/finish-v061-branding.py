@@ -11,15 +11,6 @@ def write(path: str, text: str) -> None:
     (ROOT / path).write_text(text)
 
 
-def replace_once_if_missing(path: str, old: str, new: str, marker: str) -> None:
-    text = read(path)
-    if marker in text:
-        return
-    if old not in text:
-        raise SystemExit(f"Expected branding block missing in {path}: {old[:120]!r}")
-    write(path, text.replace(old, new, 1))
-
-
 # Multiplayer Games: the Hassoun logo is the page brand on chooser, room setup,
 # and live room screens. Game/category emoji remain content icons, not branding.
 path = "mobile/src/MultiplayerGames.tsx"
@@ -57,8 +48,7 @@ text = text.replace(
 )
 write(path, text)
 
-# Smart Memorize is a full-screen Qur'an experience; show the exact logo on
-# both setup and active-lesson headers instead of using a prayer-bead emoji as brand.
+# Smart Memorize: exact logo on setup and active lesson headers.
 path = "mobile/src/quran/SmartMemorize.tsx"
 text = read(path)
 if 'import BrandMark from "../BrandMark";' not in text:
@@ -75,6 +65,24 @@ text = text.replace(
     '<Pressable onPress={onBack} style={styles.roundButton}><Text style={styles.backText}>{ar ? "›" : "‹"}</Text></Pressable>\n          <BrandMark size={40} />\n          <View style={styles.flex}><Text style={[styles.eyebrow, ar && styles.rtl]}>HASSOUN • {t("SMART MEMORIZE", "الحفظ الذكي")}</Text>'
 )
 write(path, text)
+
+# Widget legacy cleanup: old transparent-provider instances on Home must never
+# be forced back into lock-screen mode by periodic refresh. Host category decides.
+provider = "mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt"
+text = read(provider)
+text = text.replace(
+    'manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, true) }',
+    'manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }'
+)
+# Force one clean migration to the large centered circle in v0.6.1. After this
+# users can still choose Circle/Pill/Minimal from Widget Setup normally.
+old = '''      var countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"\n      if (!prefs.getBoolean("countdownStyleV060Migrated", false)) {\n        countdownStyle = "circle"\n        prefs.edit().putString("countdownStyle", "circle").putBoolean("countdownStyleV060Migrated", true).apply()\n      }'''
+new = '''      var countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"\n      if (!prefs.getBoolean("countdownStyleV061Migrated", false)) {\n        countdownStyle = "circle"\n        prefs.edit()\n          .putString("countdownStyle", "circle")\n          .putBoolean("countdownStyleV060Migrated", true)\n          .putBoolean("countdownStyleV061Migrated", true)\n          .apply()\n      }'''
+if 'countdownStyleV061Migrated' not in text:
+    if old not in text:
+        raise SystemExit("Widget countdown migration block missing")
+    text = text.replace(old, new, 1)
+write(provider, text)
 
 # Assertions: every full-screen mobile surface now has the real brand source.
 required = {
@@ -93,4 +101,10 @@ for file, marker in required.items():
     if marker not in read(file):
         raise SystemExit(f"Missing Hassoun logo branding in {file}")
 
-print("Applied v0.6.1 exact Hassoun-logo branding across all full-screen app surfaces.")
+provider_text = read(provider)
+if 'countdownStyleV061Migrated' not in provider_text:
+    raise SystemExit("v0.6.1 widget countdown migration missing")
+if 'getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }' not in provider_text:
+    raise SystemExit("Legacy transparent Home widget recovery missing")
+
+print("Applied v0.6.1 logo branding and final widget recovery/migration fixes.")
