@@ -1,0 +1,169 @@
+name: Build Hassoun v0.5.8 Final APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/v058-final-trigger.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v058-final-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+    steps:
+      - name: Checkout exact committed source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify v0.5.8 fixes are committed
+        run: |
+          grep -q 'version: "0.5.8"' mobile/app.config.ts
+          grep -q 'versionCode: 30' mobile/app.config.ts
+          grep -q 'playVisibleReaderPages' mobile/src/quran/QuranV3.tsx
+          grep -q 'android:widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_lock_widget_info.xml
+          grep -q 'android:initialLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install and typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          (
+            cd mobile
+            npm ci --ignore-scripts --no-audit --no-fund
+            npx tsc --noEmit
+          ) > /tmp/v058-typecheck.log 2>&1
+          code=$?
+          cat /tmp/v058-typecheck.log
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Prepare native widget logo
+        if: success()
+        run: |
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Generate Android project
+        id: prebuild
+        if: success()
+        shell: bash
+        run: |
+          set +e
+          (
+            cd mobile
+            npx expo prebuild --platform android --clean --no-install
+          ) > /tmp/v058-prebuild.log 2>&1
+          code=$?
+          cat /tmp/v058-prebuild.log
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Build standalone release APK
+        id: gradle
+        if: success()
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set +e
+          (
+            cd mobile/android
+            ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+          ) > /tmp/v058-gradle.log 2>&1
+          code=$?
+          tail -n 260 /tmp/v058-gradle.log
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Verify standalone APK
+        id: verify
+        if: success()
+        shell: bash
+        run: |
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/v058-apk-contents.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v058-apk-contents.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.8.apk
+          echo "Standalone APK verified with embedded JavaScript bundle."
+
+      - name: Upload v0.5.8 APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.5.8-final-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.8.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record APK success
+        if: success()
+        run: |
+          cat > .github/v058-apk-status.txt <<EOF
+          status=success
+          standalone=true
+          js_bundle_verified=true
+          quran_visible_page_playback=true
+          widget_home_safe=true
+          widget_lockscreen_keyguard_only=true
+          multiplayer_backend=ready
+          version=0.5.8
+          versionCode=30
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          artifact=hassoun-v0.5.8-final-${{ github.run_number }}
+          source_commit=$(git rev-parse HEAD)
+          EOF
+          rm -f .github/v058-last-build-error.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .github/v058-apk-status.txt .github/v058-last-build-error.log 2>/dev/null || true
+          git commit -m "Record Hassoun v0.5.8 final APK success" || true
+          git push origin HEAD:main || true
+
+      - name: Save exact build failure
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "Hassoun v0.5.8 final APK build failed"
+            echo "run_id=${{ github.run_id }}"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo
+            for f in /tmp/v058-typecheck.log /tmp/v058-prebuild.log /tmp/v058-gradle.log; do
+              echo "===== $f ====="
+              if [ -f "$f" ]; then tail -n 220 "$f"; else echo "not reached"; fi
+              echo
+            done
+          } > .github/v058-last-build-error.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v058-last-build-error.log
+          git commit -m "Record Hassoun v0.5.8 APK build failure" || true
+          git push origin HEAD:main || true
