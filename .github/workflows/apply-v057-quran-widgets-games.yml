@@ -13,7 +13,7 @@ permissions:
 jobs:
   integrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +22,26 @@ jobs:
 
       - name: Apply v0.5.7 patch
         run: python .github/scripts/apply-v057-quran-widgets-games.py
+
+      - name: Harden generated multiplayer TypeScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("push-server/src/games.ts")
+          s = p.read_text()
+          s = s.replace('await request.json<Record<string, unknown>>()', '(await request.json()) as Record<string, unknown>')
+          s = s.replace('const imposter = players[bytes[0] % players.length];', 'const imposter = players[(bytes[0] ?? 0) % players.length]!;')
+          s = s.replace('const active = players[roundIndex(round, players.length)];', 'const active = players[roundIndex(round, players.length)]!;')
+          s = s.replace('const question = TRIVIA[room.category][state.index % TRIVIA[room.category].length];', 'const question = TRIVIA[room.category][state.index % TRIVIA[room.category].length]!;')
+          s = s.replace('return getRoom(env, roomMatch[1], url.searchParams.get("playerId") ?? "");', 'return getRoom(env, roomMatch[1]!, url.searchParams.get("playerId") ?? "");')
+          s = s.replace('return action(request, env, actionMatch[1]);', 'return action(request, env, actionMatch[1]!);')
+          p.write_text(s)
+
+          p = Path("mobile/src/MultiplayerGames.tsx")
+          s = p.read_text().replace('useEffect, useMemo, useState', 'useEffect, useState')
+          s = s.replace('  const me = room?.players.find((p) => p.id === playerId);\n', '')
+          p.write_text(s)
+          PY
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -49,6 +69,7 @@ jobs:
         working-directory: mobile
         run: |
           npx expo prebuild --platform android --clean --no-install
+          cd android
           ./gradlew :app:processReleaseResources :app:compileReleaseKotlin
         env:
           EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
