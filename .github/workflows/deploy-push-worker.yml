@@ -10,7 +10,7 @@ on:
       - ".github/workflows/deploy-push-worker.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -162,3 +162,20 @@ jobs:
 
           echo "Worker health, config, D1 multiplayer tables, and create-room endpoint all passed."
           jq '{room: {code: .room.code, gameType: .room.gameType, category: .room.category}}' /tmp/game-room.json
+
+      - name: Record multiplayer backend ready
+        working-directory: .
+        run: |
+          code="$(jq -r '.room.code' /tmp/game-room.json)"
+          cat > .github/games-backend-status.txt <<EOF
+          games_backend=ready
+          worker=https://wopt-prayer-push.wopt-windsor.workers.dev
+          verified_room_code=${code}
+          verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          source_commit=$(git rev-parse HEAD)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/games-backend-status.txt
+          git commit -m "Record Hassoun multiplayer backend ready" || true
+          git push origin HEAD:main || true
