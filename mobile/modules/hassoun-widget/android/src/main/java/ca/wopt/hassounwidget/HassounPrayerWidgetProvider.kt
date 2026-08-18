@@ -69,7 +69,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val home = ComponentName(context, HassounPrayerWidgetProvider::class.java)
       manager.getAppWidgetIds(home).forEach { updateWidget(context, manager, it, false) }
       val lock = ComponentName(context, HassounLockScreenWidgetProvider::class.java)
-      manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, true) }
+      manager.getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }
     }
 
     fun updateTransparentWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
@@ -110,9 +110,13 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val highlightNext = prefs.getBoolean("highlightNext", true)
       val timeSize = prefs.getString("timeSize", "large") ?: "large"
       var countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"
-      if (!prefs.getBoolean("countdownStyleV060Migrated", false)) {
+      if (!prefs.getBoolean("countdownStyleV061Migrated", false)) {
         countdownStyle = "circle"
-        prefs.edit().putString("countdownStyle", "circle").putBoolean("countdownStyleV060Migrated", true).apply()
+        prefs.edit()
+          .putString("countdownStyle", "circle")
+          .putBoolean("countdownStyleV060Migrated", true)
+          .putBoolean("countdownStyleV061Migrated", true)
+          .apply()
       }
       val focus = prefs.getString("focus", "next") ?: "next"
       val schedule = loadSchedule(context)
