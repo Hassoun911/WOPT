@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/scripts/apply-v057-quran-widgets-games.py"
       - ".github/scripts/post-v057-responsive.py"
+      - ".github/scripts/fix-v057-widget-bridge.py"
       - ".github/workflows/apply-v057-quran-widgets-games.yml"
 
 permissions:
@@ -84,7 +85,10 @@ jobs:
             exit 0
           fi
           set +e
-          python .github/scripts/post-v057-responsive.py > /tmp/v057-responsive.log 2>&1
+          (
+            python .github/scripts/post-v057-responsive.py
+            python .github/scripts/fix-v057-widget-bridge.py
+          ) > /tmp/v057-responsive.log 2>&1
           code=$?
           echo "$code" > /tmp/v057-responsive.status
           cat /tmp/v057-responsive.log
