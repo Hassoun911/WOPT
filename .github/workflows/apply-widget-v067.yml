@@ -1,0 +1,50 @@
+name: Apply Hassoun v0.6.7 Four Widget Sizes
+
+on:
+  push:
+    paths:
+      - '.github/v067-trigger.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply four-size widget repair
+        run: |
+          set -euo pipefail
+          python .github/scripts/widget-v067-four-sizes.py
+
+      - name: Validate native widget registrations
+        run: |
+          set -euo pipefail
+          grep -q 'HassounSquareWidgetProvider' mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml
+          grep -q 'HassounVerticalWidgetProvider' mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml
+          grep -q 'HassounSlimWidgetProvider' mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml
+          grep -q 'targetCellWidth="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+          grep -q 'targetCellWidth="2"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_square_widget_info.xml
+          grep -q 'targetCellHeight="4"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_vertical_widget_info.xml
+          grep -q 'targetCellHeight="1"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_slim_widget_info.xml
+          grep -q '"xlarge" -> 44f' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+
+      - name: Commit repair and trigger APK build
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile
+          git commit -m 'Hassoun v0.6.7 add four real widget sizes and readable text'
+          printf 'trigger=%s\nreason=four-real-widget-sizes-and-readable-text\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .github/v066-trigger.txt
+          git add .github/v066-trigger.txt
+          git commit -m 'Build APK after v0.6.7 widget size repair'
+          git pull --rebase origin main
+          git push origin HEAD:main
