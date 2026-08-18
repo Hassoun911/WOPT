@@ -8,6 +8,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import BrandMark from "./BrandMark";
 import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import {
   getEmailBackendStatus,
@@ -208,8 +209,8 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.decorativeRow}>
-        <View style={styles.mosqueMark}><Text style={styles.mosqueMarkText}>و</Text></View>
-        <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
+        <BrandMark size={36} />
+        <Text style={styles.eyebrow}>HASSOUN • {copy.eyebrow}</Text>
       </View>
 
       <Text style={styles.title}>{copy.title}</Text>

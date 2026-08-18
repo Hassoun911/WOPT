@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import QuranAudio from "../../modules/quran-audio";
 import QuranSpeech, { type QuranSpeechStatus } from "../../modules/quran-speech";
+import BrandMark from "../BrandMark";
 import {
   absoluteIndex,
   allSurahs,
@@ -528,7 +529,8 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
     <ScrollView contentContainerStyle={styles.setupContent} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
         <Pressable onPress={lesson ? () => setSetupOpen(false) : onBack} style={styles.roundButton}><Text style={styles.backText}>{ar ? "›" : "‹"}</Text></Pressable>
-        <View style={styles.flex}><Text style={[styles.eyebrow, ar && styles.rtl]}>📿 {t("SMART MEMORIZE", "الحفظ الذكي")}</Text><Text style={[styles.title, ar && styles.rtl]}>{t("Create a lesson", "أنشئ درس حفظ")}</Text></View>
+        <BrandMark size={40} />
+        <View style={styles.flex}><Text style={[styles.eyebrow, ar && styles.rtl]}>HASSOUN • {t("SMART MEMORIZE", "الحفظ الذكي")}</Text><Text style={[styles.title, ar && styles.rtl]}>{t("Create a lesson", "أنشئ درس حفظ")}</Text></View>
         <Pressable onPress={() => setTipsOpen(true)} style={styles.tipButton}><Text style={styles.tipButtonText}>💡</Text></Pressable>
       </View>
 
@@ -576,7 +578,8 @@ export default function SmartMemorize({ locale, initialRange, onBack }: Props) {
       <ScrollView contentContainerStyle={styles.lessonContent} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <Pressable onPress={onBack} style={styles.roundButton}><Text style={styles.backText}>{ar ? "›" : "‹"}</Text></Pressable>
-          <View style={styles.flex}><Text style={[styles.eyebrow, ar && styles.rtl]}>📿 {t("SMART MEMORIZE", "الحفظ الذكي")}</Text><Text style={[styles.lessonTitle, ar && styles.rtl]}>{lesson.title}</Text><Text style={[styles.lessonMeta, ar && styles.rtl]}>{lesson.sourceLabel} • {num(lesson.cards.length)} {t("cards", "بطاقات")}</Text></View>
+          <BrandMark size={40} />
+          <View style={styles.flex}><Text style={[styles.eyebrow, ar && styles.rtl]}>HASSOUN • {t("SMART MEMORIZE", "الحفظ الذكي")}</Text><Text style={[styles.lessonTitle, ar && styles.rtl]}>{lesson.title}</Text><Text style={[styles.lessonMeta, ar && styles.rtl]}>{lesson.sourceLabel} • {num(lesson.cards.length)} {t("cards", "بطاقات")}</Text></View>
           <Pressable onPress={() => setTipsOpen(true)} style={styles.tipButton}><Text style={styles.tipButtonText}>💡</Text></Pressable>
         </View>
 

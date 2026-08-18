@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import BrandMark from "./BrandMark";
 
 type Locale = "en" | "ar";
 export type MultiplayerGameType = "trivia" | "imposter" | "clue";
@@ -148,7 +149,7 @@ export default function MultiplayerGames({ locale, initialGame, onBack }: Props)
   if (!game && !room) {
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>🎮 HASSOUN MULTIPLAYER</Text><Text style={styles.title}>{t("Choose a game", "اختر لعبة")}</Text><Text style={styles.subtitle}>{t("Multiplayer only • Islamic or sports topics", "متعدد اللاعبين فقط • مواضيع إسلامية أو رياضية")}</Text></View></View>
+        <View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.headerCopy}><Text style={styles.eyebrow}>HASSOUN • MULTIPLAYER</Text><Text style={styles.title}>{t("Choose a game", "اختر لعبة")}</Text><Text style={styles.subtitle}>{t("Multiplayer only • Islamic or sports topics", "متعدد اللاعبين فقط • مواضيع إسلامية أو رياضية")}</Text></View></View>
         {(Object.keys(META) as MultiplayerGameType[]).map((id) => {
           const item = META[id];
           return <Pressable key={id} onPress={() => setGame(id)} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{item.icon}</Text></View><View style={styles.gameCopy}><Text style={styles.gameTitle}>{ar ? item.ar : item.en}</Text><Text style={styles.gameNote}>{ar ? item.noteAr : item.noteEn}</Text><View style={styles.topicRow}><Text style={styles.topicPill}>☾ {t("Islamic", "إسلامي")}</Text><Text style={styles.topicPill}>⚽ {t("Sports", "رياضة")}</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>;
@@ -160,7 +161,7 @@ export default function MultiplayerGames({ locale, initialGame, onBack }: Props)
   if (!room) {
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><Pressable onPress={() => setGame(null)} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>{meta?.icon} HASSOUN GAMES</Text><Text style={styles.title}>{ar ? meta?.ar : meta?.en}</Text><Text style={styles.subtitle}>{ar ? meta?.noteAr : meta?.noteEn}</Text></View></View>
+        <View style={styles.header}><Pressable onPress={() => setGame(null)} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.headerCopy}><Text style={styles.eyebrow}>HASSOUN • GAMES</Text><Text style={styles.title}>{ar ? meta?.ar : meta?.en}</Text><Text style={styles.subtitle}>{ar ? meta?.noteAr : meta?.noteEn}</Text></View></View>
         <View style={styles.setupCard}>
           <Text style={styles.label}>{t("YOUR NAME", "اسمك")}</Text>
           <TextInput value={playerName} onChangeText={setPlayerName} placeholder={t("Player name", "اسم اللاعب")} placeholderTextColor="#9aa39f" style={styles.input} maxLength={24} />
@@ -181,7 +182,7 @@ export default function MultiplayerGames({ locale, initialGame, onBack }: Props)
   const phase = room.state.phase ?? "lobby";
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-      <View style={styles.roomTop}><Pressable onPress={leaveRoom} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.roomCodeWrap}><Text style={styles.roomCodeLabel}>{t("ROOM", "الغرفة")}</Text><Text style={styles.roomCode}>{room.code}</Text></View><View style={styles.roundPill}><Text style={styles.roundText}>{phase === "lobby" ? t("Lobby", "انتظار") : `${t("Round", "جولة")} ${room.state.round ?? 1}`}</Text></View></View>
+      <View style={styles.roomTop}><Pressable onPress={leaveRoom} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={40} /><View style={styles.roomCodeWrap}><Text style={styles.roomCodeLabel}>{t("ROOM", "الغرفة")}</Text><Text style={styles.roomCode}>{room.code}</Text></View><View style={styles.roundPill}><Text style={styles.roundText}>{phase === "lobby" ? t("Lobby", "انتظار") : `${t("Round", "جولة")} ${room.state.round ?? 1}`}</Text></View></View>
 
       <View style={styles.roomHero}><Text style={styles.roomHeroIcon}>{META[room.gameType].icon}</Text><View style={styles.headerCopy}><Text style={styles.roomHeroTitle}>{ar ? META[room.gameType].ar : META[room.gameType].en}</Text><Text style={styles.roomHeroMeta}>{room.category === "islamic" ? `☾ ${t("Islamic", "إسلامي")}` : `⚽ ${t("Sports", "رياضة")}`} • {room.players.length}/12</Text></View></View>
 
