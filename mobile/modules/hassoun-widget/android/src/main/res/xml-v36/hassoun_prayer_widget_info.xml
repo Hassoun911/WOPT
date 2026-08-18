@@ -6,7 +6,7 @@
   android:minResizeHeight="60dp"
   android:updatePeriodMillis="1800000"
   android:initialLayout="@layout/hassoun_prayer_widget_slim"
-  android:previewLayout="@layout/hassoun_prayer_widget"
+  android:previewLayout="@layout/hassoun_prayer_widget_slim"
   android:resizeMode="horizontal|vertical"
   android:widgetCategory="home_screen"
   android:description="@string/hassoun_widget_description" />
