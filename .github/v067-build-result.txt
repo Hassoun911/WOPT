@@ -1,12 +1,12 @@
 status=failure
 source_check=success
-mobile_typescript=failure
-worker_validation=skipped
+mobile_typescript=success
+worker_validation=failure
 logo=skipped
 expo_prebuild=skipped
 gradle=skipped
 apk_verify=skipped
 apk_upload=skipped
-run_id=32198615627
-run_number=5
-artifact=hassoun-v0.6.7-four-widget-sizes-5
+run_id=32198895801
+run_number=6
+artifact=hassoun-v0.6.7-four-widget-sizes-6
