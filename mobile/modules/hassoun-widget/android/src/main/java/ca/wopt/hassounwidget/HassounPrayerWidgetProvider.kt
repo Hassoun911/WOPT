@@ -95,10 +95,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       // Pick the renderer that matches the real host dimensions, while using the
       // selected layout as the preference when the current shape can support it.
       val layout = if (isLockScreen) requestedLayout else when {
-        minWidth <= 0 || minHeight <= 0 -> if (requestedLayout == "vertical") "slim" else requestedLayout
+        minWidth <= 0 || minHeight <= 0 -> "full"
         minHeight >= minWidth * 1.35 -> "vertical"
         minWidth <= 220 && minHeight >= 150 -> "square"
-        minHeight <= 125 || minWidth >= minHeight * 2.15 -> "slim"
+        minHeight <= 80 || minWidth >= minHeight * 3.20 -> "slim"
         requestedLayout == "square" -> "square"
         requestedLayout == "slim" || requestedLayout == "compact" || requestedLayout == "next" -> "slim"
         else -> "full"
