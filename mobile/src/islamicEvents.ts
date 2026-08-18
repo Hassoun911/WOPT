@@ -119,3 +119,7 @@ export function islamicDateLabel(dateKey: string, locale: "en" | "ar") {
   if (locale === "ar") return `${new Intl.NumberFormat("ar").format(hijri.day)} ${month} ${new Intl.NumberFormat("ar").format(hijri.year)} هـ`;
   return `${month} ${hijri.day}, ${hijri.year} AH`;
 }
+
+export function islamicDateLabelForEvent(event: IslamicEventOccurrence, locale: "en" | "ar") {
+  return islamicDateLabel(event.dateKey, locale);
+}
