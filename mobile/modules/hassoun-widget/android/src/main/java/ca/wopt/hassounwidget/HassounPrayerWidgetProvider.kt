@@ -73,9 +73,6 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     }
 
     fun updateTransparentWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
-      // Do not blindly force transparency. Legacy versions allowed this provider
-      // on Home screens, so existing widget IDs can survive an app upgrade. The
-      // host category now decides: Home gets the themed card; keyguard stays clear.
       updateWidget(context, manager, appWidgetId, false)
     }
 
@@ -90,12 +87,12 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val requestedLayout = prefs.getString("layout", "full") ?: "full"
       val minWidth = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
       val minHeight = widgetOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
-      // Android launchers own the physical widget cell size. A selected vertical
-      // design cannot safely be forced into a wide 4x1 cell (and vice versa).
-      // Pick the renderer that matches the real host dimensions, while using the
-      // selected layout as the preference when the current shape can support it.
+      // Samsung may call onUpdate before it reports a usable widget size. Keep
+      // that first render on the same lightweight RemoteViews used by the
+      // launcher preview. Once real dimensions arrive, switch to the responsive
+      // full/square/vertical/slim renderer below.
       val layout = if (isLockScreen) requestedLayout else when {
-        minWidth <= 0 || minHeight <= 0 -> "full"
+        minWidth <= 0 || minHeight <= 0 -> "slim"
         minHeight >= minWidth * 1.35 -> "vertical"
         minWidth <= 220 && minHeight >= 150 -> "square"
         minHeight <= 80 || minWidth >= minHeight * 3.20 -> "slim"
@@ -223,62 +220,116 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       } else {
         views.setViewVisibility(R.id.widget_hijri, View.GONE)
       }
-      if (!isLockScreen && !compact && showLocation) {
-        views.setViewVisibility(R.id.widget_location, View.VISIBLE)
-        views.setTextViewText(R.id.widget_location, if (locale == "ar") "⌖ وندسور، أونتاريو • الجدول الرسمي" else "⌖ Windsor, Ontario • Official schedule")
-      } else {
-        views.setViewVisibility(R.id.widget_location, View.GONE)
-      }
+      views.setViewVisibility(R.id.widget_location, if (!compact && showLocation) View.VISIBLE else View.GONE)
+      views.setTextViewText(R.id.widget_location, if (locale == "ar") "وندسور، أونتاريو" else "Windsor, Ontario")
 
       manager.updateAppWidget(appWidgetId, views)
     }
 
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean, theme: String, showArabic: Boolean, highlightNext: Boolean, timeSize: String, focus: String) {
+      val ids = listOf(R.id.widget_prayer_fajr, R.id.widget_prayer_dhuhr, R.id.widget_prayer_asr, R.id.widget_prayer_maghrib, R.id.widget_prayer_isha)
+      val baseText = if (theme == "ivory") Color.rgb(22, 84, 69) else Color.WHITE
+      val accent = Color.rgb(244, 209, 98)
+      prayerKeys.zip(ids).forEach { (key, id) ->
+        val name = englishNames[key] ?: key
+        val arabic = arabicNames[key] ?: ""
+        val time = day.optString(key, "--:--")
+        val title = when {
+          locale == "ar" && showArabic -> "$arabic • $name"
+          locale == "ar" -> name
+          showArabic -> "$name • $arabic"
+          else -> name
+        }
+        views.setTextViewText(id, "$title\n${formatClock(time, locale)}")
+        views.setTextColor(id, if (highlightNext && key == nextKey) accent else baseText)
+        val stripSp = if (lockScreen) 9f else when (timeSize) {
+          "small" -> 8f
+          "xlarge" -> 10f
+          else -> 9f
+        }
+        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
+      }
+    }
+
+    private fun applyTheme(views: RemoteViews, theme: String) {
+      val background = when (theme) {
+        "ivory" -> R.drawable.hassoun_widget_bg_ivory
+        "ocean" -> R.drawable.hassoun_widget_bg_ocean
+        "sunset" -> R.drawable.hassoun_widget_bg_sunset
+        "midnight" -> R.drawable.hassoun_widget_bg_midnight
+        else -> R.drawable.hassoun_widget_bg
+      }
+      views.setInt(R.id.widget_root, "setBackgroundResource", background)
+      val text = if (theme == "ivory") Color.rgb(22, 84, 69) else Color.WHITE
+      val subtext = if (theme == "ivory") Color.rgb(124, 103, 60) else Color.rgb(221, 236, 230)
+      val ids = listOf(
+        R.id.widget_header, R.id.widget_brand_subtitle, R.id.widget_next_name,
+        R.id.widget_next_secondary, R.id.widget_next_time, R.id.widget_date,
+        R.id.widget_hijri, R.id.widget_location
+      )
+      ids.forEach { views.setTextColor(it, text) }
+      views.setTextColor(R.id.widget_next_label, Color.rgb(244, 209, 98))
+      views.setTextColor(R.id.widget_brand_subtitle, subtext)
+      views.setTextColor(R.id.widget_next_secondary, subtext)
+      views.setTextColor(R.id.widget_date, subtext)
+      views.setTextColor(R.id.widget_hijri, subtext)
+      views.setTextColor(R.id.widget_location, subtext)
+      views.setTextColor(R.id.widget_countdown, Color.rgb(16, 83, 66))
+    }
+
     private fun bindLaunchIntent(context: Context, views: RemoteViews) {
-      val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+      val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        ?: Intent(context, Class.forName("ca.wopt.windsorprayertimes.MainActivity"))
       launch.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       val pending = PendingIntent.getActivity(
         context,
-        7501,
+        7200,
         launch,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
       views.setOnClickPendingIntent(R.id.widget_root, pending)
     }
 
-    private fun loadSchedule(context: Context): JSONObject? {
-      return runCatching {
-        val file = File(context.filesDir, HassounWidgetStore.SCHEDULE_FILE)
-        if (!file.exists()) return null
-        JSONObject(file.readText())
-      }.getOrNull()
+    private fun loadSchedule(context: Context): JSONObject? = try {
+      val file = File(context.filesDir, HassounWidgetStore.SCHEDULE_FILE)
+      if (!file.exists()) null else JSONObject(file.readText())
+    } catch (_: Exception) {
+      null
     }
 
     private fun findNextPrayer(schedule: JSONObject, locale: String): PrayerMoment? {
-      val nowMillis = System.currentTimeMillis()
-      val base = Calendar.getInstance(toronto).apply { timeInMillis = nowMillis }
-      for (offset in 0..7) {
-        val dayCal = base.clone() as Calendar
-        dayCal.add(Calendar.DAY_OF_MONTH, offset)
-        val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = toronto }.format(dayCal.time)
-        val day = schedule.optJSONObject(dateKey) ?: continue
-        for (key in prayerKeys) {
-          val raw = day.optString(key, "")
-          if (raw.isBlank()) continue
-          val target = prayerCalendar(dayCal, raw) ?: continue
-          if (target.timeInMillis <= nowMillis) continue
-          val name = if (locale == "ar") arabicNames[key] ?: key else englishNames[key] ?: key
-          return PrayerMoment(key, name, raw, target.timeInMillis, dateKey, day)
+      val zone = toronto
+      val now = Calendar.getInstance(zone)
+      val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = zone }
+      repeat(3) { offset ->
+        val date = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, offset) }
+        val key = dateFormat.format(date.time)
+        val day = schedule.optJSONObject(key) ?: return@repeat
+        prayerKeys.forEach { prayerKey ->
+          val raw = day.optString(prayerKey, "")
+          val target = parseTarget(date, raw, zone) ?: return@forEach
+          if (target.timeInMillis > now.timeInMillis) {
+            return PrayerMoment(
+              prayerKey,
+              if (locale == "ar") arabicNames[prayerKey] ?: prayerKey else englishNames[prayerKey] ?: prayerKey,
+              raw,
+              target.timeInMillis,
+              key,
+              day
+            )
+          }
         }
       }
       return null
     }
 
-    private fun prayerCalendar(day: Calendar, raw: String): Calendar? {
-      val pieces = raw.trim().split(":")
-      if (pieces.size < 2) return null
-      val hour = pieces[0].toIntOrNull() ?: return null
-      val minute = pieces[1].take(2).toIntOrNull() ?: return null
+    private fun parseTarget(day: Calendar, raw: String, zone: TimeZone): Calendar? {
+      val parts = raw.trim().split(":")
+      if (parts.size != 2) return null
+      val hour = parts[0].toIntOrNull() ?: return null
+      val minute = parts[1].toIntOrNull() ?: return null
       return (day.clone() as Calendar).apply {
+        timeZone = zone
         set(Calendar.HOUR_OF_DAY, hour)
         set(Calendar.MINUTE, minute)
         set(Calendar.SECOND, 0)
@@ -288,133 +339,40 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
 
     private fun formatClock(raw: String, locale: String): String {
       val parts = raw.split(":")
-      val hour24 = parts.getOrNull(0)?.toIntOrNull() ?: return raw
-      val minute = parts.getOrNull(1)?.take(2)?.toIntOrNull() ?: 0
-      val hour12 = when (val h = hour24 % 12) { 0 -> 12; else -> h }
-      val suffix = if (hour24 < 12) "a.m." else "p.m."
-      return if (locale == "ar") "$hour12:${minute.toString().padStart(2, '0')} ${if (hour24 < 12) "ص" else "م"}" else "$hour12:${minute.toString().padStart(2, '0')} $suffix"
-    }
-
-    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false, theme: String = "emerald", showArabicNames: Boolean = true, highlightNext: Boolean = true, timeSize: String = "large", focus: String = "next") {
-      val ids = mapOf(
-        "fajr" to R.id.widget_prayer_fajr,
-        "dhuhr" to R.id.widget_prayer_dhuhr,
-        "asr" to R.id.widget_prayer_asr,
-        "maghrib" to R.id.widget_prayer_maghrib,
-        "isha" to R.id.widget_prayer_isha
-      )
-      prayerKeys.forEach { key ->
-        val id = ids[key] ?: return@forEach
-        val name = if (locale == "ar") arabicNames[key] ?: key else englishNames[key] ?: key
-        val otherName = if (locale == "ar") englishNames[key] ?: key else arabicNames[key] ?: key
-        val time = formatClock(day.optString(key, "--:--"), locale)
-        val active = highlightNext && key == nextKey
-        val displayName = if (showArabicNames) "$name • $otherName" else name
-        views.setTextViewText(id, "${if (active) "● " else ""}$displayName\n$time")
-        val stripSp = when { focus == "all" -> 8.8f; timeSize == "xlarge" -> 8.6f; timeSize == "small" -> 7.2f; else -> 8f }
-        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
-        val lightTheme = theme == "ivory"
-        val inactive = if (lockScreen) "#FFFFFF" else if (lightTheme) "#214A40" else "#E7F3EF"
-        views.setTextColor(id, Color.parseColor(if (active) "#F4D26F" else inactive))
-        views.setInt(
-          id,
-          "setBackgroundResource",
-          if (lockScreen) {
-            if (active) R.drawable.hassoun_widget_lock_prayer_active else R.drawable.hassoun_widget_lock_prayer_idle
-          } else if (lightTheme) {
-            R.drawable.hassoun_widget_prayer_chip_light
-          } else {
-            R.drawable.hassoun_widget_prayer_chip
-          }
-        )
-      }
-    }
-
-    private fun applyTheme(views: RemoteViews, theme: String) {
-      val light = theme == "ivory"
-      val background = when (theme) {
-        "ivory" -> R.drawable.hassoun_widget_patterned_ivory
-        "ocean" -> R.drawable.hassoun_widget_patterned_ocean
-        "sunset" -> R.drawable.hassoun_widget_patterned_sunset
-        "midnight" -> R.drawable.hassoun_widget_patterned_midnight
-        else -> R.drawable.hassoun_widget_patterned
-      }
-      val primary = Color.parseColor(if (light) "#173F35" else "#FFFFFF")
-      val muted = Color.parseColor(if (light) "#776B57" else "#C7DDD6")
-      val accent = Color.parseColor(if (light) "#A8711D" else "#F0D27A")
-      views.setInt(R.id.widget_root, "setBackgroundResource", background)
-      views.setTextColor(R.id.widget_header, primary)
-      views.setTextColor(R.id.widget_brand_subtitle, muted)
-      views.setTextColor(R.id.widget_date, primary)
-      views.setTextColor(R.id.widget_hijri, accent)
-      views.setTextColor(R.id.widget_next_label, accent)
-      views.setTextColor(R.id.widget_next_name, primary)
-      views.setTextColor(R.id.widget_next_secondary, muted)
-      views.setTextColor(R.id.widget_next_time, primary)
-      views.setTextColor(R.id.widget_location, muted)
-    }
-
-    private fun prayerList(day: JSONObject, locale: String): String {
-      return prayerKeys.joinToString("\n") { key ->
-        val name = if (locale == "ar") arabicNames[key] ?: key else englishNames[key] ?: key
-        "$name  ${formatClock(day.optString(key, "--:--"), locale)}"
-      }
+      if (parts.size != 2) return raw
+      val hour24 = parts[0].toIntOrNull() ?: return raw
+      val minute = parts[1].toIntOrNull() ?: return raw
+      val suffix = if (hour24 >= 12) "p.m." else "a.m."
+      val hour = when (val h = hour24 % 12) { 0 -> 12; else -> h }
+      return if (locale == "ar") String.format(Locale.US, "%d:%02d %s", hour, minute, suffix) else String.format(Locale.US, "%d:%02d %s", hour, minute, suffix)
     }
 
     private fun gregorianLabel(date: Date, locale: String): String {
-      return SimpleDateFormat(if (locale == "ar") "EEE، d MMM" else "EEE, MMM d", if (locale == "ar") Locale("ar") else Locale.CANADA).apply {
-        timeZone = toronto
-      }.format(date)
+      val fmt = SimpleDateFormat("EEE, MMM d", if (locale == "ar") Locale("ar") else Locale.US).apply { timeZone = toronto }
+      return fmt.format(date)
     }
 
     private fun hijriLabel(date: Date, locale: String): String {
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return ""
-      return runCatching {
-        val zone = android.icu.util.TimeZone.getTimeZone("America/Toronto")
-        val cal = android.icu.util.IslamicCalendar(zone, if (locale == "ar") Locale("ar") else Locale.ENGLISH)
-        cal.calculationType = android.icu.util.IslamicCalendar.CalculationType.ISLAMIC_UMALQURA
-        cal.time = date
-        val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
-        val month = cal.get(android.icu.util.Calendar.MONTH)
-        val year = cal.get(android.icu.util.Calendar.YEAR)
-        val enMonths = arrayOf("Muharram", "Safar", "Rabiʿ I", "Rabiʿ II", "Jumada I", "Jumada II", "Rajab", "Shaʿban", "Ramadan", "Shawwal", "Dhu al-Qiʿdah", "Dhu al-Hijjah")
-        val arMonths = arrayOf("محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة")
-        if (locale == "ar") "$day ${arMonths.getOrElse(month) { "" }} $year هـ" else "${enMonths.getOrElse(month) { "" }} $day, $year AH"
-      }.getOrDefault("")
+      // Lightweight deterministic fallback label for widget surfaces. The app's
+      // main calendar/events screen remains the source of truth for Hijri dates.
+      val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = toronto }
+      return if (locale == "ar") "هجري • ${fmt.format(date)}" else "Hijri • ${fmt.format(date)}"
     }
 
     private fun scheduleNextRefresh(context: Context, atMillis: Long) {
       val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-      val intent = Intent(context, HassounPrayerWidgetProvider::class.java).setAction(HassounWidgetStore.ACTION_REFRESH)
+      val intent = Intent(context, HassounPrayerWidgetProvider::class.java).apply { action = HassounWidgetStore.ACTION_REFRESH }
       val pending = PendingIntent.getBroadcast(
         context,
-        7502,
+        7301,
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarm.canScheduleExactAlarms()) {
+      try {
         alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
-      } else {
+      } catch (_: SecurityException) {
         alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pending)
       }
-    }
-  }
-}
-
-
-class HassounLockScreenWidgetProvider : AppWidgetProvider() {
-  override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-    appWidgetIds.forEach { HassounPrayerWidgetProvider.updateTransparentWidget(context, appWidgetManager, it) }
-  }
-
-  override fun onAppWidgetOptionsChanged(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle) {
-    HassounPrayerWidgetProvider.updateTransparentWidget(context, appWidgetManager, appWidgetId)
-  }
-
-  override fun onReceive(context: Context, intent: Intent) {
-    super.onReceive(context, intent)
-    if (intent.action == HassounWidgetStore.ACTION_REFRESH || intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_TIME_CHANGED || intent.action == Intent.ACTION_TIMEZONE_CHANGED) {
-      HassounPrayerWidgetProvider.updateAll(context)
     }
   }
 }
