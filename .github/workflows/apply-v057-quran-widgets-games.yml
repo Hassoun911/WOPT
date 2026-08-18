@@ -14,7 +14,7 @@ permissions:
 jobs:
   integrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -138,12 +138,34 @@ jobs:
           tail -n 160 /tmp/v057-worker.log
           exit 0
 
-      - name: Validate Android native widgets
+      - name: Regenerate Android-safe Hassoun widget logo
         shell: bash
         run: |
           if [ "$(cat /tmp/v057-mobile.status)" != "0" ]; then
+            echo 99 > /tmp/v057-logo.status
+            echo "Skipped because mobile validation failed" > /tmp/v057-logo.log
+            exit 0
+          fi
+          set +e
+          (
+            sudo apt-get update -y
+            sudo apt-get install -y librsvg2-bin pngcrush
+            rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o /tmp/hassoun-widget-logo.png
+            pngcrush -q -ow /tmp/hassoun-widget-logo.png
+            cp /tmp/hassoun-widget-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+            file mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          ) > /tmp/v057-logo.log 2>&1
+          code=$?
+          echo "$code" > /tmp/v057-logo.status
+          tail -n 80 /tmp/v057-logo.log
+          exit 0
+
+      - name: Validate Android native widgets
+        shell: bash
+        run: |
+          if [ "$(cat /tmp/v057-logo.status)" != "0" ]; then
             echo 99 > /tmp/v057-native.status
-            echo "Skipped because mobile validation failed" > /tmp/v057-native.log
+            echo "Skipped because logo preparation failed" > /tmp/v057-native.log
             exit 0
           fi
           set +e
@@ -168,12 +190,13 @@ jobs:
           responsive="$(cat /tmp/v057-responsive.status)"
           mobile="$(cat /tmp/v057-mobile.status)"
           worker="$(cat /tmp/v057-worker.status)"
+          logo="$(cat /tmp/v057-logo.status)"
           native="$(cat /tmp/v057-native.status)"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if [ "$patch" = 0 ] && [ "$harden" = 0 ] && [ "$responsive" = 0 ] && [ "$mobile" = 0 ] && [ "$worker" = 0 ] && [ "$native" = 0 ]; then
+          if [ "$patch" = 0 ] && [ "$harden" = 0 ] && [ "$responsive" = 0 ] && [ "$mobile" = 0 ] && [ "$worker" = 0 ] && [ "$logo" = 0 ] && [ "$native" = 0 ]; then
             rm -f .github/v057-last-error.log
             git add -f mobile push-server .github/v057-last-error.log 2>/dev/null || true
             git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games" || exit 0
@@ -183,8 +206,8 @@ jobs:
 
           {
             echo "Hassoun v0.5.7 integration failed"
-            echo "patch=$patch harden=$harden responsive=$responsive mobile=$mobile worker=$worker native=$native"
-            for name in patch harden responsive mobile worker native; do
+            echo "patch=$patch harden=$harden responsive=$responsive mobile=$mobile worker=$worker logo=$logo native=$native"
+            for name in patch harden responsive mobile worker logo native; do
               echo
               echo "===== $name ====="
               tail -n 120 "/tmp/v057-$name.log" 2>/dev/null || true
