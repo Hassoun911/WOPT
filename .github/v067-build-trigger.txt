@@ -1,2 +1,2 @@
-trigger=2026-08-18T23:22:00Z
-reason=clean-v067-four-widget-apk-build
+trigger=2026-08-18T23:23:00Z
+reason=retry-after-adding-missing-variant-widget-providers
