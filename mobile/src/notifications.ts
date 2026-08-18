@@ -10,6 +10,10 @@ import {
 } from "./config";
 import { buildPrayerEvents } from "./events";
 import { islamicEventTimeline } from "./islamicEvents";
+import {
+  loadPhonePrayerAlertPreferences,
+  type PrayerAlertPreferences
+} from "./alertPreferences";
 import { cancelAndroidPrayerAudio, scheduleAndroidPrayerAudio } from "./prayerAudio";
 import { addDateDays, formatPrayerTime, windsorLocalToDate } from "./time";
 import type { PrayerEvent, PrayerKey, PrayerTimes } from "./types";
@@ -46,7 +50,7 @@ export async function configureNotificationChannels() {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
     name: "Prayer reminders",
-    description: "Reminders 20 and 10 minutes before each prayer",
+    description: "Custom 20 and 10 minute reminders before selected prayers",
     importance: Notifications.AndroidImportance.MAX,
     sound: "attention_chime.wav",
     vibrationPattern: [0, 240, 120, 240, 120, 240],
@@ -55,7 +59,7 @@ export async function configureNotificationChannels() {
   });
   await Notifications.setNotificationChannelAsync(ATHAN_CHANNEL_ID, {
     name: "Prayer time",
-    description: "Visual notification at the exact prayer time; native Android playback supplies the Adhan",
+    description: "Visual prayer-time alert; native Android playback supplies Adhan for selected prayers",
     importance: Notifications.AndroidImportance.MAX,
     sound: null,
     vibrationPattern: [0, 400, 180, 400],
@@ -149,6 +153,15 @@ function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
   return { ...common, title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`, body: `${time} • ${CITY_LABEL}` };
 }
 
+function eventEnabled(event: PrayerEvent, preferences: PrayerAlertPreferences) {
+  const prayer = preferences[event.prayer];
+  if (!prayer) return false;
+  if (event.kind === "twenty") return prayer.twenty;
+  if (event.kind === "ten") return prayer.ten;
+  if (event.kind === "athan") return prayer.athan;
+  return false;
+}
+
 async function cancelPrayerNotificationsUnlocked() {
   const saved = await AsyncStorage.getItem(STORAGE_KEYS.scheduledNotificationIds);
   let savedIdentifiers: string[] = [];
@@ -167,12 +180,19 @@ async function cancelPrayerNotificationsUnlocked() {
 
 export function cancelPrayerNotifications() { return withNotificationScheduleLock(cancelPrayerNotificationsUnlocked); }
 
-async function schedulePrayerNotificationsUnlocked(prayerTimes: PrayerTimes, locale: "en" | "ar") {
+async function schedulePrayerNotificationsUnlocked(
+  prayerTimes: PrayerTimes,
+  locale: "en" | "ar",
+  suppliedPreferences?: PrayerAlertPreferences
+) {
   const granted = await requestNotificationPermission();
   if (!granted) return { granted: false, count: 0 };
   await cancelPrayerNotificationsUnlocked();
+  const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();
   const days = Platform.OS === "ios" ? 4 : 14;
-  const events = buildPrayerEvents(prayerTimes, days).filter((event) => Platform.OS !== "android" || event.kind !== "athan");
+  const events = buildPrayerEvents(prayerTimes, days)
+    .filter((event) => eventEnabled(event, preferences))
+    .filter((event) => Platform.OS !== "android" || event.kind !== "athan");
   const identifiers: string[] = [];
   for (const event of events) {
     const identifier = await Notifications.scheduleNotificationAsync({
@@ -181,13 +201,26 @@ async function schedulePrayerNotificationsUnlocked(prayerTimes: PrayerTimes, loc
     });
     identifiers.push(identifier);
   }
-  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes);
-  await Promise.all([AsyncStorage.setItem(STORAGE_KEYS.scheduledNotificationIds, JSON.stringify(identifiers)), AsyncStorage.setItem(STORAGE_KEYS.alertsEnabled, "on")]);
-  return { granted: true, count: identifiers.length + androidAudio.count, reminderCount: identifiers.length, audioCount: androidAudio.count, exactAlarmGranted: Platform.OS !== "android" || androidAudio.exact };
+  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes, preferences);
+  await Promise.all([
+    AsyncStorage.setItem(STORAGE_KEYS.scheduledNotificationIds, JSON.stringify(identifiers)),
+    AsyncStorage.setItem(STORAGE_KEYS.alertsEnabled, "on")
+  ]);
+  return {
+    granted: true,
+    count: identifiers.length + androidAudio.count,
+    reminderCount: identifiers.length,
+    audioCount: androidAudio.count,
+    exactAlarmGranted: Platform.OS !== "android" || androidAudio.exact
+  };
 }
 
-export function schedulePrayerNotifications(prayerTimes: PrayerTimes, locale: "en" | "ar") {
-  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale));
+export function schedulePrayerNotifications(
+  prayerTimes: PrayerTimes,
+  locale: "en" | "ar",
+  preferences?: PrayerAlertPreferences
+) {
+  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences));
 }
 
 export async function disablePrayerNotifications() {
