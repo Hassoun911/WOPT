@@ -1,0 +1,2 @@
+trigger=2026-08-17T22:08:00-04:00
+reason=apply-v0.5.7-and-build-apk
