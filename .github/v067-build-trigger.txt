@@ -1,2 +1,2 @@
-trigger=2026-08-18T23:31:00Z
-reason=retry-after-adding-missing-widget-metadata-xml
+trigger=2026-08-18T23:42:00Z
+reason=retry-after-nonbrittle-diagnostic-workflow
