@@ -1,2 +1,2 @@
-trigger=2026-08-18T23:13:16Z
-reason=four-real-widget-sizes-and-readable-text
+trigger=2026-08-18T23:19:00Z
+reason=manual-apk-build-v0.6.7-four-widget-sizes
