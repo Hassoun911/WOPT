@@ -136,8 +136,7 @@ function AppWithEmailShell() {
               </Text>
             </View>
             <View style={styles.heroIllustration}>
-              <View style={styles.heroMoon}><Text style={styles.heroMoonText}>☾</Text></View>
-              <View style={styles.heroDome}><Text style={styles.heroDomeText}>و</Text></View>
+              <BrandMark size={70} />
             </View>
           </View>
 

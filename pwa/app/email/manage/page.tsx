@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
+const LOGO = "https://hassoun911.github.io/WOPT/assets/hassoun-logo.png";
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 type Prayer = (typeof PRAYERS)[number];
 
@@ -162,7 +163,7 @@ export default function ManageEmailPage() {
   return (
     <main style={s.page} dir={locale === "ar" ? "rtl" : "ltr"}>
       <div style={s.shell}>
-        <header style={s.header}><div><p style={s.eyebrow}>Hassoun</p><h1 style={s.h1}>{locale === "ar" ? "إدارة تنبيهات البريد" : "Manage email alerts"}</h1><p style={s.muted}>{subscription?.email}</p></div><a href="../../" style={s.link}>{locale === "ar" ? "العودة" : "Back"}</a></header>
+        <header style={s.header}><div style={s.brandRow}><img src={LOGO} alt="Hassoun" width={56} height={56} style={s.logo} /><div><p style={s.eyebrow}>HASSOUN</p><h1 style={s.h1}>{locale === "ar" ? "إدارة تنبيهات البريد" : "Manage email alerts"}</h1><p style={s.muted}>{subscription?.email}</p></div></div><a href="../../" style={s.link}>{locale === "ar" ? "العودة" : "Back"}</a></header>
         <section style={s.location}><strong>📍 {location}</strong><span style={s.small}>{subscription?.timezone}</span></section>
 
         <section style={s.card}>
