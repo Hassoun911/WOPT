@@ -1,4 +1,4 @@
-name: Apply Hassoun v0.5.7 + Build APK
+name: Build Hassoun v0.5.7 APK
 
 on:
   workflow_dispatch:
@@ -10,11 +10,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v057-direct
+  group: hassoun-v057-apk
   cancel-in-progress: true
 
 jobs:
-  integrate-build:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -22,10 +22,16 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
-      - name: Checkout
+      - name: Checkout v0.5.7
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify committed release
+        run: |
+          grep -q 'version: "0.5.7"' mobile/app.config.ts
+          grep -q 'versionCode: 29' mobile/app.config.ts
+          echo "Hassoun v0.5.7 source confirmed."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -38,53 +44,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Apply v0.5.7 source changes
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('.github/scripts/apply-v057-quran-widgets-games.py')
-          s = p.read_text()
-          old = 'updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)'
-          new = 'updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)'
-          if old in s:
-              p.write_text(s.replace(old, new, 1))
-          PY
-          python .github/scripts/apply-v057-quran-widgets-games.py
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('push-server/src/games.ts')
-          s = p.read_text()
-          s = s.replace('await request.json<Record<string, unknown>>()', '(await request.json()) as Record<string, unknown>')
-          s = s.replace('const imposter = players[bytes[0] % players.length];', 'const imposter = players[(bytes[0] ?? 0) % players.length]!;')
-          s = s.replace('const active = players[roundIndex(round, players.length)];', 'const active = players[roundIndex(round, players.length)]!;')
-          s = s.replace('const question = TRIVIA[room.category][state.index % TRIVIA[room.category].length];', 'const question = TRIVIA[room.category][state.index % TRIVIA[room.category].length]!;')
-          s = s.replace('return getRoom(env, roomMatch[1], url.searchParams.get("playerId") ?? "");', 'return getRoom(env, roomMatch[1]!, url.searchParams.get("playerId") ?? "");')
-          s = s.replace('return action(request, env, actionMatch[1]);', 'return action(request, env, actionMatch[1]!);')
-          p.write_text(s)
-
-          p = Path('mobile/src/MultiplayerGames.tsx')
-          s = p.read_text().replace('useEffect, useMemo, useState', 'useEffect, useState')
-          s = s.replace('  const me = room?.players.find((p) => p.id === playerId);\n', '')
-          p.write_text(s)
-          PY
-          python .github/scripts/post-v057-responsive.py
-          python .github/scripts/fix-v057-widget-bridge.py
-
-      - name: Commit v0.5.7 source immediately
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f mobile push-server
-          git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games"
-          git push origin HEAD:main
-
       - name: Install mobile dependencies and typecheck
         working-directory: mobile
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npx tsc --noEmit
 
-      - name: Install image tools and regenerate assets
+      - name: Regenerate Android-safe Hassoun assets
         run: |
           sudo apt-get update -y
           sudo apt-get install -y librsvg2-bin pngcrush
@@ -111,7 +77,7 @@ jobs:
         working-directory: mobile
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build Hassoun v0.5.7 APK
+      - name: Build release APK
         working-directory: mobile/android
         run: ./gradlew assembleRelease --stacktrace
 
@@ -126,7 +92,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Validate and deploy multiplayer Worker
+      - name: Deploy multiplayer Worker
+        id: worker
+        continue-on-error: true
         working-directory: push-server
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
@@ -134,3 +102,22 @@ jobs:
           npm test
           npx wrangler d1 migrations apply wopt-prayer-push --remote
           npx wrangler deploy
+
+      - name: Record verified build status
+        if: always()
+        run: |
+          cat > .github/v057-build-status.txt <<EOF
+          version=0.5.7
+          versionCode=29
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          artifact=hassoun-v0.5.7-${{ github.run_number }}
+          apk_step=${{ steps.worker.outcome != '' && 'uploaded-before-worker' || 'check-run' }}
+          worker=${{ steps.worker.outcome }}
+          source_commit=$(git rev-parse HEAD)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v057-build-status.txt
+          git commit -m "Record Hassoun v0.5.7 build status" || true
+          git push origin HEAD:main || true
