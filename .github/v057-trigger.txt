@@ -1,2 +1,2 @@
-trigger=2026-08-17T22:14:00-04:00
-reason=apply-v0.5.7-source-first-build-apk
+trigger=2026-08-17T22:18:00-04:00
+reason=build-committed-v0.5.7-and-write-status
