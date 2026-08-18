@@ -1,7 +1,10 @@
 status=success
+standalone=true
+js_bundle_verified=true
+build_type=release
 version=0.5.7
 versionCode=29
-run_id=32095148246
-run_number=1
-artifact=hassoun-v0.5.7-fast-1
-source_commit=14927a456aa4c6a43a368937cfce81226f83af4c
+run_id=32097558239
+run_number=3
+artifact=hassoun-v0.5.7-verified-3
+source_commit=27ded4a66b608b955e762a53b0030cc3f084dc22
