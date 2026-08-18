@@ -1,1 +1,1 @@
-Trigger complete Hassoun v0.6.0 release with Quran reader/audio, widgets, branding, smart emails, Islamic Events, 15-day event alerts, multiplayer, and native-safe continuous Quran Radio.
+Trigger clean Hassoun v0.6.0 source-first release: apply only missing fixes, validate everything, commit actual app source to main, then build standalone APK. Triggered 2026-08-18 07:01 America/Toronto.
