@@ -25,29 +25,43 @@ const EVENTS: IslamicEvent[] = [
 
 const cache = new Map<number, IslamicEventOccurrence[]>();
 const pad = (value: number) => String(value).padStart(2, "0");
-const dateKey = (date: Date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 
-function hijriParts(key: string) {
-  const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
-    calendar: "islamic-umalqura",
-    timeZone: "UTC",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric"
-  }).formatToParts(new Date(`${key}T12:00:00Z`));
-  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
-  return { year: read("year"), month: read("month"), day: read("day") };
+function islamicToJulianDay(year: number, month: number, day: number) {
+  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + 1948439.5 - 1;
+}
+
+function julianDayToGregorian(jd: number) {
+  const z = Math.floor(jd + 0.5);
+  const f = jd + 0.5 - z;
+  let a = z;
+  if (z >= 2299161) {
+    const alpha = Math.floor((z - 1867216.25) / 36524.25);
+    a = z + 1 + alpha - Math.floor(alpha / 4);
+  }
+  const b = a + 1524;
+  const c = Math.floor((b - 122.1) / 365.25);
+  const d = Math.floor(365.25 * c);
+  const e = Math.floor((b - d) / 30.6001);
+  const day = Math.floor(b - d - Math.floor(30.6001 * e) + f);
+  const month = e < 14 ? e - 1 : e - 13;
+  const year = month > 2 ? c - 4716 : c - 4715;
+  return { year, month, day };
+}
+
+function approximateHijriYear(gregorianYear: number) {
+  return Math.floor((gregorianYear - 622) * 33 / 32);
 }
 
 export function eventsForGregorianYear(year: number) {
   const cached = cache.get(year);
   if (cached) return cached;
   const found: IslamicEventOccurrence[] = [];
-  for (let ms = Date.UTC(year, 0, 1, 12); ms < Date.UTC(year + 1, 0, 1, 12); ms += 86_400_000) {
-    const key = dateKey(new Date(ms));
-    const hijri = hijriParts(key);
+  const center = approximateHijriYear(year);
+  for (let hijriYear = center - 2; hijriYear <= center + 2; hijriYear += 1) {
     for (const event of EVENTS) {
-      if (event.month === hijri.month && event.day === hijri.day) found.push({ ...event, dateKey: key, hijriYear: hijri.year });
+      const gregorian = julianDayToGregorian(islamicToJulianDay(hijriYear, event.month, event.day));
+      if (gregorian.year !== year) continue;
+      found.push({ ...event, dateKey: `${gregorian.year}-${pad(gregorian.month)}-${pad(gregorian.day)}`, hijriYear });
     }
   }
   found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
