@@ -1,13 +1,9 @@
 import Constants from "expo-constants";
+import { anyPrayerAlertEnabled, type PrayerAlertPreferences } from "./alertPreferences";
 import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import { getInstallationId } from "./installation";
-import { PRAYER_KEYS } from "./types";
 
-export type EmailAlertChoices = {
-  twenty: boolean;
-  ten: boolean;
-  athan: boolean;
-};
+export type EmailAlertChoices = PrayerAlertPreferences;
 
 export type EmailSignupResult = {
   ok: boolean;
@@ -49,9 +45,7 @@ export async function subscribeToPrayerEmails(
   if (!location) throw new Error("Location permission is required so Hassoun can use your local prayer times.");
 
   const installationId = await getInstallationId();
-  const prayers = Object.fromEntries(
-    PRAYER_KEYS.map((prayer) => [prayer, choices])
-  );
+  const prayerAlerts = anyPrayerAlertEnabled(choices);
 
   const response = await fetch(`${apiBase()}/email/subscribers`, {
     method: "POST",
@@ -68,7 +62,7 @@ export async function subscribeToPrayerEmails(
       countryCode: location.countryCode ?? undefined,
       countryName: location.countryName ?? undefined,
       preferences: {
-        prayerAlerts: true,
+        prayerAlerts,
         dailyPrayerSchedule: false,
         religiousOccasions: true,
         dailyContent: false,
@@ -76,7 +70,7 @@ export async function subscribeToPrayerEmails(
         communityEvents: true,
         marketing: false
       },
-      prayers
+      prayers: choices
     })
   });
 
