@@ -157,8 +157,16 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_next_secondary, if (showArabicNames) secondaryName else "")
         views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
-        val timeSp = when (timeSize) { "small" -> 20f; "medium" -> 25f; "xlarge" -> 35f; else -> 30f }
-        val prayerNameSp = when (focus) { "all" -> 20f; "balanced" -> 23f; else -> 26f }
+        val timeSp = if (layout == "vertical") {
+          when (timeSize) { "small" -> 15f; "medium" -> 17f; "xlarge" -> 21f; else -> 19f }
+        } else {
+          when (timeSize) { "small" -> 20f; "medium" -> 25f; "xlarge" -> 35f; else -> 30f }
+        }
+        val prayerNameSp = if (layout == "vertical") {
+          when (focus) { "all" -> 15f; "balanced" -> 17f; else -> 19f }
+        } else {
+          when (focus) { "all" -> 20f; "balanced" -> 23f; else -> 26f }
+        }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
 
