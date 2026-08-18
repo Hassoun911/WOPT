@@ -1,0 +1,2 @@
+trigger=2026-08-18T23:22:00Z
+reason=clean-v067-four-widget-apk-build
