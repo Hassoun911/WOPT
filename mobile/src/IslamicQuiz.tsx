@@ -16,6 +16,7 @@ import {
   type QuizMode,
   type QuizStats
 } from "./islamicQuiz";
+import BrandMark from "./BrandMark";
 
 type Props = {
   locale: QuizLocale;
@@ -176,6 +177,7 @@ export default function IslamicQuiz({ locale, dateKey, stats, onStatsChange, onB
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <View style={styles.topRow}>
+        <BrandMark size={46} />
         <View style={styles.titleWrap}>
           <Text style={styles.eyebrow}>🧠 HASSOUN QUIZ</Text>
           <Text style={styles.title}>{copy.title}</Text>

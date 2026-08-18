@@ -20,14 +20,14 @@
     </LinearLayout>
   </LinearLayout>
 
-  <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:layout_marginTop="4dp" android:orientation="horizontal" android:gravity="center_vertical">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="98dp" android:layout_marginTop="4dp" android:orientation="horizontal" android:gravity="center_vertical">
     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
       <TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PRAYER" android:textColor="#F4D26F" android:textStyle="bold" android:textSize="7sp" android:shadowColor="#C0000000" android:shadowDy="1" android:shadowRadius="3" />
       <TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="24sp" android:maxLines="1" android:shadowColor="#D0000000" android:shadowDy="1" android:shadowRadius="4" />
       <TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#E6FFFFFF" android:textSize="8sp" android:maxLines="1" android:shadowColor="#C0000000" android:shadowDy="1" android:shadowRadius="3" />
     </LinearLayout>
 
-    <Chronometer android:id="@+id/widget_countdown" android:layout_width="76dp" android:layout_height="76dp" android:layout_marginHorizontal="8dp" android:gravity="center" android:padding="5dp" android:background="@drawable/hassoun_widget_lock_countdown_circle" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="2" android:shadowColor="#B0000000" android:shadowDy="1" android:shadowRadius="3" />
+    <Chronometer android:id="@+id/widget_countdown" android:layout_width="92dp" android:layout_height="92dp" android:layout_marginHorizontal="8dp" android:gravity="center" android:padding="5dp" android:background="@drawable/hassoun_widget_lock_countdown_circle" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="17sp" android:maxLines="2" android:shadowColor="#B0000000" android:shadowDy="1" android:shadowRadius="3" />
 
     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="end" android:orientation="vertical">
       <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#E6FFFFFF" android:textStyle="bold" android:textSize="6sp" android:shadowColor="#B0000000" android:shadowDy="1" android:shadowRadius="3" />

@@ -17,6 +17,7 @@ import {
 import HassounWidget, { type HassounWidgetCountdownStyle, type HassounWidgetFocus, type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme, type HassounWidgetTimeSize } from "../modules/hassoun-widget";
 import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering";
 import { submitSupportMessage } from "./support";
+import BrandMark from "./BrandMark";
 
 type SettingsPage = "root" | "about" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";
 
@@ -91,6 +92,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
 
   const root = (
     <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <BrandMark size={50} />
       <Text style={styles.eyebrow}>⚙️ HASSOUN</Text>
       <Text style={styles.title}>{t("Settings & Support", "الإعدادات والدعم")}</Text>
       <Text style={styles.subtitle}>{t("Reading, widgets, alerts, privacy and help in one place.", "إعدادات القراءة والويدجت والتنبيهات والخصوصية والدعم في مكان واحد.")}</Text>
@@ -124,7 +126,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
 
   if (page === "widgets") {
     const previewTheme = WIDGET_THEME_META[widgetPrefs.theme || "emerald"];
-    const widgetLogo = require("../assets/icon.png");
+    const widgetLogo = require("../assets/hassoun-logo.png");
     const previewTimeSize = widgetPrefs.timeSize === "xlarge" ? 28 : widgetPrefs.timeSize === "large" ? 23 : widgetPrefs.timeSize === "medium" ? 19 : 16;
     const previewPrayerSize = widgetPrefs.focus === "next" ? 29 : widgetPrefs.focus === "balanced" ? 25 : 21;
     return (

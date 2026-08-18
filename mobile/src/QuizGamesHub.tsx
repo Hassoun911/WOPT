@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import IslamicQuiz from "./IslamicQuiz";
 import MultiplayerGames, { type MultiplayerGameType } from "./MultiplayerGames";
+import BrandMark from "./BrandMark";
 import type { QuizLocale, QuizStats } from "./islamicQuiz";
 
 type Props = { locale: QuizLocale; dateKey: string; stats: QuizStats; onStatsChange: (stats: QuizStats) => void; onBackHome: () => void };
@@ -25,7 +26,7 @@ export default function QuizGamesHub({ locale, dateKey, stats, onStatsChange, on
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-      <View style={styles.top}><Pressable onPress={onBackHome} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.copy}><Text style={styles.eyebrow}>🎮 HASSOUN GAMES</Text><Text style={styles.title}>{t("Learn. Play. Compete.", "تعلّم • العب • تنافس")}</Text><Text style={styles.subtitle}>{t("Daily Islamic learning plus live multiplayer games. Multiplayer topics are Islamic or sports only.", "تعلم إسلامي يومي وألعاب جماعية مباشرة. مواضيع اللعب الجماعي إسلامية أو رياضية فقط.")}</Text></View></View>
+      <View style={styles.top}><Pressable onPress={onBackHome} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.copy}><Text style={styles.eyebrow}>🎮 HASSOUN GAMES</Text><Text style={styles.title}>{t("Learn. Play. Compete.", "تعلّم • العب • تنافس")}</Text><Text style={styles.subtitle}>{t("Daily Islamic learning plus live multiplayer games. Multiplayer topics are Islamic or sports only.", "تعلم إسلامي يومي وألعاب جماعية مباشرة. مواضيع اللعب الجماعي إسلامية أو رياضية فقط.")}</Text></View></View>
 
       <Pressable onPress={() => setMode("daily")} style={styles.dailyCard}><View style={styles.dailyIcon}><Text style={styles.bigEmoji}>🧠</Text></View><View style={styles.copy}><Text style={styles.kicker}>{t("DAILY LEARNING", "تعلم يومي")}</Text><Text style={styles.dailyTitle}>{t("Daily Islamic Quiz", "المسابقة الإسلامية اليومية")}</Text><Text style={styles.dailyNote}>{t("Kids & Adults • streaks • badges • verified sources", "أطفال وكبار • سلسلة • شارات • مصادر موثقة")}</Text></View><Text style={styles.dailyArrow}>›</Text></Pressable>
 

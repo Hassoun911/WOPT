@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import QuranAudio, { type QuranAudioStatus } from "../../modules/quran-audio";
 import SmartMemorize from "./SmartMemorize";
+import BrandMark from "../BrandMark";
 import {
   absoluteIndex,
   allPages,
@@ -580,6 +581,11 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     }
     if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
     if (audioStatus.state === "paused") { QuranAudio?.resume(); return; }
+    if (screen === "radio" && audioStatus.mode === "range") {
+      if (audioStatus.state === "completed") playFullQuranRange(repeatQueue);
+      else QuranAudio?.resume();
+      return;
+    }
     if (!activeAyah) { playSurah(position.surah, false); return; }
     QuranAudio?.resume();
   };
@@ -591,8 +597,22 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   };
 
   const playFullQuranRange = (repeat = false) => {
-    const end = radioOngoing ? 114 : Math.max(radioStartSurah, radioEndSurah);
-    playQueue(buildSurahQueue(radioStartSurah, end), repeat);
+    if (!QuranAudio) return;
+    const start = clamp(radioStartSurah, 1, 114);
+    const end = radioOngoing ? 114 : clamp(Math.max(start, radioEndSurah), start, 114);
+    const lastAyahs = getSurahAyahs(end);
+    const lastAyah = lastAyahs[lastAyahs.length - 1];
+    if (!lastAyah) return;
+    const reciter = reciterInfo(audioPrefs.reciter);
+    const startAbsolute = absoluteIndex(start, 1) + 1;
+    const endAbsolute = absoluteIndex(end, lastAyah.ayah) + 1;
+    // Do not build thousands of JS objects or pass a multi-megabyte JSON Intent.
+    // Native foreground playback advances this compact range lazily, including on lock screen.
+    setAudioQueue([]);
+    setAudioIndex(-1);
+    setRepeatQueue(repeat);
+    completionRef.current = null;
+    QuranAudio.playRange(startAbsolute, endAbsolute, reciter.id, reciter.bitrate, ar ? reciter.ar : reciter.en, repeat, audioPrefs.speed);
   };
 
   const stopAudio = () => {
@@ -657,6 +677,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const topBar = (title: string, subtitle?: string) => (
     <View style={styles.topBar}>
       <Pressable onPress={handleBack} style={styles.iconButton}><Text style={styles.back}>{ar ? "›" : "‹"}</Text></Pressable>
+      <BrandMark size={36} />
       <View style={styles.topCopy}><Text style={[styles.topTitle, ar && styles.rtl]}>{title}</Text>{subtitle ? <Text style={[styles.topSubtitle, ar && styles.rtl]}>{subtitle}</Text> : null}</View>
       <Pressable onPress={() => setMenuOpen(true)} style={styles.topMenuButton}><Text style={styles.topMenuIcon}>☰</Text></Pressable>
     </View>
@@ -680,6 +701,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     <ScrollView style={styles.flex} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.heroHeader}>
         <Pressable onPress={onBackHome} style={styles.iconButton}><Text style={styles.back}>{ar ? "›" : "‹"}</Text></Pressable>
+        <BrandMark size={42} />
         <View style={styles.topCopy}><Text style={styles.eyebrow}>☾ {tr("HASSOUN QUR’AN", "قرآن Hassoun")}</Text><Text style={[styles.heroTitle, ar && styles.rtl]}>{tr("The Noble Qur’an", "القرآن الكريم")}</Text><Text style={[styles.heroSub, ar && styles.rtl]}>{tr("Read • listen • memorize", "اقرأ • استمع • احفظ")}</Text></View>
         <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ {tr("Verified", "موثّق")}</Text></View>
       </View>

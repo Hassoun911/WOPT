@@ -17,6 +17,7 @@ import {
 } from "react-native-safe-area-context";
 import App from "./App";
 import EmailSignupCard, { type EmailSignupCompletion } from "./src/EmailSignupCard";
+import BrandMark from "./src/BrandMark";
 import { STORAGE_KEYS } from "./src/config";
 import { configureNotificationChannels } from "./src/notifications";
 import { registerDeviceForServerPush } from "./src/push";
@@ -112,7 +113,8 @@ function AppWithEmailShell() {
       <Modal visible={visible} animationType="slide" onRequestClose={() => setVisible(false)}>
         <SafeAreaView style={styles.modalSafe} edges={["top", "bottom", "left", "right"]}>
           <View style={styles.modalHeader}>
-            <View>
+            <BrandMark size={44} />
+            <View style={{ flex: 1 }}>
               <Text style={styles.modalEyebrow}>HASSOUN</Text>
               <Text style={styles.modalTitle}>
                 {locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}

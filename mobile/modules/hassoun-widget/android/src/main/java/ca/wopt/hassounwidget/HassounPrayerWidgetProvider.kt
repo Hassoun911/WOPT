@@ -109,7 +109,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val showArabicNames = prefs.getBoolean("showArabicNames", true)
       val highlightNext = prefs.getBoolean("highlightNext", true)
       val timeSize = prefs.getString("timeSize", "large") ?: "large"
-      val countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"
+      var countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"
+      if (!prefs.getBoolean("countdownStyleV060Migrated", false)) {
+        countdownStyle = "circle"
+        prefs.edit().putString("countdownStyle", "circle").putBoolean("countdownStyleV060Migrated", true).apply()
+      }
       val focus = prefs.getString("focus", "next") ?: "next"
       val schedule = loadSchedule(context)
       val next = schedule?.let { findNextPrayer(it, locale) }
@@ -134,7 +138,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_next_secondary, if (showArabicNames) secondaryName else "")
         views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
-        val timeSp = when (timeSize) { "small" -> 18f; "medium" -> 22f; "xlarge" -> 30f; else -> 26f }
+        val timeSp = when (timeSize) { "small" -> 20f; "medium" -> 25f; "xlarge" -> 35f; else -> 30f }
         val prayerNameSp = when (focus) { "all" -> 20f; "balanced" -> 23f; else -> 26f }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
@@ -153,7 +157,14 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
             "pill" -> R.drawable.hassoun_widget_countdown
             else -> R.drawable.hassoun_widget_countdown_circle
           })
-          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, if (countdownStyle == "circle") 12f else 9.5f)
+          val countdownSp = if (countdownStyle != "circle") 10f else when {
+            isLockScreen -> 17f
+            layout == "slim" || layout == "compact" -> 10.5f
+            layout == "square" -> 14f
+            layout == "vertical" -> 16f
+            else -> 17f
+          }
+          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             views.setChronometerCountDown(R.id.widget_countdown, true)
           }
