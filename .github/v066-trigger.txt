@@ -1,2 +1,2 @@
-trigger=2026-08-18T18:14:00-04:00
-reason=restore-samsung-safe-widget-preview-and-initial-render
+trigger=2026-08-18T18:31:00-04:00
+reason=restore-missing-widget-native-provider-and-theme-resources
