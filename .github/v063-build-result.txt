@@ -1,0 +1,15 @@
+status=failure
+version=0.6.3
+run_id=32151564523
+run_number=1
+retained_v062=failure
+smart_alert_patch=skipped
+sourcecheck=skipped
+mobile_typescript=skipped
+worker_validation=skipped
+pwa_validation=skipped
+source_commit=skipped
+expo_prebuild=skipped
+gradle=skipped
+apk_verify=skipped
+apk_upload=skipped
