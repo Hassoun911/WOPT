@@ -33,41 +33,93 @@ export const ISLAMIC_EVENTS: IslamicEventDefinition[] = [
   { id: "eid-adha", month: 12, day: 10, emoji: "🕌", name: { en: "Eid al-Adha", ar: "عيد الأضحى" }, description: { en: "The Festival of Sacrifice on the 10th of Dhul-Hijjah.", ar: "عيد الأضحى في العاشر من ذي الحجة." } }
 ];
 
+const HIJRI_MONTHS_EN = ["Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani", "Jumada al-Awwal", "Jumada al-Thani", "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"];
+const HIJRI_MONTHS_AR = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
 const cache = new Map<number, IslamicEventOccurrence[]>();
-function pad(value: number) { return String(value).padStart(2, "0"); }
-function dateKeyUtc(date: Date) { return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`; }
-function hijriParts(dateKey: string) {
-  const date = new Date(`${dateKey}T12:00:00Z`);
-  try {
-    const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", { calendar: "islamic-umalqura", timeZone: "UTC", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(date);
-    const number = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
-    return { year: number("year"), month: number("month"), day: number("day") };
-  } catch { return { year: 0, month: 0, day: 0 }; }
+const pad = (value: number) => String(value).padStart(2, "0");
+
+// Deterministic tabular Hijri conversion. We intentionally do not depend on
+// Intl islamic-umalqura here because some Android/Hermes builds return no
+// usable calendar parts, which previously made the Events page show 0 dates.
+function islamicToJulianDay(year: number, month: number, day: number) {
+  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + 1948439.5 - 1;
 }
-export function islamicEventsForGregorianYear(year: number) {
-  const existing = cache.get(year); if (existing) return existing;
-  const found: IslamicEventOccurrence[] = [];
-  for (let time = Date.UTC(year, 0, 1, 12); time < Date.UTC(year + 1, 0, 1, 12); time += 86_400_000) {
-    const date = new Date(time); const dateKey = dateKeyUtc(date); const hijri = hijriParts(dateKey);
-    for (const definition of ISLAMIC_EVENTS) if (definition.month === hijri.month && definition.day === hijri.day) found.push({ ...definition, dateKey, hijriYear: hijri.year });
+
+function julianDayToGregorian(jd: number) {
+  const z = Math.floor(jd + 0.5);
+  const f = jd + 0.5 - z;
+  let a = z;
+  if (z >= 2299161) {
+    const alpha = Math.floor((z - 1867216.25) / 36524.25);
+    a = z + 1 + alpha - Math.floor(alpha / 4);
   }
-  found.sort((a, b) => a.dateKey.localeCompare(b.dateKey)); cache.set(year, found); return found;
+  const b = a + 1524;
+  const c = Math.floor((b - 122.1) / 365.25);
+  const d = Math.floor(365.25 * c);
+  const e = Math.floor((b - d) / 30.6001);
+  const day = Math.floor(b - d - Math.floor(30.6001 * e) + f);
+  const month = e < 14 ? e - 1 : e - 13;
+  const year = month > 2 ? c - 4716 : c - 4715;
+  return { year, month, day };
 }
-export function daysBetweenDateKeys(from: string, to: string) { return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000); }
+
+function approximateHijriYear(gregorianYear: number) {
+  return Math.floor((gregorianYear - 622) * 33 / 32);
+}
+
+export function islamicEventsForGregorianYear(year: number) {
+  const existing = cache.get(year);
+  if (existing) return existing;
+  const found: IslamicEventOccurrence[] = [];
+  const center = approximateHijriYear(year);
+  for (let hijriYear = center - 2; hijriYear <= center + 2; hijriYear += 1) {
+    for (const definition of ISLAMIC_EVENTS) {
+      const gregorian = julianDayToGregorian(islamicToJulianDay(hijriYear, definition.month, definition.day));
+      if (gregorian.year !== year) continue;
+      found.push({ ...definition, dateKey: `${gregorian.year}-${pad(gregorian.month)}-${pad(gregorian.day)}`, hijriYear });
+    }
+  }
+  found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  cache.set(year, found);
+  return found;
+}
+
+export function daysBetweenDateKeys(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
 export function islamicEventTimeline(todayKey: string): IslamicEventTimeline {
   const year = Number(todayKey.slice(0, 4));
   const all = [...islamicEventsForGregorianYear(year - 1), ...islamicEventsForGregorianYear(year), ...islamicEventsForGregorianYear(year + 1)].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  let previous: IslamicEventOccurrence | null = null; let next: IslamicEventOccurrence | null = null;
-  for (const event of all) { if (event.dateKey < todayKey) previous = event; if (!next && event.dateKey >= todayKey) next = event; }
+  let previous: IslamicEventOccurrence | null = null;
+  let next: IslamicEventOccurrence | null = null;
+  for (const event of all) {
+    if (event.dateKey < todayKey) previous = event;
+    if (!next && event.dateKey >= todayKey) next = event;
+  }
   return { previous, next, daysUntilNext: next ? daysBetweenDateKeys(todayKey, next.dateKey) : null };
 }
+
 export function islamicEventCountdown(days: number, locale: "en" | "ar") {
   if (days <= 0) return locale === "ar" ? "اليوم" : "Today";
   if (days < 45) return locale === "ar" ? `${new Intl.NumberFormat("ar").format(days)} يوم` : `${days} day${days === 1 ? "" : "s"}`;
-  const months = Math.floor(days / 30); const remainder = days % 30;
+  const months = Math.floor(days / 30);
+  const remainder = days % 30;
   if (locale === "ar") return `${new Intl.NumberFormat("ar").format(months)} شهر${remainder ? ` و${new Intl.NumberFormat("ar").format(remainder)} يوم` : ""}`;
   return `${months} month${months === 1 ? "" : "s"}${remainder ? ` ${remainder}d` : ""}`;
 }
+
+export function islamicDateLabelForEvent(event: IslamicEventOccurrence, locale: "en" | "ar") {
+  const month = locale === "ar" ? HIJRI_MONTHS_AR[event.month - 1] : HIJRI_MONTHS_EN[event.month - 1];
+  const day = locale === "ar" ? new Intl.NumberFormat("ar").format(event.day) : String(event.day);
+  const year = locale === "ar" ? new Intl.NumberFormat("ar").format(event.hijriYear) : String(event.hijriYear);
+  return locale === "ar" ? `${day} ${month} ${year} هـ` : `${month} ${day}, ${year} AH`;
+}
+
+// Backward-compatible helper for any older caller. Event screens should prefer
+// islamicDateLabelForEvent so the label never relies on Android calendar Intl.
 export function islamicDateLabel(dateKey: string, locale: "en" | "ar") {
-  try { return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", { calendar: "islamic-umalqura", timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`)); } catch { return ""; }
+  const year = Number(dateKey.slice(0, 4));
+  const event = [...islamicEventsForGregorianYear(year - 1), ...islamicEventsForGregorianYear(year), ...islamicEventsForGregorianYear(year + 1)].find((item) => item.dateKey === dateKey);
+  return event ? islamicDateLabelForEvent(event, locale) : "";
 }
