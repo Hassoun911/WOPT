@@ -1,0 +1,2 @@
+trigger=2026-08-18T23:12:00Z
+reason=fix-real-widget-sizes-and-home-screen-readability
