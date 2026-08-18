@@ -11,6 +11,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -87,8 +88,12 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val views = RemoteViews(
         context.packageName,
         if (isLockScreen) R.layout.hassoun_prayer_widget_lockscreen
-        else if (layout == "vertical") R.layout.hassoun_prayer_widget_vertical
-        else R.layout.hassoun_prayer_widget
+        else when (layout) {
+          "vertical" -> R.layout.hassoun_prayer_widget_vertical
+          "square" -> R.layout.hassoun_prayer_widget_square
+          "slim", "compact", "next" -> R.layout.hassoun_prayer_widget_slim
+          else -> R.layout.hassoun_prayer_widget
+        }
       )
       val locale = prefs.getString("locale", "en") ?: "en"
       val theme = prefs.getString("theme", "emerald") ?: "emerald"
@@ -97,11 +102,18 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val showGregorian = prefs.getBoolean("showGregorian", true)
       val showAllPrayers = prefs.getBoolean("showAllPrayers", true)
       val showLocation = prefs.getBoolean("showLocation", false)
+      val showLogo = prefs.getBoolean("showLogo", true)
+      val showArabicNames = prefs.getBoolean("showArabicNames", true)
+      val highlightNext = prefs.getBoolean("highlightNext", true)
+      val timeSize = prefs.getString("timeSize", "large") ?: "large"
+      val countdownStyle = prefs.getString("countdownStyle", "circle") ?: "circle"
+      val focus = prefs.getString("focus", "next") ?: "next"
       val schedule = loadSchedule(context)
       val next = schedule?.let { findNextPrayer(it, locale) }
 
       bindLaunchIntent(context, views)
       if (!isLockScreen) applyTheme(views, theme)
+      views.setViewVisibility(R.id.widget_logo, if (showLogo) View.VISIBLE else View.GONE)
       views.setTextViewText(R.id.widget_header, "HASSOUN")
       views.setTextViewText(R.id.widget_brand_subtitle, if (locale == "ar") "مواقيت الصلاة • وندسور" else "PRAYER TIMES • WINDSOR")
 
@@ -115,13 +127,30 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       } else {
         views.setTextViewText(R.id.widget_next_label, if (locale == "ar") "الصلاة القادمة" else "NEXT PRAYER")
         views.setTextViewText(R.id.widget_next_name, next.name)
-        views.setTextViewText(R.id.widget_next_secondary, if (locale == "ar") englishNames[next.key] ?: next.key else arabicNames[next.key] ?: next.key)
+        val secondaryName = if (locale == "ar") englishNames[next.key] ?: next.key else arabicNames[next.key] ?: next.key
+        views.setTextViewText(R.id.widget_next_secondary, if (showArabicNames) secondaryName else "")
+        views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
+        val timeSp = when (timeSize) { "small" -> 18f; "medium" -> 22f; "xlarge" -> 30f; else -> 26f }
+        val prayerNameSp = when (focus) { "all" -> 20f; "balanced" -> 23f; else -> 26f }
+        views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
+        views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
 
         val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
         if (showCountdown) {
           views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
-          views.setChronometer(R.id.widget_countdown, SystemClock.elapsedRealtime() + delay, if (locale == "ar") "⏳ %s" else "⏳ %s left", true)
+          val countFormat = when (countdownStyle) {
+            "minimal" -> if (locale == "ar") "%s متبقي" else "%s left"
+            "pill" -> if (locale == "ar") "⏳ %s متبقي" else "⏳ %s left"
+            else -> if (locale == "ar") "%s\nمتبقي" else "%s\nLEFT"
+          }
+          views.setChronometer(R.id.widget_countdown, SystemClock.elapsedRealtime() + delay, countFormat, true)
+          views.setInt(R.id.widget_countdown, "setBackgroundResource", when (countdownStyle) {
+            "minimal" -> R.drawable.hassoun_widget_countdown_minimal
+            "pill" -> R.drawable.hassoun_widget_countdown
+            else -> R.drawable.hassoun_widget_countdown_circle
+          })
+          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, if (countdownStyle == "circle") 10f else 8.5f)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             views.setChronometerCountDown(R.id.widget_countdown, true)
           }
@@ -129,10 +158,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
           views.setViewVisibility(R.id.widget_countdown, View.GONE)
         }
 
-        val fullLayout = isLockScreen || layout == "full" || layout == "vertical"
-        if (fullLayout && (showAllPrayers || isLockScreen)) {
+        val supportsPrayerStrip = isLockScreen || layout in setOf("full", "vertical", "square", "slim", "next", "compact")
+        if (supportsPrayerStrip && (showAllPrayers || isLockScreen)) {
           views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
-          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme)
+          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme, showArabicNames, highlightNext, timeSize, focus)
         } else {
           views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
         }
@@ -225,7 +254,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       return if (locale == "ar") "$hour12:${minute.toString().padStart(2, '0')} ${if (hour24 < 12) "ص" else "م"}" else "$hour12:${minute.toString().padStart(2, '0')} $suffix"
     }
 
-    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false, theme: String = "emerald") {
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean = false, theme: String = "emerald", showArabicNames: Boolean = true, highlightNext: Boolean = true, timeSize: String = "large", focus: String = "next") {
       val ids = mapOf(
         "fajr" to R.id.widget_prayer_fajr,
         "dhuhr" to R.id.widget_prayer_dhuhr,
@@ -236,9 +265,13 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       prayerKeys.forEach { key ->
         val id = ids[key] ?: return@forEach
         val name = if (locale == "ar") arabicNames[key] ?: key else englishNames[key] ?: key
+        val otherName = if (locale == "ar") englishNames[key] ?: key else arabicNames[key] ?: key
         val time = formatClock(day.optString(key, "--:--"), locale)
-        val active = key == nextKey
-        views.setTextViewText(id, "${if (active) "● " else ""}$name\n$time")
+        val active = highlightNext && key == nextKey
+        val displayName = if (showArabicNames) "$name • $otherName" else name
+        views.setTextViewText(id, "${if (active) "● " else ""}$displayName\n$time")
+        val stripSp = when { focus == "all" -> 8.8f; timeSize == "xlarge" -> 8.6f; timeSize == "small" -> 7.2f; else -> 8f }
+        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
         val lightTheme = theme == "ivory"
         val inactive = if (lockScreen) "#FFFFFF" else if (lightTheme) "#214A40" else "#E7F3EF"
         views.setTextColor(id, Color.parseColor(if (active) "#F4D26F" else inactive))
@@ -259,11 +292,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     private fun applyTheme(views: RemoteViews, theme: String) {
       val light = theme == "ivory"
       val background = when (theme) {
-        "ivory" -> R.drawable.hassoun_widget_background_ivory
-        "ocean" -> R.drawable.hassoun_widget_background_ocean
-        "sunset" -> R.drawable.hassoun_widget_background_sunset
-        "midnight" -> R.drawable.hassoun_widget_background_midnight
-        else -> R.drawable.hassoun_widget_background
+        "ivory" -> R.drawable.hassoun_widget_patterned_ivory
+        "ocean" -> R.drawable.hassoun_widget_patterned_ocean
+        "sunset" -> R.drawable.hassoun_widget_patterned_sunset
+        "midnight" -> R.drawable.hassoun_widget_patterned_midnight
+        else -> R.drawable.hassoun_widget_patterned
       }
       val primary = Color.parseColor(if (light) "#173F35" else "#FFFFFF")
       val muted = Color.parseColor(if (light) "#776B57" else "#C7DDD6")

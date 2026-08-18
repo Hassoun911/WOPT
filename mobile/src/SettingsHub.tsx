@@ -14,7 +14,7 @@ import {
   TextInput,
   View
 } from "react-native";
-import HassounWidget, { type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme } from "../modules/hassoun-widget";
+import HassounWidget, { type HassounWidgetCountdownStyle, type HassounWidgetFocus, type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme, type HassounWidgetTimeSize } from "../modules/hassoun-widget";
 import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering";
 import { submitSupportMessage } from "./support";
 
@@ -125,6 +125,8 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
   if (page === "widgets") {
     const previewTheme = WIDGET_THEME_META[widgetPrefs.theme || "emerald"];
     const widgetLogo = require("../assets/icon.png");
+    const previewTimeSize = widgetPrefs.timeSize === "xlarge" ? 28 : widgetPrefs.timeSize === "large" ? 23 : widgetPrefs.timeSize === "medium" ? 19 : 16;
+    const previewPrayerSize = widgetPrefs.focus === "next" ? 29 : widgetPrefs.focus === "balanced" ? 25 : 21;
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BackHeader title={t("Widgets", "الويدجت")} onBack={() => setPage("root")} />
@@ -183,8 +185,9 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
             widgetPrefs.layout === "slim" && styles.widgetRichPreviewSlim,
             { backgroundColor: previewTheme.bg, borderColor: previewTheme.border }
           ]}>
+            <View pointerEvents="none" style={styles.previewIslamicPattern}><Text style={[styles.previewPatternText, { color: previewTheme.accent }]}>✦  ◇  ✦  ◇  ✦  ◇  ✦</Text><Text style={[styles.previewPatternMosque, { color: previewTheme.muted }]}>⌒⌒  ◇  ⌒⌒  ◇  ⌒⌒</Text></View>
             <View style={styles.previewHeaderRow}>
-              <Image source={widgetLogo} style={styles.previewLogo} resizeMode="contain" />
+              {widgetPrefs.showLogo ? <Image source={widgetLogo} style={styles.previewLogo} resizeMode="contain" /> : null}
               <View style={styles.previewBrandBlock}><Text style={[styles.previewBrand, { color: previewTheme.fg }]}>HASSOUN</Text><Text style={[styles.previewTiny, { color: previewTheme.muted }]}>PRAYER TIMES • WINDSOR</Text></View>
               {widgetPrefs.layout !== "slim" && <Text style={[styles.previewTiny, { color: previewTheme.muted }]}>Mon, Aug 17</Text>}
             </View>
@@ -192,7 +195,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
               <View style={styles.slimPreviewRow}><Text style={[styles.slimPrayer, { color: previewTheme.fg }]}>Dhuhr</Text><Text style={[styles.slimTime, { color: previewTheme.accent }]}>1:36 p.m.</Text><Text style={[styles.slimCountdown, { color: previewTheme.fg }]}>50:34</Text></View>
             ) : (
               <>
-                <View style={styles.previewPrayerRow}><View><Text style={[styles.previewTiny, { color: previewTheme.accent }]}>NEXT PRAYER</Text><Text style={[styles.previewPrayer, { color: previewTheme.fg }]}>Dhuhr</Text><Text style={[styles.previewArabic, { color: previewTheme.muted }]}>الظهر</Text></View><View style={styles.previewTimeBlock}><Text style={[styles.previewTime, { color: previewTheme.fg }]}>1:36 p.m.</Text>{widgetPrefs.showCountdown && <Text style={[styles.previewCountdown, { color: previewTheme.accent }]}>⏳ 50:34 left</Text>}</View></View>
+                <View style={styles.previewPrayerRow}><View style={styles.previewSide}><Text style={[styles.previewTiny, { color: previewTheme.accent }]}>NEXT PRAYER</Text><Text style={[styles.previewPrayer, { color: previewTheme.fg, fontSize: previewPrayerSize }]}>Dhuhr</Text>{widgetPrefs.showArabicNames ? <Text style={[styles.previewArabic, { color: previewTheme.muted }]}>الظهر</Text> : null}</View>{widgetPrefs.showCountdown ? <View style={[styles.previewCountdownCenter, widgetPrefs.countdownStyle === "circle" && styles.previewCountdownCircle, widgetPrefs.countdownStyle === "pill" && styles.previewCountdownPill, { borderColor: previewTheme.accent }]}><Text style={[styles.previewCountdownBig, { color: widgetPrefs.countdownStyle === "circle" ? "#173f35" : previewTheme.accent }]}>50:34</Text><Text style={[styles.previewCountdownLabel, { color: widgetPrefs.countdownStyle === "circle" ? "#31564b" : previewTheme.muted }]}>LEFT</Text></View> : null}<View style={[styles.previewTimeBlock, styles.previewSide]}><Text style={[styles.previewTiny, { color: previewTheme.muted }]}>ADHAN</Text><Text style={[styles.previewTime, { color: previewTheme.fg, fontSize: previewTimeSize }]}>1:36 p.m.</Text></View></View>
                 {widgetPrefs.showHijri && <Text style={[styles.previewMeta, { color: previewTheme.muted }]}>Rabiʿ I 4, 1448 AH</Text>}
                 {(widgetPrefs.layout === "full" || widgetPrefs.layout === "vertical") && widgetPrefs.showAllPrayers && (
                   <View style={widgetPrefs.layout === "vertical" ? styles.previewPrayerListVertical : styles.previewPrayerList}>
@@ -208,6 +211,9 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
         <Text style={styles.sectionLabel}>{t("SHOW ON WIDGET", "إظهار على الويدجت")}</Text>
         {([
           ["showCountdown", t("Live countdown", "العد التنازلي المباشر")],
+          ["showLogo", t("Hassoun logo", "شعار Hassoun")],
+          ["showArabicNames", t("Arabic prayer names", "أسماء الصلوات بالعربية")],
+          ["highlightNext", t("Highlight next prayer", "تمييز الصلاة القادمة")],
           ["showHijri", t("Hijri date", "التاريخ الهجري")],
           ["showGregorian", t("Gregorian date", "التاريخ الميلادي")],
           ["showAllPrayers", t("All five prayer times", "مواقيت الصلوات الخمس")],
@@ -215,6 +221,16 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
         ] as Array<[keyof HassounWidgetPreferences, string]>).map(([key, label]) => (
           <View key={key} style={styles.toggleRow}><Text style={styles.toggleLabel}>{label}</Text><Switch value={Boolean(widgetPrefs[key])} onValueChange={(value) => updateWidget({ [key]: value } as Partial<HassounWidgetPreferences>)} trackColor={{ false: "#d6dbd8", true: "#8cc9b7" }} thumbColor={Boolean(widgetPrefs[key]) ? "#0b7057" : "#fff"} /></View>
         ))}
+
+
+        <Text style={styles.sectionLabel}>{t("NEXT PRAYER TIME SIZE", "حجم وقت الصلاة القادمة")}</Text>
+        <View style={styles.optionGrid}>{([ ["small", t("Small", "صغير")], ["medium", t("Medium", "متوسط")], ["large", t("Large", "كبير")], ["xlarge", t("Extra large", "كبير جداً")] ] as Array<[HassounWidgetTimeSize, string]>).map(([value, label]) => <Pressable key={value} onPress={() => updateWidget({ timeSize: value })} style={[styles.optionChip, widgetPrefs.timeSize === value && styles.optionChipActive]}><Text style={[styles.optionChipText, widgetPrefs.timeSize === value && styles.optionChipTextActive]}>{label}</Text></Pressable>)}</View>
+
+        <Text style={styles.sectionLabel}>{t("COUNTDOWN STYLE", "شكل العد التنازلي")}</Text>
+        <View style={styles.optionGrid}>{([ ["circle", t("Circle", "دائرة")], ["pill", t("Pill", "كبسولة")], ["minimal", t("Minimal", "بسيط")] ] as Array<[HassounWidgetCountdownStyle, string]>).map(([value, label]) => <Pressable key={value} onPress={() => updateWidget({ countdownStyle: value })} style={[styles.optionChip, widgetPrefs.countdownStyle === value && styles.optionChipActive]}><Text style={[styles.optionChipText, widgetPrefs.countdownStyle === value && styles.optionChipTextActive]}>{label}</Text></Pressable>)}</View>
+
+        <Text style={styles.sectionLabel}>{t("LAYOUT EMPHASIS", "تركيز التصميم")}</Text>
+        <View style={styles.optionGrid}>{([ ["next", t("Next prayer", "الصلاة القادمة")], ["balanced", t("Balanced", "متوازن")], ["all", t("All prayers", "كل الصلوات")] ] as Array<[HassounWidgetFocus, string]>).map(([value, label]) => <Pressable key={value} onPress={() => updateWidget({ focus: value })} style={[styles.optionChip, widgetPrefs.focus === value && styles.optionChipActive]}><Text style={[styles.optionChipText, widgetPrefs.focus === value && styles.optionChipTextActive]}>{label}</Text></Pressable>)}</View>
 
         <Pressable onPress={() => {
           const ok = HassounWidget.requestPin();
@@ -386,6 +402,7 @@ const styles = StyleSheet.create({
   layoutTitle: { color: "#173f35", fontSize: 10, fontWeight: "900", marginTop: 7, textAlign: "center" },
   layoutNote: { color: "#8a948f", fontSize: 7, lineHeight: 10, textAlign: "center", marginTop: 3 },
   previewStage: { alignItems: "center", marginBottom: 6 },
+  previewIslamicPattern: { position: "absolute", top: 5, left: 4, right: 4, bottom: 4, opacity: .16, justifyContent: "space-between", overflow: "hidden" }, previewPatternText: { fontSize: 22, letterSpacing: 8, textAlign: "center" }, previewPatternMosque: { fontSize: 20, letterSpacing: 7, textAlign: "center", marginBottom: 4 },
   widgetRichPreview: { width: "100%", minHeight: 184, borderRadius: 25, borderWidth: 1, padding: 14 },
   widgetRichPreviewSquare: { width: 250, minHeight: 250 },
   widgetRichPreviewVertical: { width: 220, minHeight: 350 },
@@ -395,7 +412,7 @@ const styles = StyleSheet.create({
   previewBrandBlock: { flex: 1 },
   previewBrand: { fontSize: 11, fontWeight: "900" },
   previewTiny: { fontSize: 7, fontWeight: "800" },
-  previewPrayerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12 },
+  previewPrayerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 6 }, previewSide: { flex: 1 }, previewCountdownCenter: { minWidth: 64, minHeight: 48, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }, previewCountdownCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: "#F2E0A8" }, previewCountdownPill: { minWidth: 76, minHeight: 42, borderRadius: 22, backgroundColor: "rgba(0,0,0,.12)" }, previewCountdownBig: { fontSize: 11, fontWeight: "900" }, previewCountdownLabel: { fontSize: 5.5, fontWeight: "900", marginTop: 1 },
   previewPrayer: { fontSize: 27, fontWeight: "900" },
   previewArabic: { fontSize: 10, marginTop: 1 },
   previewTimeBlock: { alignItems: "flex-end" },
@@ -420,7 +437,7 @@ const styles = StyleSheet.create({
   lockPrayerText: { flex: 1, color: "#fff", borderWidth: 1, borderColor: "#55FFFFFF", borderRadius: 7, paddingVertical: 5, textAlign: "center", fontSize: 5.5, fontWeight: "900" },
   lockPrayerActive: { color: "#F4D26F", borderColor: "#F4D26F" },
   toggleRow: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 17, borderWidth: 1, borderColor: "#e2dfd7", paddingHorizontal: 14, marginBottom: 7 },
-  toggleLabel: { color: "#264b41", fontSize: 12, fontWeight: "800" },
+  toggleLabel: { color: "#264b41", fontSize: 12, fontWeight: "800" }, optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 8 }, optionChip: { minWidth: "22%", flexGrow: 1, minHeight: 43, borderRadius: 14, backgroundColor: "#fff", borderWidth: 1, borderColor: "#dedbd3", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }, optionChipActive: { backgroundColor: "#0b654f", borderColor: "#0b654f" }, optionChipText: { color: "#53645e", fontSize: 8.5, fontWeight: "900", textAlign: "center" }, optionChipTextActive: { color: "#fff" },
   primaryButton: { minHeight: 52, backgroundColor: "#0b654f", borderRadius: 17, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, marginTop: 10 },
   primaryButtonText: { color: "#fff", fontSize: 12, fontWeight: "900" },
   secondaryButton: { minHeight: 50, backgroundColor: "#edf5f1", borderRadius: 17, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, marginTop: 8, marginBottom: 10 },

@@ -21,6 +21,7 @@ import {
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
+import { handleGames } from "./games";
 import { duePrayerEvents } from "./schedule";
 import {
   getSubscriberPreferences,
@@ -198,7 +199,8 @@ async function runScheduled(env: Env, scheduledTime: number) {
     env.DB.prepare("DELETE FROM email_outbox WHERE status IN ('sent', 'cancelled') AND created_at < datetime('now', '-90 days')"),
     env.DB.prepare("DELETE FROM location_prayer_cache WHERE prayer_date < date('now', '-45 days')"),
     env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < datetime('now', '-30 days')"),
-    env.DB.prepare("DELETE FROM admin_password_resets WHERE consumed_at IS NOT NULL AND created_at < datetime('now', '-30 days')")
+    env.DB.prepare("DELETE FROM admin_password_resets WHERE consumed_at IS NOT NULL AND created_at < datetime('now', '-30 days')"),
+    env.DB.prepare("DELETE FROM game_rooms WHERE updated_at < datetime('now', '-2 days')")
   ]);
 }
 
@@ -224,6 +226,8 @@ export default {
         response = await registerWeb(request, env);
       } else if (request.method === "DELETE" && url.pathname === "/subscriptions") {
         response = await unsubscribe(request, env);
+      } else if (url.pathname.startsWith("/games/")) {
+        response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
       } else if (request.method === "POST" && url.pathname === "/support/contact") {
         response = await submitSupportContact(request, env);
       } else if (request.method === "POST" && url.pathname === "/email/subscribers") {

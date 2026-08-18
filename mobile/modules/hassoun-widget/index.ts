@@ -3,6 +3,10 @@ import { requireNativeModule } from "expo-modules-core";
 
 export type HassounWidgetLayout = "compact" | "next" | "full" | "square" | "vertical" | "slim";
 export type HassounWidgetTheme = "emerald" | "ivory" | "ocean" | "sunset" | "midnight";
+export type HassounWidgetTimeSize = "small" | "medium" | "large" | "xlarge";
+export type HassounWidgetCountdownStyle = "circle" | "pill" | "minimal";
+export type HassounWidgetFocus = "next" | "balanced" | "all";
+
 export type HassounWidgetPreferences = {
   layout: HassounWidgetLayout;
   theme: HassounWidgetTheme;
@@ -11,6 +15,12 @@ export type HassounWidgetPreferences = {
   showGregorian: boolean;
   showAllPrayers: boolean;
   showLocation: boolean;
+  showLogo: boolean;
+  showArabicNames: boolean;
+  highlightNext: boolean;
+  timeSize: HassounWidgetTimeSize;
+  countdownStyle: HassounWidgetCountdownStyle;
+  focus: HassounWidgetFocus;
   locale: "en" | "ar";
 };
 
@@ -22,16 +32,7 @@ export type HassounWidgetCapabilities = {
 };
 
 type NativeWidget = {
-  setPreferences: (
-    layout: HassounWidgetLayout,
-    theme: HassounWidgetTheme,
-    showCountdown: boolean,
-    showHijri: boolean,
-    showGregorian: boolean,
-    showAllPrayers: boolean,
-    showLocation: boolean,
-    locale: "en" | "ar"
-  ) => void;
+  setPreferences: (preferences: HassounWidgetPreferences) => void;
   getPreferences: () => HassounWidgetPreferences;
   syncPrayerSchedule: (scheduleJson: string, locale: "en" | "ar") => void;
   refresh: () => void;
@@ -41,11 +42,7 @@ type NativeWidget = {
 
 let native: NativeWidget | null = null;
 if (Platform.OS === "android") {
-  try {
-    native = requireNativeModule<NativeWidget>("HassounWidget");
-  } catch {
-    native = null;
-  }
+  try { native = requireNativeModule<NativeWidget>("HassounWidget"); } catch { native = null; }
 }
 
 const defaults: HassounWidgetPreferences = {
@@ -56,35 +53,26 @@ const defaults: HassounWidgetPreferences = {
   showGregorian: true,
   showAllPrayers: true,
   showLocation: false,
+  showLogo: true,
+  showArabicNames: true,
+  highlightNext: true,
+  timeSize: "large",
+  countdownStyle: "circle",
+  focus: "next",
   locale: "en"
 };
 
 const HassounWidget = {
   available: Boolean(native),
   setPreferences(preferences: HassounWidgetPreferences) {
-    native?.setPreferences(
-      preferences.layout,
-      preferences.theme,
-      preferences.showCountdown,
-      preferences.showHijri,
-      preferences.showGregorian,
-      preferences.showAllPrayers,
-      preferences.showLocation,
-      preferences.locale
-    );
+    native?.setPreferences(preferences);
   },
-  getPreferences() {
-    return native?.getPreferences() ?? defaults;
+  getPreferences(): HassounWidgetPreferences {
+    return { ...defaults, ...(native?.getPreferences() ?? {}) };
   },
-  syncPrayerSchedule(scheduleJson: string, locale: "en" | "ar") {
-    native?.syncPrayerSchedule(scheduleJson, locale);
-  },
-  refresh() {
-    native?.refresh();
-  },
-  requestPin() {
-    return native?.requestPin() ?? false;
-  },
+  syncPrayerSchedule(scheduleJson: string, locale: "en" | "ar") { native?.syncPrayerSchedule(scheduleJson, locale); },
+  refresh() { native?.refresh(); },
+  requestPin() { return native?.requestPin() ?? false; },
   getCapabilities(): HassounWidgetCapabilities {
     return native?.getCapabilities() ?? { available: false, pinningSupported: false, lockScreenEligible: false, sdkInt: 0 };
   }

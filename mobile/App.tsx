@@ -14,7 +14,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import IslamicQuiz from "./src/IslamicQuiz";
+import QuizGamesHub from "./src/QuizGamesHub";
 import SettingsHub from "./src/SettingsHub";
 import HassounWidget from "./modules/hassoun-widget";
 import QuranAudio, { type QuranAudioStatus } from "./modules/quran-audio";
@@ -361,8 +361,8 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
           <View style={styles.quizIconWrap}><Text style={styles.quizIcon}>🧠</Text></View>
           <View style={styles.quizCopy}>
             <Text style={styles.quizEyebrow}>{locale === "ar" ? "تعلّم كل يوم" : "LEARN EVERY DAY"}</Text>
-            <Text style={styles.quizTitle}>{locale === "ar" ? "المسابقة الإسلامية اليومية" : "Daily Islamic Quiz"}</Text>
-            <Text style={styles.quizDescription}>{locale === "ar" ? "أسئلة للأطفال والكبار مع شارات وسلسلة أيام." : "Kids & Adults questions with badges and daily streaks."}</Text>
+            <Text style={styles.quizTitle}>{locale === "ar" ? "المسابقة والألعاب الجماعية" : "Quiz & Multiplayer Games"}</Text>
+            <Text style={styles.quizDescription}>{locale === "ar" ? "مسابقة يومية + Trivia وImposter وألعاب إسلامية ورياضية جماعية." : "Daily quiz + live Trivia, Imposter and Islamic/sports multiplayer games."}</Text>
           </View>
           <Text style={styles.quizArrow}>›</Text>
         </View>
@@ -465,7 +465,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const body = activeTab === "quran"
     ? <Quran locale={locale} onBackHome={() => { setQuranAppNavVisible(true); setQuranOwnsAudioSurface(false); setActiveTab("home"); }} onAppNavVisibilityChange={setQuranAppNavVisible} onLocalAudioSurfaceChange={setQuranOwnsAudioSurface} />
     : activeTab === "quiz"
-      ? <IslamicQuiz locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
+      ? <QuizGamesHub locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
       : activeTab === "alerts"
         ? alertsScreen
         : activeTab === "more"
@@ -475,7 +475,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const navItems: Array<{ tab: AppTab; emoji: string; en: string; ar: string }> = [
     { tab: "home", emoji: "🏠", en: "Home", ar: "الرئيسية" },
     { tab: "quran", emoji: "📖", en: "Qur’an", ar: "القرآن" },
-    { tab: "quiz", emoji: "🧠", en: "Quiz", ar: "مسابقة" },
+    { tab: "quiz", emoji: "🎮", en: "Games", ar: "ألعاب" },
     { tab: "alerts", emoji: "🔔", en: "Alerts", ar: "تنبيهات" },
     { tab: "more", emoji: "•••", en: "More", ar: "المزيد" }
   ];
