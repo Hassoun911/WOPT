@@ -1,4 +1,4 @@
-# Redeploy Hassoun Worker with Settings & Support contact endpoint
+# Deploy Hassoun Worker with prayer alerts, support, and multiplayer games
 name: Deploy Hassoun Push Worker
 
 on:
@@ -113,7 +113,7 @@ jobs:
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
 
-      - name: Smoke test Worker
+      - name: Smoke test Worker and multiplayer room creation
         run: |
           set -euo pipefail
 
@@ -141,5 +141,24 @@ jobs:
           done
           test "$config_ok" = true
 
-          echo "Worker health, push, and email-signup config checks passed."
-          jq '{emailDeliveryConfigured}' /tmp/config.json
+          player_id="smoke_$(date +%s)_$RANDOM"
+          games_ok=false
+          for attempt in $(seq 1 10); do
+            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' \
+              -X POST "${PUSH_WORKER_URL}/games/rooms" \
+              -H 'Content-Type: application/json' \
+              --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
+            if [ "$http_code" = "200" ] \
+              && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null \
+              && jq -e '.room.gameType == "trivia" and .room.category == "islamic"' /tmp/game-room.json >/dev/null; then
+              games_ok=true
+              break
+            fi
+            echo "Multiplayer endpoint not ready yet (${attempt}/10), HTTP ${http_code}"
+            cat /tmp/game-room.json || true
+            sleep 2
+          done
+          test "$games_ok" = true
+
+          echo "Worker health, config, D1 multiplayer tables, and create-room endpoint all passed."
+          jq '{room: {code: .room.code, gameType: .room.gameType, category: .room.category}}' /tmp/game-room.json
