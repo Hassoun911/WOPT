@@ -31,8 +31,6 @@ jobs:
         run: |
           set -euo pipefail
           python .github/scripts/fix-widget-and-brand-final.py
-          # The staged logo-exact base64 is corrupted. Use the existing, proven
-          # Android-safe Hassoun app icon instead so Metro/AAPT2 receives a valid PNG.
           cp mobile/assets/icon.png mobile/assets/hassoun-logo.png
           mkdir -p pwa/public/assets
           cp mobile/assets/icon.png pwa/public/assets/hassoun-logo.png
@@ -52,10 +50,12 @@ jobs:
           grep -q 'HIJRI_DAY_OFFSET' mobile/src/islamicEvents.ts
           ! grep -q 'islamic-umalqura' mobile/src/islamicEvents.ts
           grep -q 'islamicToJulianDay' push-server/src/islamicEvents.ts
-          grep -q 'initialLayout="@layout/hassoun_prayer_widget"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
-          grep -q 'initialLayout="@layout/hassoun_prayer_widget"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
+          grep -q 'initialLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+          grep -q 'previewLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
+          grep -q 'initialLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
+          grep -q 'previewLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
           grep -q 'minHeight <= 80 || minWidth >= minHeight \* 3.20' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          grep -q 'minWidth <= 0 || minHeight <= 0 -> "full"' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          grep -q 'minWidth <= 0 || minHeight <= 0 -> "slim"' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
           grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_lock_widget_info.xml
           grep -q 'hassoun-logo.png' mobile/App.tsx
           grep -q 'BrandMark' mobile/AppWithEmail.tsx
@@ -118,7 +118,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile push-server pwa/public/assets/hassoun-logo.png
-          git commit -m "Hassoun v0.6.6 use Android-safe Hassoun branding" || true
+          git commit -m "Hassoun v0.6.6 Samsung-safe widget entry and Android-safe branding" || true
           git pull --rebase origin main
           git push origin HEAD:main
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -177,7 +177,7 @@ jobs:
           gradle=${{ steps.gradle.outcome }}
           apk_verify=${{ steps.verifyapk.outcome }}
           apk_upload=${{ steps.uploadapk.outcome }}
-          samsung_home_widget_full_initial=true
+          samsung_safe_initial_widget=true
           samsung_api36_widget_fixed=true
           islamic_events_android_intl_dependency_removed=true
           android_safe_hassoun_logo=true
