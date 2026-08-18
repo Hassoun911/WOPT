@@ -1,0 +1,95 @@
+name: Build Hassoun v0.5.7 Fast APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/v057-fast-apk-trigger.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v057-fast-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+    steps:
+      - name: Checkout v0.5.7
+        uses: actions/checkout@v4
+
+      - name: Verify release source
+        run: |
+          grep -q 'version: "0.5.7"' mobile/app.config.ts
+          grep -q 'versionCode: 29' mobile/app.config.ts
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies and typecheck
+        working-directory: mobile
+        timeout-minutes: 5
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Use existing validated Hassoun icon for widget
+        run: |
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Generate Android project
+        working-directory: mobile
+        timeout-minutes: 4
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build installable APK
+        working-directory: mobile/android
+        timeout-minutes: 12
+        run: ./gradlew assembleDebug --no-daemon --max-workers=2 --stacktrace
+
+      - name: Rename APK
+        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.5.7-fast-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record success marker
+        run: |
+          cat > .github/v057-fast-apk-status.txt <<EOF
+          status=success
+          version=0.5.7
+          versionCode=29
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          artifact=hassoun-v0.5.7-fast-${{ github.run_number }}
+          source_commit=$(git rev-parse HEAD)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v057-fast-apk-status.txt
+          git commit -m "Record Hassoun v0.5.7 fast APK success" || true
+          git push origin HEAD:main || true
