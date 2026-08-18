@@ -1,2 +1,2 @@
-trigger=2026-08-17T23:47:00-04:00
-reason=fix-missing-embedded-js-bundle
+trigger=2026-08-17T23:59:00-04:00
+reason=build-release-apk-with-embedded-js-and-verify
