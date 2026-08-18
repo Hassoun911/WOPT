@@ -1,0 +1,2 @@
+trigger=2026-08-18T14:20:00-04:00
+reason=fix-initial-empty-widget-and-responsive-shapes
