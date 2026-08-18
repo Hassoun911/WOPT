@@ -3,11 +3,14 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View
 } from "react-native";
+import {
+  DEFAULT_EMAIL_PRAYER_ALERTS,
+  summarizePrayerAlertPreferences
+} from "./alertPreferences";
 import BrandMark from "./BrandMark";
 import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import {
@@ -15,6 +18,7 @@ import {
   subscribeToPrayerEmails,
   type EmailAlertChoices
 } from "./emailSignup";
+import PrayerAlertPreferenceGrid from "./PrayerAlertPreferenceGrid";
 
 type Props = {
   locale: "en" | "ar";
@@ -32,8 +36,8 @@ export type EmailSignupCompletion = {
 const COPY = {
   en: {
     eyebrow: "PRAYER EMAIL ALERTS",
-    title: "Never miss a prayer",
-    description: "Get email alerts for prayer times based automatically on your current location.",
+    title: "Email alerts, your way",
+    description: "Choose exactly which prayers you want and whether Hassoun emails you 20 minutes before, 10 minutes before, at prayer time, or any combination.",
     emailLabel: "Your email address",
     placeholder: "you@example.com",
     emailGood: "Email looks good",
@@ -42,26 +46,17 @@ const COPY = {
     locationDenied: "Allow location so Hassoun can select your local prayer times.",
     refresh: "Refresh",
     detected: "Detected automatically",
-    timingTitle: "Notify me",
-    twenty: "20 minutes before",
-    twentyHint: "Early reminder",
-    ten: "10 minutes before",
-    tenHint: "Final reminder",
-    athan: "At prayer time",
-    athanHint: "When the prayer begins",
-    privacy: "We use your location only to set local prayer times and your time zone. No continuous tracking.",
-    subscribe: "Sign up for prayer emails",
+    timingTitle: "Customize prayer emails",
+    privacy: "Your choices are stored securely with your subscription. Existing subscribers receive a secure manage link before changes are made.",
+    subscribe: "Save prayer email preferences",
     checking: "Checking email service…",
     unavailable: "Email service is temporarily unavailable. Please try again shortly.",
-    creating: "Creating your prayer email subscription…",
-    twentyShort: "20 min before",
-    tenShort: "10 min before",
-    athanShort: "At prayer time"
+    creating: "Saving your Hassoun email preferences…"
   },
   ar: {
     eyebrow: "تنبيهات الصلاة عبر البريد",
-    title: "لا تفوّت أي صلاة",
-    description: "استلم تنبيهات البريد حسب مواقيت الصلاة المحلية التي يحددها موقعك تلقائياً.",
+    title: "تنبيهات البريد كما تريد",
+    description: "اختر كل صلاة على حدة وحدد التنبيه قبل ٢٠ دقيقة أو ١٠ دقائق أو عند دخول وقت الصلاة أو أي مجموعة منها.",
     emailLabel: "بريدك الإلكتروني",
     placeholder: "you@example.com",
     emailGood: "البريد صحيح",
@@ -70,21 +65,12 @@ const COPY = {
     locationDenied: "اسمح بالموقع ليختار Hassoun مواقيت الصلاة المحلية.",
     refresh: "تحديث",
     detected: "تم تحديده تلقائياً",
-    timingTitle: "نبّهني",
-    twenty: "قبل الصلاة بـ٢٠ دقيقة",
-    twentyHint: "تنبيه مبكر",
-    ten: "قبل الصلاة بـ١٠ دقائق",
-    tenHint: "التنبيه الأخير",
-    athan: "عند دخول وقت الصلاة",
-    athanHint: "عند بداية وقت الصلاة",
-    privacy: "نستخدم موقعك فقط لتحديد مواقيت الصلاة والمنطقة الزمنية. لا توجد متابعة مستمرة للموقع.",
-    subscribe: "الاشتراك بتنبيهات الصلاة",
+    timingTitle: "خصص تنبيهات البريد لكل صلاة",
+    privacy: "تُحفظ اختياراتك بأمان مع الاشتراك. المشترك الحالي يستلم رابط إدارة آمن قبل إجراء أي تغيير.",
+    subscribe: "حفظ إعدادات تنبيهات البريد",
     checking: "جارٍ التحقق من خدمة البريد…",
     unavailable: "خدمة البريد غير متاحة مؤقتاً. حاول مرة أخرى بعد قليل.",
-    creating: "جارٍ إنشاء اشتراك تنبيهات الصلاة…",
-    twentyShort: "قبل ٢٠ دقيقة",
-    tenShort: "قبل ١٠ دقائق",
-    athanShort: "عند وقت الصلاة"
+    creating: "جارٍ حفظ إعدادات بريد Hassoun…"
   }
 } as const;
 
@@ -96,7 +82,7 @@ function locationLabel(location: DetectedPrayerLocation | null) {
 export default function EmailSignupCard({ locale, onComplete }: Props) {
   const copy = COPY[locale];
   const [email, setEmail] = useState("");
-  const [choices, setChoices] = useState<EmailAlertChoices>({ twenty: false, ten: false, athan: true });
+  const [choices, setChoices] = useState<EmailAlertChoices>(() => JSON.parse(JSON.stringify(DEFAULT_EMAIL_PRAYER_ALERTS)) as EmailAlertChoices);
   const [checking, setChecking] = useState(true);
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -135,19 +121,7 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
   }, [copy.locationDenied]);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const anyTiming = choices.twenty || choices.ten || choices.athan;
-
-  const timing = useMemo(() => {
-    return [
-      choices.twenty ? copy.twentyShort : null,
-      choices.ten ? copy.tenShort : null,
-      choices.athan ? copy.athanShort : null
-    ].filter(Boolean).join(" • ");
-  }, [choices, copy]);
-
-  const setChoice = (key: keyof EmailAlertChoices, value: boolean) => {
-    setChoices((current) => ({ ...current, [key]: value }));
-  };
+  const timing = useMemo(() => summarizePrayerAlertPreferences(choices, locale), [choices, locale]);
 
   const refreshLocation = async () => {
     if (locationBusy) return;
@@ -165,7 +139,7 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
   };
 
   const submit = async () => {
-    if (!emailValid || !location || !anyTiming || busy || !available) return;
+    if (!emailValid || !location || busy || !available) return;
     setBusy(true);
     setError("");
     try {
@@ -184,33 +158,14 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
     }
   };
 
-  const choiceRow = (
-    label: string,
-    hint: string,
-    key: keyof EmailAlertChoices,
-    last = false
-  ) => (
-    <View style={[styles.choiceRow, last && styles.choiceRowLast]}>
-      <View style={styles.choiceIcon}><Text style={styles.choiceIconText}>{key === "athan" ? "◖" : "◷"}</Text></View>
-      <View style={styles.choiceCopy}>
-        <Text style={styles.choiceText}>{label}</Text>
-        <Text style={styles.choiceHint}>{hint}</Text>
-      </View>
-      <Switch
-        value={choices[key]}
-        onValueChange={(value) => setChoice(key, value)}
-        disabled={busy}
-        trackColor={{ false: "#d8d2c6", true: "#9cc8ba" }}
-        thumbColor={choices[key] ? "#0b6a53" : "#fff"}
-      />
-    </View>
-  );
-
   return (
     <View style={styles.card}>
       <View style={styles.decorativeRow}>
-        <BrandMark size={36} />
-        <Text style={styles.eyebrow}>HASSOUN • {copy.eyebrow}</Text>
+        <BrandMark size={42} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.eyebrow}>HASSOUN • {copy.eyebrow}</Text>
+          <Text style={styles.micro}>{locale === "ar" ? "إعدادات خاصة بهذا المستخدم" : "Personal settings for this subscriber"}</Text>
+        </View>
       </View>
 
       <Text style={styles.title}>{copy.title}</Text>
@@ -259,15 +214,14 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
         ) : null}
       </View>
 
-      <Text style={styles.sectionTitle}>{copy.timingTitle}</Text>
-      <View style={styles.choiceList}>
-        {choiceRow(copy.twenty, copy.twentyHint, "twenty")}
-        {choiceRow(copy.ten, copy.tenHint, "ten")}
-        {choiceRow(copy.athan, copy.athanHint, "athan", true)}
+      <View style={styles.preferenceHeader}>
+        <Text style={styles.sectionTitleNoMargin}>{copy.timingTitle}</Text>
+        <Text style={styles.preferenceSummary}>{timing}</Text>
       </View>
+      <PrayerAlertPreferenceGrid locale={locale} value={choices} onChange={setChoices} disabled={busy} showSummary={false} />
 
       <View style={styles.privacyCard}>
-        <Text style={styles.privacyIcon}>♢</Text>
+        <Text style={styles.privacyIcon}>◇</Text>
         <Text style={styles.privacyText}>{copy.privacy}</Text>
       </View>
 
@@ -284,21 +238,14 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
 
       <Pressable
         onPress={submit}
-        disabled={!available || busy || !emailValid || !location || !anyTiming}
+        disabled={!available || busy || !emailValid || !location}
         style={({ pressed }) => [
           styles.button,
-          (!available || busy || !emailValid || !location || !anyTiming) && styles.buttonDisabled,
+          (!available || busy || !emailValid || !location) && styles.buttonDisabled,
           pressed && available && !busy && styles.buttonPressed
         ]}
       >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Text style={styles.buttonText}>{copy.subscribe}</Text>
-            <Text style={styles.buttonArrow}>→</Text>
-          </>
-        )}
+        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{copy.subscribe}</Text>}
       </Pressable>
       {busy ? <Text style={styles.busyText}>{copy.creating}</Text> : null}
     </View>
@@ -306,52 +253,22 @@ export default function EmailSignupCard({ locale, onComplete }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 20,
-    borderRadius: 24,
-    backgroundColor: "#fffdf8",
-    borderWidth: 1,
-    borderColor: "#e3dac9",
-    shadowColor: "#604f35",
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 3
-  },
-  decorativeRow: { flexDirection: "row", alignItems: "center", gap: 9 },
-  mosqueMark: { width: 30, height: 30, borderRadius: 10, backgroundColor: "#e7efe9", alignItems: "center", justifyContent: "center" },
-  mosqueMarkText: { color: "#0b6a53", fontSize: 18, fontWeight: "900" },
-  eyebrow: { color: "#7a6b53", fontSize: 10, fontWeight: "900", letterSpacing: 1.7 },
+  card: { padding: 20, borderRadius: 24, backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#e3dac9", shadowColor: "#604f35", shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 7 }, elevation: 3 },
+  decorativeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  eyebrow: { color: "#7a6b53", fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
+  micro: { color: "#9a9488", fontSize: 8, marginTop: 3 },
   title: { color: "#153f35", fontSize: 25, lineHeight: 30, fontWeight: "900", marginTop: 15 },
   description: { color: "#6f746c", fontSize: 13, lineHeight: 20, marginTop: 7 },
   fieldLabel: { color: "#3f524b", fontSize: 12, fontWeight: "900", marginTop: 22, marginBottom: 7 },
-  inputWrap: {
-    minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#d8cfbe",
-    backgroundColor: "#fff",
-    borderRadius: 15,
-    paddingLeft: 14,
-    paddingRight: 12
-  },
+  inputWrap: { minHeight: 56, flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: "#d8cfbe", backgroundColor: "#fff", borderRadius: 15, paddingLeft: 14, paddingRight: 12 },
   inputWrapValid: { borderColor: "#8bbcab", backgroundColor: "#fbfffd" },
   input: { flex: 1, minHeight: 54, fontSize: 16, color: "#173f35" },
   emailStatus: { color: "#9a8f7d", fontSize: 17, fontWeight: "900" },
   emailStatusValid: { color: "#0b7a5c" },
   emailGood: { color: "#0b7a5c", fontSize: 11, fontWeight: "800", marginTop: 6 },
   sectionTitle: { color: "#3f524b", fontSize: 12, fontWeight: "900", marginTop: 20, marginBottom: 8 },
-  locationCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    padding: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e2d8c7",
-    backgroundColor: "#f8f3e9"
-  },
+  sectionTitleNoMargin: { color: "#3f524b", fontSize: 12, fontWeight: "900" },
+  locationCard: { flexDirection: "row", alignItems: "center", gap: 11, padding: 13, borderRadius: 16, borderWidth: 1, borderColor: "#e2d8c7", backgroundColor: "#f8f3e9" },
   locationCardReady: { backgroundColor: "#f4f7ef", borderColor: "#d5e1d5" },
   locationIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#e9e4d8", alignItems: "center", justifyContent: "center" },
   locationIcon: { color: "#0b6a53", fontSize: 21, fontWeight: "900" },
@@ -362,14 +279,8 @@ const styles = StyleSheet.create({
   locationError: { color: "#945244", fontSize: 11, lineHeight: 16 },
   refreshButton: { minWidth: 32, minHeight: 32, borderRadius: 10, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
   refreshText: { color: "#0b6a53", fontSize: 16, fontWeight: "900" },
-  choiceList: { borderWidth: 1, borderColor: "#e2d8c7", borderRadius: 17, overflow: "hidden", backgroundColor: "#fff" },
-  choiceRow: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 13, borderBottomWidth: 1, borderBottomColor: "#eee8de" },
-  choiceRowLast: { borderBottomWidth: 0 },
-  choiceIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#f6f1e8", alignItems: "center", justifyContent: "center" },
-  choiceIconText: { color: "#6e7c75", fontSize: 18 },
-  choiceCopy: { flex: 1 },
-  choiceText: { color: "#244d42", fontSize: 14, fontWeight: "800" },
-  choiceHint: { color: "#979288", fontSize: 11, marginTop: 2 },
+  preferenceHeader: { marginTop: 22, marginBottom: 9 },
+  preferenceSummary: { color: "#7e8a85", fontSize: 9, fontWeight: "800", marginTop: 4 },
   privacyCard: { flexDirection: "row", alignItems: "flex-start", gap: 9, backgroundColor: "#f7f0e3", borderRadius: 14, padding: 12, marginTop: 14 },
   privacyIcon: { color: "#0b6a53", fontSize: 17, fontWeight: "900" },
   privacyText: { flex: 1, color: "#746e63", fontSize: 11, lineHeight: 17 },
@@ -377,10 +288,9 @@ const styles = StyleSheet.create({
   statusText: { color: "#617871", fontSize: 12 },
   unavailable: { color: "#8a6b2d", backgroundColor: "#fff8e7", padding: 12, borderRadius: 12, fontSize: 12, lineHeight: 18, marginTop: 14 },
   error: { color: "#9c4035", backgroundColor: "#fff1ee", padding: 12, borderRadius: 12, fontSize: 12, lineHeight: 18, marginTop: 14 },
-  button: { minHeight: 56, flexDirection: "row", gap: 10, borderRadius: 16, backgroundColor: "#0b5b47", alignItems: "center", justifyContent: "center", marginTop: 16, paddingHorizontal: 14 },
+  button: { minHeight: 56, borderRadius: 16, backgroundColor: "#0b5b47", alignItems: "center", justifyContent: "center", marginTop: 16, paddingHorizontal: 14 },
   buttonDisabled: { opacity: 0.38 },
   buttonPressed: { transform: [{ scale: 0.99 }], opacity: 0.94 },
   buttonText: { color: "#fff", fontSize: 14, fontWeight: "900", textAlign: "center" },
-  buttonArrow: { color: "#fff", fontSize: 18, fontWeight: "700" },
   busyText: { color: "#617871", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 9 }
 });
