@@ -12,11 +12,13 @@ export type QuranAudioStatus = {
   queueIndex?: number;
   queueSize?: number;
   repeat?: boolean;
+  mode?: "queue" | "range";
 };
 
 export type QuranAudioNativeModule = {
   play(url: string, speed: number): Promise<void>;
   playQueue(itemsJson: string, startIndex: number, repeat: boolean, speed: number): void;
+  playRange(startAbsolute: number, endAbsolute: number, reciterId: string, bitrate: number, reciterName: string, repeat: boolean, speed: number): void;
   pause(): void;
   resume(): void;
   stop(): void;
