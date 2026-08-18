@@ -1,2 +1,2 @@
-trigger=2026-08-18T17:48:00-04:00
-reason=normalize-hassoun-png-for-aapt2-and-rebuild-apk
+trigger=2026-08-18T17:57:00-04:00
+reason=use-known-good-hassoun-png-and-rebuild-apk
