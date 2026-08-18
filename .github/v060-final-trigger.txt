@@ -1,1 +1,1 @@
-Trigger clean Hassoun v0.6.0 source-first release after direct Islamic Events source commit. Apply remaining integration, validate app/Worker/native audio, commit source to main, build standalone APK. Triggered 2026-08-18 07:08 America/Toronto.
+Trigger final clean Hassoun v0.6.0 release after direct app/events/email/native-audio fixes. Run finishing pass, validate every required fix, commit generated source, then clean standalone APK build. Triggered 2026-08-18 07:17 America/Toronto.
