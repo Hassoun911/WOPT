@@ -1,0 +1,62 @@
+name: Apply Hassoun v0.5.7 Quran Widgets Games
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/scripts/apply-v057-quran-widgets-games.py"
+      - ".github/workflows/apply-v057-quran-widgets-games.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply v0.5.7 patch
+        run: python .github/scripts/apply-v057-quran-widgets-games.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mobile/package-lock.json
+            push-server/package-lock.json
+
+      - name: Validate mobile
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Validate Android native widget generation
+        working-directory: mobile
+        run: |
+          npx expo prebuild --platform android --clean --no-install
+          ./gradlew :app:processReleaseResources :app:compileReleaseKotlin
+        env:
+          EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+
+      - name: Commit integrated update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f mobile push-server
+          git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games" || exit 0
+          git push origin HEAD:main
