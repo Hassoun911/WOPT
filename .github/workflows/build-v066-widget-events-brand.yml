@@ -46,21 +46,15 @@ jobs:
           set -euo pipefail
           grep -q 'version: "0.6.6"' mobile/app.config.ts
           grep -q 'versionCode: 38' mobile/app.config.ts
-
-          # Events must not depend on Android/Hermes Islamic Intl support.
           grep -q 'islamicToJulianDay' mobile/src/islamicEvents.ts
           grep -q 'HIJRI_DAY_OFFSET' mobile/src/islamicEvents.ts
           ! grep -q 'islamic-umalqura' mobile/src/islamicEvents.ts
           grep -q 'islamicToJulianDay' push-server/src/islamicEvents.ts
-
-          # Samsung must start from the safe full Home widget on base and API 36.
           grep -q 'initialLayout="@layout/hassoun_prayer_widget"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
           grep -q 'initialLayout="@layout/hassoun_prayer_widget"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
           grep -q 'minHeight <= 80 || minWidth >= minHeight \* 3.20' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
           grep -q 'minWidth <= 0 || minHeight <= 0 -> "full"' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
           grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_lock_widget_info.xml
-
-          # Full-screen page branding uses the shared Hassoun logo.
           grep -q 'hassoun-logo.png' mobile/App.tsx
           grep -q 'BrandMark' mobile/AppWithEmail.tsx
           grep -q 'BrandMark' mobile/src/IslamicEventsPage.tsx
@@ -72,8 +66,6 @@ jobs:
           grep -q 'BrandMark' mobile/src/quran/QuranV3.tsx
           grep -q 'BrandMark' mobile/src/quran/SmartMemorize.tsx
           test -s pwa/public/assets/hassoun-logo.png
-
-          # Retain recent Qur'an/audio/game fixes.
           grep -q 'playVisibleReaderPages' mobile/src/quran/QuranV3.tsx
           grep -q 'QuranAudio.playRange' mobile/src/quran/QuranV3.tsx
           grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
@@ -95,6 +87,32 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Normalize Hassoun PNG for Android AAPT2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/ReencodePng.java <<'EOF'
+          import javax.imageio.ImageIO;
+          import java.awt.image.BufferedImage;
+          import java.io.File;
+          public class ReencodePng {
+            public static void main(String[] args) throws Exception {
+              File f = new File(args[0]);
+              BufferedImage image = ImageIO.read(f);
+              if (image == null) throw new IllegalStateException("Could not decode PNG: " + f);
+              File tmp = new File(f.getParentFile(), f.getName() + ".normalized.png");
+              if (!ImageIO.write(image, "png", tmp)) throw new IllegalStateException("Could not encode PNG");
+              if (!f.delete() || !tmp.renameTo(f)) throw new IllegalStateException("Could not replace PNG");
+            }
+          }
+          EOF
+          javac /tmp/ReencodePng.java
+          java -cp /tmp ReencodePng mobile/assets/hassoun-logo.png
+          cp mobile/assets/hassoun-logo.png pwa/public/assets/hassoun-logo.png
+          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          file mobile/assets/hassoun-logo.png
+          test -s mobile/assets/hassoun-logo.png
 
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v4
@@ -124,7 +142,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mobile push-server pwa/public/assets/hassoun-logo.png
-          git commit -m "Hassoun v0.6.6 fix Samsung widget Islamic events and exact branding" || true
+          git commit -m "Hassoun v0.6.6 normalize Android logo resource" || true
           git pull --rebase origin main
           git push origin HEAD:main
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -140,6 +158,8 @@ jobs:
       - name: Build standalone release APK
         id: gradle
         timeout-minutes: 28
+        env:
+          NODE_ENV: production
         run: |
           set -euo pipefail
           cd mobile/android
