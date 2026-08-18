@@ -230,6 +230,10 @@ export function QuranPageText({
 
   useEffect(() => {
     let active = true;
+    // Page-specific QCF fonts are not interchangeable. Clear the previous page
+    // immediately so Unicode fallback can never be drawn with the wrong page font.
+    setRemoteText({});
+    setFontFamily(undefined);
     setLoading(true);
     void (async () => {
       try {
@@ -267,7 +271,7 @@ export function QuranPageText({
   return (
     <View>
       {loading ? <View style={styles.loadingRow}><ActivityIndicator size="small" color="#0b654f" /><Text style={styles.loadingText}>{locale === "ar" ? "جارٍ تجهيز خط المصحف…" : "Preparing Mushaf font…"}</Text></View> : null}
-      <Text style={{ color: effectiveColor, fontSize: appearance.fontSize, lineHeight, textAlign: "right", writingDirection: "rtl", fontFamily }}>
+      <Text allowFontScaling={false} style={{ color: effectiveColor, fontSize: appearance.fontSize, lineHeight, textAlign: "right", writingDirection: "rtl", fontFamily, includeFontPadding: false }}>
         {ayahs.map((ayah) => {
           const key = ayahKey(ayah);
           const selected = selectedKey === key;
@@ -296,14 +300,13 @@ export function QuranPageText({
           }
 
           if ((appearance.font === "qcf-v1" || appearance.font === "qcf-v2") && raw) {
-            const decoded = decodeNumericEntities(raw).trimEnd();
-            const glyphs = Array.from(decoded);
-            const markerGlyph = glyphs.pop() ?? "";
-            const verseGlyphs = glyphs.join("");
+            // code_v1/code_v2 are page-font glyph streams, not ordinary Arabic
+            // characters. Splitting/recoloring the final glyph corrupts shaping and
+            // ayah markers. Keep the exact verified page-font sequence intact.
+            const decoded = decodeNumericEntities(raw).trim();
             return (
-              <Text key={key} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
-                {verseGlyphs}
-                {markerGlyph ? <Text style={{ color: "#0b8b69", fontFamily }}>{markerGlyph}</Text> : null}{bookmarked ? <Text style={{ fontFamily: undefined, fontSize: Math.max(14, appearance.fontSize * 0.52) }}> 🔖 </Text> : null}{" "}
+              <Text key={key} allowFontScaling={false} onPress={() => onPressAyah(ayah)} style={[highlightStyle, { fontFamily, color: effectiveColor }]}>
+                {decoded}{bookmarked ? <Text style={{ fontFamily: undefined, fontSize: Math.max(14, appearance.fontSize * 0.52) }}> 🔖 </Text> : null}{" "}
               </Text>
             );
           }

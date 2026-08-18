@@ -73,7 +73,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     }
 
     fun updateTransparentWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
-      updateWidget(context, manager, appWidgetId, true)
+      // Do not blindly force transparency. Legacy versions allowed this provider
+      // on Home screens, so existing widget IDs can survive an app upgrade. The
+      // host category now decides: Home gets the themed card; keyguard stays clear.
+      updateWidget(context, manager, appWidgetId, false)
     }
 
     private fun updateWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int, forceLockScreen: Boolean = false) {
@@ -150,7 +153,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
             "pill" -> R.drawable.hassoun_widget_countdown
             else -> R.drawable.hassoun_widget_countdown_circle
           })
-          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, if (countdownStyle == "circle") 10f else 8.5f)
+          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, if (countdownStyle == "circle") 12f else 9.5f)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             views.setChronometerCountDown(R.id.widget_countdown, true)
           }

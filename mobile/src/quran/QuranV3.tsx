@@ -196,6 +196,8 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const readerTapStart = useRef<{ x: number; y: number; time: number } | null>(null);
   const readerAtTop = useRef(true);
   const readerAtBottom = useRef(false);
+  const readerViewportHeight = useRef(0);
+  const readerContentHeight = useRef(0);
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
   const surahs = allSurahs();
@@ -366,9 +368,15 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     verticalGestureStartY.current = null;
     if (start == null) return;
     const dy = event.nativeEvent.pageY - start;
-    if (Math.abs(dy) < 60) return;
-    if (dy < 0 && readerAtBottom.current) turnReaderPage(1);
-    else if (dy > 0 && readerAtTop.current) turnReaderPage(-1);
+    if (Math.abs(dy) < 48) return;
+
+    // A Mushaf page that fits entirely inside the viewport never produces enough
+    // scroll events to mark itself as "at bottom". Treat it as both scroll edges
+    // so an upward/downward page gesture always works. This applies regardless of
+    // whether the reader was opened from Surah, Juz, Pages, Search or Bookmark.
+    const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+    if (dy < 0 && (readerAtBottom.current || contentFits)) turnReaderPage(1);
+    else if (dy > 0 && (readerAtTop.current || contentFits)) turnReaderPage(-1);
   };
 
 
@@ -860,7 +868,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
                 </View>
               ) : null}
               {showStandaloneBasmala ? <Text style={[styles.basmala, { color: textColor, fontSize: Math.max(21, appearance.fontSize - 3), lineHeight: Math.round(Math.max(21, appearance.fontSize - 3) * appearance.lineHeightMultiplier) }]}>بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</Text> : null}
-              <QuranPageText page={page} ayahs={segment.ayahs} appearance={appearance} locale={locale} selectedKey={selectedAyah ? refKey(selectedAyah) : null} highlightedKey={audioPrefs.highlightAudio && activeAyah ? refKey(activeAyah) : null} bookmarkedKeys={bookmarks} onPressAyah={(ayah) => { setSelectedAyah((current) => current?.surah === ayah.surah && current?.ayah === ayah.ayah ? null : ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} />
+              <QuranPageText key={`${page}-${segment.surah}-${appearance.font}-${appearance.tajweed ? "tajweed" : "plain"}`} page={page} ayahs={segment.ayahs} appearance={appearance} locale={locale} selectedKey={selectedAyah ? refKey(selectedAyah) : null} highlightedKey={audioPrefs.highlightAudio && activeAyah ? refKey(activeAyah) : null} bookmarkedKeys={bookmarks} onPressAyah={(ayah) => { setSelectedAyah((current) => current?.surah === ayah.surah && current?.ayah === ayah.ayah ? null : ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} />
             </View>
           );
         })}
@@ -884,10 +892,21 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
             style={styles.flex}
             contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
             scrollEventThrottle={16}
+            onLayout={({ nativeEvent }) => {
+              readerViewportHeight.current = nativeEvent.layout.height;
+              readerAtBottom.current = readerContentHeight.current <= nativeEvent.layout.height + 12;
+            }}
+            onContentSizeChange={(_width, height) => {
+              readerContentHeight.current = height;
+              readerAtBottom.current = height <= readerViewportHeight.current + 12;
+            }}
             onTouchStart={handleVerticalTouchStart}
             onTouchEnd={handleVerticalTouchEnd}
             onScroll={({ nativeEvent }) => {
+              readerViewportHeight.current = nativeEvent.layoutMeasurement.height;
+              readerContentHeight.current = nativeEvent.contentSize.height;
               readerAtTop.current = nativeEvent.contentOffset.y <= 8;
               readerAtBottom.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
             }}
