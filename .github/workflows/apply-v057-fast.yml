@@ -1,4 +1,4 @@
-name: Apply Hassoun v0.5.7 Fast Integration
+name: Apply Hassoun v0.5.7 + Build APK
 
 on:
   workflow_dispatch:
@@ -10,18 +10,20 @@ permissions:
   contents: write
 
 jobs:
-  integrate:
+  integrate-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node and Java
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -36,7 +38,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Apply integrated v0.5.7 code
+      - name: Apply v0.5.7 source changes
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -68,33 +70,7 @@ jobs:
           python .github/scripts/post-v057-responsive.py
           python .github/scripts/fix-v057-widget-bridge.py
 
-      - name: Validate mobile and multiplayer backend
-        run: |
-          cd mobile
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx tsc --noEmit
-          cd ../push-server
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-          npm test
-
-      - name: Regenerate Android-safe widget logo
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y librsvg2-bin pngcrush
-          rsvg-convert -w 512 -h 512 mobile/assets/hassoun-brand.svg -o /tmp/hassoun-widget-logo.png
-          pngcrush -q -ow /tmp/hassoun-widget-logo.png
-          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
-          cp /tmp/hassoun-widget-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-
-      - name: Validate only native widget module
-        run: |
-          cd mobile
-          npx expo prebuild --platform android --clean --no-install
-          cd android
-          ./gradlew :wopt-hassoun-widget:compileReleaseLibraryResources :wopt-hassoun-widget:compileReleaseKotlin
-
-      - name: Update APK workflow to v0.5.7
+      - name: Update release naming
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -106,7 +82,17 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Commit v0.5.7 to main
+      - name: Validate TypeScript and Worker
+        run: |
+          cd mobile
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+          cd ../push-server
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Commit v0.5.7 source to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -114,3 +100,51 @@ jobs:
           git add -f mobile push-server .github/workflows/android-debug.yml .github/v057-last-error.log 2>/dev/null || true
           git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games"
           git push origin HEAD:main
+
+      - name: Install image tools and regenerate assets
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y librsvg2-bin pngcrush
+          cd mobile
+          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/icon.png
+          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/adaptive-icon.png
+          rsvg-convert -w 512 -h 512 assets/hassoun-notification.svg -o /tmp/notification-icon.png
+          rsvg-convert -w 512 -h 512 assets/hassoun-brand.svg -o /tmp/hassoun-logo.png
+          rsvg-convert -w 512 -h 512 assets/hassoun-brand.svg -o /tmp/splash-logo.png
+          pngcrush -q -ow /tmp/icon.png
+          pngcrush -q -ow /tmp/adaptive-icon.png
+          pngcrush -q -ow /tmp/notification-icon.png
+          pngcrush -q -ow /tmp/hassoun-logo.png
+          pngcrush -q -ow /tmp/splash-logo.png
+          cp /tmp/icon.png assets/icon.png
+          cp /tmp/adaptive-icon.png assets/adaptive-icon.png
+          cp /tmp/notification-icon.png assets/notification-icon.png
+          cp /tmp/hassoun-logo.png assets/hassoun-logo.png
+          cp /tmp/splash-logo.png assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp /tmp/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build Hassoun v0.5.7 APK
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: cp mobile/android/app/build/outputs/apk/release/app-release.apk mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.7.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.5.7-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.7.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Apply multiplayer D1 migration and deploy Worker
+        working-directory: push-server
+        run: |
+          npx wrangler d1 migrations apply wopt-prayer-push --remote
+          npx wrangler deploy
