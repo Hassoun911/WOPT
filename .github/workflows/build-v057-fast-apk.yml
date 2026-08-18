@@ -1,4 +1,4 @@
-name: Build Hassoun v0.5.7 Standalone APK
+name: Build Hassoun v0.5.7 Verified APK
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v057-standalone-apk
+  group: hassoun-v057-verified-apk
   cancel-in-progress: true
 
 jobs:
@@ -59,57 +59,44 @@ jobs:
         timeout-minutes: 4
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build fast native APK shell
+      - name: Build release APK with embedded JS
         working-directory: mobile/android
-        timeout-minutes: 12
-        run: ./gradlew assembleDebug --no-daemon --max-workers=2 --stacktrace
+        timeout-minutes: 18
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
 
-      - name: Repack APK with embedded production JS bundle
-        working-directory: mobile
-        timeout-minutes: 8
+      - name: Verify release APK and embedded JS bundle
         run: |
-          npx -y @expo/repack-app@latest \
-            --platform android \
-            --source-app android/app/build/outputs/apk/debug/app-debug.apk \
-            --output android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk \
-            --js-bundle-only \
-            --embed-bundle-assets \
-            --ks "$HOME/.android/debug.keystore" \
-            --ks-pass pass:android \
-            --ks-key-alias androiddebugkey \
-            --ks-key-pass pass:android
-
-      - name: Verify standalone APK has embedded JS
-        run: |
-          APK="mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk"
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          unzip -l "$APK" | tee /tmp/apk-contents.txt
+          unzip -l "$APK" > /tmp/apk-contents.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-contents.txt
-          echo "Standalone JavaScript bundle is packaged inside the APK."
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.7.apk
+          echo "Verified standalone release APK contains the embedded JavaScript bundle."
 
-      - name: Upload standalone APK
+      - name: Upload verified APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.7-standalone-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk
+          name: hassoun-v0.5.7-verified-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.7.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Record verified standalone APK success
+      - name: Record verified APK success
         run: |
           cat > .github/v057-fast-apk-status.txt <<EOF
           status=success
           standalone=true
           js_bundle_verified=true
+          build_type=release
           version=0.5.7
           versionCode=29
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
-          artifact=hassoun-v0.5.7-standalone-${{ github.run_number }}
+          artifact=hassoun-v0.5.7-verified-${{ github.run_number }}
           source_commit=$(git rev-parse HEAD)
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v057-fast-apk-status.txt
-          git commit -m "Record Hassoun v0.5.7 standalone APK success" || true
+          git commit -m "Record Hassoun v0.5.7 verified APK success" || true
           git push origin HEAD:main || true
