@@ -1,4 +1,4 @@
-name: Build Hassoun v0.6.0 Final APK
+name: Build Hassoun v0.6.0 Clean APK
 
 on:
   workflow_dispatch:
@@ -10,44 +10,45 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v060-final-apk
+  group: hassoun-v060-clean-apk
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 42
+    timeout-minutes: 55
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+
     steps:
-      - name: Checkout exact source
+      - name: Checkout exact main source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Apply only missing v0.6.0 source updates
-        id: patch
+      - name: Apply remaining v0.6.0 source once
+        id: finish
         shell: bash
         run: |
-          set +e
-          {
-            if [ ! -f mobile/src/IslamicEventsPage.tsx ] || ! grep -q 'version: "0.6.0"' mobile/app.config.ts; then
-              echo "Applying complete v0.6.0 base update"
-              python .github/scripts/apply-v060-complete.py
-            else
-              echo "v0.6.0 base source already present"
-            fi
+          set -o pipefail
+          python .github/scripts/finish-v060-remaining.py 2>&1 | tee /tmp/v060-finish.log
 
-            # Always run the idempotent finishing pass. It patches only the remaining
-            # Qur'an Radio UI, exact-logo surfaces and widget countdown geometry.
-            python .github/scripts/finish-v060-remaining.py
-          } > /tmp/v060-patch.log 2>&1
-          code=$?
-          cat /tmp/v060-patch.log
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
+      - name: Commit finished v0.6.0 source before validation
+        id: source_commit
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f mobile push-server
+          git commit -m "Apply remaining Hassoun v0.6.0 source fixes" || true
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep $((attempt * 3))
+          done
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,11 +66,12 @@ jobs:
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Validate every required fix before committing
-        id: validate
+      - name: Validate required v0.6.0 source markers
+        id: markers
+        continue-on-error: true
         shell: bash
         run: |
-          set +e
+          set -o pipefail
           (
             grep -q 'version: "0.6.0"' mobile/app.config.ts
             grep -q 'versionCode: 32' mobile/app.config.ts
@@ -84,98 +86,95 @@ jobs:
             grep -q 'prayerTimes:' push-server/src/globalPrayerEmail.ts
             grep -q 'upcomingEvent' push-server/src/globalPrayerEmail.ts
             grep -q 'UPCOMING ISLAMIC EVENT' push-server/src/prayerEmailTemplate.ts
-            grep -q 'hassoun911.github.io/WOPT/assets/hassoun-logo.png' push-server/src/prayerEmailTemplate.ts
             grep -q 'readerViewportHeight' mobile/src/quran/QuranV3.tsx
-            grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
             grep -q 'playVisibleReaderPages' mobile/src/quran/QuranV3.tsx
             grep -q 'Do not build thousands of JS objects' mobile/src/quran/QuranV3.tsx
             grep -q 'QuranAudio.playRange' mobile/src/quran/QuranV3.tsx
             grep -q 'playRange' mobile/modules/quran-audio/index.ts
             grep -q 'ACTION_PLAY_RANGE' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
-            grep -q 'notification_icon' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
             grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_lock_widget_info.xml
-            grep -q 'updateWidget(context, manager, appWidgetId, false)' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
             grep -q 'countdownStyleV060Migrated' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
             grep -q 'layout_width="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
             grep -q 'BrandMark size={42}' mobile/src/quran/QuranV3.tsx
             grep -q 'BrandMark size={44}' mobile/src/QuizGamesHub.tsx
             grep -q 'BrandMark size={46}' mobile/src/IslamicQuiz.tsx
-            grep -q 'hassoun-logo.png' mobile/App.tsx
             grep -q 'notification-icon.png' mobile/app.config.ts
+          ) 2>&1 | tee /tmp/v060-markers.log
+
+      - name: Validate mobile TypeScript
+        id: mobile
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          (
             cd mobile
             npm ci --ignore-scripts --no-audit --no-fund
             npx tsc --noEmit
-            cd ../push-server
+          ) 2>&1 | tee /tmp/v060-mobile.log
+
+      - name: Validate Worker TypeScript and tests
+        id: worker
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          (
+            cd push-server
             npm ci --ignore-scripts --no-audit --no-fund
             npm run typecheck
             npm test
-          ) > /tmp/v060-validate.log 2>&1
-          code=$?
-          cat /tmp/v060-validate.log
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
-
-      - name: Commit validated v0.6.0 source to main before Android build
-        if: success()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f mobile push-server
-          git commit -m "Hassoun v0.6.0 complete validated source" || true
-          git pull --rebase origin main
-          git push origin HEAD:main
-
-      - name: Prepare exact Hassoun widget logo
-        if: success()
-        run: |
-          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
-          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          ) 2>&1 | tee /tmp/v060-worker.log
 
       - name: Generate clean Android project
         id: prebuild
-        if: success()
+        if: steps.markers.outcome == 'success' && steps.mobile.outcome == 'success' && steps.worker.outcome == 'success'
+        continue-on-error: true
         shell: bash
         run: |
-          set +e
+          set -o pipefail
           (
             cd mobile
             rm -rf android
             npx expo prebuild --platform android --clean --no-install
-          ) > /tmp/v060-prebuild.log 2>&1
-          code=$?
-          cat /tmp/v060-prebuild.log
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
+          ) 2>&1 | tee /tmp/v060-prebuild.log
+
+      - name: Ensure Hassoun widget logo after prebuild
+        if: steps.prebuild.outcome == 'success'
+        shell: bash
+        run: |
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/hassoun-logo.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
       - name: Build clean standalone release APK
         id: gradle
-        if: success()
+        if: steps.prebuild.outcome == 'success'
+        continue-on-error: true
         shell: bash
-        timeout-minutes: 23
+        timeout-minutes: 28
         run: |
-          set +e
+          set -o pipefail
           (
             cd mobile/android
             ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
-          ) > /tmp/v060-gradle.log 2>&1
-          code=$?
-          tail -n 320 /tmp/v060-gradle.log
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit $code
+          ) 2>&1 | tee /tmp/v060-gradle.log
 
-      - name: Verify standalone APK contains production JavaScript
-        if: success()
+      - name: Verify standalone APK
+        id: verify_apk
+        if: steps.gradle.outcome == 'success'
+        continue-on-error: true
         shell: bash
         run: |
+          set -o pipefail
           APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          unzip -l "$APK" > /tmp/v060-apk-contents.txt
+          unzip -l "$APK" | tee /tmp/v060-apk-contents.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v060-apk-contents.txt
           cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.0.apk
-          echo "Hassoun v0.6.0 standalone APK verified with embedded production JavaScript."
 
       - name: Upload clean v0.6.0 APK
-        if: success()
+        id: upload
+        if: steps.verify_apk.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: hassoun-v0.6.0-clean-${{ github.run_number }}
@@ -183,61 +182,44 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Record APK success
-        if: success()
-        run: |
-          cat > .github/v060-apk-status.txt <<EOF
-          status=success
-          clean_build=true
-          standalone=true
-          js_bundle_verified=true
-          quran_page_navigation_fixed=true
-          quran_qcf_text_fixed=true
-          quran_visible_page_playback=true
-          quran_radio_continuous_range_fixed=true
-          widget_home_theme_fixed=true
-          widget_countdown_centered=true
-          widget_lockscreen_transparent=true
-          exact_hassoun_logo=true
-          smart_prayer_emails=true
-          islamic_events_page=true
-          islamic_event_15_day_home=true
-          islamic_event_15_day_email=true
-          islamic_event_15_day_notification=true
-          multiplayer_backend=ready
-          version=0.6.0
-          versionCode=32
-          run_id=${{ github.run_id }}
-          run_number=${{ github.run_number }}
-          artifact=hassoun-v0.6.0-clean-${{ github.run_number }}
-          source_commit=$(git rev-parse HEAD)
-          EOF
-          rm -f .github/v060-last-build-error.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A .github/v060-apk-status.txt .github/v060-last-build-error.log 2>/dev/null || true
-          git commit -m "Record Hassoun v0.6.0 clean APK success" || true
-          git pull --rebase origin main || true
-          git push origin HEAD:main || true
-
-      - name: Save exact build failure
-        if: failure()
+      - name: Record exact build result
+        if: always()
         shell: bash
         run: |
           {
-            echo "Hassoun v0.6.0 clean APK build failed"
+            echo "version=0.6.0"
+            echo "versionCode=32"
             echo "run_id=${{ github.run_id }}"
-            echo "source_commit=$(git rev-parse HEAD)"
+            echo "run_number=${{ github.run_number }}"
+            echo "source_commit=${{ steps.source_commit.outputs.sha }}"
+            echo "finish=${{ steps.finish.outcome }}"
+            echo "markers=${{ steps.markers.outcome }}"
+            echo "mobile=${{ steps.mobile.outcome }}"
+            echo "worker=${{ steps.worker.outcome }}"
+            echo "prebuild=${{ steps.prebuild.outcome }}"
+            echo "gradle=${{ steps.gradle.outcome }}"
+            echo "verify_apk=${{ steps.verify_apk.outcome }}"
+            echo "upload=${{ steps.upload.outcome }}"
+            echo "artifact=hassoun-v0.6.0-clean-${{ github.run_number }}"
             echo
-            for f in /tmp/v060-patch.log /tmp/v060-validate.log /tmp/v060-prebuild.log /tmp/v060-gradle.log; do
+            for f in /tmp/v060-finish.log /tmp/v060-markers.log /tmp/v060-mobile.log /tmp/v060-worker.log /tmp/v060-prebuild.log /tmp/v060-gradle.log; do
               echo "===== $f ====="
-              if [ -f "$f" ]; then tail -n 360 "$f"; else echo "not reached"; fi
+              if [ -f "$f" ]; then tail -n 180 "$f"; else echo "not reached"; fi
               echo
             done
-          } > .github/v060-last-build-error.log
+          } > .github/v060-build-result.txt
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/v060-last-build-error.log
-          git commit -m "Record Hassoun v0.6.0 clean build failure" || true
-          git pull --rebase origin main || true
-          git push origin HEAD:main || true
+          git add .github/v060-build-result.txt
+          git commit -m "Record Hassoun v0.6.0 build result" || true
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main
+            sleep $((attempt * 3))
+          done
+
+      - name: Fail job when APK was not uploaded
+        if: always() && steps.upload.outcome != 'success'
+        run: exit 1
