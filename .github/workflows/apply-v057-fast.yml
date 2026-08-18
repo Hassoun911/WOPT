@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: hassoun-v057-direct
+  cancel-in-progress: true
+
 jobs:
   integrate-build:
     runs-on: ubuntu-latest
@@ -82,17 +86,7 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Validate TypeScript and Worker
-        run: |
-          cd mobile
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx tsc --noEmit
-          cd ../push-server
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-          npm test
-
-      - name: Commit v0.5.7 source to main
+      - name: Commit v0.5.7 source immediately
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -100,6 +94,12 @@ jobs:
           git add -f mobile push-server .github/workflows/android-debug.yml .github/v057-last-error.log 2>/dev/null || true
           git commit -m "Hassoun v0.5.7 Quran widgets multiplayer games"
           git push origin HEAD:main
+
+      - name: Install mobile dependencies and typecheck
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
 
       - name: Install image tools and regenerate assets
         run: |
@@ -143,8 +143,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Apply multiplayer D1 migration and deploy Worker
+      - name: Validate and deploy multiplayer Worker
         working-directory: push-server
         run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
           npx wrangler d1 migrations apply wopt-prayer-push --remote
           npx wrangler deploy
