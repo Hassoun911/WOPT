@@ -36,8 +36,6 @@ jobs:
           set -euo pipefail
           grep -q 'version: "0.6.2"' mobile/app.config.ts
           grep -q 'versionCode: 34' mobile/app.config.ts
-
-          # Android 16 / Samsung widget fix.
           grep -q 'widgetCategory="home_screen"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
           grep -q 'initialLayout="@layout/hassoun_prayer_widget_slim"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_prayer_widget_info.xml
           grep -q 'widgetCategory="keyguard"' mobile/modules/hassoun-widget/android/src/main/res/xml-v36/hassoun_lock_widget_info.xml
@@ -46,15 +44,11 @@ jobs:
           grep -q 'getAppWidgetIds(lock).forEach { updateWidget(context, manager, it, false) }' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
           grep -q 'android:layout_width="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
           grep -q 'android:layout_height="92dp"' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
-
-          # Islamic Events + 15-day system.
           grep -q 'islamicToJulianDay' mobile/src/islamicEvents.ts
           grep -q 'islamicDateLabelForEvent' mobile/src/IslamicEventsPage.tsx
           grep -q 'scheduleIslamicEventReminders' mobile/App.tsx
           grep -q 'upcomingIslamicDays <= 15' mobile/App.tsx
-          grep -q 'islamicEvent' push-server/src/prayerEmailTemplate.ts
-
-          # Exact Hassoun logo branding.
+          grep -q 'upcomingEvent' push-server/src/prayerEmailTemplate.ts
           grep -q 'BrandMark' mobile/src/MultiplayerGames.tsx
           grep -q 'BrandMark' mobile/src/EmailSignupCard.tsx
           grep -q 'BrandMark' mobile/src/quran/SmartMemorize.tsx
@@ -66,18 +60,12 @@ jobs:
           grep -q 'heroLogoShell' mobile/App.tsx
           grep -q 'notification-icon.png' mobile/app.config.ts
           grep -q 'hassoun911.github.io/WOPT/assets/hassoun-logo.png' push-server/src/prayerEmailTemplate.ts
-
-          # Home per-prayer Adhan mute/unmute.
           grep -q 'Tap any prayer to mute or unmute its Adhan audio' mobile/App.tsx
           grep -q 'togglePrayerAudio' mobile/App.tsx
           grep -q 'prayerAudioMuted' mobile/src/config.ts
           grep -q 'mutedPrayers.has(event.prayer)' mobile/src/prayerAudio.ts
-
-          # Next prayer cannot stay at 0h 0m after prayer passes.
           grep -q 'const deltaMs = target.getTime() - now.getTime();' mobile/App.tsx
           grep -q 'seconds < 60' mobile/App.tsx
-
-          # Qur'an reader/audio fixes.
           grep -q 'MULTI_SURAH_PLAY_CHOOSER_V061' mobile/src/quran/QuranV3.tsx
           grep -q 'Which Surah do you want to play?' mobile/src/quran/QuranV3.tsx
           grep -q 'playReaderSurahFromVisibleAyah' mobile/src/quran/QuranV3.tsx
@@ -240,5 +228,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v062-build-result.txt
           git commit -m "Record Hassoun v0.6.2 build failure" || true
-          git pull --rebase origin main || true
           git push origin HEAD:main || true
