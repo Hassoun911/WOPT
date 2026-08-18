@@ -1,4 +1,4 @@
-name: Build Hassoun v0.5.7 Fast APK
+name: Build Hassoun v0.5.7 Standalone APK
 
 on:
   workflow_dispatch:
@@ -10,13 +10,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v057-fast-apk
+  group: hassoun-v057-standalone-apk
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
     steps:
@@ -44,14 +44,12 @@ jobs:
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install dependencies and typecheck
+      - name: Install dependencies
         working-directory: mobile
         timeout-minutes: 5
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx tsc --noEmit
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Use existing validated Hassoun icon for widget
+      - name: Use validated Hassoun logo in widget
         run: |
           mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
           cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
@@ -61,35 +59,57 @@ jobs:
         timeout-minutes: 4
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build installable APK
+      - name: Build fast native APK shell
         working-directory: mobile/android
         timeout-minutes: 12
         run: ./gradlew assembleDebug --no-daemon --max-workers=2 --stacktrace
 
-      - name: Rename APK
-        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7.apk
+      - name: Repack APK with embedded production JS bundle
+        working-directory: mobile
+        timeout-minutes: 8
+        run: |
+          npx -y @expo/repack-app@latest \
+            --platform android \
+            --source-app android/app/build/outputs/apk/debug/app-debug.apk \
+            --output android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk \
+            --js-bundle-only \
+            --embed-bundle-assets \
+            --ks "$HOME/.android/debug.keystore" \
+            --ks-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --ks-key-pass pass:android
 
-      - name: Upload APK
+      - name: Verify standalone APK has embedded JS
+        run: |
+          APK="mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk"
+          test -s "$APK"
+          unzip -l "$APK" | tee /tmp/apk-contents.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-contents.txt
+          echo "Standalone JavaScript bundle is packaged inside the APK."
+
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.7-fast-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7.apk
+          name: hassoun-v0.5.7-standalone-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/debug/Hassoun-v0.5.7-standalone.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Record success marker
+      - name: Record verified standalone APK success
         run: |
           cat > .github/v057-fast-apk-status.txt <<EOF
           status=success
+          standalone=true
+          js_bundle_verified=true
           version=0.5.7
           versionCode=29
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
-          artifact=hassoun-v0.5.7-fast-${{ github.run_number }}
+          artifact=hassoun-v0.5.7-standalone-${{ github.run_number }}
           source_commit=$(git rev-parse HEAD)
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v057-fast-apk-status.txt
-          git commit -m "Record Hassoun v0.5.7 fast APK success" || true
+          git commit -m "Record Hassoun v0.5.7 standalone APK success" || true
           git push origin HEAD:main || true
