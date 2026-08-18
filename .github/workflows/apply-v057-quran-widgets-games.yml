@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/scripts/apply-v057-quran-widgets-games.py"
+      - ".github/scripts/post-v057-responsive.py"
       - ".github/workflows/apply-v057-quran-widgets-games.yml"
 
 permissions:
@@ -55,6 +56,9 @@ jobs:
           s = s.replace('  const me = room?.players.find((p) => p.id === playerId);\n', '')
           p.write_text(s)
           PY
+
+      - name: Apply responsive widget finishing pass
+        run: python .github/scripts/post-v057-responsive.py
 
       - name: Setup Node
         uses: actions/setup-node@v4
