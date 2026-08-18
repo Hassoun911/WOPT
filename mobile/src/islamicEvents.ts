@@ -33,50 +33,50 @@ export const ISLAMIC_EVENTS: IslamicEventDefinition[] = [
   { id: "eid-adha", month: 12, day: 10, emoji: "🕌", name: { en: "Eid al-Adha", ar: "عيد الأضحى" }, description: { en: "The Festival of Sacrifice on the 10th of Dhul-Hijjah.", ar: "عيد الأضحى في العاشر من ذي الحجة." } }
 ];
 
-const HIJRI_MONTHS_EN = ["Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani", "Jumada al-Awwal", "Jumada al-Thani", "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"];
-const HIJRI_MONTHS_AR = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
+const HIJRI_EPOCH = 1948439.5;
+const HIJRI_DAY_OFFSET = 1;
 const cache = new Map<number, IslamicEventOccurrence[]>();
-const pad = (value: number) => String(value).padStart(2, "0");
 
-// Deterministic tabular Hijri conversion. We intentionally do not depend on
-// Intl islamic-umalqura here because some Android/Hermes builds return no
-// usable calendar parts, which previously made the Events page show 0 dates.
+function pad(value: number) { return String(value).padStart(2, "0"); }
+function dateKeyUtc(date: Date) { return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`; }
+
+function gregorianToJulianDay(year: number, month: number, day: number) {
+  let y = year;
+  let m = month;
+  if (m <= 2) { y -= 1; m += 12; }
+  const a = Math.floor(y / 100);
+  const b = 2 - a + Math.floor(a / 4);
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524.5;
+}
+
 function islamicToJulianDay(year: number, month: number, day: number) {
-  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + 1948439.5 - 1;
+  return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + HIJRI_EPOCH - 1;
 }
 
-function julianDayToGregorian(jd: number) {
-  const z = Math.floor(jd + 0.5);
-  const f = jd + 0.5 - z;
-  let a = z;
-  if (z >= 2299161) {
-    const alpha = Math.floor((z - 1867216.25) / 36524.25);
-    a = z + 1 + alpha - Math.floor(alpha / 4);
-  }
-  const b = a + 1524;
-  const c = Math.floor((b - 122.1) / 365.25);
-  const d = Math.floor(365.25 * c);
-  const e = Math.floor((b - d) / 30.6001);
-  const day = Math.floor(b - d - Math.floor(30.6001 * e) + f);
-  const month = e < 14 ? e - 1 : e - 13;
-  const year = month > 2 ? c - 4716 : c - 4715;
-  return { year, month, day };
+function hijriPartsFromGregorian(year: number, month: number, day: number) {
+  const jd = Math.floor(gregorianToJulianDay(year, month, day) + HIJRI_DAY_OFFSET) + 0.5;
+  const hijriYear = Math.floor((30 * (jd - HIJRI_EPOCH) + 10646) / 10631);
+  const hijriMonth = Math.min(12, Math.max(1, Math.ceil((jd - (29 + islamicToJulianDay(hijriYear, 1, 1))) / 29.5) + 1));
+  const hijriDay = Math.max(1, Math.floor(jd - islamicToJulianDay(hijriYear, hijriMonth, 1) + 1));
+  return { year: hijriYear, month: hijriMonth, day: hijriDay };
 }
 
-function approximateHijriYear(gregorianYear: number) {
-  return Math.floor((gregorianYear - 622) * 33 / 32);
+export function hijriPartsForDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) return { year: 0, month: 0, day: 0 };
+  return hijriPartsFromGregorian(year, month, day);
 }
 
 export function islamicEventsForGregorianYear(year: number) {
   const existing = cache.get(year);
   if (existing) return existing;
   const found: IslamicEventOccurrence[] = [];
-  const center = approximateHijriYear(year);
-  for (let hijriYear = center - 2; hijriYear <= center + 2; hijriYear += 1) {
+  for (let time = Date.UTC(year, 0, 1, 12); time < Date.UTC(year + 1, 0, 1, 12); time += 86_400_000) {
+    const date = new Date(time);
+    const dateKey = dateKeyUtc(date);
+    const hijri = hijriPartsFromGregorian(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
     for (const definition of ISLAMIC_EVENTS) {
-      const gregorian = julianDayToGregorian(islamicToJulianDay(hijriYear, definition.month, definition.day));
-      if (gregorian.year !== year) continue;
-      found.push({ ...definition, dateKey: `${gregorian.year}-${pad(gregorian.month)}-${pad(gregorian.day)}`, hijriYear });
+      if (definition.month === hijri.month && definition.day === hijri.day) found.push({ ...definition, dateKey, hijriYear: hijri.year });
     }
   }
   found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
@@ -109,17 +109,13 @@ export function islamicEventCountdown(days: number, locale: "en" | "ar") {
   return `${months} month${months === 1 ? "" : "s"}${remainder ? ` ${remainder}d` : ""}`;
 }
 
-export function islamicDateLabelForEvent(event: IslamicEventOccurrence, locale: "en" | "ar") {
-  const month = locale === "ar" ? HIJRI_MONTHS_AR[event.month - 1] : HIJRI_MONTHS_EN[event.month - 1];
-  const day = locale === "ar" ? new Intl.NumberFormat("ar").format(event.day) : String(event.day);
-  const year = locale === "ar" ? new Intl.NumberFormat("ar").format(event.hijriYear) : String(event.hijriYear);
-  return locale === "ar" ? `${day} ${month} ${year} هـ` : `${month} ${day}, ${year} AH`;
-}
+const HIJRI_MONTHS_EN = ["Muharram", "Safar", "Rabi al-Awwal", "Rabi al-Thani", "Jumada al-Awwal", "Jumada al-Thani", "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"];
+const HIJRI_MONTHS_AR = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
 
-// Backward-compatible helper for any older caller. Event screens should prefer
-// islamicDateLabelForEvent so the label never relies on Android calendar Intl.
 export function islamicDateLabel(dateKey: string, locale: "en" | "ar") {
-  const year = Number(dateKey.slice(0, 4));
-  const event = [...islamicEventsForGregorianYear(year - 1), ...islamicEventsForGregorianYear(year), ...islamicEventsForGregorianYear(year + 1)].find((item) => item.dateKey === dateKey);
-  return event ? islamicDateLabelForEvent(event, locale) : "";
+  const hijri = hijriPartsForDateKey(dateKey);
+  if (!hijri.year || !hijri.month || !hijri.day) return "";
+  const month = locale === "ar" ? HIJRI_MONTHS_AR[hijri.month - 1] : HIJRI_MONTHS_EN[hijri.month - 1];
+  if (locale === "ar") return `${new Intl.NumberFormat("ar").format(hijri.day)} ${month} ${new Intl.NumberFormat("ar").format(hijri.year)} هـ`;
+  return `${month} ${hijri.day}, ${hijri.year} AH`;
 }
