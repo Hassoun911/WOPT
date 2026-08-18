@@ -1,0 +1,8 @@
+version=0.5.7
+versionCode=29
+run_id=32091222742
+run_number=6
+artifact=hassoun-v0.5.7-6
+apk_step=uploaded-before-worker
+worker=skipped
+source_commit=2a0850c14d8faba9bf173cab3114c8880d44fa93
