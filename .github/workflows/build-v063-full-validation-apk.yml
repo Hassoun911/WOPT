@@ -25,9 +25,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply retained v0.6.2 fixes
+      - name: Confirm retained v0.6.2 source is already present
         id: v062
-        run: python .github/scripts/apply-v062-final.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f mobile/src/IslamicEventsPage.tsx
+          grep -q 'countdownStyleV061Migrated' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          grep -q 'MULTI_SURAH_PLAY_CHOOSER_V061' mobile/src/quran/QuranV3.tsx
+          grep -q 'QuranAudio.playRange' mobile/src/quran/QuranV3.tsx
+          grep -q 'Keep the exact verified page-font sequence intact' mobile/src/quran/quranRendering.tsx
 
       - name: Apply v0.6.3 smart alerts
         id: v063
