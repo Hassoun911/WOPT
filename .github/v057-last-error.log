@@ -1,0 +1,159 @@
+Hassoun v0.5.7 integration failed
+patch=0 harden=0 responsive=0 mobile=0 worker=0 native=1
+
+===== patch =====
+Applied Hassoun v0.5.7: widgets, Noble Qur'an navigation, and multiplayer games.
+
+===== harden =====
+
+===== responsive =====
+Applied responsive Square/Slim widgets and Islamic Widget Studio preview.
+
+===== mobile =====
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 488 packages in 10s
+
+===== worker =====
+
+added 106 packages in 4s
+
+> wopt-prayer-push-server@0.1.0 typecheck
+> tsc --noEmit
+
+
+> wopt-prayer-push-server@0.1.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/WOPT/WOPT/push-server[39m
+
+ [32m✓[39m tests/schedule.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 00:28:15
+[2m   Duration [22m 189ms[2m (transform 30ms, setup 0ms, import 43ms, tests 22ms, environment 0ms)[22m
+
+
+===== native =====
+
+> Task :expo-constants:processReleaseManifest
+> Task :wopt-hassoun-widget:extractDeepLinksRelease
+> Task :wopt-prayer-audio:extractDeepLinksRelease
+
+> Task :react-native-safe-area-context:processReleaseManifest
+package="com.th3rdwave.safeareacontext" found in source AndroidManifest.xml: /home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/AndroidManifest.xml.
+Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
+Recommendation: remove package="com.th3rdwave.safeareacontext" from the source AndroidManifest.xml: /home/runner/work/WOPT/WOPT/mobile/node_modules/react-native-safe-area-context/android/src/main/AndroidManifest.xml.
+
+> Task :wopt-quran-audio:extractDeepLinksRelease
+> Task :wopt-quran-audio:processReleaseManifest
+> Task :wopt-prayer-audio:processReleaseManifest
+> Task :wopt-hassoun-widget:processReleaseManifest
+> Task :wopt-quran-speech:extractDeepLinksRelease
+> Task :wopt-quran-speech:processReleaseManifest
+> Task :expo-constants:compileReleaseLibraryResources
+> Task :expo:compileReleaseLibraryResources
+> Task :expo-log-box:compileReleaseLibraryResources
+
+> Task :app:createBundleReleaseJsAndAssets
+(node:3207) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Starting Metro Bundler
+
+
+> Task :expo:parseReleaseLocalResources
+> Task :expo-constants:parseReleaseLocalResources
+> Task :expo-log-box:parseReleaseLocalResources
+> Task :expo-constants:generateReleaseRFile
+> Task :expo-log-box:generateReleaseRFile
+> Task :expo:generateReleaseRFile
+> Task :expo-modules-core:compileReleaseLibraryResources
+> Task :react-native-async-storage_async-storage:compileReleaseLibraryResources
+> Task :react-native-safe-area-context:compileReleaseLibraryResources
+> Task :react-native-safe-area-context:parseReleaseLocalResources
+> Task :expo-modules-core:parseReleaseLocalResources
+> Task :react-native-async-storage_async-storage:parseReleaseLocalResources
+> Task :react-native-safe-area-context:generateReleaseRFile
+> Task :expo-modules-core:generateReleaseRFile
+> Task :react-native-async-storage_async-storage:generateReleaseRFile
+> Task :wopt-quran-audio:compileReleaseLibraryResources
+> Task :wopt-hassoun-widget:parseReleaseLocalResources
+> Task :wopt-prayer-audio:compileReleaseLibraryResources
+> Task :wopt-hassoun-widget:generateReleaseRFile
+> Task :wopt-prayer-audio:parseReleaseLocalResources
+> Task :wopt-quran-audio:parseReleaseLocalResources
+> Task :wopt-prayer-audio:generateReleaseRFile
+> Task :wopt-quran-audio:generateReleaseRFile
+> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :wopt-quran-speech:compileReleaseLibraryResources
+> Task :expo:generateReleaseBuildConfig
+> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :wopt-quran-speech:parseReleaseLocalResources
+> Task :expo-constants:generateReleaseBuildConfig
+> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-modules-core:generateReleaseBuildConfig
+> Task :wopt-quran-speech:generateReleaseRFile
+> Task :expo-constants:javaPreCompileRelease
+> Task :expo-log-box:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-log-box:generateReleaseBuildConfig
+> Task :expo-log-box:javaPreCompileRelease
+> Task :wopt-hassoun-widget:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :wopt-hassoun-widget:generateReleaseBuildConfig
+> Task :wopt-hassoun-widget:compileReleaseLibraryResources FAILED
+> Task :wopt-hassoun-widget:javaPreCompileRelease
+> Task :wopt-prayer-audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :wopt-prayer-audio:generateReleaseBuildConfig
+> Task :wopt-prayer-audio:javaPreCompileRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android Bundled 14393ms index.ts (713 modules)
+Writing bundle output to: /home/runner/work/WOPT/WOPT/mobile/android/app/build/generated/assets/react/release/index.android.bundle
+Writing sourcemap output to: /home/runner/work/WOPT/WOPT/mobile/android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map
+Copying 2 asset files
+Done writing bundle output
+Done writing sourcemap output
+
+> Task :expo-modules-core:compileReleaseKotlin
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/apploader/AppLoaderProvider.kt:34:52 Unchecked cast of 'Class<*>!' to 'Class<out HeadlessAppLoader>'.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:14:8 'class UIManagerModule : ReactContextBaseJavaModule, LifecycleEventListener, UIManager' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:22:8 'typealias ErrorManagerModule = JSLoggerModule' is deprecated. Use JSLoggerModule instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:61:13 'val hostingRuntimeContext: MainRuntime' is deprecated. Use AppContext.runtimeContext instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:271:21 'typealias ErrorManagerModule = JSLoggerModule' is deprecated. Use JSLoggerModule instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:380:21 'val DEFAULT: Int' is deprecated. UIManagerType.DEFAULT will be deleted in the next release of React Native. Use [LEGACY] instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:381:10 'class UIManagerModule : ReactContextBaseJavaModule, LifecycleEventListener, UIManager' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/defaultmodules/NativeModulesProxyModule.kt:16:5 'fun Constants(legacyConstantsProvider: () -> Map<String, Any?>): Unit' is deprecated. Use `Constant` or `Property` instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/events/KModuleEventEmitterWrapper.kt:99:21 'fun getEventDispatcherForReactTag(context: ReactContext, reactTag: Int): EventDispatcher?' is deprecated. reactTag is no longer needed.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/events/KModuleEventEmitterWrapper.kt:108:21 'fun getEventDispatcherForReactTag(context: ReactContext, reactTag: Int): EventDispatcher?' is deprecated. reactTag is no longer needed.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewDefinitionBuilder.kt:470:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewDefinitionBuilder.kt:470:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
+w: file:///home/runner/work/WOPT/WOPT/mobile/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
+
+[Incubating] Problems report is available at: file:///home/runner/work/WOPT/WOPT/mobile/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':wopt-hassoun-widget:compileReleaseLibraryResources'.
+> A failure occurred while executing com.android.build.gradle.tasks.CompileLibraryResourcesTask$CompileLibraryResourcesAction
+   > There was a failure while executing work items
+      > A failure occurred while executing com.android.build.gradle.internal.res.Aapt2CompileRunnable
+         > AAPT2 aapt2-8.12.0-13700139-linux Daemon #0: Unexpected error during compile '/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/build/intermediates/packaged_res/release/packageReleaseResources/drawable/hassoun_widget_logo.png', attempting to stop daemon.
+           This should not happen under normal circumstances, please file an issue if it does.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3m 34s
+139 actionable tasks: 139 executed
