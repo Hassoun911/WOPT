@@ -1,2 +1,2 @@
-trigger=2026-08-17T23:18:00-04:00
-reason=fast-apk-only-after-hour-timeouts
+trigger=2026-08-17T23:47:00-04:00
+reason=fix-missing-embedded-js-bundle
