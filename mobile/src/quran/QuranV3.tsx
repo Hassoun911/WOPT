@@ -172,6 +172,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const [menuOpen, setMenuOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [playerVisible, setPlayerVisible] = useState(true);
+  const [readerPlayChooserOpen, setReaderPlayChooserOpen] = useState(false);
   const [copiedSelection, setCopiedSelection] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -241,6 +242,29 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const activeAyahOnVisiblePage = Boolean(
     activeAyah && visibleReaderPages.includes(pageForAyah(activeAyah.surah, activeAyah.ayah) ?? -1)
   );
+  // MULTI_SURAH_PLAY_CHOOSER_V061
+  // A Mushaf page may contain the end of one Surah plus one or more new Surahs.
+  // Keep one playback choice per visible Surah, starting at the first ayah the
+  // user can actually see on this page/spread.
+  const visibleReaderSurahChoices = (() => {
+    const firstVisible = new Map<number, QuranAyah>();
+    for (const page of visibleReaderPages) {
+      for (const ayah of pageAyahsFor(page, pages)) {
+        if (!firstVisible.has(ayah.surah)) firstVisible.set(ayah.surah, ayah);
+      }
+    }
+    return [...firstVisible.values()].map((ayah) => ({
+      surah: ayah.surah,
+      startAyah: ayah.ayah,
+      surahInfo: getSurah(ayah.surah)
+    }));
+  })();
+  const readerAudioStartedFromVisibleView = Boolean(
+    audioQueue[0] && (
+      visibleReaderPages.includes(pageForAyah(audioQueue[0].surah, audioQueue[0].ayah) ?? -1) ||
+      activeAyahOnVisiblePage
+    )
+  );
 
   // Reader, Radio and the Quran menu own the audio controls while they are visible.
   // Everywhere else, App.tsx may show the single global persistent player.
@@ -308,6 +332,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     readerAtBottom.current = false;
     setPosition(next);
     setSelectedAyah(null);
+    setReaderPlayChooserOpen(false);
     persistLast(next);
   };
 
@@ -398,6 +423,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   };
 
   const handleBack = () => {
+    if (readerPlayChooserOpen) { setReaderPlayChooserOpen(false); return true; }
     if (appearanceOpen) { setAppearanceOpen(false); return true; }
     if (menuOpen) { setMenuOpen(false); return true; }
     if (screen === "home") { onBackHome(); return true; }
@@ -508,6 +534,23 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     const queue = visibleReaderPages.flatMap((page) => pageAyahsFor(page, pages));
     playQueue(queue, repeat);
   };
+  const playReaderSurahFromVisibleAyah = (surah: number, startAyah: number, repeat = false) => {
+    // Start exactly where this Surah first appears on the visible Mushaf page,
+    // then keep playing the same Surah across as many following pages as needed.
+    const queue = getSurahAyahs(surah).filter((ayah) => ayah.ayah >= startAyah);
+    setReaderPlayChooserOpen(false);
+    playQueue(queue, repeat);
+  };
+  const startReaderPlaybackFromView = () => {
+    if (!visibleReaderSurahChoices.length) return;
+    if (visibleReaderSurahChoices.length === 1) {
+      const choice = visibleReaderSurahChoices[0]!;
+      playReaderSurahFromVisibleAyah(choice.surah, choice.startAyah, false);
+      return;
+    }
+    // Do not silently choose the first Surah when several are visible.
+    setReaderPlayChooserOpen(true);
+  };
 
   const toggleSelectedPlayback = (ayah: QuranAyah) => {
     const sameAyah = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah;
@@ -566,17 +609,12 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
   const togglePlayerPlayback = () => {
     if (screen === "reader") {
-      // Reader playback always belongs to what is visible now. If the native
-      // session is playing/paused on another page, replace it with the current
-      // page (or current two-page spread) instead of resuming unrelated audio.
-      if (!activeAyahOnVisiblePage) {
-        playVisibleReaderPages(false);
-        return;
-      }
-      if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
-      if (audioStatus.state === "paused") { QuranAudio?.resume(); return; }
-      // A completed visible-page queue should replay that page from its first ayah.
-      playVisibleReaderPages(false);
+      // Pause/resume only when this reader session was started from the current
+      // visible page/spread. If the existing audio belongs somewhere else, Play
+      // starts from what the user is looking at instead.
+      if (readerAudioStartedFromVisibleView && audioStatus.state === "playing") { QuranAudio?.pause(); return; }
+      if (readerAudioStartedFromVisibleView && audioStatus.state === "paused") { QuranAudio?.resume(); return; }
+      startReaderPlaybackFromView();
       return;
     }
     if (audioStatus.state === "playing") { QuranAudio?.pause(); return; }
@@ -1020,6 +1058,38 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
       ) : null}
       {screen === "reader" && playerVisible && !selectedAyah && !menuOpen && !appearanceOpen ? miniPlayer : null}
       {menu}
+      <Modal visible={readerPlayChooserOpen} transparent animationType="fade" onRequestClose={() => setReaderPlayChooserOpen(false)}>
+        <View style={styles.readerPlayChooserShade}>
+          <View style={styles.readerPlayChooserCard}>
+            <View style={styles.readerPlayChooserHeader}>
+              <BrandMark size={44} />
+              <View style={styles.topCopy}>
+                <Text style={[styles.readerPlayChooserEyebrow, ar && styles.rtl]}>HASSOUN • {tr("QUR’AN PLAYBACK", "تشغيل القرآن")}</Text>
+                <Text style={[styles.readerPlayChooserTitle, ar && styles.rtl]}>{tr("Which Surah do you want to play?", "أي سورة تريد تشغيلها؟")}</Text>
+                <Text style={[styles.readerPlayChooserNote, ar && styles.rtl]}>{tr("This page contains more than one Surah. Choose one and Hassoun will continue it to the end, even across following pages.", "هذه الصفحة تحتوي على أكثر من سورة. اختر سورة وسيواصل حسّون تشغيلها حتى نهايتها حتى لو امتدت إلى صفحات تالية.")}</Text>
+              </View>
+            </View>
+            <ScrollView style={styles.readerPlayChooserList} showsVerticalScrollIndicator={false}>
+              {visibleReaderSurahChoices.map((choice) => (
+                <Pressable key={`reader-play-${choice.surah}`} onPress={() => playReaderSurahFromVisibleAyah(choice.surah, choice.startAyah, false)} style={styles.readerPlayChooserOption}>
+                  <View style={styles.readerPlayChooserNumber}><Text style={styles.readerPlayChooserNumberText}>{num(choice.surah)}</Text></View>
+                  <View style={styles.topCopy}>
+                    <Text style={[styles.readerPlayChooserArabic, ar && styles.rtl]}>{choice.surahInfo?.nameArabic ?? `سورة ${num(choice.surah)}`}</Text>
+                    <Text style={[styles.readerPlayChooserEnglish, ar && styles.rtl]}>{choice.surahInfo?.nameTransliterated ?? tr(`Surah ${choice.surah}`, `سورة ${num(choice.surah)}`)}</Text>
+                    <Text style={[styles.readerPlayChooserStart, ar && styles.rtl]}>
+                      {choice.startAyah === 1
+                        ? tr("Play from the beginning • continue to end of Surah", "تشغيل من البداية • متابعة حتى نهاية السورة")
+                        : tr(`Start at visible Ayah ${choice.startAyah} • continue to end of Surah`, `ابدأ من الآية الظاهرة ${num(choice.startAyah)} • متابعة حتى نهاية السورة`)}
+                    </Text>
+                  </View>
+                  <Text style={styles.readerPlayChooserPlay}>▶</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable onPress={() => setReaderPlayChooserOpen(false)} style={styles.readerPlayChooserCancel}><Text style={styles.readerPlayChooserCancelText}>{tr("Cancel", "إلغاء")}</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
       <ReaderSettingsSheet visible={appearanceOpen} locale={locale} appearance={appearance} setAppearance={setAppearance} reset={resetAppearance} onDone={() => setAppearanceOpen(false)} />
     </View>
   );
@@ -1027,6 +1097,22 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: "#f6f3eb" },
+  readerPlayChooserShade: { flex: 1, backgroundColor: "rgba(0,25,20,.56)", justifyContent: "center", padding: 20 },
+  readerPlayChooserCard: { width: "100%", maxWidth: 520, maxHeight: "78%", alignSelf: "center", borderRadius: 28, backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#d8c99d", padding: 16, shadowColor: "#000", shadowOpacity: .24, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 16 },
+  readerPlayChooserHeader: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 12 },
+  readerPlayChooserEyebrow: { color: "#a17825", fontSize: 7.5, fontWeight: "900", letterSpacing: 1 },
+  readerPlayChooserTitle: { color: "#173f35", fontSize: 19, fontWeight: "900", marginTop: 2 },
+  readerPlayChooserNote: { color: "#738079", fontSize: 8.5, lineHeight: 13, marginTop: 4 },
+  readerPlayChooserList: { maxHeight: 390 },
+  readerPlayChooserOption: { minHeight: 84, borderRadius: 20, backgroundColor: "#f8f5ed", borderWidth: 1, borderColor: "#e1d8c5", padding: 11, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 },
+  readerPlayChooserNumber: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#d9bd70" },
+  readerPlayChooserNumberText: { color: "#fff", fontSize: 10, fontWeight: "900" },
+  readerPlayChooserArabic: { color: "#173f35", fontSize: 18, fontWeight: "800", writingDirection: "rtl" },
+  readerPlayChooserEnglish: { color: "#355d51", fontSize: 10, fontWeight: "900", marginTop: 1 },
+  readerPlayChooserStart: { color: "#8b7958", fontSize: 7.5, lineHeight: 11, marginTop: 3 },
+  readerPlayChooserPlay: { width: 36, height: 36, borderRadius: 18, overflow: "hidden", textAlign: "center", textAlignVertical: "center", backgroundColor: "#0b654f", color: "#fff", fontSize: 13, fontWeight: "900" },
+  readerPlayChooserCancel: { minHeight: 44, borderRadius: 15, backgroundColor: "#edf2ee", alignItems: "center", justifyContent: "center", marginTop: 4 },
+  readerPlayChooserCancelText: { color: "#31564b", fontSize: 10, fontWeight: "900" },
   rtl: { textAlign: "right", writingDirection: "rtl" },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "#f6f3eb" },
   big: { fontSize: 46 }, centerTitle: { color: "#173f35", fontSize: 20, fontWeight: "900", marginTop: 10 },

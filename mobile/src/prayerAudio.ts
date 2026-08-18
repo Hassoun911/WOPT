@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import PrayerAudio from "../modules/prayer-audio";
+import { STORAGE_KEYS } from "./config";
 import { buildPrayerEvents } from "./events";
 import type { PrayerKey, PrayerTimes } from "./types";
 
@@ -49,8 +50,19 @@ export async function scheduleAndroidPrayerAudio(
     return { count: 0, exact: false, available: false };
   }
 
+  let mutedPrayers = new Set<PrayerKey>();
+  try {
+    const saved = await AsyncStorage.getItem(STORAGE_KEYS.prayerAudioMuted);
+    const parsed = saved ? JSON.parse(saved) as unknown : [];
+    if (Array.isArray(parsed)) {
+      mutedPrayers = new Set(parsed.filter((value): value is PrayerKey =>
+        typeof value === "string" && ["fajr", "dhuhr", "asr", "maghrib", "isha"].includes(value)
+      ));
+    }
+  } catch {}
+
   const events = buildPrayerEvents(prayerTimes, 30)
-    .filter((event) => event.kind === "athan")
+    .filter((event) => event.kind === "athan" && !mutedPrayers.has(event.prayer))
     .map((event) => ({
       id: event.id,
       prayer: event.prayer,
