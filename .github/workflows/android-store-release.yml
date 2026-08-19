@@ -1,0 +1,101 @@
+name: Hassoun 1.0 Android Store Validation
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-store-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-android-store-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-android-store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript validation
+        run: npm run typecheck
+
+      - name: Verify restricted exact-alarm permission is absent
+        run: |
+          if grep -R --line-number --fixed-strings "android.permission.USE_EXACT_ALARM" app.config.ts modules; then
+            echo "USE_EXACT_ALARM is not allowed in the store release source."
+            exit 1
+          fi
+          grep -R --line-number --fixed-strings "android.permission.SCHEDULE_EXACT_ALARM" app.config.ts modules/prayer-audio/android/src/main/AndroidManifest.xml
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK and AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Verify Android target SDK 36+
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "Release APK not found."
+            exit 1
+          fi
+          ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          TARGET="$($ANALYZER manifest target-sdk "$APK")"
+          echo "Detected targetSdkVersion=$TARGET"
+          if [ "$TARGET" -lt 36 ]; then
+            echo "Google Play store release requires targetSdkVersion 36 or newer."
+            exit 1
+          fi
+
+      - name: Verify final manifest permissions
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          PERMISSIONS="$($ANALYZER manifest permissions "$APK")"
+          echo "$PERMISSIONS"
+          if echo "$PERMISSIONS" | grep -q "android.permission.USE_EXACT_ALARM"; then
+            echo "Restricted USE_EXACT_ALARM leaked into the final Android manifest."
+            exit 1
+          fi
+          echo "$PERMISSIONS" | grep -q "android.permission.SCHEDULE_EXACT_ALARM"
+
+      - name: Upload unsigned validation AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-android-store-validation-aab
+          path: mobile/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
