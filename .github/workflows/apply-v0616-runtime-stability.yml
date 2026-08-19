@@ -1,4 +1,5 @@
 name: Apply Hassoun v0.6.16 Runtime Stability
+# retrigger: apply radio recovery + always-on vertical Quran reading
 
 on:
   push:
@@ -116,8 +117,6 @@ jobs:
               '''    private const val CHANNEL_ID = "hassoun-quran-audio"\n    private const val NOTIFICATION_ID = 4821\n    private const val PLAYBACK_PREFS = "hassoun-quran-playback-v2"\n    private const val MAX_STREAM_RETRIES = 3\n''',
               'service recovery constants')
 
-          # Always open the reader in vertical continuous browsing, regardless of
-          # whether the user entered from Surah, Juz, Page, Search, or Bookmark.
           replace_once(quran,
               '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n  const surahs = allSurahs();\n''',
               '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n\n  useEffect(() => {\n    if (screen === "reader" && appearance.browseMode !== "vertical") {\n      setAppearance((current) => ({ ...current, browseMode: "vertical" }));\n    }\n  }, [screen, appearance.browseMode]);\n\n  const surahs = allSurahs();\n''',
