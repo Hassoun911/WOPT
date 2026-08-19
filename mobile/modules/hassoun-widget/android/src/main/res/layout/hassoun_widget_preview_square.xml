@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical"
+  android:gravity="center"
+  android:padding="12dp"
+  android:background="@drawable/hassoun_widget_bg_ivory">
+
+  <ImageView
+    android:layout_width="40dp"
+    android:layout_height="40dp"
+    android:src="@drawable/hassoun_widget_logo"
+    android:contentDescription="Hassoun" />
+
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:text="HASSOUN"
+    android:textColor="#184A3C"
+    android:textStyle="bold"
+    android:textSize="15sp" />
+
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="PRAYER TIMES"
+    android:textColor="#9A6F3C"
+    android:textSize="9sp" />
+</LinearLayout>
