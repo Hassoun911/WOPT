@@ -1,2 +1,2 @@
-trigger=2026-08-19T06:25:00Z
-reason=v0.6.14-restore-stable-widget-rendering
+trigger=2026-08-19T14:18:00Z
+reason=v0.6.15-samsung-remoteviews-vertical-square-fix
