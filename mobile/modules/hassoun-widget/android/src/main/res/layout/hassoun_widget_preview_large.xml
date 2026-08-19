@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical"
+  android:gravity="center"
+  android:padding="18dp"
+  android:background="@drawable/hassoun_widget_bg_ivory">
+
+  <ImageView
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:src="@drawable/hassoun_widget_logo"
+    android:contentDescription="Hassoun" />
+
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="HASSOUN"
+    android:textColor="#184A3C"
+    android:textStyle="bold"
+    android:textSize="18sp" />
+
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="2dp"
+    android:text="PRAYER TIMES • WINDSOR"
+    android:textColor="#9A6F3C"
+    android:textStyle="bold"
+    android:textSize="10sp" />
+</LinearLayout>
