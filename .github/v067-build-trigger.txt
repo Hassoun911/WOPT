@@ -1,2 +1,2 @@
-trigger=2026-08-18T20:04:00-04:00
-reason=retry-after-worker-dev-dependency-fix
+trigger=2026-08-19T00:58:18Z
+reason=v0.6.8-light-dark-auto-widget-theme

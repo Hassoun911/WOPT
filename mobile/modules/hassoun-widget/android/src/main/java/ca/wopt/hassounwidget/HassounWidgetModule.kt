@@ -16,6 +16,7 @@ class HassounWidgetModule : Module() {
       val context = appContext.reactContext ?: return@Function null
       val layout = (preferences["layout"] as? String).takeIf { it in setOf("compact", "next", "full", "square", "vertical", "slim") } ?: "full"
       val theme = (preferences["theme"] as? String).takeIf { it in setOf("emerald", "ivory", "ocean", "sunset", "midnight") } ?: "emerald"
+      val appearance = (preferences["appearance"] as? String).takeIf { it in setOf("light", "dark", "auto") } ?: "auto"
       val timeSize = (preferences["timeSize"] as? String).takeIf { it in setOf("small", "medium", "large", "xlarge") } ?: "large"
       val countdownStyle = (preferences["countdownStyle"] as? String).takeIf { it in setOf("circle", "pill", "minimal") } ?: "circle"
       val focus = (preferences["focus"] as? String).takeIf { it in setOf("next", "balanced", "all") } ?: "next"
@@ -26,6 +27,7 @@ class HassounWidgetModule : Module() {
         .putString("layout", layout)
         .putBoolean("android16WidgetSafeMode", false)
         .putString("theme", theme)
+        .putString("appearance", appearance)
         .putBoolean("showCountdown", preferences["showCountdown"] as? Boolean ?: true)
         .putBoolean("showHijri", preferences["showHijri"] as? Boolean ?: true)
         .putBoolean("showGregorian", preferences["showGregorian"] as? Boolean ?: true)
@@ -53,6 +55,7 @@ class HassounWidgetModule : Module() {
       mapOf(
         "layout" to (prefs.getString("layout", if (Build.VERSION.SDK_INT >= 36) "slim" else "full") ?: if (Build.VERSION.SDK_INT >= 36) "slim" else "full"),
         "theme" to (prefs.getString("theme", "emerald") ?: "emerald"),
+        "appearance" to (prefs.getString("appearance", "auto") ?: "auto"),
         "showCountdown" to prefs.getBoolean("showCountdown", true),
         "showHijri" to prefs.getBoolean("showHijri", true),
         "showGregorian" to prefs.getBoolean("showGregorian", true),
@@ -121,7 +124,7 @@ class HassounWidgetModule : Module() {
   }
 
   private fun defaults() = mapOf(
-    "layout" to (if (Build.VERSION.SDK_INT >= 36) "slim" else "full"), "theme" to "emerald", "showCountdown" to true,
+    "layout" to (if (Build.VERSION.SDK_INT >= 36) "slim" else "full"), "theme" to "emerald", "appearance" to "auto", "showCountdown" to true,
     "showHijri" to true, "showGregorian" to true, "showAllPrayers" to true,
     "showLocation" to false, "showLogo" to true, "showArabicNames" to true,
     "highlightNext" to true, "timeSize" to "large", "countdownStyle" to "circle",

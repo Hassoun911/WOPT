@@ -3,6 +3,7 @@ import { requireNativeModule } from "expo-modules-core";
 
 export type HassounWidgetLayout = "compact" | "next" | "full" | "square" | "vertical" | "slim";
 export type HassounWidgetTheme = "emerald" | "ivory" | "ocean" | "sunset" | "midnight";
+export type HassounWidgetAppearance = "light" | "dark" | "auto";
 export type HassounWidgetTimeSize = "small" | "medium" | "large" | "xlarge";
 export type HassounWidgetCountdownStyle = "circle" | "pill" | "minimal";
 export type HassounWidgetFocus = "next" | "balanced" | "all";
@@ -10,6 +11,7 @@ export type HassounWidgetFocus = "next" | "balanced" | "all";
 export type HassounWidgetPreferences = {
   layout: HassounWidgetLayout;
   theme: HassounWidgetTheme;
+  appearance: HassounWidgetAppearance;
   showCountdown: boolean;
   showHijri: boolean;
   showGregorian: boolean;
@@ -48,6 +50,7 @@ if (Platform.OS === "android") {
 const defaults: HassounWidgetPreferences = {
   layout: "full",
   theme: "emerald",
+  appearance: "auto",
   showCountdown: true,
   showHijri: true,
   showGregorian: true,

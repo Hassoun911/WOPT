@@ -8,6 +8,7 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.SystemClock
@@ -52,7 +53,8 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       intent.action == HassounWidgetStore.ACTION_REFRESH ||
       intent.action == Intent.ACTION_BOOT_COMPLETED ||
       intent.action == Intent.ACTION_TIME_CHANGED ||
-      intent.action == Intent.ACTION_TIMEZONE_CHANGED
+      intent.action == Intent.ACTION_TIMEZONE_CHANGED ||
+      intent.action == Intent.ACTION_CONFIGURATION_CHANGED
     ) {
       updateAll(context)
     }
@@ -107,8 +109,12 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       // that first render on the same lightweight RemoteViews used by the
       // launcher preview. Once real dimensions arrive, switch to the responsive
       // full/square/vertical/slim renderer below.
-      val layout = if (isLockScreen) requestedLayout else providerLayout ?: when {
+      val layout = if (isLockScreen) requestedLayout else when {
+        // Samsung can invoke onUpdate before it gives the widget usable dimensions.
+        // Always use the shallow safe shell for that very first render, including
+        // the Large 4x2 provider. This prevents the launcher "Couldn't add widget" failure.
         minWidth <= 0 || minHeight <= 0 -> "slim"
+        providerLayout != null -> providerLayout
         minHeight >= minWidth * 1.35 -> "vertical"
         minWidth <= 220 && minHeight >= 150 -> "square"
         minHeight <= 80 || minWidth >= minHeight * 3.20 -> "slim"
@@ -127,7 +133,15 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
       )
       val locale = prefs.getString("locale", "en") ?: "en"
-      val theme = prefs.getString("theme", "emerald") ?: "emerald"
+      val storedTheme = prefs.getString("theme", "emerald") ?: "emerald"
+      val appearance = prefs.getString("appearance", "auto") ?: "auto"
+      val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+      val theme = when (appearance) {
+        "light" -> "ivory"
+        "dark" -> "midnight"
+        "auto" -> if (systemDark) "midnight" else "ivory"
+        else -> storedTheme
+      }
       val showCountdown = prefs.getBoolean("showCountdown", true)
       val showHijri = prefs.getBoolean("showHijri", true)
       val showGregorian = prefs.getBoolean("showGregorian", true)

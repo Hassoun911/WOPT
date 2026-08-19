@@ -12,9 +12,10 @@ import {
   Switch,
   Text,
   TextInput,
-  View
+  View,
+  useColorScheme
 } from "react-native";
-import HassounWidget, { type HassounWidgetCountdownStyle, type HassounWidgetFocus, type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme, type HassounWidgetTimeSize } from "../modules/hassoun-widget";
+import HassounWidget, { type HassounWidgetAppearance, type HassounWidgetCountdownStyle, type HassounWidgetFocus, type HassounWidgetLayout, type HassounWidgetPreferences, type HassounWidgetTheme, type HassounWidgetTimeSize } from "../modules/hassoun-widget";
 import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering";
 import { submitSupportMessage } from "./support";
 import BrandMark from "./BrandMark";
@@ -68,6 +69,7 @@ function LegalCard({ title, children }: { title: string; children: React.ReactNo
 export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOpenEmailAlerts }: Props) {
   const ar = locale === "ar";
   const t = (en: string, arabic: string) => ar ? arabic : en;
+  const systemColorScheme = useColorScheme();
   const [page, setPage] = useState<SettingsPage>("root");
   const [readerOpen, setReaderOpen] = useState(false);
   const { appearance, setAppearance, reset } = useQuranAppearance();
@@ -131,36 +133,33 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
   if (page === "root") return root;
 
   if (page === "widgets") {
-    const previewTheme = WIDGET_THEME_META[widgetPrefs.theme || "emerald"];
+    const effectivePreviewTheme: HassounWidgetTheme = widgetPrefs.appearance === "light" ? "ivory" : widgetPrefs.appearance === "dark" ? "midnight" : systemColorScheme === "dark" ? "midnight" : "ivory";
+    const previewTheme = WIDGET_THEME_META[effectivePreviewTheme];
     const widgetLogo = require("../assets/hassoun-logo.png");
     const previewTimeSize = widgetPrefs.timeSize === "xlarge" ? 28 : widgetPrefs.timeSize === "large" ? 23 : widgetPrefs.timeSize === "medium" ? 19 : 16;
     const previewPrayerSize = widgetPrefs.focus === "next" ? 29 : widgetPrefs.focus === "balanced" ? 25 : 21;
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BackHeader title={t("Widgets", "الويدجت")} onBack={() => setPage("root")} />
-        <Text style={styles.subtitle}>{t("Choose your preferred layout, then resize the widget on your Home screen. Hassoun automatically uses the best design for the actual width and height Android gives it.", "اختر التصميم المفضل ثم غيّر حجم الويدجت على الشاشة الرئيسية. يختار Hassoun تلقائياً أفضل تصميم حسب العرض والارتفاع الفعليين.")}</Text>
+        <Text style={styles.subtitle}>{t("Choose Light, Dark or Auto, then pick a widget size. Hassoun keeps the layout optimized for the actual size Android gives it.", "اختر فاتح أو داكن أو تلقائي، ثم اختر حجم الويدجت. يحافظ Hassoun على التصميم المناسب للحجم الفعلي الذي يمنحه أندرويد.")}</Text>
 
-        <Text style={styles.sectionLabel}>{t("WIDGET STYLE", "نمط الويدجت")}</Text>
+        <Text style={styles.sectionLabel}>{t("WIDGET APPEARANCE", "مظهر الويدجت")}</Text>
+        <Text style={styles.layoutNote}>{t("Choose Light, Dark, or Auto. Auto follows your Android light/dark setting and refreshes the widget when the phone theme changes.", "اختر فاتح أو داكن أو تلقائي. الوضع التلقائي يتبع مظهر أندرويد ويحدّث الويدجت عند تغيير مظهر الهاتف.")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScrollContent}>
           {([
-            ["emerald", t("Emerald", "زمردي")],
-            ["ivory", t("Ivory", "عاجي")],
-            ["ocean", t("Ocean", "أزرق")],
-            ["sunset", t("Sunset", "غروب")],
-            ["midnight", t("Midnight", "ليلي")]
-          ] as Array<[HassounWidgetTheme, string]>).map(([theme, label]) => {
-            const meta = WIDGET_THEME_META[theme];
-            return (
-              <Pressable key={theme} onPress={() => updateWidget({ theme })} style={[styles.themeChoice, widgetPrefs.theme === theme && styles.themeChoiceActive]}>
-                <View style={[styles.themeSwatch, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                  <Image source={widgetLogo} style={styles.themeLogo} resizeMode="contain" />
-                  <Text style={[styles.themePrayer, { color: meta.fg }]}>Dhuhr</Text>
-                  <Text style={[styles.themeTime, { color: meta.accent }]}>1:36</Text>
-                </View>
-                <Text style={styles.themeLabel}>{label}</Text>
-              </Pressable>
-            );
-          })}
+            ["light", t("Light", "فاتح"), "#FFF9EE", "#165445", "#B27A23"],
+            ["dark", t("Dark", "داكن"), "#10294A", "#FFFFFF", "#F3D083"],
+            ["auto", t("Auto", "تلقائي"), systemColorScheme === "dark" ? "#10294A" : "#FFF9EE", systemColorScheme === "dark" ? "#FFFFFF" : "#165445", "#D2B25A"]
+          ] as Array<[HassounWidgetAppearance, string, string, string, string]>).map(([appearance, label, bg, fg, accent]) => (
+            <Pressable key={appearance} onPress={() => updateWidget({ appearance })} style={[styles.themeChoice, widgetPrefs.appearance === appearance && styles.themeChoiceActive]}>
+              <View style={[styles.themeSwatch, { backgroundColor: bg, borderColor: accent }]}>
+                <Image source={widgetLogo} style={styles.themeLogo} resizeMode="contain" />
+                <Text style={[styles.themePrayer, { color: fg }]}>Maghrib</Text>
+                <Text style={[styles.themeTime, { color: accent }]}>8:31</Text>
+              </View>
+              <Text style={styles.themeLabel}>{widgetPrefs.appearance === appearance ? `✓ ${label}` : label}</Text>
+            </Pressable>
+          ))}
         </ScrollView>
 
         <Text style={styles.sectionLabel}>{t("WIDGET LAYOUT", "تصميم الويدجت")}</Text>
