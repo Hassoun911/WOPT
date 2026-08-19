@@ -2,7 +2,7 @@ name: Deploy Hassoun PWA
 
 on:
   push:
-    branches: [main]
+    branches: [main, work/hassoun-1.0-store-admin]
     paths:
       - "pwa/**"
       - ".github/workflows/deploy-pages.yml"
@@ -48,6 +48,7 @@ jobs:
         run: |
           test -f out/index.html
           test -f out/quran/index.html
+          test -f out/admin/index.html
           test -f out/manifest.webmanifest
           test -f out/sw.js
 
@@ -69,5 +70,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-# redeploy after complete Hassoun visible-brand audit
