@@ -1,0 +1,2 @@
+trigger=2026-08-19T16:46:00Z
+reason=final-exact-alarm-radio-continuous-scroll
