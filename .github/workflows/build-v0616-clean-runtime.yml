@@ -1,4 +1,4 @@
-name: Build Hassoun v0.6.16 Clean Runtime APK
+name: Build Hassoun v0.6.17 Alarm Radio Reader APK
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v0616-clean-runtime
+  group: hassoun-v0617-runtime
   cancel-in-progress: true
 
 jobs:
@@ -29,14 +29,17 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Confirm v0.6.16 runtime fixes
+      - name: Confirm v0.6.17 runtime fixes
         id: sourcecheck
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'version: "0.6.16"' mobile/app.config.ts
-          grep -q 'android.permission.USE_EXACT_ALARM' mobile/app.config.ts
-          grep -q 'restoreExactPrayerAlarms' mobile/src/prayerAudio.ts
+          grep -q 'version: "0.6.17"' mobile/app.config.ts
+          grep -q 'versionCode: 40' mobile/app.config.ts
+          grep -q 'android.permission.SCHEDULE_EXACT_ALARM' mobile/app.config.ts
+          grep -q 'android.permission.SCHEDULE_EXACT_ALARM' mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml
+          ! grep -q 'maxSdkVersion="32"' mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml
+          grep -q 'requestExactAlarmAccessIfNeeded' mobile/src/prayerAudio.ts
           grep -q 'MAX_STREAM_RETRIES = 3' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
           grep -q 'restorePlaybackState()' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
           grep -q 'browseMode: "vertical"' mobile/src/quran/QuranV3.tsx
@@ -114,20 +117,20 @@ jobs:
           set -euo pipefail
           APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          unzip -l "$APK" > /tmp/v0616-apk.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v0616-apk.txt
-          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
+          unzip -l "$APK" > /tmp/v0617-apk.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v0617-apk.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.17.apk
 
-      - name: Upload v0.6.16 APK
+      - name: Upload v0.6.17 APK
         id: uploadapk
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.6.16-clean-runtime-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
+          name: hassoun-v0.6.17-alarm-radio-reader-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.17.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Record v0.6.16 clean build result
+      - name: Record v0.6.17 build result
         if: always()
         shell: bash
         run: |
@@ -144,11 +147,11 @@ jobs:
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
           head_sha=${{ github.sha }}
-          artifact=hassoun-v0.6.16-clean-runtime-${{ github.run_number }}
+          artifact=hassoun-v0.6.17-alarm-radio-reader-${{ github.run_number }}
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v0616-build-result.txt
-          git commit -m "Record Hassoun v0.6.16 clean build result" || true
+          git commit -m "Record Hassoun v0.6.17 build result" || true
           git pull --rebase origin main || true
           git push origin HEAD:main || true
