@@ -7,8 +7,8 @@
   android:targetCellWidth="2"
   android:targetCellHeight="2"
   android:updatePeriodMillis="1800000"
-  android:initialLayout="@layout/hassoun_prayer_widget_square"
-  android:previewLayout="@layout/hassoun_prayer_widget_square"
+  android:initialLayout="@layout/hassoun_widget_preview_square"
+  android:previewLayout="@layout/hassoun_widget_preview_square"
   android:resizeMode="horizontal|vertical"
   android:widgetCategory="home_screen"
   android:description="@string/hassoun_widget_description" />
