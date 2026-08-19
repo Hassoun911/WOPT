@@ -1,0 +1,2 @@
+trigger=2026-08-19T16:32:00Z
+reason=v0.6.16-clean-alarm-radio-reader-build
