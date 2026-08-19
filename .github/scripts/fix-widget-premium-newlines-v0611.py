@@ -21,3 +21,4 @@ if changed == 0:
     raise RuntimeError("No malformed widget strings were found to repair")
 path.write_text(text, encoding="utf-8")
 print(f"Fixed {changed} malformed Kotlin widget strings")
+# v0.6.11 trigger: force workflow run after workflow file exists on main.
