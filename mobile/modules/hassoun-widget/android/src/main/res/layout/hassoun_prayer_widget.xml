@@ -37,14 +37,16 @@
         android:text="HASSOUN"
         android:textStyle="bold"
         android:textSize="10sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
       <TextView
         android:id="@+id/widget_brand_subtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textStyle="bold"
         android:textSize="5.5sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
 
     <LinearLayout
@@ -59,13 +61,15 @@
         android:layout_height="wrap_content"
         android:textStyle="bold"
         android:textSize="6.5sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
       <TextView
         android:id="@+id/widget_hijri"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="5.5sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
   </LinearLayout>
 
@@ -85,27 +89,37 @@
       android:layout_weight="1"
       android:orientation="vertical"
       android:gravity="center_vertical">
-      <TextView
-        android:id="@+id/widget_next_label"
+      <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="NEXT PRAYER"
-        android:textStyle="bold"
-        android:textSize="6.5sp"
-        android:maxLines="1" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+          android:id="@+id/widget_next_label"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="NEXT PRAYER"
+          android:textStyle="bold"
+          android:textSize="6.5sp"
+          android:maxLines="1"
+          android:includeFontPadding="false" />
+        <TextView
+          android:id="@+id/widget_next_secondary"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginStart="5dp"
+          android:textSize="6.5sp"
+          android:maxLines="1"
+          android:includeFontPadding="false" />
+      </LinearLayout>
       <TextView
         android:id="@+id/widget_next_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textStyle="bold"
-        android:textSize="27sp"
-        android:maxLines="1" />
-      <TextView
-        android:id="@+id/widget_next_secondary"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="7sp"
-        android:maxLines="1" />
+        android:textSize="28sp"
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
 
     <Chronometer
@@ -118,7 +132,8 @@
       android:padding="2dp"
       android:textStyle="bold"
       android:textSize="11.5sp"
-      android:maxLines="2" />
+      android:maxLines="2"
+      android:includeFontPadding="false" />
 
     <LinearLayout
       android:layout_width="wrap_content"
@@ -132,14 +147,16 @@
         android:textColor="#D4B76A"
         android:textStyle="bold"
         android:textSize="5.5sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
       <TextView
         android:id="@+id/widget_next_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textStyle="bold"
         android:textSize="28sp"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
   </LinearLayout>
 
