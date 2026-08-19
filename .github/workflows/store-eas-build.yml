@@ -1,0 +1,68 @@
+name: Hassoun 1.0 EAS Store Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Store platform to build
+        required: true
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-eas-store-${{ inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Require Expo credentials
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "EXPO_TOKEN GitHub secret is required for production EAS builds."
+            exit 1
+          fi
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+
+      - name: Validate source before remote build
+        working-directory: mobile
+        run: |
+          npm run quran:data
+          npx tsc --noEmit
+
+      - name: Start Android Play Store AAB build
+        if: ${{ inputs.platform == 'android' || inputs.platform == 'all' }}
+        working-directory: mobile
+        run: eas build --platform android --profile production --non-interactive --no-wait
+
+      - name: Start iOS App Store build
+        if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
+        working-directory: mobile
+        run: eas build --platform ios --profile production --non-interactive --no-wait
