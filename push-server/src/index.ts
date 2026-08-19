@@ -4,18 +4,12 @@ import {
   getAdminCrmOverview,
   listAdminTeam,
   listAppContent,
-  listAppSettings,
-  listAuditLog,
   updateAdminTeamMember,
-  updateAppContent,
-  updateAppSetting,
-  updateSubscriberStatus
+  updateAppContent
 } from "./adminCrm";
 import { createAdminTeamMember } from "./adminTeamCreate";
 import {
-  createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
-  listAdminEmailCampaigns,
   refreshAdminEmailCampaignStatuses
 } from "./adminEmail";
 import {
@@ -26,11 +20,17 @@ import {
   logoutAdmin
 } from "./adminAuth";
 import { requestAdminPasswordReset, resetAdminPassword } from "./adminPasswordReset";
+import { dispatchDueAdminPushCampaigns } from "./adminPush";
 import {
-  createAdminPushCampaign,
-  dispatchDueAdminPushCampaigns,
-  listAdminPushCampaigns
-} from "./adminPush";
+  createRestrictedEmailCampaign,
+  createRestrictedPushCampaign,
+  listRestrictedAppSettings,
+  listRestrictedAuditLog,
+  listRestrictedEmailCampaigns,
+  listRestrictedPushCampaigns,
+  updateRestrictedAppSetting,
+  updateRestrictedSubscriberStatus
+} from "./adminRestricted";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -271,13 +271,13 @@ export default {
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listAdminSubscribers(request, env, url);
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
-        response = await updateSubscriberStatus(request, env, url.pathname.split("/")[3]);
+        response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3]);
       } else if (request.method === "GET" && url.pathname === "/admin/crm/overview") {
         response = await getAdminCrmOverview(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/settings") {
-        response = await listAppSettings(request, env);
+        response = await listRestrictedAppSettings(request, env);
       } else if (request.method === "POST" && url.pathname.startsWith("/admin/settings/")) {
-        response = await updateAppSetting(request, env, decodeURIComponent(url.pathname.slice("/admin/settings/".length)));
+        response = await updateRestrictedAppSetting(request, env, decodeURIComponent(url.pathname.slice("/admin/settings/".length)));
       } else if (request.method === "GET" && url.pathname === "/admin/content") {
         response = await listAppContent(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/content") {
@@ -291,15 +291,15 @@ export default {
       } else if (request.method === "POST" && url.pathname.startsWith("/admin/team/")) {
         response = await updateAdminTeamMember(request, env, url.pathname.slice("/admin/team/".length));
       } else if (request.method === "GET" && url.pathname === "/admin/audit") {
-        response = await listAuditLog(request, env, url);
+        response = await listRestrictedAuditLog(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
-        response = await createAdminPushCampaign(request, env);
+        response = await createRestrictedPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
-        response = await listAdminPushCampaigns(request, env);
+        response = await listRestrictedPushCampaigns(request, env);
       } else if (request.method === "POST" && url.pathname === "/admin/email/campaigns") {
-        response = await createAdminEmailCampaign(request, env);
+        response = await createRestrictedEmailCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
-        response = await listAdminEmailCampaigns(request, env);
+        response = await listRestrictedEmailCampaigns(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
