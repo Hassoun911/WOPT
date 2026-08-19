@@ -1,0 +1,37 @@
+name: Fix Hassoun v0.6.11 Premium Widget Kotlin Strings
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/scripts/fix-widget-premium-newlines-v0611.py"
+      - ".github/workflows/fix-widget-premium-newlines-v0611.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Repair escaped newlines
+        run: python .github/scripts/fix-widget-premium-newlines-v0611.py
+      - name: Validate Kotlin strings
+        run: |
+          set -euo pipefail
+          grep -q '\\n\$time' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          git diff --check
+      - name: Commit repair and trigger APK
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf 'trigger=%s\nreason=v0.6.11-premium-widget-structure-kotlin-fix\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .github/v067-build-trigger.txt
+          git add mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt .github/v067-build-trigger.txt
+          git commit -m "Fix premium widget Kotlin multiline strings" || true
+          git pull --rebase origin main
+          git push origin HEAD:main
