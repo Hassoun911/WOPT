@@ -1,2 +1,2 @@
-trigger=2026-08-19T00:58:18Z
-reason=v0.6.8-light-dark-auto-widget-theme
+trigger=2026-08-19T01:06:00Z
+reason=v0.6.8-light-dark-auto-widget-theme-direct-build
