@@ -1,12 +1,22 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import PrayerAudio from "../modules/prayer-audio";
 import { loadPhonePrayerAlertPreferences, type PrayerAlertPreferences } from "./alertPreferences";
 import { buildPrayerEvents } from "./events";
 import type { PrayerKey, PrayerTimes } from "./types";
 
-const EXACT_ALARM_SETUP_KEY = "wopt:exact-alarm-setup:v1";
 let firstLaunchAlarmCheckStarted = false;
+let exactAlarmSettingsOpenedThisSession = false;
+
+async function restoreExactAlarmsIfAvailable() {
+  if (Platform.OS !== "android" || !PrayerAudio) return;
+  try {
+    if (PrayerAudio.canScheduleExactAlarms()) {
+      await PrayerAudio.restoreExactPrayerAlarms();
+    }
+  } catch {
+    // The next schedule refresh or Test Adhan can retry without crashing startup.
+  }
+}
 
 function startFirstLaunchExactAlarmSetup() {
   if (Platform.OS !== "android" || !PrayerAudio || firstLaunchAlarmCheckStarted) return;
@@ -16,15 +26,24 @@ function startFirstLaunchExactAlarmSetup() {
   setTimeout(() => {
     void (async () => {
       try {
-        const alreadyHandled = await AsyncStorage.getItem(EXACT_ALARM_SETUP_KEY);
-        if (alreadyHandled) return;
-        await AsyncStorage.setItem(EXACT_ALARM_SETUP_KEY, "shown");
-        if (!prayerAudio.canScheduleExactAlarms()) prayerAudio.openExactAlarmSettings();
+        if (prayerAudio.canScheduleExactAlarms()) {
+          await prayerAudio.restoreExactPrayerAlarms();
+          return;
+        }
+        if (!exactAlarmSettingsOpenedThisSession) {
+          exactAlarmSettingsOpenedThisSession = true;
+          prayerAudio.openExactAlarmSettings();
+        }
       } catch {
         // Alerts settings and Test Adhan remain the recovery path.
       }
     })();
   }, 1200);
+
+  AppState.addEventListener("change", (state) => {
+    if (state !== "active") return;
+    void restoreExactAlarmsIfAvailable();
+  });
 }
 
 startFirstLaunchExactAlarmSetup();
