@@ -100,6 +100,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN
       )
       val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0
+      if (!isLockScreen) {
+        updateRenderedHomeWidget(context, manager, appWidgetId)
+        return
+      }
       val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
       val requestedLayout = prefs.getString("layout", "full") ?: "full"
       val providerClassName = manager.getAppWidgetInfo(appWidgetId)?.provider?.className.orEmpty()
@@ -272,6 +276,119 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       manager.updateAppWidget(appWidgetId, views)
     }
 
+
+    private fun updateRenderedHomeWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
+      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
+      val info = manager.getAppWidgetInfo(appWidgetId)
+      val className = info?.provider?.className.orEmpty()
+      val layout = when {
+        className.endsWith("HassounVerticalWidgetProvider") -> "vertical"
+        className.endsWith("HassounSquareWidgetProvider") -> "square"
+        className.endsWith("HassounSlimWidgetProvider") -> "slim"
+        else -> "full"
+      }
+      val layoutRes = when (layout) {
+        "vertical" -> R.layout.hassoun_prayer_widget_vertical
+        "square" -> R.layout.hassoun_prayer_widget_square
+        "slim" -> R.layout.hassoun_prayer_widget_slim
+        else -> R.layout.hassoun_prayer_widget
+      }
+      val options = manager.getAppWidgetOptions(appWidgetId)
+      val fallback = when (layout) {
+        "vertical" -> 165 to 330
+        "square" -> 180 to 180
+        "slim" -> 320 to 90
+        else -> 320 to 180
+      }
+      val widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).takeIf { it > 0 } ?: fallback.first
+      val heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0).takeIf { it > 0 } ?: fallback.second
+
+      val appearance = prefs.getString("appearance", "auto") ?: "auto"
+      val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+      val dark = when (appearance) {
+        "light" -> false
+        "dark" -> true
+        else -> systemDark
+      }
+      val locale = prefs.getString("locale", "en") ?: "en"
+      val showLogo = prefs.getBoolean("showLogo", true)
+      val showArabic = prefs.getBoolean("showArabicNames", true)
+      val showGregorian = prefs.getBoolean("showGregorian", true)
+      val showHijri = prefs.getBoolean("showHijri", true)
+      val highlightNext = prefs.getBoolean("highlightNext", true)
+      val showCountdown = prefs.getBoolean("showCountdown", true)
+      val timeSize = prefs.getString("timeSize", "large") ?: "large"
+      val textScale = when (timeSize) {
+        "small" -> 0.88f
+        "medium" -> 0.95f
+        "xlarge" -> 1.10f
+        else -> 1.0f
+      }
+
+      val next = loadSchedule(context)?.let { findNextPrayer(it, locale) }
+      val now = Date()
+      val prayerData = if (next == null) emptyList() else prayerKeys.map { key ->
+        WidgetRenderPrayer(
+          key = key,
+          english = englishNames[key] ?: key,
+          arabic = arabicNames[key] ?: "",
+          time = formatClock(next.day.optString(key, "--:--"), locale),
+          active = highlightNext && key == next.key
+        )
+      }
+      val englishNext = if (next == null) "Open Hassoun" else englishNames[next.key] ?: next.key
+      val arabicNext = if (next == null) "" else arabicNames[next.key] ?: ""
+      val mainName = if (locale == "ar" && next != null) arabicNext else englishNext
+      val secondary = if (locale == "ar" && next != null) englishNext else arabicNext
+      val state = WidgetRenderState(
+        layout = layout,
+        dark = dark,
+        showLogo = showLogo,
+        showArabic = showArabic,
+        showGregorian = showGregorian,
+        showHijri = showHijri,
+        dateText = if (showGregorian) gregorianLabel(now, locale) else "",
+        hijriText = if (showHijri) hijriLabel(now, locale) else "",
+        nextPrayer = mainName,
+        nextArabic = if (showArabic) secondary else "",
+        nextTime = if (next == null) "--:--" else formatClockMain(next.timeText),
+        nextSuffix = if (next == null) "" else formatClockSuffix(next.timeText),
+        prayers = prayerData,
+        textScale = textScale
+      )
+
+      val views = RemoteViews(context.packageName, layoutRes)
+      bindLaunchIntent(context, views)
+      val bitmap = HassounWidgetBitmapRenderer.render(context, widthDp, heightDp, state)
+      views.setImageViewBitmap(R.id.widget_canvas, bitmap)
+
+      if (next != null && showCountdown) {
+        val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
+        views.setChronometer(R.id.widget_countdown, SystemClock.elapsedRealtime() + delay, "%s\nLEFT", true)
+        views.setInt(
+          R.id.widget_countdown,
+          "setBackgroundResource",
+          if (dark) R.drawable.hassoun_widget_countdown_circle_dark else R.drawable.hassoun_widget_countdown_circle_light
+        )
+        views.setTextColor(R.id.widget_countdown, if (dark) Color.rgb(246, 222, 161) else Color.rgb(24, 74, 60))
+        val chronoSize = when (layout) {
+          "vertical" -> 9.5f
+          "square" -> 9f
+          "slim" -> 7.5f
+          else -> 11.5f
+        }
+        views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, chronoSize)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          views.setChronometerCountDown(R.id.widget_countdown, true)
+        }
+        scheduleNextRefresh(context, next.targetMillis + 15_000L)
+      } else {
+        views.setViewVisibility(R.id.widget_countdown, View.GONE)
+      }
+      manager.updateAppWidget(appWidgetId, views)
+    }
+
     private fun bindPrayerStrip(
       views: RemoteViews,
       day: JSONObject,
@@ -294,25 +411,14 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         val time = formatClock(day.optString(key, "--:--"), locale)
         val title = when (layout) {
           "vertical" -> when {
-            locale == "ar" && showArabic -> "$arabic  •  $name
-$time"
-            locale == "ar" -> "$name
-$time"
-            showArabic -> "$name  •  $arabic
-$time"
-            else -> "$name
-$time"
+            locale == "ar" && showArabic -> "$arabic  •  $name\n$time"
+            locale == "ar" -> "$name\n$time"
+            showArabic -> "$name  •  $arabic\n$time"
+            else -> "$name\n$time"
           }
-          "slim", "compact", "next" -> "$name
-$time"
-          "square" -> if (showArabic) "$name
-$arabic
-$time" else "$name
-$time"
-          else -> if (showArabic) "$name
-$arabic
-$time" else "$name
-$time"
+          "slim", "compact", "next" -> "$name\n$time"
+          "square" -> if (showArabic) "$name\n$arabic\n$time" else "$name\n$time"
+          else -> if (showArabic) "$name\n$arabic\n$time" else "$name\n$time"
         }
         views.setTextViewText(id, title)
         val icon = prayerIcons[key] ?: 0

@@ -1,2 +1,2 @@
-trigger=2026-08-19T05:11:14Z
-reason=v0.6.11-premium-widget-structure
+trigger=2026-08-19T05:26:51Z
+reason=v0.6.12-premium-canvas-widgets
