@@ -9,6 +9,7 @@ on:
     paths:
       - "mobile/**"
       - "push-server/**"
+      - "pwa/**"
       - ".github/workflows/store-validation.yml"
 
 permissions:
@@ -28,27 +29,22 @@ jobs:
       NODE_ENV: production
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-
       - uses: gradle/actions/setup-gradle@v4
-
       - name: Install and type-check mobile app
         working-directory: mobile
         run: |
           npm ci --include=dev --no-audit --no-fund
           npm run quran:data
           npx tsc --noEmit
-
       - name: Validate Expo store configuration
         working-directory: mobile
         run: |
@@ -61,32 +57,27 @@ jobs:
           if (config.version !== '1.0.0') fail(`Expected version 1.0.0, found ${config.version}`);
           if (config.android?.package !== 'ca.wopt.windsorprayertimes') fail('Unexpected Android package');
           if (config.ios?.bundleIdentifier !== 'ca.wopt.windsorprayertimes') fail('Unexpected iOS bundle id');
+          if (config.ios?.supportsTablet !== false) fail('iPad support must stay disabled until iPad QA is complete');
           const permissions = new Set(config.android?.permissions || []);
           if (!permissions.has('android.permission.SCHEDULE_EXACT_ALARM')) fail('SCHEDULE_EXACT_ALARM is required');
           if (permissions.has('android.permission.USE_EXACT_ALARM')) fail('USE_EXACT_ALARM must not be present in store build');
           NODE
-
       - name: Clean Android prebuild
         working-directory: mobile
         run: npx expo prebuild --platform android --clean --no-install
-
       - name: Validate Android API and permissions
         run: |
           ! grep -R "android.permission.USE_EXACT_ALARM" mobile/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.SCHEDULE_EXACT_ALARM" mobile/android/app/src/main/AndroidManifest.xml
           grep -q "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" mobile/android/app/src/main/AndroidManifest.xml
           grep -R -E "targetSdk(Version)?[^0-9]*36|targetSdkVersion[^0-9]*36" mobile/android mobile/node_modules/expo mobile/node_modules/react-native | head -n 1
-
       - name: Build release APK and AAB for validation
         working-directory: mobile/android
-        run: |
-          ./gradlew assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
-
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
       - name: Verify validation artifacts
         run: |
           test -s mobile/android/app/build/outputs/apk/release/app-release.apk
           test -s mobile/android/app/build/outputs/bundle/release/app-release.aab
-
       - uses: actions/upload-artifact@v4
         with:
           name: hassoun-1.0-validation-android-${{ github.run_number }}
@@ -115,3 +106,23 @@ jobs:
       - name: Run backend tests
         working-directory: push-server
         run: npm test
+
+  admin-pwa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install Admin/PWA dependencies
+        working-directory: pwa
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Type-check Admin CRM
+        working-directory: pwa
+        run: npx tsc --noEmit
+      - name: Build PWA and Admin CRM
+        working-directory: pwa
+        run: npm run build
