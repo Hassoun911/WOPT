@@ -61,6 +61,7 @@ jobs:
           const permissions = new Set(config.android?.permissions || []);
           if (!permissions.has('android.permission.SCHEDULE_EXACT_ALARM')) fail('SCHEDULE_EXACT_ALARM is required');
           if (permissions.has('android.permission.USE_EXACT_ALARM')) fail('USE_EXACT_ALARM must not be present in store build');
+          if (config.ios?.privacyManifests?.NSPrivacyTracking !== false) fail('iOS privacy manifest must explicitly disable tracking');
           NODE
       - name: Clean Android prebuild
         working-directory: mobile
@@ -86,6 +87,57 @@ jobs:
             mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
+
+  mobile-ios:
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install and type-check mobile app
+        working-directory: mobile
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npm run quran:data
+          npx tsc --noEmit
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Clean iOS prebuild
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --clean --no-install
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install
+      - name: Verify iOS privacy and native modules
+        run: |
+          test -f mobile/ios/Hassoun/PrivacyInfo.xcprivacy || find mobile/ios -name PrivacyInfo.xcprivacy -print -quit | grep .
+          grep -R "NSSpeechRecognitionUsageDescription" mobile/ios/*/Info.plist
+          grep -R "QuranAudioModule" mobile/ios/Pods/Target\ Support\ Files mobile/ios/Pods/Manifest.lock mobile/ios/Podfile.lock || true
+          grep -q "QuranAudio" mobile/ios/Podfile.lock
+          grep -q "QuranSpeech" mobile/ios/Podfile.lock
+          grep -q "PrayerAudio" mobile/ios/Podfile.lock
+      - name: Compile iOS app for simulator
+        working-directory: mobile/ios
+        run: |
+          WORKSPACE=$(find . -maxdepth 2 -name '*.xcworkspace' -print -quit)
+          test -n "$WORKSPACE"
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); schemes=d.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')
+          test -n "$SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
   backend:
     runs-on: ubuntu-latest
