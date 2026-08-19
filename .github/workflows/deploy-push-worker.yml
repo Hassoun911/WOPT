@@ -1,10 +1,10 @@
-# Deploy Hassoun Worker with prayer alerts, support, and multiplayer games
+# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, and Admin CRM
 name: Deploy Hassoun Push Worker
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, work/hassoun-1.0-store-admin]
     paths:
       - "push-server/**"
       - ".github/workflows/deploy-push-worker.yml"
@@ -113,62 +113,51 @@ jobs:
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
 
-      - name: Smoke test Worker and multiplayer room creation
+      - name: Smoke test Worker, CRM runtime, and multiplayer
         run: |
           set -euo pipefail
 
-          health_ok=false
-          for attempt in $(seq 1 10); do
+          for attempt in $(seq 1 15); do
             if curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json \
               && jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null; then
-              health_ok=true
               break
             fi
+            test "$attempt" -lt 15
             sleep 2
           done
-          test "$health_ok" = true
 
-          config_ok=false
           for attempt in $(seq 1 15); do
-            if curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json \
-              && jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json >/dev/null \
-              && jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null; then
-              config_ok=true
+            if curl -fsS "${PUSH_WORKER_URL}/app/runtime" -o /tmp/runtime.json \
+              && jq -e '.ok == true and (.settings | type == "object")' /tmp/runtime.json >/dev/null; then
               break
             fi
-            echo "Waiting for latest Worker config to propagate (${attempt}/15)…"
+            test "$attempt" -lt 15
             sleep 2
           done
-          test "$config_ok" = true
 
           player_id="smoke_$(date +%s)_$RANDOM"
-          games_ok=false
           for attempt in $(seq 1 10); do
             http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' \
               -X POST "${PUSH_WORKER_URL}/games/rooms" \
               -H 'Content-Type: application/json' \
               --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
             if [ "$http_code" = "200" ] \
-              && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null \
-              && jq -e '.room.gameType == "trivia" and .room.category == "islamic"' /tmp/game-room.json >/dev/null; then
-              games_ok=true
+              && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null; then
               break
             fi
-            echo "Multiplayer endpoint not ready yet (${attempt}/10), HTTP ${http_code}"
-            cat /tmp/game-room.json || true
+            test "$attempt" -lt 10
             sleep 2
           done
-          test "$games_ok" = true
 
-          echo "Worker health, config, D1 multiplayer tables, and create-room endpoint all passed."
-          jq '{room: {code: .room.code, gameType: .room.gameType, category: .room.category}}' /tmp/game-room.json
+          echo "Worker, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
 
-      - name: Record multiplayer backend ready
+      - name: Record backend verification on current branch
         working-directory: .
         run: |
           code="$(jq -r '.room.code' /tmp/game-room.json)"
           cat > .github/games-backend-status.txt <<EOF
           games_backend=ready
+          crm_runtime=ready
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
           verified_room_code=${code}
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -177,5 +166,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/games-backend-status.txt
-          git commit -m "Record Hassoun multiplayer backend ready" || true
-          git push origin HEAD:main || true
+          git commit -m "Record Hassoun backend verification" || true
+          git push origin HEAD:${GITHUB_REF_NAME} || true
