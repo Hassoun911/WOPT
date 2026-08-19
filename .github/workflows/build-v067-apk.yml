@@ -1,4 +1,4 @@
-name: Build Hassoun v0.6.7 Four Widget Sizes APK
+name: Build Hassoun v0.6.16 Runtime Stability APK
 
 on:
   workflow_dispatch:
@@ -28,17 +28,127 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Confirm required v0.6.7 files exist
+      - name: Apply v0.6.16 Qur’an radio recovery and continuous reader scrolling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def patch(path: str, marker: str, old: str, new: str, label: str):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if marker in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Missing patch target: {label}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          service = 'mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt'
+          quran = 'mobile/src/quran/QuranV3.tsx'
+
+          patch(service, 'import android.os.Handler',
+              'import android.os.Build\nimport android.os.IBinder\nimport android.os.PowerManager\n',
+              'import android.os.Build\nimport android.os.Handler\nimport android.os.IBinder\nimport android.os.Looper\nimport android.os.PowerManager\n',
+              'radio Handler imports')
+
+          patch(service, 'private var retryCount = 0',
+              '  private var rangeReciterBase = ""\n  private var rangeReciterName = "Hassoun"\n',
+              '  private var rangeReciterBase = ""\n  private var rangeReciterName = "Hassoun"\n  private val mainHandler = Handler(Looper.getMainLooper())\n  private var retryCount = 0\n  private var resumePositionMs = 0\n',
+              'radio recovery state')
+
+          patch(service, 'if (intent == null) {\n      if (restorePlaybackState())',
+              '  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {\n    when (intent?.action) {\n',
+              '  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {\n    if (intent == null) {\n      if (restorePlaybackState()) {\n        playCurrent(resumePositionMs)\n      } else {\n        stopSelf()\n      }\n      return START_STICKY\n    }\n\n    when (intent.action) {\n',
+              'sticky service recovery')
+
+          # Persist compact continuous-range playback as soon as it starts.
+          p = Path(service)
+          text = p.read_text(encoding='utf-8')
+          if 'savePlaybackState()\n        if (rangeActive) playCurrent()' not in text:
+              old = '        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        if (rangeActive) playCurrent() else stopPlayback(true)\n'
+              new = '        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        retryCount = 0\n        resumePositionMs = 0\n        savePlaybackState()\n        if (rangeActive) playCurrent() else stopPlayback(true)\n'
+              if old not in text: raise SystemExit('Missing patch target: range persist start')
+              text = text.replace(old, new, 1)
+              p.write_text(text, encoding='utf-8')
+
+          patch(service, 'override fun onTaskRemoved(rootIntent: Intent?)',
+              '  override fun onBind(intent: Intent?): IBinder? = null\n\n  override fun onDestroy() {\n',
+              '  override fun onBind(intent: Intent?): IBinder? = null\n\n  override fun onTaskRemoved(rootIntent: Intent?) {\n    savePlaybackState()\n    super.onTaskRemoved(rootIntent)\n  }\n\n  override fun onDestroy() {\n    if (state == "playing" || state == "loading") savePlaybackState()\n',
+              'task removal recovery')
+
+          patch(service, 'private fun playCurrent(startPositionMs: Int = 0)',
+              '  private fun playCurrent() {\n    val item = currentItem() ?: run {\n',
+              '  private fun playCurrent(startPositionMs: Int = 0) {\n    val item = currentItem() ?: run {\n',
+              'resumable playCurrent')
+
+          p = Path(service)
+          text = p.read_text(encoding='utf-8')
+          if 'retryOrAdvance()' not in text:
+              old = '''    next.setDataSource(item.url)\n    next.setOnPreparedListener { mediaPlayer ->\n      applySpeed(mediaPlayer)\n      mediaPlayer.start()\n      state = "playing"\n      publishSnapshot()\n      updateNotification()\n    }\n    next.setOnCompletionListener {\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        playCurrent()\n      } else if (repeatQueue && currentQueueSize() > 0) {\n        queueIndex = 0\n        playCurrent()\n      } else {\n        state = "completed"\n        publishSnapshot()\n        updateNotification()\n      }\n    }\n    next.setOnErrorListener { _, _, _ ->\n      // A failed network item should not kill a long continuous range. Skip it\n      // when another ayah remains; surface an error only at the end.\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        playCurrent()\n      } else {\n        state = "error"\n        publishSnapshot()\n        updateNotification()\n      }\n      true\n    }\n    next.prepareAsync()\n'''
+              new = '''    next.setOnPreparedListener { mediaPlayer ->\n      applySpeed(mediaPlayer)\n      val seekTo = startPositionMs.coerceAtLeast(0)\n      if (seekTo > 0) runCatching { mediaPlayer.seekTo(seekTo) }\n      mediaPlayer.start()\n      retryCount = 0\n      resumePositionMs = 0\n      state = "playing"\n      savePlaybackState()\n      publishSnapshot()\n      updateNotification()\n    }\n    next.setOnCompletionListener {\n      retryCount = 0\n      resumePositionMs = 0\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        savePlaybackState()\n        playCurrent()\n      } else if (repeatQueue && currentQueueSize() > 0) {\n        queueIndex = 0\n        savePlaybackState()\n        playCurrent()\n      } else {\n        state = "completed"\n        clearSavedPlayback()\n        publishSnapshot()\n        updateNotification()\n      }\n    }\n    next.setOnErrorListener { _, _, _ ->\n      retryOrAdvance()\n      true\n    }\n    runCatching {\n      next.setDataSource(item.url)\n      next.prepareAsync()\n    }.onFailure {\n      retryOrAdvance()\n    }\n'''
+              if old not in text: raise SystemExit('Missing patch target: radio playback pipeline')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          patch(service, 'private fun retryOrAdvance()',
+              '  private fun pausePlayback() {\n    player?.let {\n',
+              '''  private fun retryOrAdvance() {\n    resumePositionMs = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)\n    releasePlayer()\n    if (retryCount < MAX_STREAM_RETRIES) {\n      retryCount += 1\n      state = "loading"\n      savePlaybackState()\n      publishSnapshot()\n      updateNotification()\n      mainHandler.postDelayed({ playCurrent(resumePositionMs) }, 1200L * retryCount)\n      return\n    }\n    retryCount = 0\n    resumePositionMs = 0\n    if (queueIndex + 1 < currentQueueSize()) {\n      queueIndex += 1\n      savePlaybackState()\n      playCurrent()\n    } else if (repeatQueue && currentQueueSize() > 0) {\n      queueIndex = 0\n      savePlaybackState()\n      playCurrent()\n    } else {\n      state = "error"\n      publishSnapshot()\n      updateNotification()\n    }\n  }\n\n  private fun pausePlayback() {\n    player?.let {\n''',
+              'stream retry helper')
+
+          p = Path(service)
+          text = p.read_text(encoding='utf-8')
+          if 'private fun savePlaybackState()' not in text:
+              old = '  private fun releasePlayer() {\n'
+              new = '''  private fun savePlaybackState() {\n    if (!rangeActive) return\n    val position = runCatching { player?.currentPosition ?: resumePositionMs }.getOrDefault(resumePositionMs)\n    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit()\n      .putBoolean("rangeActive", true)\n      .putInt("rangeStart", rangeStartAbsolute)\n      .putInt("rangeEnd", rangeEndAbsolute)\n      .putString("reciterBase", rangeReciterBase)\n      .putString("reciterName", rangeReciterName)\n      .putInt("queueIndex", queueIndex)\n      .putBoolean("repeat", repeatQueue)\n      .putFloat("speed", speed)\n      .putString("state", state)\n      .putInt("positionMs", position.coerceAtLeast(0))\n      .apply()\n  }\n\n  private fun restorePlaybackState(): Boolean {\n    val prefs = getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)\n    if (!prefs.getBoolean("rangeActive", false)) return false\n    val savedState = prefs.getString("state", "idle") ?: "idle"\n    if (savedState !in setOf("playing", "loading")) return false\n    rangeStartAbsolute = prefs.getInt("rangeStart", 1).coerceAtLeast(1)\n    rangeEndAbsolute = prefs.getInt("rangeEnd", rangeStartAbsolute).coerceAtLeast(rangeStartAbsolute)\n    rangeReciterBase = prefs.getString("reciterBase", "").orEmpty().trimEnd('/')\n    rangeReciterName = prefs.getString("reciterName", "Hassoun").orEmpty().ifBlank { "Hassoun" }\n    queueIndex = prefs.getInt("queueIndex", 0).coerceIn(0, (rangeEndAbsolute - rangeStartAbsolute).coerceAtLeast(0))\n    repeatQueue = prefs.getBoolean("repeat", false)\n    speed = prefs.getFloat("speed", 1.0f).coerceIn(0.5f, 2.0f)\n    resumePositionMs = prefs.getInt("positionMs", 0).coerceAtLeast(0)\n    retryCount = 0\n    rangeActive = rangeReciterBase.isNotBlank()\n    state = "loading"\n    return rangeActive\n  }\n\n  private fun clearSavedPlayback() {\n    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit().clear().apply()\n  }\n\n  private fun releasePlayer() {\n'''
+              if old not in text: raise SystemExit('Missing patch target: recovery helpers')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          p = Path(service)
+          text = p.read_text(encoding='utf-8')
+          if 'PLAYBACK_PREFS = "hassoun-quran-playback-v2"' not in text:
+              old = '    private const val CHANNEL_ID = "hassoun-quran-audio"\n    private const val NOTIFICATION_ID = 4821\n'
+              new = '    private const val CHANNEL_ID = "hassoun-quran-audio"\n    private const val NOTIFICATION_ID = 4821\n    private const val PLAYBACK_PREFS = "hassoun-quran-playback-v2"\n    private const val MAX_STREAM_RETRIES = 3\n'
+              if old not in text: raise SystemExit('Missing patch target: recovery constants')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Make stop clear saved range state so a user-initiated Stop never restarts later.
+          p = Path(service)
+          text = p.read_text(encoding='utf-8')
+          if 'clearSavedPlayback()\n    publishSnapshot()' not in text:
+              old = '    rangeReciterName = "Hassoun"\n    state = "idle"\n    publishSnapshot()\n'
+              new = '    rangeReciterName = "Hassoun"\n    retryCount = 0\n    resumePositionMs = 0\n    state = "idle"\n    clearSavedPlayback()\n    publishSnapshot()\n'
+              if old not in text: raise SystemExit('Missing patch target: stop recovery cleanup')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Always enable vertical page browsing whenever the reader opens from any entry point.
+          p = Path(quran)
+          text = p.read_text(encoding='utf-8')
+          if 'browseMode: "vertical"' not in text[text.find('const { appearance'):text.find('const surahs = allSurahs();')+30]:
+              old = '  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n  const surahs = allSurahs();\n'
+              new = '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n\n  useEffect(() => {\n    if (screen === "reader" && appearance.browseMode !== "vertical") {\n      setAppearance((current) => ({ ...current, browseMode: "vertical" }));\n    }\n  }, [screen, appearance.browseMode]);\n\n  const surahs = allSurahs();\n'''
+              if old not in text: raise SystemExit('Missing patch target: reader vertical mode')
+              text = text.replace(old, new, 1)
+          text = text.replace('    if (Math.abs(dy) < 48) return;\n', '    if (Math.abs(dy) < 24) return;\n', 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt mobile/src/quran/QuranV3.tsx
+          git commit -m "Fix Qur’an radio recovery and continuous reader scrolling v0.6.16" || true
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
+
+      - name: Confirm required widget and runtime files exist
         id: sourcecheck
         run: |
           set -euo pipefail
           test -s mobile/modules/hassoun-widget/android/src/main/AndroidManifest.xml
           test -s mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          test -s mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounVariantWidgetProviders.kt
-          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_prayer_widget_info.xml
-          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_square_widget_info.xml
-          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_vertical_widget_info.xml
-          test -s mobile/modules/hassoun-widget/android/src/main/res/xml/hassoun_slim_widget_info.xml
+          test -s mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+          grep -q 'MAX_STREAM_RETRIES = 3' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+          grep -q 'browseMode: "vertical"' mobile/src/quran/QuranV3.tsx
+          grep -q 'android.permission.USE_EXACT_ALARM' mobile/app.config.ts
           test -s mobile/assets/icon.png
 
       - name: Setup Node 22
@@ -107,20 +217,20 @@ jobs:
           set -euo pipefail
           APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          unzip -l "$APK" > /tmp/v067-apk.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v067-apk.txt
-          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
+          unzip -l "$APK" > /tmp/v016-apk.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v016-apk.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
 
-      - name: Upload v0.6.7 APK
+      - name: Upload v0.6.16 APK
         id: uploadapk
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.6.7-four-widget-sizes-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.7.apk
+          name: hassoun-v0.6.16-runtime-stability-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Record v0.6.7 build result
+      - name: Record v0.6.16 build result
         if: always()
         shell: bash
         run: |
@@ -136,11 +246,11 @@ jobs:
           apk_upload=${{ steps.uploadapk.outcome }}
           run_id=${{ github.run_id }}
           run_number=${{ github.run_number }}
-          artifact=hassoun-v0.6.7-four-widget-sizes-${{ github.run_number }}
+          artifact=hassoun-v0.6.16-runtime-stability-${{ github.run_number }}
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/v067-build-result.txt
-          git commit -m "Record Hassoun v0.6.7 build result" || true
+          git commit -m "Record Hassoun v0.6.16 build result" || true
           git pull --rebase origin main || true
           git push origin HEAD:main || true
