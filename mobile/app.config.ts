@@ -1,5 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
+const appFunctionality = ["NSPrivacyCollectedDataTypePurposeAppFunctionality"];
+
 const config: ExpoConfig = {
   name: "Hassoun",
   slug: "wopt",
@@ -15,10 +17,64 @@ const config: ExpoConfig = {
     buildNumber: "1",
     infoPlist: {
       UIBackgroundModes: ["remote-notification", "audio"],
-      NSLocationWhenInUseUsageDescription: "Hassoun uses your location only when you choose location-based prayer features, so it can determine the appropriate local prayer time zone and location.",
+      NSLocationWhenInUseUsageDescription: "Hassoun uses your location only when you choose location-based prayer email alerts, so it can determine the appropriate local prayer time zone.",
       NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you start Qur’an recitation practice.",
       NSSpeechRecognitionUsageDescription: "Hassoun uses speech recognition only during Qur’an recitation practice to compare your recitation with the selected verses.",
       ITSAppUsesNonExemptEncryption: false
+    },
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyAccessedAPITypes: [
+        {
+          NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults",
+          NSPrivacyAccessedAPITypeReasons: ["CA92.1"]
+        }
+      ],
+      NSPrivacyCollectedDataTypes: [
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeName",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeEmailAddress",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePreciseLocation",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeDeviceID",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeCustomerSupport",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeAudioData",
+          NSPrivacyCollectedDataTypeLinked: false,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeGameplayContent",
+          NSPrivacyCollectedDataTypeLinked: false,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: appFunctionality
+        }
+      ]
     }
   },
   android: {
