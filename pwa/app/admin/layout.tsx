@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <>
       {children}
       <nav
-        aria-label="Admin CMS navigation"
+        aria-label="Admin CRM navigation"
         style={{
           position: "fixed",
           left: 14,
@@ -22,12 +22,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           background: "rgba(255,255,255,.96)",
           border: "1px solid #cedbd6",
           boxShadow: "0 10px 30px rgba(17,61,49,.14)",
-          fontFamily: "system-ui,-apple-system,sans-serif"
+          fontFamily: "system-ui,-apple-system,sans-serif",
+          flexWrap: "wrap"
         }}
       >
-        <a href={`${basePath}/admin/`} style={linkStyle}>Dashboard</a>
-        <a href={`${basePath}/admin/email/`} style={linkStyle}>Email campaigns</a>
-        <a href={`${basePath}/admin/reset/`} style={linkStyle}>Password recovery</a>
+        <a href={`${basePath}/admin/`} style={linkStyle}>CRM</a>
+        <a href={`${basePath}/admin/email/`} style={linkStyle}>Email</a>
+        <a href={`${basePath}/admin/team/`} style={linkStyle}>Admin Team</a>
+        <a href={`${basePath}/admin/reset/`} style={linkStyle}>Password</a>
       </nav>
     </>
   );
