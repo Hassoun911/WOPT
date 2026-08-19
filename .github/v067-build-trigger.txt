@@ -1,2 +1,2 @@
-trigger=2026-08-19T01:54:30Z
-reason=v0.6.9-premium-native-widget-layouts
+trigger=2026-08-19T02:31:00Z
+reason=v0.6.9-premium-light-dark-layout-rebuild
