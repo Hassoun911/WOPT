@@ -4,38 +4,18 @@
   android:layout_height="match_parent"
   android:orientation="horizontal"
   android:gravity="center_vertical"
-  android:paddingLeft="14dp"
-  android:paddingRight="14dp"
-  android:background="@drawable/hassoun_widget_bg_ivory">
+  android:paddingLeft="12dp"
+  android:paddingRight="12dp"
+  android:background="#FFF8EA">
 
-  <ImageView
-    android:layout_width="36dp"
-    android:layout_height="36dp"
-    android:src="@drawable/hassoun_widget_logo"
-    android:contentDescription="Hassoun" />
-
-  <LinearLayout
+  <TextView
     android:layout_width="0dp"
     android:layout_height="wrap_content"
     android:layout_weight="1"
-    android:orientation="vertical"
-    android:layout_marginLeft="9dp">
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="HASSOUN"
-      android:textColor="#184A3C"
-      android:textStyle="bold"
-      android:textSize="14sp" />
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="PRAYER TIMES • WINDSOR"
-      android:textColor="#9A6F3C"
-      android:textSize="8sp" />
-  </LinearLayout>
+    android:text="HASSOUN  •  PRAYER TIMES"
+    android:textColor="#184A3C"
+    android:textStyle="bold"
+    android:textSize="12sp" />
 
   <TextView
     android:layout_width="wrap_content"
@@ -43,5 +23,5 @@
     android:text="--:--"
     android:textColor="#184A3C"
     android:textStyle="bold"
-    android:textSize="20sp" />
+    android:textSize="16sp" />
 </LinearLayout>
