@@ -1,343 +1,645 @@
 from pathlib import Path
-import re
 from textwrap import dedent
 
 ROOT = Path(__file__).resolve().parents[2]
 ANDROID = ROOT / "mobile/modules/hassoun-widget/android/src/main"
-JAVA = ANDROID / "java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt"
-LAYOUT = ANDROID / "res/layout"
-DRAWABLE = ANDROID / "res/drawable"
+JAVA_DIR = ANDROID / "java/ca/wopt/hassounwidget"
+RES = ANDROID / "res"
+LAYOUT = RES / "layout"
+PROVIDER = JAVA_DIR / "HassounPrayerWidgetProvider.kt"
+RENDERER = JAVA_DIR / "HassounWidgetBitmapRenderer.kt"
 
 
-def write(path: Path, content: str):
-    path.write_text(dedent(content).lstrip(), encoding="utf-8")
-
-
-def must_replace(text: str, old: str, new: str) -> str:
-    if old not in text:
-        raise RuntimeError(f"Expected source block not found:\n{old[:180]}")
-    return text.replace(old, new, 1)
+def write(path: Path, text: str):
+    path.write_text(dedent(text).lstrip(), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
-# 1) Provider: stop treating time + suffix + Arabic + English as one blob.
+# Premium bitmap renderer. Android RemoteViews is used only as the host;
+# all typography/cards/icons are drawn as one controlled canvas so Samsung's
+# launcher cannot reflow the mockup into ugly wrapped TextViews.
 # ---------------------------------------------------------------------------
-provider = JAVA.read_text(encoding="utf-8")
-provider = must_replace(
-    provider,
-    '    private val prayerSymbols = mapOf("fajr" to "☼", "dhuhr" to "☀", "asr" to "☀", "maghrib" to "☾", "isha" to "☾")',
-    '''    private val prayerIcons = mapOf(
-      "fajr" to R.drawable.ic_widget_fajr,
-      "dhuhr" to R.drawable.ic_widget_dhuhr,
-      "asr" to R.drawable.ic_widget_asr,
-      "maghrib" to R.drawable.ic_widget_maghrib,
-      "isha" to R.drawable.ic_widget_isha
-    )'''
-)
-provider = must_replace(
-    provider,
-    '        views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))',
-    '''        if (isLockScreen) {
-          views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
-        } else {
-          views.setTextViewText(R.id.widget_next_time, formatClockMain(next.timeText))
-          views.setTextViewText(R.id.widget_next_suffix, formatClockSuffix(next.timeText))
-        }'''
-)
-provider = must_replace(
-    provider,
-    '        views.setTextViewText(R.id.widget_next_time, "")\n        views.setViewVisibility(R.id.widget_countdown, View.GONE)',
-    '        views.setTextViewText(R.id.widget_next_time, "")\n        if (!isLockScreen) views.setTextViewText(R.id.widget_next_suffix, "")\n        views.setViewVisibility(R.id.widget_countdown, View.GONE)'
-)
-provider = must_replace(
-    provider,
-    '        views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)\n        views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)',
-    '''        views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
-        views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
-        if (!isLockScreen) {
-          val suffixSp = when (layout) {
-            "vertical" -> 9f
-            "square" -> 7.5f
-            "slim", "compact", "next" -> 6.5f
-            else -> 11f
-          }
-          views.setTextViewTextSize(R.id.widget_next_suffix, TypedValue.COMPLEX_UNIT_SP, suffixSp)
-        }'''
-)
-provider = provider.replace(
-    'R.id.widget_next_secondary, R.id.widget_next_time, R.id.widget_date,',
-    'R.id.widget_next_secondary, R.id.widget_next_time, R.id.widget_next_suffix, R.id.widget_date,',
-    1
+write(RENDERER, r'''
+package ca.wopt.hassounwidget
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+internal data class WidgetRenderPrayer(
+  val key: String,
+  val english: String,
+  val arabic: String,
+  val time: String,
+  val active: Boolean
 )
 
-new_bind = r'''    private fun bindPrayerStrip(
-      views: RemoteViews,
-      day: JSONObject,
-      locale: String,
-      nextKey: String,
-      lockScreen: Boolean,
-      theme: String,
-      showArabic: Boolean,
-      highlightNext: Boolean,
-      timeSize: String,
-      layout: String
-    ) {
-      val ids = listOf(R.id.widget_prayer_fajr, R.id.widget_prayer_dhuhr, R.id.widget_prayer_asr, R.id.widget_prayer_maghrib, R.id.widget_prayer_isha)
-      val baseText = if (theme == "ivory") Color.rgb(20, 72, 61) else Color.rgb(247, 241, 222)
-      val activeText = if (theme == "ivory") Color.rgb(13, 83, 66) else Color.rgb(239, 207, 132)
+internal data class WidgetRenderState(
+  val layout: String,
+  val dark: Boolean,
+  val showLogo: Boolean,
+  val showArabic: Boolean,
+  val showGregorian: Boolean,
+  val showHijri: Boolean,
+  val dateText: String,
+  val hijriText: String,
+  val nextPrayer: String,
+  val nextArabic: String,
+  val nextTime: String,
+  val nextSuffix: String,
+  val prayers: List<WidgetRenderPrayer>,
+  val textScale: Float
+)
 
-      prayerKeys.zip(ids).forEach { (key, id) ->
-        val name = englishNames[key] ?: key
-        val arabic = arabicNames[key] ?: ""
-        val time = formatClock(day.optString(key, "--:--"), locale)
-        val title = when (layout) {
-          "vertical" -> when {
-            locale == "ar" && showArabic -> "$arabic  •  $name\n$time"
-            locale == "ar" -> "$name\n$time"
-            showArabic -> "$name  •  $arabic\n$time"
-            else -> "$name\n$time"
-          }
-          "slim", "compact", "next" -> "$name\n$time"
-          "square" -> if (showArabic) "$name\n$arabic\n$time" else "$name\n$time"
-          else -> if (showArabic) "$name\n$arabic\n$time" else "$name\n$time"
-        }
-        views.setTextViewText(id, title)
-        val icon = prayerIcons[key] ?: 0
-        if (layout == "vertical") {
-          views.setTextViewCompoundDrawables(id, icon, 0, 0, 0)
-          views.setInt(id, "setCompoundDrawablePadding", 8)
-        } else {
-          views.setTextViewCompoundDrawables(id, 0, icon, 0, 0)
-          views.setInt(id, "setCompoundDrawablePadding", 3)
-        }
+internal object HassounWidgetBitmapRenderer {
+  private data class Palette(
+    val bg: Int,
+    val card: Int,
+    val activeCard: Int,
+    val text: Int,
+    val muted: Int,
+    val gold: Int,
+    val border: Int,
+    val activeBorder: Int,
+    val silhouette: Int
+  )
 
-        val active = highlightNext && key == nextKey
-        views.setTextColor(id, if (active) activeText else baseText)
-        val chipBackground = when {
-          active && theme == "ivory" -> R.drawable.hassoun_widget_prayer_chip_active_light
-          active -> R.drawable.hassoun_widget_prayer_chip_active_dark
-          theme == "ivory" -> R.drawable.hassoun_widget_prayer_chip_light
-          else -> R.drawable.hassoun_widget_prayer_chip_dark
+  fun render(context: Context, widthDp: Int, heightDp: Int, state: WidgetRenderState): Bitmap {
+    val w = widthDp.coerceIn(90, 420)
+    val h = heightDp.coerceIn(60, 460)
+    val maxPixels = 180000.0
+    val rawPixels = (w * h).toDouble().coerceAtLeast(1.0)
+    val scale = min(2.0, sqrt(maxPixels / rawPixels)).coerceAtLeast(1.0).toFloat()
+    val bitmap = Bitmap.createBitmap((w * scale).roundToInt(), (h * scale).roundToInt(), Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    canvas.scale(scale, scale)
+    val p = palette(state.dark)
+
+    when (state.layout) {
+      "vertical" -> drawVertical(context, canvas, w.toFloat(), h.toFloat(), state, p)
+      "square" -> drawSquare(context, canvas, w.toFloat(), h.toFloat(), state, p)
+      "slim" -> drawSlim(context, canvas, w.toFloat(), h.toFloat(), state, p)
+      else -> drawLarge(context, canvas, w.toFloat(), h.toFloat(), state, p)
+    }
+    return bitmap
+  }
+
+  private fun palette(dark: Boolean): Palette = if (dark) {
+    Palette(
+      bg = Color.rgb(8, 43, 38),
+      card = Color.rgb(14, 57, 50),
+      activeCard = Color.rgb(20, 75, 64),
+      text = Color.rgb(248, 242, 228),
+      muted = Color.rgb(210, 187, 130),
+      gold = Color.rgb(216, 180, 105),
+      border = Color.rgb(118, 91, 48),
+      activeBorder = Color.rgb(216, 180, 105),
+      silhouette = Color.argb(38, 226, 211, 167)
+    )
+  } else {
+    Palette(
+      bg = Color.rgb(251, 248, 239),
+      card = Color.rgb(255, 253, 248),
+      activeCard = Color.rgb(239, 245, 235),
+      text = Color.rgb(24, 74, 60),
+      muted = Color.rgb(145, 105, 56),
+      gold = Color.rgb(183, 139, 69),
+      border = Color.rgb(225, 213, 185),
+      activeBorder = Color.rgb(138, 164, 121),
+      silhouette = Color.argb(34, 105, 126, 105)
+    )
+  }
+
+  private fun baseCanvas(canvas: Canvas, w: Float, h: Float, p: Palette, radius: Float) {
+    val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(24, 0, 0, 0) }
+    canvas.drawRoundRect(RectF(2f, 3f, w - 2f, h - 1f), radius, radius, shadow)
+    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = p.bg }
+    canvas.drawRoundRect(RectF(1f, 1f, w - 1f, h - 2f), radius, radius, bg)
+    val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      style = Paint.Style.STROKE
+      strokeWidth = 1.2f
+      color = p.gold
+    }
+    canvas.drawRoundRect(RectF(1f, 1f, w - 1f, h - 2f), radius, radius, border)
+  }
+
+  private fun drawLarge(context: Context, c: Canvas, w: Float, h: Float, s: WidgetRenderState, p: Palette) {
+    baseCanvas(c, w, h, p, 18f)
+    val pad = 12f
+    val headerH = 36f
+    val bottomH = (h * 0.29f).coerceIn(52f, 66f)
+    val heroTop = headerH + 6f
+    val heroBottom = h - bottomH - 8f
+
+    drawBrand(context, c, pad, 7f, w, s, p, 32f, 13.5f, 5.5f)
+    drawDate(c, w - pad, 13f, s, p, 6.2f, 5.3f)
+    drawMosqueBackdrop(c, RectF(pad + 3f, heroTop + 10f, w - pad - 3f, heroBottom - 2f), p.silhouette)
+
+    val label = paintSans(p.gold, 7.2f * s.textScale, true)
+    c.drawText("NEXT PRAYER", pad + 5f, heroTop + 17f, label)
+
+    val namePaint = paintSerif(p.text, 34f * s.textScale, false)
+    fitText(namePaint, s.nextPrayer, w * 0.33f, 34f * s.textScale, 24f)
+    c.drawText(s.nextPrayer, pad + 5f, heroTop + 50f, namePaint)
+    if (s.showArabic && s.nextArabic.isNotBlank()) {
+      val ar = paintSans(p.muted, 9f * s.textScale, false)
+      c.drawText(s.nextArabic, pad + 5f, heroTop + 67f, ar)
+    }
+
+    val rightX = w - pad - 5f
+    val adhan = paintSans(p.gold, 6.8f, true).apply { textAlign = Paint.Align.RIGHT }
+    c.drawText("ADHAN", rightX, heroTop + 20f, adhan)
+    val suffixPaint = paintSerif(p.text, 10f * s.textScale, false).apply { textAlign = Paint.Align.RIGHT }
+    val suffixW = suffixPaint.measureText(s.nextSuffix)
+    val timePaint = paintSerif(p.text, 34f * s.textScale, false).apply { textAlign = Paint.Align.RIGHT }
+    fitText(timePaint, s.nextTime, w * 0.27f, 34f * s.textScale, 24f)
+    val timeBaseline = heroTop + 55f
+    c.drawText(s.nextSuffix, rightX, timeBaseline + 1f, suffixPaint)
+    c.drawText(s.nextTime, rightX - suffixW - 5f, timeBaseline, timePaint)
+
+    drawLargePrayerCards(c, w, h, bottomH, s, p)
+  }
+
+  private fun drawLargePrayerCards(c: Canvas, w: Float, h: Float, bottomH: Float, s: WidgetRenderState, p: Palette) {
+    val pad = 8f
+    val gap = 3f
+    val top = h - bottomH - 2f
+    val available = w - pad * 2 - gap * 4
+    val cardW = available / 5f
+    s.prayers.take(5).forEachIndexed { index, prayer ->
+      val left = pad + index * (cardW + gap)
+      val rect = RectF(left, top, left + cardW, h - 8f)
+      drawCard(c, rect, prayer.active, p, 12f)
+      val cx = rect.centerX()
+      drawPrayerIcon(c, prayer.key, cx, rect.top + 12f, 5.5f, if (prayer.active) p.activeBorder else p.gold, p.card)
+      val title = paintSans(p.text, 6.9f * s.textScale, true).apply { textAlign = Paint.Align.CENTER }
+      c.drawText(prayer.english, cx, rect.top + 27f, title)
+      if (s.showArabic) {
+        val ar = paintSans(p.text, 6.1f * s.textScale, false).apply { textAlign = Paint.Align.CENTER }
+        c.drawText(prayer.arabic, cx, rect.top + 38f, ar)
+      }
+      val tm = paintSans(p.text, 6.8f * s.textScale, true).apply { textAlign = Paint.Align.CENTER }
+      c.drawText(prayer.time, cx, rect.bottom - 8f, tm)
+    }
+  }
+
+  private fun drawVertical(context: Context, c: Canvas, w: Float, h: Float, s: WidgetRenderState, p: Palette) {
+    baseCanvas(c, w, h, p, 17f)
+    val pad = 8f
+    drawBrand(context, c, pad, 6f, w, s, p, 27f, 10.5f, 4.4f)
+    drawDate(c, w - pad, 11f, s, p, 5.1f, 4.4f)
+
+    val heroTop = 38f
+    val heroBottom = (h * 0.43f).coerceIn(135f, 165f)
+    drawMosqueBackdrop(c, RectF(pad, heroTop + 8f, w - pad, heroBottom), p.silhouette)
+    val label = paintSans(p.gold, 6.3f, true)
+    c.drawText("NEXT PRAYER", pad + 5f, heroTop + 14f, label)
+    val name = paintSerif(p.text, 29f * s.textScale, false)
+    fitText(name, s.nextPrayer, w - 2 * pad - 10f, 29f * s.textScale, 22f)
+    c.drawText(s.nextPrayer, pad + 5f, heroTop + 43f, name)
+    if (s.showArabic) {
+      val ar = paintSans(p.muted, 7.5f, false)
+      c.drawText(s.nextArabic, pad + 5f, heroTop + 57f, ar)
+    }
+
+    val right = w - pad - 6f
+    val adhan = paintSans(p.gold, 5.5f, true).apply { textAlign = Paint.Align.RIGHT }
+    c.drawText("ADHAN", right, heroTop + 78f, adhan)
+    val suffix = paintSerif(p.text, 7.5f, false).apply { textAlign = Paint.Align.RIGHT }
+    val sw = suffix.measureText(s.nextSuffix)
+    val time = paintSerif(p.text, 25f * s.textScale, false).apply { textAlign = Paint.Align.RIGHT }
+    fitText(time, s.nextTime, w * 0.43f, 25f * s.textScale, 19f)
+    val by = heroTop + 104f
+    c.drawText(s.nextSuffix, right, by, suffix)
+    c.drawText(s.nextTime, right - sw - 3f, by, time)
+
+    val rowsTop = heroBottom + 6f
+    val gap = 4f
+    val rowH = ((h - rowsTop - 8f - gap * 4) / 5f).coerceAtLeast(31f)
+    s.prayers.take(5).forEachIndexed { i, prayer ->
+      val top = rowsTop + i * (rowH + gap)
+      val rect = RectF(pad, top, w - pad, (top + rowH).coerceAtMost(h - 8f))
+      drawCard(c, rect, prayer.active, p, 11f)
+      drawPrayerIcon(c, prayer.key, rect.left + 14f, rect.centerY(), 5.8f, if (prayer.active) p.activeBorder else p.gold, p.card)
+      val title = paintSans(p.text, 8.6f * s.textScale, true)
+      c.drawText(prayer.english, rect.left + 26f, rect.centerY() - 2f, title)
+      if (s.showArabic) {
+        val ar = paintSans(p.text, 7f * s.textScale, false).apply { textAlign = Paint.Align.CENTER }
+        c.drawText(prayer.arabic, rect.centerX() + 10f, rect.centerY() + 2f, ar)
+      }
+      val tm = paintSans(p.text, 8.2f * s.textScale, true).apply { textAlign = Paint.Align.RIGHT }
+      c.drawText(prayer.time, rect.right - 8f, rect.centerY() + 3f, tm)
+    }
+  }
+
+  private fun drawSquare(context: Context, c: Canvas, w: Float, h: Float, s: WidgetRenderState, p: Palette) {
+    baseCanvas(c, w, h, p, 17f)
+    val pad = 8f
+    drawBrand(context, c, pad, 6f, w, s, p, 26f, 10.5f, 4.3f)
+    drawDecorativeMoon(c, w - 18f, 20f, p)
+    val label = paintSans(p.gold, 6f, true)
+    c.drawText("NEXT PRAYER", pad + 3f, 45f, label)
+    val name = paintSerif(p.text, 28f * s.textScale, false)
+    fitText(name, s.nextPrayer, w - 2 * pad, 28f * s.textScale, 21f)
+    c.drawText(s.nextPrayer, pad + 3f, 73f, name)
+    if (s.showArabic) c.drawText(s.nextArabic, pad + 3f, 86f, paintSans(p.muted, 7f, false))
+
+    val right = w - pad - 3f
+    c.drawText("ADHAN", right, 104f, paintSans(p.gold, 5.5f, true).apply { textAlign = Paint.Align.RIGHT })
+    val suffix = paintSerif(p.text, 7f, false).apply { textAlign = Paint.Align.RIGHT }
+    val sw = suffix.measureText(s.nextSuffix)
+    val time = paintSerif(p.text, 23f * s.textScale, false).apply { textAlign = Paint.Align.RIGHT }
+    fitText(time, s.nextTime, w * 0.42f, 23f * s.textScale, 18f)
+    c.drawText(s.nextSuffix, right, 128f, suffix)
+    c.drawText(s.nextTime, right - sw - 3f, 128f, time)
+
+    val cardsTop = h - 46f
+    val gap = 2f
+    val cardW = (w - 2 * pad - 4 * gap) / 5f
+    s.prayers.take(5).forEachIndexed { i, prayer ->
+      val l = pad + i * (cardW + gap)
+      val rect = RectF(l, cardsTop, l + cardW, h - 7f)
+      drawCard(c, rect, prayer.active, p, 8f)
+      val cx = rect.centerX()
+      drawPrayerIcon(c, prayer.key, cx, rect.top + 9f, 4f, if (prayer.active) p.activeBorder else p.gold, p.card)
+      val nm = paintSans(p.text, 4.8f, true).apply { textAlign = Paint.Align.CENTER }
+      c.drawText(prayer.english, cx, rect.top + 20f, nm)
+      val tm = paintSans(p.text, 4.7f, true).apply { textAlign = Paint.Align.CENTER }
+      c.drawText(prayer.time.substringBefore(" "), cx, rect.bottom - 5f, tm)
+    }
+  }
+
+  private fun drawSlim(context: Context, c: Canvas, w: Float, h: Float, s: WidgetRenderState, p: Palette) {
+    baseCanvas(c, w, h, p, 15f)
+    val pad = 7f
+    if (s.showLogo) drawLogo(context, c, pad, (h - 28f) / 2f, 28f)
+    val brandX = if (s.showLogo) 40f else pad
+    c.drawText("HASSOUN", brandX, h * 0.36f, paintSerif(p.text, 9f, true))
+    c.drawText("WINDSOR • CANADA", brandX, h * 0.53f, paintSans(p.muted, 3.8f, true))
+
+    val nextX = w * 0.27f
+    c.drawText("NEXT", nextX, h * 0.28f, paintSans(p.gold, 4.4f, true))
+    val name = paintSerif(p.text, 12f * s.textScale, false)
+    fitText(name, s.nextPrayer, w * 0.17f, 12f * s.textScale, 9f)
+    c.drawText(s.nextPrayer, nextX, h * 0.52f, name)
+    if (s.showArabic) c.drawText(s.nextArabic, nextX, h * 0.70f, paintSans(p.muted, 4.4f, false))
+
+    val timeX = w * 0.62f
+    c.drawText("ADHAN", timeX, h * 0.29f, paintSans(p.gold, 4.2f, true))
+    val tm = paintSerif(p.text, 15f * s.textScale, false)
+    c.drawText(s.nextTime, timeX, h * 0.57f, tm)
+    c.drawText(s.nextSuffix, timeX, h * 0.72f, paintSerif(p.text, 5.5f, false))
+
+    val stripLeft = w * 0.73f
+    val cardW = (w - stripLeft - 6f) / 5f
+    s.prayers.take(5).forEachIndexed { i, prayer ->
+      val rect = RectF(stripLeft + i * cardW, 9f, stripLeft + (i + 1) * cardW - 1f, h - 9f)
+      drawCard(c, rect, prayer.active, p, 6f)
+      val cx = rect.centerX()
+      drawPrayerIcon(c, prayer.key, cx, rect.top + 9f, 3.2f, if (prayer.active) p.activeBorder else p.gold, p.card)
+      c.drawText(prayer.english.take(3), cx, rect.top + 20f, paintSans(p.text, 3.6f, true).apply { textAlign = Paint.Align.CENTER })
+      c.drawText(prayer.time.substringBefore(" "), cx, rect.bottom - 5f, paintSans(p.text, 3.5f, true).apply { textAlign = Paint.Align.CENTER })
+    }
+  }
+
+  private fun drawBrand(context: Context, c: Canvas, x: Float, y: Float, w: Float, s: WidgetRenderState, p: Palette, logo: Float, brandSize: Float, subSize: Float) {
+    var tx = x
+    if (s.showLogo) {
+      drawLogo(context, c, x, y, logo)
+      tx += logo + 8f
+    }
+    c.drawText("HASSOUN", tx, y + brandSize + 1f, paintSerif(p.text, brandSize, true))
+    c.drawText("WINDSOR • CANADA", tx, y + brandSize + subSize + 6f, paintSans(p.gold, subSize, true))
+  }
+
+  private fun drawDate(c: Canvas, x: Float, y: Float, s: WidgetRenderState, p: Palette, dateSize: Float, hijriSize: Float) {
+    if (s.showGregorian && s.dateText.isNotBlank()) {
+      c.drawText(s.dateText, x, y + dateSize, paintSans(p.text, dateSize, true).apply { textAlign = Paint.Align.RIGHT })
+    }
+    if (s.showHijri && s.hijriText.isNotBlank()) {
+      c.drawText(s.hijriText, x, y + dateSize + hijriSize + 3f, paintSans(p.muted, hijriSize, false).apply { textAlign = Paint.Align.RIGHT })
+    }
+  }
+
+  private fun drawLogo(context: Context, c: Canvas, x: Float, y: Float, size: Float) {
+    try {
+      val d = context.getDrawable(R.drawable.hassoun_widget_logo) ?: return
+      d.setBounds(x.roundToInt(), y.roundToInt(), (x + size).roundToInt(), (y + size).roundToInt())
+      d.draw(c)
+    } catch (_: Exception) { }
+  }
+
+  private fun drawCard(c: Canvas, rect: RectF, active: Boolean, p: Palette, radius: Float) {
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (active) p.activeCard else p.card }
+    c.drawRoundRect(rect, radius, radius, fill)
+    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      style = Paint.Style.STROKE
+      strokeWidth = if (active) 1.4f else 0.9f
+      color = if (active) p.activeBorder else p.border
+    }
+    c.drawRoundRect(rect, radius, radius, line)
+  }
+
+  private fun drawMosqueBackdrop(c: Canvas, rect: RectF, color: Int) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+    val base = rect.bottom
+    val center = rect.centerX()
+    c.drawRect(rect.left + rect.width() * 0.18f, base - rect.height() * 0.13f, rect.right - rect.width() * 0.18f, base, paint)
+    c.drawCircle(center, base - rect.height() * 0.13f, rect.height() * 0.18f, paint)
+    c.drawRect(center - rect.width() * 0.04f, base - rect.height() * 0.43f, center + rect.width() * 0.04f, base, paint)
+    c.drawCircle(center, base - rect.height() * 0.43f, rect.width() * 0.045f, paint)
+    val minaretW = rect.width() * 0.035f
+    val leftM = rect.left + rect.width() * 0.24f
+    val rightM = rect.right - rect.width() * 0.24f
+    c.drawRect(leftM - minaretW, base - rect.height() * 0.46f, leftM + minaretW, base, paint)
+    c.drawRect(rightM - minaretW, base - rect.height() * 0.46f, rightM + minaretW, base, paint)
+    c.drawCircle(leftM, base - rect.height() * 0.46f, minaretW * 1.3f, paint)
+    c.drawCircle(rightM, base - rect.height() * 0.46f, minaretW * 1.3f, paint)
+  }
+
+  private fun drawDecorativeMoon(c: Canvas, cx: Float, cy: Float, p: Palette) {
+    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f; color = p.gold }
+    c.drawArc(RectF(cx - 7f, cy - 7f, cx + 7f, cy + 7f), -70f, 220f, false, stroke)
+  }
+
+  private fun drawPrayerIcon(c: Canvas, key: String, cx: Float, cy: Float, r: Float, color: Int, cardColor: Int) {
+    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.25f; strokeCap = Paint.Cap.ROUND; this.color = color }
+    when (key) {
+      "fajr" -> {
+        c.drawLine(cx - r * 1.6f, cy + r * 0.6f, cx + r * 1.6f, cy + r * 0.6f, line)
+        c.drawArc(RectF(cx - r, cy - r * 0.5f, cx + r, cy + r * 1.5f), 180f, 180f, false, line)
+        ray(c, cx, cy - r * 0.8f, r * 0.8f, -PI / 2, line)
+        ray(c, cx, cy, r * 1.05f, -2.55, line)
+        ray(c, cx, cy, r * 1.05f, -0.60, line)
+      }
+      "dhuhr" -> {
+        c.drawCircle(cx, cy, r * 0.72f, line)
+        for (i in 0 until 8) ray(c, cx, cy, r * 1.55f, i * PI / 4, line, r * 1.05f)
+      }
+      "asr" -> {
+        c.drawArc(RectF(cx - r * 0.8f, cy - r * 0.3f, cx + r * 0.8f, cy + r * 1.3f), 180f, 180f, false, line)
+        c.drawLine(cx - r * 1.5f, cy + r * 0.6f, cx + r * 1.5f, cy + r * 0.6f, line)
+        ray(c, cx, cy - r * 0.1f, r * 1.4f, -PI / 2, line, r * 0.9f)
+      }
+      "maghrib", "isha" -> {
+        c.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), -70f, 220f, false, line)
+        if (key == "isha") {
+          val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+          c.drawCircle(cx + r * 1.15f, cy - r * 0.95f, 1.1f, dot)
         }
-        views.setInt(id, "setBackgroundResource", chipBackground)
-        val stripSp = if (lockScreen) 9.5f else when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 8.4f; "medium" -> 9.2f; "xlarge" -> 10.4f; else -> 9.8f }
-          "square" -> when (timeSize) { "small" -> 5.0f; "medium" -> 5.6f; "xlarge" -> 6.6f; else -> 6.1f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 4.0f; "medium" -> 4.5f; "xlarge" -> 5.4f; else -> 5.0f }
-          else -> when (timeSize) { "small" -> 7.2f; "medium" -> 8.0f; "xlarge" -> 9.2f; else -> 8.6f }
-        }
-        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
       }
     }
-'''
-provider, n = re.subn(r'    private fun bindPrayerStrip\([\s\S]*?\n    private fun applyTheme', new_bind + '\n    private fun applyTheme', provider, count=1)
-if n != 1:
-    raise RuntimeError("Could not replace bindPrayerStrip")
+  }
 
-helpers = r'''    private fun formatClockMain(raw: String): String {
-      val parts = raw.split(":")
-      if (parts.size != 2) return raw
-      val hour24 = parts[0].toIntOrNull() ?: return raw
-      val minute = parts[1].toIntOrNull() ?: return raw
-      val hour = when (val h = hour24 % 12) { 0 -> 12; else -> h }
-      return String.format(Locale.US, "%d:%02d", hour, minute)
+  private fun ray(c: Canvas, cx: Float, cy: Float, outer: Float, angle: Double, p: Paint, inner: Float = outer * 0.65f) {
+    c.drawLine(
+      cx + (cos(angle) * inner).toFloat(), cy + (sin(angle) * inner).toFloat(),
+      cx + (cos(angle) * outer).toFloat(), cy + (sin(angle) * outer).toFloat(), p
+    )
+  }
+
+  private fun paintSans(color: Int, size: Float, bold: Boolean): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    this.color = color
+    textSize = size
+    typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
+  }
+
+  private fun paintSerif(color: Int, size: Float, bold: Boolean): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    this.color = color
+    textSize = size
+    typeface = Typeface.create("serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
+  }
+
+  private fun fitText(p: Paint, text: String, maxWidth: Float, maxSize: Float, minSize: Float) {
+    var size = maxSize
+    p.textSize = size
+    while (size > minSize && p.measureText(text) > maxWidth) {
+      size -= 1f
+      p.textSize = size
     }
-
-    private fun formatClockSuffix(raw: String): String {
-      val hour24 = raw.substringBefore(":").toIntOrNull() ?: return ""
-      return if (hour24 >= 12) "p.m." else "a.m."
-    }
-
-'''
-provider = provider.replace('    private fun formatClock(raw: String, locale: String): String {', helpers + '    private fun formatClock(raw: String, locale: String): String {', 1)
-JAVA.write_text(provider, encoding="utf-8")
-
-# ---------------------------------------------------------------------------
-# 2) Real vector icons instead of emoji glyphs.
-# ---------------------------------------------------------------------------
-icons = {
-"ic_widget_fajr.xml": '''
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="@android:color/transparent" android:strokeColor="#B88842" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M4,16L20,16M6,19L18,19M8,15a4,4 0,1 1,8,0M12,5L12,8M5.8,8.8L7.9,10.4M18.2,8.8L16.1,10.4" />
-</vector>''',
-"ic_widget_dhuhr.xml": '''
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="@android:color/transparent" android:strokeColor="#C79B43" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M12,7a5,5 0,1 0,0 10a5,5 0,1 0,0 -10M12,2L12,4M12,20L12,22M2,12L4,12M20,12L22,12M5,5L6.5,6.5M17.5,17.5L19,19M19,5L17.5,6.5M6.5,17.5L5,19" />
-</vector>''',
-"ic_widget_asr.xml": '''
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="@android:color/transparent" android:strokeColor="#C79B43" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M5,18L19,18M8,16a4,4 0,1 1,8,0M12,6L12,9M6.5,9L8,10.5M17.5,9L16,10.5" />
-</vector>''',
-"ic_widget_maghrib.xml": '''
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="#547B68" android:pathData="M19.5,15.2A8,8 0,1 1,8.8,4.3A6.6,6.6 0,0 0,19.5,15.2Z" />
-</vector>''',
-"ic_widget_isha.xml": '''
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="24" android:viewportHeight="24">
-  <path android:fillColor="#4C6670" android:pathData="M18.7,15.3A7.2,7.2 0,1 1,9,5.5A5.9,5.9 0,0 0,18.7,15.3Z" />
-  <path android:fillColor="#B88842" android:pathData="M18.8,4L19.4,5.6L21,6.2L19.4,6.8L18.8,8.4L18.2,6.8L16.6,6.2L18.2,5.6Z" />
-</vector>'''
+  }
 }
-for name, content in icons.items():
-    write(DRAWABLE / name, content)
-
-# ---------------------------------------------------------------------------
-# 3) Premium layouts. Every home-screen layout includes widget_next_suffix.
-# ---------------------------------------------------------------------------
-write(LAYOUT / "hassoun_prayer_widget.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-  android:id="@+id/widget_root"
-  android:layout_width="match_parent" android:layout_height="match_parent"
-  android:orientation="vertical" android:padding="10dp"
-  android:background="@drawable/hassoun_widget_bg">
-
-  <LinearLayout android:layout_width="match_parent" android:layout_height="42dp" android:orientation="horizontal" android:gravity="center_vertical">
-    <ImageView android:id="@+id/widget_logo" android:layout_width="38dp" android:layout_height="38dp" android:src="@drawable/hassoun_widget_logo" android:scaleType="fitCenter" android:contentDescription="Hassoun" />
-    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="9dp" android:orientation="vertical">
-      <TextView android:id="@+id/widget_header" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HASSOUN" android:fontFamily="serif" android:textStyle="bold" android:textSize="14sp" android:letterSpacing="0.11" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_brand_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textStyle="bold" android:textSize="6.2sp" android:letterSpacing="0.08" android:maxLines="1" android:includeFontPadding="false" />
-    </LinearLayout>
-    <LinearLayout android:layout_width="112dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
-      <TextView android:id="@+id/widget_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textStyle="bold" android:textSize="7sp" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_hijri" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textSize="6sp" android:maxLines="1" android:includeFontPadding="false" />
-    </LinearLayout>
-  </LinearLayout>
-
-  <FrameLayout android:id="@+id/widget_hero" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="5dp" android:layout_marginBottom="8dp" android:background="@drawable/hassoun_widget_hero_light">
-    <ImageView android:id="@+id/widget_hero_art" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="bottom" android:src="@drawable/hassoun_widget_mosque_silhouette_light" android:alpha="0.26" android:scaleType="fitCenter" android:contentDescription="" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="13dp" android:paddingRight="13dp">
-      <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.16" android:orientation="vertical" android:gravity="center_vertical">
-        <TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PRAYER" android:textStyle="bold" android:textSize="8.5sp" android:letterSpacing="0.09" android:maxLines="1" android:includeFontPadding="false" />
-        <TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="40sp" android:maxLines="1" android:includeFontPadding="false" />
-        <TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="10sp" android:maxLines="1" android:includeFontPadding="false" />
-      </LinearLayout>
-      <Chronometer android:id="@+id/widget_countdown" android:layout_width="82dp" android:layout_height="82dp" android:layout_marginHorizontal="10dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:padding="5dp" android:textStyle="bold" android:textSize="14sp" android:maxLines="2" android:includeFontPadding="false" />
-      <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.02" android:orientation="vertical" android:gravity="center_vertical|end">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="7.5sp" android:letterSpacing="0.08" android:includeFontPadding="false" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end|bottom" android:orientation="horizontal">
-          <TextView android:id="@+id/widget_next_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="38sp" android:maxLines="1" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="24sp" android:autoSizeMaxTextSize="38sp" android:autoSizeStepGranularity="1sp" />
-          <TextView android:id="@+id/widget_next_suffix" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:layout_marginBottom="5dp" android:fontFamily="serif" android:textSize="11sp" android:maxLines="1" android:includeFontPadding="false" />
-        </LinearLayout>
-      </LinearLayout>
-    </LinearLayout>
-  </FrameLayout>
-
-  <LinearLayout android:id="@+id/widget_prayer_strip" android:layout_width="match_parent" android:layout_height="78dp" android:orientation="horizontal">
-    <TextView android:id="@+id/widget_prayer_fajr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_asr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_isha" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-  </LinearLayout>
-  <TextView android:id="@+id/widget_location" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" android:textSize="1sp" />
-</LinearLayout>
 ''')
 
-write(LAYOUT / "hassoun_prayer_widget_vertical.xml", '''
+# ---------------------------------------------------------------------------
+# Home widget hosts: image canvas + native live Chronometer only.
+# ---------------------------------------------------------------------------
+layouts = {
+"hassoun_prayer_widget.xml": r'''
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
   android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
-  android:orientation="vertical" android:padding="8dp" android:background="@drawable/hassoun_widget_bg">
-  <LinearLayout android:layout_width="match_parent" android:layout_height="34dp" android:orientation="horizontal" android:gravity="center_vertical">
-    <ImageView android:id="@+id/widget_logo" android:layout_width="30dp" android:layout_height="30dp" android:src="@drawable/hassoun_widget_logo" android:scaleType="fitCenter" android:contentDescription="Hassoun" />
-    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical">
-      <TextView android:id="@+id/widget_header" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HASSOUN" android:fontFamily="serif" android:textStyle="bold" android:textSize="10.5sp" android:letterSpacing="0.07" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_brand_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textStyle="bold" android:textSize="4.8sp" android:maxLines="1" android:includeFontPadding="false" />
+  android:background="@drawable/hassoun_widget_bg_ivory">
+  <ImageView android:id="@+id/widget_canvas" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:contentDescription="Hassoun Prayer Times" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.42" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="76dp" android:orientation="horizontal" android:gravity="center_vertical">
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1.05" />
+      <Chronometer android:id="@+id/widget_countdown" android:layout_width="76dp" android:layout_height="76dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textColor="#184A3C" android:textStyle="bold" android:textSize="12sp" android:maxLines="2" android:includeFontPadding="false" />
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="0.95" />
     </LinearLayout>
-    <LinearLayout android:layout_width="88dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
-      <TextView android:id="@+id/widget_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textStyle="bold" android:textSize="5.5sp" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_hijri" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textSize="4.8sp" android:maxLines="1" android:includeFontPadding="false" />
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.58" />
+  </LinearLayout>
+</FrameLayout>
+''',
+"hassoun_prayer_widget_vertical.xml": r'''
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+  android:background="@drawable/hassoun_widget_bg_ivory">
+  <ImageView android:id="@+id/widget_canvas" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:contentDescription="Hassoun Prayer Times" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.28" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="60dp" android:orientation="horizontal" android:gravity="center_vertical">
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="0.20" />
+      <Chronometer android:id="@+id/widget_countdown" android:layout_width="60dp" android:layout_height="60dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textColor="#184A3C" android:textStyle="bold" android:textSize="10sp" android:maxLines="2" android:includeFontPadding="false" />
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="0.80" />
     </LinearLayout>
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.72" />
   </LinearLayout>
-
-  <FrameLayout android:id="@+id/widget_hero" android:layout_width="match_parent" android:layout_height="145dp" android:layout_marginTop="4dp" android:layout_marginBottom="7dp" android:background="@drawable/hassoun_widget_hero_light">
-    <ImageView android:id="@+id/widget_hero_art" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hassoun_widget_mosque_silhouette_light" android:alpha="0.22" android:scaleType="fitCenter" android:contentDescription="" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="10dp">
-      <TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PRAYER" android:textStyle="bold" android:textSize="7sp" android:letterSpacing="0.06" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="34sp" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:maxLines="1" android:includeFontPadding="false" />
-      <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical">
-        <Chronometer android:id="@+id/widget_countdown" android:layout_width="62dp" android:layout_height="62dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:padding="3dp" android:textStyle="bold" android:textSize="12sp" android:maxLines="2" android:includeFontPadding="false" />
-        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
-          <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="5.8sp" android:letterSpacing="0.05" android:includeFontPadding="false" />
-          <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="bottom|end" android:orientation="horizontal">
-            <TextView android:id="@+id/widget_next_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="28sp" android:maxLines="1" android:includeFontPadding="false" />
-            <TextView android:id="@+id/widget_next_suffix" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="3dp" android:layout_marginBottom="4dp" android:fontFamily="serif" android:textSize="9sp" android:maxLines="1" android:includeFontPadding="false" />
-          </LinearLayout>
-        </LinearLayout>
-      </LinearLayout>
+</FrameLayout>
+''',
+"hassoun_prayer_widget_square.xml": r'''
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+  android:background="@drawable/hassoun_widget_bg_ivory">
+  <ImageView android:id="@+id/widget_canvas" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:contentDescription="Hassoun Prayer Times" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.58" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="58dp" android:orientation="horizontal" android:gravity="center_vertical">
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="0.20" />
+      <Chronometer android:id="@+id/widget_countdown" android:layout_width="58dp" android:layout_height="58dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textColor="#184A3C" android:textStyle="bold" android:textSize="9.5sp" android:maxLines="2" android:includeFontPadding="false" />
+      <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="0.80" />
     </LinearLayout>
-  </FrameLayout>
-
-  <LinearLayout android:id="@+id/widget_prayer_strip" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical">
-    <TextView android:id="@+id/widget_prayer_fajr" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:textDirection="ltr" android:paddingLeft="10dp" android:paddingRight="10dp" android:textStyle="bold" android:maxLines="2" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp" android:gravity="center_vertical" android:textDirection="ltr" android:paddingLeft="10dp" android:paddingRight="10dp" android:textStyle="bold" android:maxLines="2" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_asr" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp" android:gravity="center_vertical" android:textDirection="ltr" android:paddingLeft="10dp" android:paddingRight="10dp" android:textStyle="bold" android:maxLines="2" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp" android:gravity="center_vertical" android:textDirection="ltr" android:paddingLeft="10dp" android:paddingRight="10dp" android:textStyle="bold" android:maxLines="2" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_isha" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp" android:gravity="center_vertical" android:textDirection="ltr" android:paddingLeft="10dp" android:paddingRight="10dp" android:textStyle="bold" android:maxLines="2" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="10sp" android:autoSizeStepGranularity="1sp" />
+    <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="0.42" />
   </LinearLayout>
-  <TextView android:id="@+id/widget_location" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" android:textSize="1sp" />
-</LinearLayout>
-''')
-
-write(LAYOUT / "hassoun_prayer_widget_square.xml", '''
+</FrameLayout>
+''',
+"hassoun_prayer_widget_slim.xml": r'''
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="7dp" android:background="@drawable/hassoun_widget_bg">
-  <LinearLayout android:layout_width="match_parent" android:layout_height="28dp" android:orientation="horizontal" android:gravity="center_vertical">
-    <ImageView android:id="@+id/widget_logo" android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/hassoun_widget_logo" android:contentDescription="Hassoun" />
-    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="5dp" android:orientation="vertical"><TextView android:id="@+id/widget_header" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HASSOUN" android:fontFamily="serif" android:textStyle="bold" android:textSize="9sp" android:letterSpacing="0.06" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_brand_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="4sp" android:maxLines="1" android:includeFontPadding="false" /></LinearLayout>
-    <TextView android:id="@+id/widget_date" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" /><TextView android:id="@+id/widget_hijri" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+  android:background="@drawable/hassoun_widget_bg_ivory">
+  <ImageView android:id="@+id/widget_canvas" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:contentDescription="Hassoun Prayer Times" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical">
+    <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1.0" />
+    <Chronometer android:id="@+id/widget_countdown" android:layout_width="46dp" android:layout_height="46dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textColor="#184A3C" android:textStyle="bold" android:textSize="8sp" android:maxLines="2" android:includeFontPadding="false" />
+    <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1.0" />
   </LinearLayout>
-  <FrameLayout android:id="@+id/widget_hero" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="3dp" android:layout_marginBottom="5dp" android:background="@drawable/hassoun_widget_hero_light">
-    <ImageView android:id="@+id/widget_hero_art" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hassoun_widget_mosque_silhouette_light" android:alpha="0.2" android:scaleType="fitCenter" android:contentDescription="" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="7dp"><TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PRAYER" android:textStyle="bold" android:textSize="5.8sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="27sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="6.5sp" android:maxLines="1" android:includeFontPadding="false" /><LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical"><Chronometer android:id="@+id/widget_countdown" android:layout_width="52dp" android:layout_height="52dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textStyle="bold" android:textSize="10.5sp" android:maxLines="2" android:includeFontPadding="false" /><View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" /><LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="5sp" /><LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="bottom|end"><TextView android:id="@+id/widget_next_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="24sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_next_suffix" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="2dp" android:layout_marginBottom="3dp" android:fontFamily="serif" android:textSize="7.5sp" android:maxLines="1" android:includeFontPadding="false" /></LinearLayout></LinearLayout></LinearLayout></LinearLayout>
-  </FrameLayout>
-  <LinearLayout android:id="@+id/widget_prayer_strip" android:layout_width="match_parent" android:layout_height="42dp" android:orientation="horizontal"><TextView android:id="@+id/widget_prayer_fajr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:maxLines="3" android:textStyle="bold" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="4sp" android:autoSizeMaxTextSize="6sp" android:autoSizeStepGranularity="1sp" /><TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:gravity="center" android:maxLines="3" android:textStyle="bold" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="4sp" android:autoSizeMaxTextSize="6sp" android:autoSizeStepGranularity="1sp" /><TextView android:id="@+id/widget_prayer_asr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:gravity="center" android:maxLines="3" android:textStyle="bold" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="4sp" android:autoSizeMaxTextSize="6sp" android:autoSizeStepGranularity="1sp" /><TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:gravity="center" android:maxLines="3" android:textStyle="bold" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="4sp" android:autoSizeMaxTextSize="6sp" android:autoSizeStepGranularity="1sp" /><TextView android:id="@+id/widget_prayer_isha" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="2dp" android:gravity="center" android:maxLines="3" android:textStyle="bold" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="4sp" android:autoSizeMaxTextSize="6sp" android:autoSizeStepGranularity="1sp" /></LinearLayout>
-  <TextView android:id="@+id/widget_location" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" android:textSize="1sp" />
-</LinearLayout>
-''')
+</FrameLayout>
+'''
+}
+for name, body in layouts.items():
+    write(LAYOUT / name, body)
 
-write(LAYOUT / "hassoun_prayer_widget_slim.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:padding="6dp" android:gravity="center_vertical" android:background="@drawable/hassoun_widget_bg">
-  <FrameLayout android:id="@+id/widget_hero" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.45" android:background="@drawable/hassoun_widget_hero_light"><ImageView android:id="@+id/widget_hero_art" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/hassoun_widget_mosque_silhouette_light" android:alpha="0.14" android:scaleType="fitCenter" android:contentDescription="" /><LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:padding="5dp"><ImageView android:id="@+id/widget_logo" android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/hassoun_widget_logo" android:contentDescription="Hassoun" /><LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="5dp" android:orientation="vertical"><TextView android:id="@+id/widget_header" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HASSOUN" android:fontFamily="serif" android:textStyle="bold" android:textSize="7sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_brand_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="3.5sp" android:maxLines="1" android:includeFontPadding="false" /></LinearLayout><LinearLayout android:layout_width="70dp" android:layout_height="wrap_content" android:orientation="vertical"><TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT" android:textStyle="bold" android:textSize="4.5sp" /><TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="17sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="4.5sp" android:maxLines="1" android:includeFontPadding="false" /></LinearLayout><Chronometer android:id="@+id/widget_countdown" android:layout_width="44dp" android:layout_height="44dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:textStyle="bold" android:textSize="8.5sp" android:maxLines="2" android:includeFontPadding="false" /><LinearLayout android:layout_width="74dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="4sp" /><LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="bottom|end"><TextView android:id="@+id/widget_next_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="18sp" android:maxLines="1" android:includeFontPadding="false" /><TextView android:id="@+id/widget_next_suffix" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="2dp" android:layout_marginBottom="2dp" android:fontFamily="serif" android:textSize="6sp" android:maxLines="1" android:includeFontPadding="false" /></LinearLayout></LinearLayout><TextView android:id="@+id/widget_date" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" /><TextView android:id="@+id/widget_hijri" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" /></LinearLayout></FrameLayout>
-  <LinearLayout android:id="@+id/widget_prayer_strip" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.95" android:layout_marginStart="5dp" android:orientation="horizontal"><TextView android:id="@+id/widget_prayer_fajr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:maxLines="2" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="3.5sp" android:autoSizeMaxTextSize="5sp" android:autoSizeStepGranularity="0.5sp" /><TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="1dp" android:gravity="center" android:maxLines="2" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="3.5sp" android:autoSizeMaxTextSize="5sp" android:autoSizeStepGranularity="0.5sp" /><TextView android:id="@+id/widget_prayer_asr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="1dp" android:gravity="center" android:maxLines="2" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="3.5sp" android:autoSizeMaxTextSize="5sp" android:autoSizeStepGranularity="0.5sp" /><TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="1dp" android:gravity="center" android:maxLines="2" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="3.5sp" android:autoSizeMaxTextSize="5sp" android:autoSizeStepGranularity="0.5sp" /><TextView android:id="@+id/widget_prayer_isha" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="1dp" android:gravity="center" android:maxLines="2" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="3.5sp" android:autoSizeMaxTextSize="5sp" android:autoSizeStepGranularity="0.5sp" /></LinearLayout>
-  <TextView android:id="@+id/widget_location" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" android:textSize="1sp" />
-</LinearLayout>
-''')
+# ---------------------------------------------------------------------------
+# Provider: route home-screen widgets through the bitmap renderer. Lock screen
+# keeps the existing RemoteViews path. Also clean malformed multiline strings
+# left by the previous attempt so Kotlin still compiles.
+# ---------------------------------------------------------------------------
+provider = PROVIDER.read_text(encoding="utf-8")
+provider = provider.replace('"$arabic  •  $name\n$time"', '"$arabic  •  $name\\n$time"')
+provider = provider.replace('"$name  •  $arabic\n$time"', '"$name  •  $arabic\\n$time"')
+provider = provider.replace('"$name\n$arabic\n$time"', '"$name\\n$arabic\\n$time"')
+provider = provider.replace('"$name\n$time"', '"$name\\n$time"')
 
-# Softer surfaces: the concept board has blended panels, not outlined nested boxes.
-write(DRAWABLE / "hassoun_widget_hero_light.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-  <gradient android:angle="0" android:startColor="#00FFFDF8" android:centerColor="#36F8F2E4" android:endColor="#00EEF3E7" />
-  <corners android:radius="20dp" />
-</shape>
-''')
-write(DRAWABLE / "hassoun_widget_hero_dark.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-  <gradient android:angle="0" android:startColor="#00123F36" android:centerColor="#4A153F36" android:endColor="#00071F1D" />
-  <corners android:radius="20dp" />
-</shape>
-''')
-write(DRAWABLE / "hassoun_widget_prayer_chip_light.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-  <solid android:color="#FDFBF6" />
-  <stroke android:width="1dp" android:color="#E6D9BE" />
-  <corners android:radius="14dp" />
-</shape>
-''')
-write(DRAWABLE / "hassoun_widget_prayer_chip_active_light.xml", '''
-<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-  <solid android:color="#F1F6EF" />
-  <stroke android:width="1.5dp" android:color="#8CA77C" />
-  <corners android:radius="14dp" />
-</shape>
-''')
+lock_marker = '''      val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0\n'''
+route = '''      val isLockScreen = forceLockScreen || (hostCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD) != 0\n      if (!isLockScreen) {\n        updateRenderedHomeWidget(context, manager, appWidgetId)\n        return\n      }\n'''
+if 'updateRenderedHomeWidget(context, manager, appWidgetId)' not in provider:
+    if lock_marker not in provider:
+        raise RuntimeError("Could not find lock-screen route marker")
+    provider = provider.replace(lock_marker, route, 1)
 
-print("Applied premium widget structure v0.6.11")
+method = r'''
+    private fun updateRenderedHomeWidget(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
+      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
+      val info = manager.getAppWidgetInfo(appWidgetId)
+      val className = info?.provider?.className.orEmpty()
+      val layout = when {
+        className.endsWith("HassounVerticalWidgetProvider") -> "vertical"
+        className.endsWith("HassounSquareWidgetProvider") -> "square"
+        className.endsWith("HassounSlimWidgetProvider") -> "slim"
+        else -> "full"
+      }
+      val layoutRes = when (layout) {
+        "vertical" -> R.layout.hassoun_prayer_widget_vertical
+        "square" -> R.layout.hassoun_prayer_widget_square
+        "slim" -> R.layout.hassoun_prayer_widget_slim
+        else -> R.layout.hassoun_prayer_widget
+      }
+      val options = manager.getAppWidgetOptions(appWidgetId)
+      val fallback = when (layout) {
+        "vertical" -> 165 to 330
+        "square" -> 180 to 180
+        "slim" -> 320 to 90
+        else -> 320 to 180
+      }
+      val widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).takeIf { it > 0 } ?: fallback.first
+      val heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0).takeIf { it > 0 } ?: fallback.second
+
+      val appearance = prefs.getString("appearance", "auto") ?: "auto"
+      val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+      val dark = when (appearance) {
+        "light" -> false
+        "dark" -> true
+        else -> systemDark
+      }
+      val locale = prefs.getString("locale", "en") ?: "en"
+      val showLogo = prefs.getBoolean("showLogo", true)
+      val showArabic = prefs.getBoolean("showArabicNames", true)
+      val showGregorian = prefs.getBoolean("showGregorian", true)
+      val showHijri = prefs.getBoolean("showHijri", true)
+      val highlightNext = prefs.getBoolean("highlightNext", true)
+      val showCountdown = prefs.getBoolean("showCountdown", true)
+      val timeSize = prefs.getString("timeSize", "large") ?: "large"
+      val textScale = when (timeSize) {
+        "small" -> 0.88f
+        "medium" -> 0.95f
+        "xlarge" -> 1.10f
+        else -> 1.0f
+      }
+
+      val next = loadSchedule(context)?.let { findNextPrayer(it, locale) }
+      val now = Date()
+      val prayerData = if (next == null) emptyList() else prayerKeys.map { key ->
+        WidgetRenderPrayer(
+          key = key,
+          english = englishNames[key] ?: key,
+          arabic = arabicNames[key] ?: "",
+          time = formatClock(next.day.optString(key, "--:--"), locale),
+          active = highlightNext && key == next.key
+        )
+      }
+      val englishNext = if (next == null) "Open Hassoun" else englishNames[next.key] ?: next.key
+      val arabicNext = if (next == null) "" else arabicNames[next.key] ?: ""
+      val mainName = if (locale == "ar" && next != null) arabicNext else englishNext
+      val secondary = if (locale == "ar" && next != null) englishNext else arabicNext
+      val state = WidgetRenderState(
+        layout = layout,
+        dark = dark,
+        showLogo = showLogo,
+        showArabic = showArabic,
+        showGregorian = showGregorian,
+        showHijri = showHijri,
+        dateText = if (showGregorian) gregorianLabel(now, locale) else "",
+        hijriText = if (showHijri) hijriLabel(now, locale) else "",
+        nextPrayer = mainName,
+        nextArabic = if (showArabic) secondary else "",
+        nextTime = if (next == null) "--:--" else formatClockMain(next.timeText),
+        nextSuffix = if (next == null) "" else formatClockSuffix(next.timeText),
+        prayers = prayerData,
+        textScale = textScale
+      )
+
+      val views = RemoteViews(context.packageName, layoutRes)
+      bindLaunchIntent(context, views)
+      val bitmap = HassounWidgetBitmapRenderer.render(context, widthDp, heightDp, state)
+      views.setImageViewBitmap(R.id.widget_canvas, bitmap)
+
+      if (next != null && showCountdown) {
+        val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
+        views.setChronometer(R.id.widget_countdown, SystemClock.elapsedRealtime() + delay, "%s\nLEFT", true)
+        views.setInt(
+          R.id.widget_countdown,
+          "setBackgroundResource",
+          if (dark) R.drawable.hassoun_widget_countdown_circle_dark else R.drawable.hassoun_widget_countdown_circle_light
+        )
+        views.setTextColor(R.id.widget_countdown, if (dark) Color.rgb(246, 222, 161) else Color.rgb(24, 74, 60))
+        val chronoSize = when (layout) {
+          "vertical" -> 9.5f
+          "square" -> 9f
+          "slim" -> 7.5f
+          else -> 11.5f
+        }
+        views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, chronoSize)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          views.setChronometerCountDown(R.id.widget_countdown, true)
+        }
+        scheduleNextRefresh(context, next.targetMillis + 15_000L)
+      } else {
+        views.setViewVisibility(R.id.widget_countdown, View.GONE)
+      }
+      manager.updateAppWidget(appWidgetId, views)
+    }
+
+'''
+if 'private fun updateRenderedHomeWidget(' not in provider:
+    marker = '    private fun bindPrayerStrip('
+    if marker not in provider:
+        raise RuntimeError("Could not find provider insertion marker")
+    provider = provider.replace(marker, method + marker, 1)
+
+PROVIDER.write_text(provider, encoding="utf-8")
+print("Applied premium canvas-rendered Hassoun widgets")
