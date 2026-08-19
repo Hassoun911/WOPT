@@ -3,10 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import IslamicQuiz from "./DailyIslamicQuiz";
 import MultiplayerGames, { type MultiplayerGameType } from "./MultiplayerGames";
 import BrandMark from "./BrandMark";
+import FeatureUnavailable from "./FeatureUnavailable";
+import { useRemoteControl } from "./remoteControlStore";
 import type { QuizLocale, QuizStats } from "./islamicQuiz";
 
 type Props = { locale: QuizLocale; dateKey: string; stats: QuizStats; onStatsChange: (stats: QuizStats) => void; onBackHome: () => void };
-
 type ViewMode = "hub" | "daily" | "multiplayer";
 
 const games: Array<{ id: MultiplayerGameType; icon: string; en: string; ar: string; noteEn: string; noteAr: string }> = [
@@ -18,23 +19,36 @@ const games: Array<{ id: MultiplayerGameType; icon: string; en: string; ar: stri
 export default function QuizGamesHub({ locale, dateKey, stats, onStatsChange, onBackHome }: Props) {
   const [mode, setMode] = useState<ViewMode>("hub");
   const [selectedGame, setSelectedGame] = useState<MultiplayerGameType | undefined>();
+  const control = useRemoteControl();
   const ar = locale === "ar";
   const t = (en: string, arabic: string) => ar ? arabic : en;
+  const dailyEnabled = control.features.quiz;
+  const multiplayerEnabled = control.features.multiplayerGames;
 
-  if (mode === "daily") return <IslamicQuiz locale={locale} dateKey={dateKey} stats={stats} onStatsChange={onStatsChange} onBackHome={() => setMode("hub")} />;
-  if (mode === "multiplayer") return <MultiplayerGames locale={locale} initialGame={selectedGame} onBack={() => { setSelectedGame(undefined); setMode("hub"); }} />;
+  if (!dailyEnabled && !multiplayerEnabled) {
+    return <FeatureUnavailable locale={locale} titleEn="Games are temporarily unavailable" titleAr="الألعاب غير متاحة مؤقتاً" onBack={onBackHome} />;
+  }
+
+  if (mode === "daily") {
+    if (!dailyEnabled) return <FeatureUnavailable locale={locale} titleEn="Daily Quiz is temporarily unavailable" titleAr="المسابقة اليومية غير متاحة مؤقتاً" onBack={() => setMode("hub")} />;
+    return <IslamicQuiz locale={locale} dateKey={dateKey} stats={stats} onStatsChange={onStatsChange} onBackHome={() => setMode("hub")} />;
+  }
+  if (mode === "multiplayer") {
+    if (!multiplayerEnabled) return <FeatureUnavailable locale={locale} titleEn="Multiplayer is temporarily unavailable" titleAr="اللعب الجماعي غير متاح مؤقتاً" onBack={() => setMode("hub")} />;
+    return <MultiplayerGames locale={locale} initialGame={selectedGame} onBack={() => { setSelectedGame(undefined); setMode("hub"); }} />;
+  }
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <View style={styles.top}><Pressable onPress={onBackHome} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.copy}><Text style={styles.eyebrow}>🎮 HASSOUN GAMES</Text><Text style={styles.title}>{t("Learn. Play. Compete.", "تعلّم • العب • تنافس")}</Text><Text style={styles.subtitle}>{t("Daily Islamic learning plus live multiplayer games. Multiplayer topics are Islamic or sports only.", "تعلم إسلامي يومي وألعاب جماعية مباشرة. مواضيع اللعب الجماعي إسلامية أو رياضية فقط.")}</Text></View></View>
 
-      <Pressable onPress={() => setMode("daily")} style={styles.dailyCard}><View style={styles.dailyIcon}><Text style={styles.bigEmoji}>🧠</Text></View><View style={styles.copy}><Text style={styles.kicker}>{t("DAILY LEARNING", "تعلم يومي")}</Text><Text style={styles.dailyTitle}>{t("Daily Islamic Quiz", "المسابقة الإسلامية اليومية")}</Text><Text style={styles.dailyNote}>{t("Kids & Adults • streaks • badges • verified sources", "أطفال وكبار • سلسلة • شارات • مصادر موثقة")}</Text></View><Text style={styles.dailyArrow}>›</Text></Pressable>
+      {dailyEnabled ? <Pressable onPress={() => setMode("daily")} style={styles.dailyCard}><View style={styles.dailyIcon}><Text style={styles.bigEmoji}>🧠</Text></View><View style={styles.copy}><Text style={styles.kicker}>{t("DAILY LEARNING", "تعلم يومي")}</Text><Text style={styles.dailyTitle}>{t("Daily Islamic Quiz", "المسابقة الإسلامية اليومية")}</Text><Text style={styles.dailyNote}>{t("Kids & Adults • streaks • badges • verified sources", "أطفال وكبار • سلسلة • شارات • مصادر موثقة")}</Text></View><Text style={styles.dailyArrow}>›</Text></Pressable> : null}
 
-      <View style={styles.sectionHead}><View><Text style={styles.kicker}>{t("MULTIPLAYER", "متعدد اللاعبين")}</Text><Text style={styles.sectionTitle}>{t("Play with friends", "العب مع الأصدقاء")}</Text></View><View style={styles.livePill}><Text style={styles.liveText}>● LIVE</Text></View></View>
-
-      {games.map((game) => <Pressable key={game.id} onPress={() => { setSelectedGame(game.id); setMode("multiplayer"); }} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{game.icon}</Text></View><View style={styles.copy}><Text style={styles.gameTitle}>{ar ? game.ar : game.en}</Text><Text style={styles.gameNote}>{ar ? game.noteAr : game.noteEn}</Text><View style={styles.tags}><Text style={styles.tag}>☾ {t("Islamic", "إسلامي")}</Text><Text style={styles.tag}>⚽ {t("Sports", "رياضة")}</Text><Text style={styles.tag}>👥 2–12</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>)}
-
-      <View style={styles.safety}><Text style={styles.safetyIcon}>✓</Text><View style={styles.copy}><Text style={styles.safetyTitle}>{t("Focused, family-friendly topics", "مواضيع هادفة ومناسبة للعائلة")}</Text><Text style={styles.safetyText}>{t("Multiplayer content is limited to Islamic knowledge and sports. No gambling or inappropriate categories.", "المحتوى الجماعي محصور بالمعرفة الإسلامية والرياضة دون قمار أو فئات غير مناسبة.")}</Text></View></View>
+      {multiplayerEnabled ? <>
+        <View style={styles.sectionHead}><View><Text style={styles.kicker}>{t("MULTIPLAYER", "متعدد اللاعبين")}</Text><Text style={styles.sectionTitle}>{t("Play with friends", "العب مع الأصدقاء")}</Text></View><View style={styles.livePill}><Text style={styles.liveText}>● LIVE</Text></View></View>
+        {games.map((game) => <Pressable key={game.id} onPress={() => { setSelectedGame(game.id); setMode("multiplayer"); }} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{game.icon}</Text></View><View style={styles.copy}><Text style={styles.gameTitle}>{ar ? game.ar : game.en}</Text><Text style={styles.gameNote}>{ar ? game.noteAr : game.noteEn}</Text><View style={styles.tags}><Text style={styles.tag}>☾ {t("Islamic", "إسلامي")}</Text><Text style={styles.tag}>⚽ {t("Sports", "رياضة")}</Text><Text style={styles.tag}>👥 2–12</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>)}
+        <View style={styles.safety}><Text style={styles.safetyIcon}>✓</Text><View style={styles.copy}><Text style={styles.safetyTitle}>{t("Focused, family-friendly topics", "مواضيع هادفة ومناسبة للعائلة")}</Text><Text style={styles.safetyText}>{t("Multiplayer content is limited to Islamic knowledge and sports. No gambling or inappropriate categories.", "المحتوى الجماعي محصور بالمعرفة الإسلامية والرياضة دون قمار أو فئات غير مناسبة.")}</Text></View></View>
+      </> : null}
     </ScrollView>
   );
 }
