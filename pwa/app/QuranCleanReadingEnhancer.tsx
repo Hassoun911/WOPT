@@ -148,7 +148,7 @@ export default function QuranCleanReadingEnhancer() {
       showTools(action === "settings" || action === "surahs" || action === "search" ? 8000 : 4200);
     };
 
-    const onOpenTools = (event: MouseEvent) => {
+    const onOpenTools = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
       if (app.classList.contains("wopt-clean-tools-open")) hideTools(); else showTools(6000);
