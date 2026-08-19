@@ -1,5 +1,6 @@
-import { Platform } from "react-native";
 import { requireNativeModule } from "expo-modules-core";
+import { Platform } from "react-native";
+import { getRemoteControlConfig } from "../../src/remoteControlStore";
 
 export type HassounWidgetLayout = "compact" | "next" | "full" | "square" | "vertical" | "slim";
 export type HassounWidgetTheme = "emerald" | "ivory" | "ocean" | "sunset" | "midnight";
@@ -65,18 +66,29 @@ const defaults: HassounWidgetPreferences = {
   locale: "en"
 };
 
+function enabled() {
+  return getRemoteControlConfig().features.widgets;
+}
+
 const HassounWidget = {
-  available: Boolean(native),
+  get available() { return Boolean(native) && enabled(); },
   setPreferences(preferences: HassounWidgetPreferences) {
-    native?.setPreferences(preferences);
+    if (enabled()) native?.setPreferences(preferences);
   },
   getPreferences(): HassounWidgetPreferences {
     return { ...defaults, ...(native?.getPreferences() ?? {}) };
   },
-  syncPrayerSchedule(scheduleJson: string, locale: "en" | "ar") { native?.syncPrayerSchedule(scheduleJson, locale); },
-  refresh() { native?.refresh(); },
-  requestPin() { return native?.requestPin() ?? false; },
+  syncPrayerSchedule(scheduleJson: string, locale: "en" | "ar") {
+    if (enabled()) native?.syncPrayerSchedule(scheduleJson, locale);
+  },
+  refresh() {
+    if (enabled()) native?.refresh();
+  },
+  requestPin() {
+    return enabled() ? (native?.requestPin() ?? false) : false;
+  },
   getCapabilities(): HassounWidgetCapabilities {
+    if (!enabled()) return { available: false, pinningSupported: false, lockScreenEligible: false, sdkInt: 0 };
     return native?.getCapabilities() ?? { available: false, pinningSupported: false, lockScreenEligible: false, sdkInt: 0 };
   }
 };
