@@ -32,6 +32,19 @@ import {
   updateReleaseCheck,
   updateSupportTicket
 } from "./adminControl";
+import {
+  createAdminUser,
+  listAdminUsers,
+  resetAdminUserPassword,
+  revokeAdminUserSessions,
+  updateAdminUser
+} from "./adminUsers";
+import {
+  closeAdminGameRoom,
+  deleteAdminGameRoom,
+  inspectAdminGameRoom,
+  listAdminGameRooms
+} from "./adminGames";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -275,6 +288,24 @@ export default {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listAdminSubscribers(request, env, url);
+      } else if (request.method === "GET" && url.pathname === "/admin/users") {
+        response = await listAdminUsers(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users") {
+        response = await createAdminUser(request, env);
+      } else if (request.method === "PATCH" && url.pathname === "/admin/users") {
+        response = await updateAdminUser(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users/password") {
+        response = await resetAdminUserPassword(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users/revoke-sessions") {
+        response = await revokeAdminUserSessions(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/games/rooms") {
+        response = await listAdminGameRooms(request, env, url);
+      } else if (request.method === "GET" && url.pathname === "/admin/games/room") {
+        response = await inspectAdminGameRoom(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/games/rooms/close") {
+        response = await closeAdminGameRoom(request, env);
+      } else if (request.method === "DELETE" && url.pathname === "/admin/games/rooms") {
+        response = await deleteAdminGameRoom(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
         response = await createAdminPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
