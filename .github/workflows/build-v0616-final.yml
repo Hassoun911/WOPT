@@ -1,0 +1,126 @@
+name: Build Hassoun v0.6.16 Final APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-v0616-final.yml"
+      - ".github/v0616-final-trigger.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v0616-final
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate TypeScript
+        id: typescript
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+          npx tsc --noEmit
+
+      - name: Prepare Android-safe Hassoun logo
+        id: logo
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp mobile/assets/icon.png mobile/assets/hassoun-logo.png
+          mkdir -p mobile/modules/hassoun-widget/android/src/main/res/drawable
+          cp mobile/assets/icon.png mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Clean Expo Android prebuild
+        id: prebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        id: gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify APK
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/hassoun-v0616.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v0616.txt
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
+
+      - name: Upload APK
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v0.6.16-final-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.16.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record final result
+        if: always()
+        shell: bash
+        run: |
+          cat > .github/v0616-final-result.txt <<EOF
+          status=${{ job.status }}
+          typescript=${{ steps.typescript.outcome }}
+          logo=${{ steps.logo.outcome }}
+          expo_prebuild=${{ steps.prebuild.outcome }}
+          gradle=${{ steps.gradle.outcome }}
+          apk_verify=${{ steps.verify.outcome }}
+          apk_upload=${{ steps.upload.outcome }}
+          run_id=${{ github.run_id }}
+          run_number=${{ github.run_number }}
+          head_sha=${{ github.sha }}
+          artifact=hassoun-v0.6.16-final-${{ github.run_number }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/v0616-final-result.txt
+          git commit -m "Record Hassoun v0.6.16 final APK result" || true
+          git pull --rebase origin main || true
+          git push origin HEAD:main || true
