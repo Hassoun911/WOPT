@@ -23,6 +23,7 @@ export type NativeDeviceLocation = {
 export type PrayerAudioNativeModule = {
   canScheduleExactAlarms(): boolean;
   scheduleExactPrayerAlarms(eventsJson: string): Promise<PrayerAudioScheduleResult>;
+  restoreExactPrayerAlarms(): Promise<{ exact: boolean }>;
   scheduleTestPrayerAlarm(prayer: string, delaySeconds: number): Promise<PrayerAudioTestResult>;
   getCurrentDeviceLocation(): Promise<NativeDeviceLocation | null>;
   cancelExactPrayerAlarms(): Promise<void>;
