@@ -1,2 +1,2 @@
-trigger=2026-08-19T01:06:00Z
-reason=v0.6.8-light-dark-auto-widget-theme-direct-build
+trigger=2026-08-19T01:54:30Z
+reason=v0.6.9-premium-native-widget-layouts
