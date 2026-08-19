@@ -4,19 +4,12 @@
   android:layout_height="match_parent"
   android:orientation="vertical"
   android:gravity="center"
-  android:padding="12dp"
-  android:background="@drawable/hassoun_widget_bg_ivory">
-
-  <ImageView
-    android:layout_width="40dp"
-    android:layout_height="40dp"
-    android:src="@drawable/hassoun_widget_logo"
-    android:contentDescription="Hassoun" />
+  android:padding="10dp"
+  android:background="#FFF8EA">
 
   <TextView
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_marginTop="6dp"
     android:text="HASSOUN"
     android:textColor="#184A3C"
     android:textStyle="bold"
@@ -25,7 +18,8 @@
   <TextView
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:layout_marginTop="3dp"
     android:text="PRAYER TIMES"
     android:textColor="#9A6F3C"
-    android:textSize="9sp" />
+    android:textSize="8sp" />
 </LinearLayout>
