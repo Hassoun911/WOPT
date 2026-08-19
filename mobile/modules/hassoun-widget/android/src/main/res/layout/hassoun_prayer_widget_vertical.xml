@@ -22,7 +22,7 @@
       <TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:maxLines="1" android:includeFontPadding="false" />
       <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical">
         <Chronometer android:id="@+id/widget_countdown" android:layout_width="62dp" android:layout_height="62dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:padding="3dp" android:textStyle="bold" android:textSize="12sp" android:maxLines="2" android:includeFontPadding="false" />
-        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <TextView android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" android:text="" android:includeFontPadding="false" />
         <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
           <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="5.8sp" android:letterSpacing="0.05" android:includeFontPadding="false" />
           <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="bottom|end" android:orientation="horizontal">
