@@ -18,6 +18,20 @@ import {
   dispatchDueAdminPushCampaigns,
   listAdminPushCampaigns
 } from "./adminPush";
+import {
+  applyPrayerOverrides,
+  deleteAdminContent,
+  deletePrayerOverride,
+  getAdminControlOverview,
+  getPublicControlConfig,
+  listReleaseChecks,
+  listSupportTickets,
+  saveAdminContent,
+  saveAdminSetting,
+  savePrayerOverride,
+  updateReleaseCheck,
+  updateSupportTicket
+} from "./adminControl";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -48,7 +62,7 @@ function corsHeaders(request: Request, env: Env) {
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     Vary: "Origin"
   };
 }
@@ -178,8 +192,9 @@ async function loadSchedule(env: Env) {
   if (!response.ok) throw new Error(`Schedule fetch failed: ${response.status}`);
   const data = (await response.json()) as PrayerFile;
   if (!data.prayer_times) throw new Error("Schedule is missing prayer_times");
-  cachedSchedule = { expiresAt: Date.now() + 300_000, data };
-  return data;
+  const merged = await applyPrayerOverrides(env, data);
+  cachedSchedule = { expiresAt: Date.now() + 300_000, data: merged };
+  return merged;
 }
 
 async function runScheduled(env: Env, scheduledTime: number) {
@@ -214,11 +229,13 @@ export default {
       if (request.method === "GET" && url.pathname === "/health") {
         response = json({ ok: true, service: "wopt-prayer-push" });
       } else if (request.method === "GET" && url.pathname === "/config") {
+        const control = await getPublicControlConfig(env);
         response = json({
           vapidPublicKey: env.VAPID_PUBLIC_KEY,
           emailSignup: true,
           emailDeliveryConfigured: emailDeliveryConfigured(env),
-          automaticLocation: true
+          automaticLocation: false,
+          control
         });
       } else if (request.method === "POST" && url.pathname === "/subscriptions/expo") {
         response = await registerExpo(request, env);
@@ -266,6 +283,28 @@ export default {
         response = await createAdminEmailCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
         response = await listAdminEmailCampaigns(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/control") {
+        response = await getAdminControlOverview(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/settings") {
+        response = await saveAdminSetting(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/content") {
+        response = await saveAdminContent(request, env);
+      } else if (request.method === "DELETE" && url.pathname === "/admin/control/content") {
+        response = await deleteAdminContent(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/prayer-overrides") {
+        response = await savePrayerOverride(request, env);
+        cachedSchedule = null;
+      } else if (request.method === "DELETE" && url.pathname === "/admin/control/prayer-overrides") {
+        response = await deletePrayerOverride(request, env, url);
+        cachedSchedule = null;
+      } else if (request.method === "GET" && url.pathname === "/admin/support/tickets") {
+        response = await listSupportTickets(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/support/tickets") {
+        response = await updateSupportTicket(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/release/checks") {
+        response = await listReleaseChecks(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/release/checks") {
+        response = await updateReleaseCheck(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
