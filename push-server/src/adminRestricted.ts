@@ -1,4 +1,5 @@
 import { requireAdmin } from "./adminAuth";
+import { listAdminSubscribers } from "./adminData";
 import {
   listAppSettings,
   listAuditLog,
@@ -23,6 +24,12 @@ async function requireOperator(request: Request, env: Env) {
     return { admin: null, response: json({ error: "Owner or admin access required" }, 403) };
   }
   return { admin: auth.admin, response: null };
+}
+
+export async function listRestrictedSubscribers(request: Request, env: Env, url: URL) {
+  const auth = await requireOperator(request, env);
+  if (!auth.admin) return auth.response!;
+  return listAdminSubscribers(request, env, url);
 }
 
 export async function listRestrictedAppSettings(request: Request, env: Env) {
