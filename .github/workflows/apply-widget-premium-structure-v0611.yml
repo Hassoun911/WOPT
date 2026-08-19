@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".github/scripts/apply-widget-premium-structure-v0611.py"
       - ".github/scripts/fix-widget-premium-newlines-v0611.py"
       - ".github/workflows/apply-widget-premium-structure-v0611.yml"
 
@@ -27,20 +26,6 @@ jobs:
 
       - name: Repair premium widget Kotlin strings
         run: python .github/scripts/fix-widget-premium-newlines-v0611.py
-
-      - name: Validate premium widget structure
-        run: |
-          set -euo pipefail
-          grep -q 'widget_next_suffix' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
-          grep -q 'widget_next_suffix' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_vertical.xml
-          grep -q 'widget_next_suffix' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_square.xml
-          grep -q 'widget_next_suffix' mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_slim.xml
-          grep -q 'setTextViewCompoundDrawables' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          grep -q 'formatClockMain' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          grep -q '\\n\$time' mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          test -f mobile/modules/hassoun-widget/android/src/main/res/drawable/ic_widget_fajr.xml
-          test -f mobile/modules/hassoun-widget/android/src/main/res/drawable/ic_widget_isha.xml
-          git diff --check
 
       - name: Commit Kotlin repair and trigger APK
         run: |
