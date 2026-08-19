@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/v0616-build-trigger.txt"
+      - ".github/workflows/build-v0616-clean-runtime.yml"
 
 permissions:
   contents: write
