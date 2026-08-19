@@ -1,0 +1,13 @@
+status=failure
+source_check=failure
+mobile_typescript=skipped
+worker_validation=skipped
+logo=skipped
+expo_prebuild=skipped
+gradle=skipped
+apk_verify=skipped
+apk_upload=skipped
+run_id=32276758159
+run_number=2
+head_sha=1ce86aa58f21c0eaeee0f876d2d4f395ca844fc2
+artifact=hassoun-v0.6.16-clean-runtime-2
