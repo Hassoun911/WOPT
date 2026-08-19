@@ -1,5 +1,17 @@
 import { getAdminDashboard, listAdminSubscribers } from "./adminData";
 import {
+  createAppContent,
+  getAdminCrmOverview,
+  listAdminTeam,
+  listAppContent,
+  listAppSettings,
+  listAuditLog,
+  updateAdminTeamMember,
+  updateAppContent,
+  updateAppSetting,
+  updateSubscriberStatus
+} from "./adminCrm";
+import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
   listAdminEmailCampaigns,
@@ -189,7 +201,6 @@ async function runScheduled(env: Env, scheduledTime: number) {
 
   await dispatchDueAdminPushCampaigns(env);
   await dispatchDueAdminEmailCampaigns(env);
-
   await dispatchGlobalPrayerEmails(env, scheduledTime);
   await processEmailOutbox(env);
   await refreshAdminEmailCampaignStatuses(env);
@@ -258,6 +269,26 @@ export default {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listAdminSubscribers(request, env, url);
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
+        response = await updateSubscriberStatus(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "GET" && url.pathname === "/admin/crm/overview") {
+        response = await getAdminCrmOverview(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/settings") {
+        response = await listAppSettings(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/settings/")) {
+        response = await updateAppSetting(request, env, decodeURIComponent(url.pathname.slice("/admin/settings/".length)));
+      } else if (request.method === "GET" && url.pathname === "/admin/content") {
+        response = await listAppContent(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/content") {
+        response = await createAppContent(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/content/")) {
+        response = await updateAppContent(request, env, url.pathname.slice("/admin/content/".length));
+      } else if (request.method === "GET" && url.pathname === "/admin/team") {
+        response = await listAdminTeam(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/team/")) {
+        response = await updateAdminTeamMember(request, env, url.pathname.slice("/admin/team/".length));
+      } else if (request.method === "GET" && url.pathname === "/admin/audit") {
+        response = await listAuditLog(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
         response = await createAdminPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
