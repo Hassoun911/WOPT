@@ -202,6 +202,13 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const readerContentHeight = useRef(0);
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
+
+  useEffect(() => {
+    if (screen === "reader" && appearance.browseMode !== "vertical") {
+      setAppearance((current) => ({ ...current, browseMode: "vertical" }));
+    }
+  }, [screen, appearance.browseMode]);
+
   const surahs = allSurahs();
   const pages = allPages();
   const pageNumbers = useMemo(() => Array.from({ length: 604 }, (_item, index) => index + 1), []);
@@ -394,7 +401,7 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     verticalGestureStartY.current = null;
     if (start == null) return;
     const dy = event.nativeEvent.pageY - start;
-    if (Math.abs(dy) < 48) return;
+    if (Math.abs(dy) < 24) return;
 
     // A Mushaf page that fits entirely inside the viewport never produces enough
     // scroll events to mark itself as "at bottom". Treat it as both scroll edges

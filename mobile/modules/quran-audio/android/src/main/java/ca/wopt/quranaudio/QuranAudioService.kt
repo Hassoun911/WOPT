@@ -12,7 +12,9 @@ import android.media.MediaPlayer
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import org.json.JSONArray
 
@@ -34,6 +36,9 @@ class QuranAudioService : Service() {
   private var rangeEndAbsolute = 0
   private var rangeReciterBase = ""
   private var rangeReciterName = "Hassoun"
+  private val mainHandler = Handler(Looper.getMainLooper())
+  private var retryCount = 0
+  private var resumePositionMs = 0
 
   override fun onCreate() {
     super.onCreate()
@@ -55,7 +60,16 @@ class QuranAudioService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    when (intent?.action) {
+    if (intent == null) {
+      if (restorePlaybackState()) {
+        playCurrent(resumePositionMs)
+      } else {
+        stopSelf()
+      }
+      return START_STICKY
+    }
+
+    when (intent.action) {
       ACTION_PLAY_QUEUE -> {
         rangeActive = false
         rangeEndAbsolute = 0
@@ -75,6 +89,9 @@ class QuranAudioService : Service() {
         queueIndex = 0
         repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)
         speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)
+        retryCount = 0
+        resumePositionMs = 0
+        savePlaybackState()
         if (rangeActive) playCurrent() else stopPlayback(true)
       }
       ACTION_PAUSE -> pausePlayback()
@@ -100,7 +117,13 @@ class QuranAudioService : Service() {
 
   override fun onBind(intent: Intent?): IBinder? = null
 
+  override fun onTaskRemoved(rootIntent: Intent?) {
+    savePlaybackState()
+    super.onTaskRemoved(rootIntent)
+  }
+
   override fun onDestroy() {
+    if (state == "playing" || state == "loading") savePlaybackState()
     releasePlayer()
     mediaSession?.release()
     mediaSession = null
@@ -127,7 +150,7 @@ class QuranAudioService : Service() {
     )
   }
 
-  private fun playCurrent() {
+  private fun playCurrent(startPositionMs: Int = 0) {
     val item = currentItem() ?: run {
       stopPlayback(true)
       return
@@ -146,41 +169,75 @@ class QuranAudioService : Service() {
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
     )
-    next.setDataSource(item.url)
     next.setOnPreparedListener { mediaPlayer ->
       applySpeed(mediaPlayer)
+      val seekTo = startPositionMs.coerceAtLeast(0)
+      if (seekTo > 0) runCatching { mediaPlayer.seekTo(seekTo) }
       mediaPlayer.start()
+      retryCount = 0
+      resumePositionMs = 0
       state = "playing"
+      savePlaybackState()
       publishSnapshot()
       updateNotification()
     }
     next.setOnCompletionListener {
+      retryCount = 0
+      resumePositionMs = 0
       if (queueIndex + 1 < currentQueueSize()) {
         queueIndex += 1
+        savePlaybackState()
         playCurrent()
       } else if (repeatQueue && currentQueueSize() > 0) {
         queueIndex = 0
+        savePlaybackState()
         playCurrent()
       } else {
         state = "completed"
+        clearSavedPlayback()
         publishSnapshot()
         updateNotification()
       }
     }
     next.setOnErrorListener { _, _, _ ->
-      // A failed network item should not kill a long continuous range. Skip it
-      // when another ayah remains; surface an error only at the end.
-      if (queueIndex + 1 < currentQueueSize()) {
-        queueIndex += 1
-        playCurrent()
-      } else {
-        state = "error"
-        publishSnapshot()
-        updateNotification()
-      }
+      retryOrAdvance()
       true
     }
-    next.prepareAsync()
+    runCatching {
+      next.setDataSource(item.url)
+      next.prepareAsync()
+    }.onFailure {
+      retryOrAdvance()
+    }
+  }
+
+  private fun retryOrAdvance() {
+    resumePositionMs = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+    releasePlayer()
+    if (retryCount < MAX_STREAM_RETRIES) {
+      retryCount += 1
+      state = "loading"
+      savePlaybackState()
+      publishSnapshot()
+      updateNotification()
+      mainHandler.postDelayed({ playCurrent(resumePositionMs) }, 1200L * retryCount)
+      return
+    }
+    retryCount = 0
+    resumePositionMs = 0
+    if (queueIndex + 1 < currentQueueSize()) {
+      queueIndex += 1
+      savePlaybackState()
+      playCurrent()
+    } else if (repeatQueue && currentQueueSize() > 0) {
+      queueIndex = 0
+      savePlaybackState()
+      playCurrent()
+    } else {
+      state = "error"
+      publishSnapshot()
+      updateNotification()
+    }
   }
 
   private fun pausePlayback() {
@@ -248,13 +305,56 @@ class QuranAudioService : Service() {
     rangeEndAbsolute = 0
     rangeReciterBase = ""
     rangeReciterName = "Hassoun"
+    retryCount = 0
+    resumePositionMs = 0
     state = "idle"
+    clearSavedPlayback()
     publishSnapshot()
     if (removeNotification) {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) stopForeground(STOP_FOREGROUND_REMOVE)
       else @Suppress("DEPRECATION") stopForeground(true)
       stopSelf()
     }
+  }
+
+  private fun savePlaybackState() {
+    if (!rangeActive) return
+    val position = runCatching { player?.currentPosition ?: resumePositionMs }.getOrDefault(resumePositionMs)
+    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit()
+      .putBoolean("rangeActive", true)
+      .putInt("rangeStart", rangeStartAbsolute)
+      .putInt("rangeEnd", rangeEndAbsolute)
+      .putString("reciterBase", rangeReciterBase)
+      .putString("reciterName", rangeReciterName)
+      .putInt("queueIndex", queueIndex)
+      .putBoolean("repeat", repeatQueue)
+      .putFloat("speed", speed)
+      .putString("state", state)
+      .putInt("positionMs", position.coerceAtLeast(0))
+      .apply()
+  }
+
+  private fun restorePlaybackState(): Boolean {
+    val prefs = getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+    if (!prefs.getBoolean("rangeActive", false)) return false
+    val savedState = prefs.getString("state", "idle") ?: "idle"
+    if (savedState !in setOf("playing", "loading")) return false
+    rangeStartAbsolute = prefs.getInt("rangeStart", 1).coerceAtLeast(1)
+    rangeEndAbsolute = prefs.getInt("rangeEnd", rangeStartAbsolute).coerceAtLeast(rangeStartAbsolute)
+    rangeReciterBase = prefs.getString("reciterBase", "").orEmpty().trimEnd('/')
+    rangeReciterName = prefs.getString("reciterName", "Hassoun").orEmpty().ifBlank { "Hassoun" }
+    queueIndex = prefs.getInt("queueIndex", 0).coerceIn(0, (rangeEndAbsolute - rangeStartAbsolute).coerceAtLeast(0))
+    repeatQueue = prefs.getBoolean("repeat", false)
+    speed = prefs.getFloat("speed", 1.0f).coerceIn(0.5f, 2.0f)
+    resumePositionMs = prefs.getInt("positionMs", 0).coerceAtLeast(0)
+    retryCount = 0
+    rangeActive = rangeReciterBase.isNotBlank()
+    state = "loading"
+    return rangeActive
+  }
+
+  private fun clearSavedPlayback() {
+    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit().clear().apply()
   }
 
   private fun releasePlayer() {
@@ -387,6 +487,8 @@ class QuranAudioService : Service() {
   companion object {
     private const val CHANNEL_ID = "hassoun-quran-audio"
     private const val NOTIFICATION_ID = 4821
+    private const val PLAYBACK_PREFS = "hassoun-quran-playback-v2"
+    private const val MAX_STREAM_RETRIES = 3
     private const val ACTION_PLAY_QUEUE = "ca.wopt.quranaudio.PLAY_QUEUE"
     private const val ACTION_PLAY_RANGE = "ca.wopt.quranaudio.PLAY_RANGE"
     private const val ACTION_PAUSE = "ca.wopt.quranaudio.PAUSE"
