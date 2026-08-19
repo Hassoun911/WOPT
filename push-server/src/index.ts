@@ -11,6 +11,7 @@ import {
   updateAppSetting,
   updateSubscriberStatus
 } from "./adminCrm";
+import { createAdminTeamMember } from "./adminTeamCreate";
 import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
@@ -285,6 +286,8 @@ export default {
         response = await updateAppContent(request, env, url.pathname.slice("/admin/content/".length));
       } else if (request.method === "GET" && url.pathname === "/admin/team") {
         response = await listAdminTeam(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/team") {
+        response = await createAdminTeamMember(request, env);
       } else if (request.method === "POST" && url.pathname.startsWith("/admin/team/")) {
         response = await updateAdminTeamMember(request, env, url.pathname.slice("/admin/team/".length));
       } else if (request.method === "GET" && url.pathname === "/admin/audit") {
