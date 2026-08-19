@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import IslamicQuiz from "./IslamicQuiz";
+import IslamicQuiz from "./DailyIslamicQuiz";
 import MultiplayerGames, { type MultiplayerGameType } from "./MultiplayerGames";
 import BrandMark from "./BrandMark";
 import type { QuizLocale, QuizStats } from "./islamicQuiz";
