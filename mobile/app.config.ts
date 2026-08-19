@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "0.6.6",
+  version: "0.6.16",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
@@ -13,14 +13,14 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     infoPlist: {
-      UIBackgroundModes: ["remote-notification"],
+      UIBackgroundModes: ["remote-notification", "audio"],
       NSLocationWhenInUseUsageDescription: "Hassoun uses your location to automatically select the correct local prayer times and email alert time zone.",
       NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation."
     }
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 38,
+    versionCode: 39,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#003d33"
@@ -28,7 +28,7 @@ const config: ExpoConfig = {
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
       "android.permission.RECEIVE_BOOT_COMPLETED",
-      "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.USE_EXACT_ALARM",
       "android.permission.FOREGROUND_SERVICE",
       "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
       "android.permission.VIBRATE",
