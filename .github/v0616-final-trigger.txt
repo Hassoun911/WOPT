@@ -1,0 +1,2 @@
+trigger=2026-08-19T16:40:00Z
+reason=exact-alarm-quran-radio-continuous-reader-final
