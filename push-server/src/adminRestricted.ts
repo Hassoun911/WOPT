@@ -17,24 +17,36 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function requireOperator(request: Request, env: Env) {
+async function authenticated(request: Request, env: Env) {
   const auth = await requireAdmin(request, env);
   if (!auth.admin) return { admin: null, response: auth.response! };
-  if (auth.admin.role !== "owner" && auth.admin.role !== "admin") {
-    return { admin: null, response: json({ error: "Owner or admin access required" }, 403) };
-  }
   return { admin: auth.admin, response: null };
 }
 
+async function requireOperator(request: Request, env: Env) {
+  const auth = await authenticated(request, env);
+  if (!auth.admin) return auth;
+  if (auth.admin.role !== "owner" && auth.admin.role !== "admin") {
+    return { admin: null, response: json({ error: "Owner or admin access required" }, 403) };
+  }
+  return auth;
+}
+
+function isOperator(role: string) {
+  return role === "owner" || role === "admin";
+}
+
 export async function listRestrictedSubscribers(request: Request, env: Env, url: URL) {
-  const auth = await requireOperator(request, env);
+  const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
+  if (!isOperator(auth.admin.role)) return json({ ok: true, subscribers: [] });
   return listAdminSubscribers(request, env, url);
 }
 
 export async function listRestrictedAppSettings(request: Request, env: Env) {
-  const auth = await requireOperator(request, env);
+  const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
+  if (!isOperator(auth.admin.role)) return json({ ok: true, settings: [] });
   return listAppSettings(request, env);
 }
 
@@ -51,8 +63,9 @@ export async function updateRestrictedSubscriberStatus(request: Request, env: En
 }
 
 export async function listRestrictedAuditLog(request: Request, env: Env, url: URL) {
-  const auth = await requireOperator(request, env);
+  const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
+  if (!isOperator(auth.admin.role)) return json({ ok: true, entries: [] });
   return listAuditLog(request, env, url);
 }
 
@@ -63,8 +76,9 @@ export async function createRestrictedPushCampaign(request: Request, env: Env) {
 }
 
 export async function listRestrictedPushCampaigns(request: Request, env: Env) {
-  const auth = await requireOperator(request, env);
+  const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
+  if (!isOperator(auth.admin.role)) return json({ ok: true, campaigns: [] });
   return listAdminPushCampaigns(request, env);
 }
 
@@ -75,7 +89,8 @@ export async function createRestrictedEmailCampaign(request: Request, env: Env) 
 }
 
 export async function listRestrictedEmailCampaigns(request: Request, env: Env) {
-  const auth = await requireOperator(request, env);
+  const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
+  if (!isOperator(auth.admin.role)) return json({ ok: true, campaigns: [] });
   return listAdminEmailCampaigns(request, env);
 }
