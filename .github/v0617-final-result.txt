@@ -1,0 +1,12 @@
+status=success
+typescript=success
+logo=success
+expo_prebuild=success
+permissions=success
+gradle=success
+apk_verify=success
+apk_upload=success
+run_id=32277753386
+run_number=2
+head_sha=ca92f6ec65f04ae648bc41790f5c8375ae49647c
+artifact=hassoun-v0.6.17-final-2
