@@ -244,7 +244,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
           const ok = HassounWidget.requestPin();
           if (!ok) Alert.alert(t("Widget picker", "اختيار الويدجت"), t("Your launcher does not support adding a widget directly. Touch and hold the Home screen, choose Widgets, then choose Hassoun.", "مشغل هاتفك لا يدعم إضافة الويدجت مباشرة. اضغط مطولاً على الشاشة الرئيسية ثم اختر الويدجت ثم Hassoun."));
         }} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>＋ {t("Add Hassoun widget", "إضافة ويدجت Hassoun")}</Text>
+          <Text style={styles.primaryButtonText}>＋ {t("Add selected widget", "إضافة الويدجت المحدد")}</Text>
         </Pressable>
         <Pressable onPress={() => HassounWidget.refresh()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>↻ {t("Refresh widgets", "تحديث الويدجت")}</Text></Pressable>
 

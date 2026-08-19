@@ -95,20 +95,30 @@ class HassounWidgetModule : Module() {
       val manager = AppWidgetManager.getInstance(context)
       if (!manager.isRequestPinAppWidgetSupported) return@Function false
 
-      // The provider metadata already uses the shallow slim initialLayout,
-      // which is the Samsung-safe shell. Do not overwrite the user's saved layout.
-      // Ask Android to send us a success broadcast after the widget is actually
-      // placed, then populate it immediately so it never remains an empty shell.
+      val prefs = context.getSharedPreferences(HassounWidgetStore.PREFS, Context.MODE_PRIVATE)
+      val selectedLayout = prefs.getString("layout", "full") ?: "full"
+      val providerClass = when (selectedLayout) {
+        "square" -> HassounSquareWidgetProvider::class.java
+        "vertical" -> HassounVerticalWidgetProvider::class.java
+        "slim", "compact", "next" -> HassounSlimWidgetProvider::class.java
+        else -> HassounPrayerWidgetProvider::class.java
+      }
+      val requestCode = when (selectedLayout) {
+        "square" -> 7612
+        "vertical" -> 7614
+        "slim", "compact", "next" -> 7611
+        else -> 7620
+      }
       val refreshIntent = android.content.Intent(context, HassounPrayerWidgetProvider::class.java).apply {
         action = HassounWidgetStore.ACTION_REFRESH
       }
       val successCallback = android.app.PendingIntent.getBroadcast(
         context,
-        7610,
+        requestCode,
         refreshIntent,
         android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
       )
-      manager.requestPinAppWidget(ComponentName(context, HassounPrayerWidgetProvider::class.java), null, successCallback)
+      manager.requestPinAppWidget(ComponentName(context, providerClass), null, successCallback)
     }
 
     Function("getCapabilities") {

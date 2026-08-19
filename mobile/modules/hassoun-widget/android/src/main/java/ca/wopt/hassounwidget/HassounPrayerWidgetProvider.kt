@@ -109,12 +109,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       // that first render on the same lightweight RemoteViews used by the
       // launcher preview. Once real dimensions arrive, switch to the responsive
       // full/square/vertical/slim renderer below.
-      val layout = if (isLockScreen) requestedLayout else when {
-        // Samsung can invoke onUpdate before it gives the widget usable dimensions.
-        // Always use the shallow safe shell for that very first render, including
-        // the Large 4x2 provider. This prevents the launcher "Couldn't add widget" failure.
-        minWidth <= 0 || minHeight <= 0 -> "slim"
-        providerLayout != null -> providerLayout
+      val layout = if (isLockScreen) requestedLayout else providerLayout ?: when {
         minHeight >= minWidth * 1.35 -> "vertical"
         minWidth <= 220 && minHeight >= 150 -> "square"
         minHeight <= 80 || minWidth >= minHeight * 3.20 -> "slim"
@@ -185,16 +180,16 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
         views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
         val timeSp = when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 21f; "medium" -> 25f; "xlarge" -> 34f; else -> 29f }
-          "square" -> when (timeSize) { "small" -> 20f; "medium" -> 24f; "xlarge" -> 32f; else -> 28f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 24f; "medium" -> 29f; "xlarge" -> 40f; else -> 34f }
-          else -> when (timeSize) { "small" -> 25f; "medium" -> 31f; "xlarge" -> 44f; else -> 37f }
+          "vertical" -> when (timeSize) { "small" -> 21f; "medium" -> 24f; "xlarge" -> 32f; else -> 28f }
+          "square" -> when (timeSize) { "small" -> 18f; "medium" -> 21f; "xlarge" -> 28f; else -> 24f }
+          "slim", "compact", "next" -> when (timeSize) { "small" -> 18f; "medium" -> 22f; "xlarge" -> 30f; else -> 26f }
+          else -> when (timeSize) { "small" -> 20f; "medium" -> 24f; "xlarge" -> 32f; else -> 28f }
         }
         val prayerNameSp = when (layout) {
-          "vertical" -> when (focus) { "all" -> 21f; "balanced" -> 25f; else -> 30f }
-          "square" -> when (focus) { "all" -> 20f; "balanced" -> 24f; else -> 29f }
-          "slim", "compact", "next" -> when (focus) { "all" -> 20f; "balanced" -> 25f; else -> 31f }
-          else -> when (focus) { "all" -> 22f; "balanced" -> 27f; else -> 34f }
+          "vertical" -> when (focus) { "all" -> 20f; "balanced" -> 24f; else -> 28f }
+          "square" -> when (focus) { "all" -> 19f; "balanced" -> 22f; else -> 26f }
+          "slim", "compact", "next" -> when (focus) { "all" -> 18f; "balanced" -> 21f; else -> 24f }
+          else -> when (focus) { "all" -> 20f; "balanced" -> 24f; else -> 28f }
         }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
@@ -214,11 +209,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
             else -> R.drawable.hassoun_widget_countdown_circle
           })
           val countdownSp = if (countdownStyle != "circle") 10f else when {
-            isLockScreen -> 17f
-            layout == "slim" || layout == "compact" -> 10.5f
-            layout == "square" -> 14f
-            layout == "vertical" -> 16f
-            else -> 17f
+            isLockScreen -> 15f
+            layout == "slim" || layout == "compact" -> 10f
+            layout == "square" -> 11.5f
+            layout == "vertical" -> 13f
+            else -> 11.5f
           }
           views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -228,10 +223,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
           views.setViewVisibility(R.id.widget_countdown, View.GONE)
         }
 
-        val supportsPrayerStrip = isLockScreen || layout in setOf("full", "vertical", "square", "slim", "next", "compact")
+        val supportsPrayerStrip = isLockScreen || layout in setOf("full", "vertical")
         if (supportsPrayerStrip && (showAllPrayers || isLockScreen)) {
           views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
-          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme, showArabicNames, highlightNext, timeSize, focus)
+          bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme, showArabicNames, highlightNext, timeSize, focus, layout)
         } else {
           views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
         }
@@ -258,7 +253,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       manager.updateAppWidget(appWidgetId, views)
     }
 
-    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean, theme: String, showArabic: Boolean, highlightNext: Boolean, timeSize: String, focus: String) {
+    private fun bindPrayerStrip(views: RemoteViews, day: JSONObject, locale: String, nextKey: String, lockScreen: Boolean, theme: String, showArabic: Boolean, highlightNext: Boolean, timeSize: String, focus: String, layout: String) {
       val ids = listOf(R.id.widget_prayer_fajr, R.id.widget_prayer_dhuhr, R.id.widget_prayer_asr, R.id.widget_prayer_maghrib, R.id.widget_prayer_isha)
       val baseText = if (theme == "ivory") Color.rgb(22, 84, 69) else Color.WHITE
       val accent = Color.rgb(244, 209, 98)
@@ -274,11 +269,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
         views.setTextViewText(id, "$title\n${formatClock(time, locale)}")
         views.setTextColor(id, if (highlightNext && key == nextKey) accent else baseText)
-        val stripSp = if (lockScreen) 10f else when (timeSize) {
-          "small" -> 9.5f
-          "medium" -> 11f
-          "xlarge" -> 14f
-          else -> 12.5f
+        val chipBackground = if (theme == "ivory") R.drawable.hassoun_widget_prayer_chip_light else R.drawable.hassoun_widget_prayer_chip_dark
+        views.setInt(id, "setBackgroundResource", chipBackground)
+        val stripSp = if (lockScreen) 9.5f else when (layout) {
+          "vertical" -> when (timeSize) { "small" -> 8.5f; "medium" -> 9.5f; "xlarge" -> 11.5f; else -> 10.5f }
+          else -> when (timeSize) { "small" -> 7.5f; "medium" -> 8.5f; "xlarge" -> 10.5f; else -> 9.5f }
         }
         views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
       }
