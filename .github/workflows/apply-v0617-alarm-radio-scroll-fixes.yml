@@ -1,0 +1,142 @@
+name: Apply v0.6.17 Alarm Radio Scroll Fixes
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-v0617-alarm-radio-scroll-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply runtime fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected block not found in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          # --- Exact alarm special access: request it reliably on current Android versions. ---
+          manifest = 'mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml'
+          replace_once(manifest,
+              '  <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />',
+              '  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />')
+
+          config = 'mobile/app.config.ts'
+          replace_once(config, '  version: "0.6.16",', '  version: "0.6.17",')
+          replace_once(config, '    versionCode: 39,', '    versionCode: 40,')
+          replace_once(config, '      "android.permission.USE_EXACT_ALARM",', '      "android.permission.SCHEDULE_EXACT_ALARM",')
+
+          prayer_ts = 'mobile/src/prayerAudio.ts'
+          p = Path(prayer_ts)
+          text = p.read_text()
+          start = text.index('let firstLaunchAlarmCheckStarted = false;')
+          end_marker = 'startFirstLaunchExactAlarmSetup();\n'
+          end = text.index(end_marker, start) + len(end_marker)
+          replacement = '''let exactAlarmSettingsOpenedThisSession = false;\nlet exactAlarmWatcherStarted = false;\n\nasync function restoreExactAlarmsIfAvailable() {\n  if (Platform.OS !== "android" || !PrayerAudio) return false;\n  try {\n    if (!PrayerAudio.canScheduleExactAlarms()) return false;\n    await PrayerAudio.restoreExactPrayerAlarms();\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nexport async function ensureAndroidExactAlarmAccessOnLaunch() {\n  if (Platform.OS !== "android" || !PrayerAudio) return true;\n  if (await restoreExactAlarmsIfAvailable()) return true;\n  if (!exactAlarmSettingsOpenedThisSession) {\n    exactAlarmSettingsOpenedThisSession = true;\n    // Run after the React activity is mounted. Android will still require the\n    // user to flip the special-access switch; apps cannot silently grant it.\n    await new Promise((resolve) => setTimeout(resolve, 500));\n    PrayerAudio.openExactAlarmSettings();\n  }\n  return false;\n}\n\nexport function startAndroidExactAlarmPermissionWatcher() {\n  if (Platform.OS !== "android" || !PrayerAudio || exactAlarmWatcherStarted) return;\n  exactAlarmWatcherStarted = true;\n  AppState.addEventListener("change", (state) => {\n    if (state === "active") void restoreExactAlarmsIfAvailable();\n  });\n}\n'''
+          p.write_text(text[:start] + replacement + text[end:])
+
+          app = 'mobile/App.tsx'
+          replace_once(app,
+              'import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";',
+              'import { ensureAndroidExactAlarmAccessOnLaunch, openExactAlarmSettings, scheduleAndroidTestAdhan, startAndroidExactAlarmPermissionWatcher } from "./src/prayerAudio";')
+          replace_once(app,
+              '  const upcomingIslamicDays = islamicTimeline.daysUntilNext;\n\n  useEffect(() => {\n    if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);',
+              '''  const upcomingIslamicDays = islamicTimeline.daysUntilNext;\n\n  useEffect(() => {\n    startAndroidExactAlarmPermissionWatcher();\n    const permissionTimer = setTimeout(() => {\n      void ensureAndroidExactAlarmAccessOnLaunch();\n    }, 1600);\n    return () => clearTimeout(permissionTimer);\n  }, []);\n\n  useEffect(() => {\n    if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);''')
+
+          # --- Qur'an radio: keep network awake and retry transient stream failures. ---
+          service = 'mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt'
+          replace_once(service,
+              'import android.media.session.PlaybackState\nimport android.os.Build\nimport android.os.IBinder\nimport android.os.PowerManager',
+              'import android.media.session.PlaybackState\nimport android.net.wifi.WifiManager\nimport android.os.Build\nimport android.os.Handler\nimport android.os.IBinder\nimport android.os.Looper\nimport android.os.PowerManager')
+          replace_once(service,
+              '  private var state = "idle"\n  private var mediaSession: MediaSession? = null',
+              '''  private var state = "idle"\n  private var mediaSession: MediaSession? = null\n  private val retryHandler = Handler(Looper.getMainLooper())\n  private var retryCount = 0\n  private var wifiLock: WifiManager.WifiLock? = null''')
+          replace_once(service,
+              '  override fun onDestroy() {\n    releasePlayer()\n    mediaSession?.release()',
+              '  override fun onDestroy() {\n    retryHandler.removeCallbacksAndMessages(null)\n    releasePlayer()\n    releaseWifiLock()\n    mediaSession?.release()')
+          replace_once(service,
+              '  private fun playCurrent() {\n    val item = currentItem() ?: run {',
+              '  private fun playCurrent() {\n    ensureWifiLock()\n    retryHandler.removeCallbacksAndMessages(null)\n    val item = currentItem() ?: run {')
+          replace_once(service,
+              '    next.setOnPreparedListener { mediaPlayer ->\n      applySpeed(mediaPlayer)',
+              '    next.setOnPreparedListener { mediaPlayer ->\n      retryCount = 0\n      applySpeed(mediaPlayer)')
+          replace_once(service,
+              '    next.setOnCompletionListener {\n      if (queueIndex + 1 < currentQueueSize()) {',
+              '    next.setOnCompletionListener {\n      retryCount = 0\n      if (queueIndex + 1 < currentQueueSize()) {')
+          old_error = '''    next.setOnErrorListener { _, _, _ ->\n      // A failed network item should not kill a long continuous range. Skip it\n      // when another ayah remains; surface an error only at the end.\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        playCurrent()\n      } else {\n        state = "error"\n        publishSnapshot()\n        updateNotification()\n      }\n      true\n    }'''
+          new_error = '''    next.setOnErrorListener { _, _, _ ->\n      // Samsung/Android may briefly suspend a streaming connection while the\n      // screen is off. Retry the same ayah before skipping so radio playback\n      // survives short Wi-Fi/cellular interruptions.\n      if (retryCount < 3 && currentItem() != null) {\n        retryCount += 1\n        state = "loading"\n        publishSnapshot()\n        updateNotification()\n        releasePlayer()\n        retryHandler.postDelayed({ playCurrent() }, 1200L * retryCount)\n      } else if (queueIndex + 1 < currentQueueSize()) {\n        retryCount = 0\n        queueIndex += 1\n        playCurrent()\n      } else {\n        retryCount = 0\n        state = "error"\n        publishSnapshot()\n        updateNotification()\n      }\n      true\n    }'''
+          replace_once(service, old_error, new_error)
+          replace_once(service,
+              '  private fun stopPlayback(removeNotification: Boolean) {\n    releasePlayer()',
+              '  private fun stopPlayback(removeNotification: Boolean) {\n    retryHandler.removeCallbacksAndMessages(null)\n    releasePlayer()\n    releaseWifiLock()')
+          replace_once(service,
+              '  private fun releasePlayer() {\n    player?.let { mediaPlayer ->',
+              '''  private fun ensureWifiLock() {\n    if (wifiLock?.isHeld == true) return\n    val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager\n    @Suppress("DEPRECATION")\n    val lock = manager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "$packageName:quran-radio")\n    lock.setReferenceCounted(false)\n    runCatching { lock.acquire() }\n    wifiLock = lock\n  }\n\n  private fun releaseWifiLock() {\n    wifiLock?.let { lock ->\n      if (runCatching { lock.isHeld }.getOrDefault(false)) runCatching { lock.release() }\n    }\n    wifiLock = null\n  }\n\n  private fun releasePlayer() {\n    player?.let { mediaPlayer ->''')
+
+          # --- Qur'an reader: always use continuous vertical browsing and auto-turn at scroll edges. ---
+          rendering = 'mobile/src/quran/quranRendering.tsx'
+          replace_once(rendering,
+              '          setAppearanceState({ ...DEFAULT_QURAN_APPEARANCE, ...parsed });',
+              '          setAppearanceState({ ...DEFAULT_QURAN_APPEARANCE, ...parsed, browseMode: "vertical" });')
+
+          quran = 'mobile/src/quran/QuranV3.tsx'
+          replace_once(quran,
+              '  const readerContentHeight = useRef(0);',
+              '  const readerContentHeight = useRef(0);\n  const readerLastScrollY = useRef(0);\n  const readerScrollDirection = useRef<"up" | "down" | null>(null);')
+          replace_once(quran,
+              '  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();',
+              '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n\n  useEffect(() => {\n    // Continuous vertical reading is the default for every entry point: Surah,\n    // Juz, Mushaf page, search result and bookmark.\n    if (appearance.browseMode !== "vertical") {\n      setAppearance((current) => ({ ...current, browseMode: "vertical" }));\n    }\n  }, [appearance.browseMode]);''')
+          replace_once(quran, '    if (Math.abs(dy) < 48) return;', '    if (Math.abs(dy) < 24) return;')
+          replace_once(quran,
+              '    readerAtTop.current = true;\n    readerAtBottom.current = false;\n    setPosition(next);',
+              '    readerAtTop.current = true;\n    readerAtBottom.current = false;\n    readerLastScrollY.current = 0;\n    readerScrollDirection.current = null;\n    setPosition(next);')
+          old_scroll = '''            onScroll={({ nativeEvent }) => {\n              readerViewportHeight.current = nativeEvent.layoutMeasurement.height;\n              readerContentHeight.current = nativeEvent.contentSize.height;\n              readerAtTop.current = nativeEvent.contentOffset.y <= 8;\n              readerAtBottom.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;\n            }}'''
+          new_scroll = '''            onScroll={({ nativeEvent }) => {\n              readerViewportHeight.current = nativeEvent.layoutMeasurement.height;\n              readerContentHeight.current = nativeEvent.contentSize.height;\n              const y = nativeEvent.contentOffset.y;\n              if (y > readerLastScrollY.current + 1) readerScrollDirection.current = "down";\n              else if (y < readerLastScrollY.current - 1) readerScrollDirection.current = "up";\n              readerLastScrollY.current = y;\n              readerAtTop.current = y <= 8;\n              readerAtBottom.current = y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;\n            }}\n            onScrollEndDrag={() => {\n              const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n              if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) turnReaderPage(1);\n              else if (readerScrollDirection.current === "up" && (readerAtTop.current || contentFits)) turnReaderPage(-1);\n              readerScrollDirection.current = null;\n            }}'''
+          replace_once(quran, old_scroll, new_scroll)
+
+          # Trigger a clean current Android APK.
+          Path('.github/v067-build-trigger.txt').write_text('trigger=2026-08-19T16:25:00Z\nreason=v0.6.17-alarm-radio-continuous-quran-scroll\n')
+          PY
+
+      - name: Validate fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'SCHEDULE_EXACT_ALARM' mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml
+          ! grep -q 'maxSdkVersion="32"' mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml
+          grep -q 'ensureAndroidExactAlarmAccessOnLaunch' mobile/App.tsx
+          grep -q 'createWifiLock' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+          grep -q 'onScrollEndDrag' mobile/src/quran/QuranV3.tsx
+          grep -q 'browseMode: "vertical"' mobile/src/quran/quranRendering.tsx
+          cd mobile
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+          npx tsc --noEmit
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          git add mobile .github/v067-build-trigger.txt
+          git commit -m "Fix exact alarms Quran radio and continuous Quran scroll v0.6.17"
+          git pull --rebase origin main
+          git push origin HEAD:main
