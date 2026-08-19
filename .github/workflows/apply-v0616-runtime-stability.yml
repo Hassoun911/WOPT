@@ -1,4 +1,5 @@
 name: Apply v0.6.17 Continuous Quran Scrolling
+# trigger continuous scrolling final
 
 on:
   push:
