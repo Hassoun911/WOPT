@@ -1,2 +1,2 @@
-trigger=2026-08-19T06:09:00Z
-reason=v0.6.13-samsung-safe-picker-recovery
+trigger=2026-08-19T06:25:00Z
+reason=v0.6.14-restore-stable-widget-rendering
