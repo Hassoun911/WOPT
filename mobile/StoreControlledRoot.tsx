@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import AppWithEmail from "./AppWithEmail";
 import { DEFAULT_REMOTE_CONTROL, loadRemoteControlConfig, type RemoteControlConfig } from "./src/remoteConfig";
+import { setRemoteControlConfig } from "./src/remoteControlStore";
 
 function versionParts(value: string) {
   return value.split(".").map((part) => Number(part.replace(/[^0-9].*$/, "")) || 0).slice(0, 3);
@@ -30,11 +31,16 @@ export default function StoreControlledRoot() {
     void loadRemoteControlConfig().then((next) => {
       if (!cancelled) {
         setConfig(next);
+        setRemoteControlConfig(next);
         setLoaded(true);
       }
     });
     return () => { cancelled = true; };
   }, [refreshTick]);
+
+  useEffect(() => {
+    setRemoteControlConfig(config);
+  }, [config]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
