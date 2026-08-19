@@ -1,6 +1,9 @@
 {
-  "platforms": ["android"],
+  "platforms": ["android", "apple"],
   "android": {
     "modules": ["ca.wopt.prayeraudio.PrayerAudioModule"]
+  },
+  "apple": {
+    "modules": ["PrayerAudioModule"]
   }
 }
