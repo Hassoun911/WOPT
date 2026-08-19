@@ -1,47 +1,207 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   android:id="@+id/widget_root"
-  android:layout_width="match_parent" android:layout_height="match_parent"
-  android:orientation="vertical" android:padding="10dp"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical"
+  android:paddingLeft="14dp"
+  android:paddingRight="14dp"
+  android:paddingTop="12dp"
+  android:paddingBottom="12dp"
   android:background="@drawable/hassoun_widget_bg">
 
-  <LinearLayout android:layout_width="match_parent" android:layout_height="42dp" android:orientation="horizontal" android:gravity="center_vertical">
-    <ImageView android:id="@+id/widget_logo" android:layout_width="38dp" android:layout_height="38dp" android:src="@drawable/hassoun_widget_logo" android:scaleType="fitCenter" android:contentDescription="Hassoun" />
-    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="9dp" android:orientation="vertical">
-      <TextView android:id="@+id/widget_header" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HASSOUN" android:fontFamily="serif" android:textStyle="bold" android:textSize="14sp" android:letterSpacing="0.11" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_brand_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textStyle="bold" android:textSize="6.2sp" android:letterSpacing="0.08" android:maxLines="1" android:includeFontPadding="false" />
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="46dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+    <ImageView
+      android:id="@+id/widget_logo"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:src="@drawable/hassoun_widget_logo"
+      android:scaleType="fitCenter"
+      android:contentDescription="Hassoun" />
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:layout_marginStart="10dp"
+      android:orientation="vertical">
+      <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="HASSOUN"
+        android:fontFamily="serif"
+        android:textStyle="bold"
+        android:textSize="15sp"
+        android:letterSpacing="0.10"
+        android:maxLines="1"
+        android:includeFontPadding="false" />
+      <TextView
+        android:id="@+id/widget_brand_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:textSize="7sp"
+        android:letterSpacing="0.07"
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
-    <LinearLayout android:layout_width="112dp" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
-      <TextView android:id="@+id/widget_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textStyle="bold" android:textSize="7sp" android:maxLines="1" android:includeFontPadding="false" />
-      <TextView android:id="@+id/widget_hijri" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:textSize="6sp" android:maxLines="1" android:includeFontPadding="false" />
+    <LinearLayout
+      android:layout_width="132dp"
+      android:layout_height="wrap_content"
+      android:layout_marginEnd="6dp"
+      android:orientation="vertical"
+      android:gravity="end">
+      <TextView
+        android:id="@+id/widget_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:textStyle="bold"
+        android:textSize="8.5sp"
+        android:maxLines="1"
+        android:includeFontPadding="false" />
+      <TextView
+        android:id="@+id/widget_hijri"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:textSize="7.2sp"
+        android:maxLines="1"
+        android:includeFontPadding="false" />
     </LinearLayout>
   </LinearLayout>
 
-  <FrameLayout android:id="@+id/widget_hero" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="5dp" android:layout_marginBottom="8dp" android:background="@drawable/hassoun_widget_hero_light">
-    <ImageView android:id="@+id/widget_hero_art" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="bottom" android:src="@drawable/hassoun_widget_mosque_silhouette_light" android:alpha="0.26" android:scaleType="fitCenter" android:contentDescription="" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="13dp" android:paddingRight="13dp">
-      <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.16" android:orientation="vertical" android:gravity="center_vertical">
-        <TextView android:id="@+id/widget_next_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PRAYER" android:textStyle="bold" android:textSize="8.5sp" android:letterSpacing="0.09" android:maxLines="1" android:includeFontPadding="false" />
-        <TextView android:id="@+id/widget_next_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="40sp" android:maxLines="1" android:includeFontPadding="false" />
-        <TextView android:id="@+id/widget_next_secondary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="10sp" android:maxLines="1" android:includeFontPadding="false" />
+  <FrameLayout
+    android:id="@+id/widget_hero"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/hassoun_widget_hero_light">
+    <ImageView
+      android:id="@+id/widget_hero_art"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:layout_gravity="bottom"
+      android:src="@drawable/hassoun_widget_mosque_silhouette_light"
+      android:alpha="0.26"
+      android:scaleType="fitCenter"
+      android:contentDescription="" />
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:paddingLeft="18dp"
+      android:paddingRight="18dp">
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.16"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+        <TextView
+          android:id="@+id/widget_next_label"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="NEXT PRAYER"
+          android:textStyle="bold"
+          android:textSize="8.5sp"
+          android:letterSpacing="0.09"
+          android:maxLines="1"
+          android:includeFontPadding="false" />
+        <TextView
+          android:id="@+id/widget_next_name"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:fontFamily="serif"
+          android:textSize="40sp"
+          android:maxLines="1"
+          android:includeFontPadding="false" />
+        <TextView
+          android:id="@+id/widget_next_secondary"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="4dp"
+          android:textSize="12sp"
+          android:maxLines="1"
+          android:includeFontPadding="false" />
       </LinearLayout>
-      <Chronometer android:id="@+id/widget_countdown" android:layout_width="82dp" android:layout_height="82dp" android:layout_marginHorizontal="10dp" android:gravity="center" android:background="@drawable/hassoun_widget_countdown_circle_light" android:padding="5dp" android:textStyle="bold" android:textSize="14sp" android:maxLines="2" android:includeFontPadding="false" />
-      <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.02" android:orientation="vertical" android:gravity="center_vertical|end">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADHAN" android:textColor="#AF7E39" android:textStyle="bold" android:textSize="7.5sp" android:letterSpacing="0.08" android:includeFontPadding="false" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end|bottom" android:orientation="horizontal">
-          <TextView android:id="@+id/widget_next_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="serif" android:textSize="38sp" android:maxLines="1" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="24sp" android:autoSizeMaxTextSize="38sp" android:autoSizeStepGranularity="1sp" />
-          <TextView android:id="@+id/widget_next_suffix" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:layout_marginBottom="5dp" android:fontFamily="serif" android:textSize="11sp" android:maxLines="1" android:includeFontPadding="false" />
+      <Chronometer
+        android:id="@+id/widget_countdown"
+        android:layout_width="82dp"
+        android:layout_height="82dp"
+        android:layout_marginHorizontal="10dp"
+        android:gravity="center"
+        android:background="@drawable/hassoun_widget_countdown_circle_light"
+        android:padding="5dp"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:maxLines="2"
+        android:includeFontPadding="false" />
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.02"
+        android:orientation="vertical"
+        android:gravity="center_vertical|end">
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="ADHAN"
+          android:textColor="#AF7E39"
+          android:textStyle="bold"
+          android:textSize="7.5sp"
+          android:letterSpacing="0.08"
+          android:includeFontPadding="false" />
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="end|bottom"
+          android:orientation="horizontal">
+          <TextView
+            android:id="@+id/widget_next_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="serif"
+            android:textSize="38sp"
+            android:maxLines="1"
+            android:includeFontPadding="false"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="24sp"
+            android:autoSizeMaxTextSize="38sp"
+            android:autoSizeStepGranularity="1sp" />
+          <TextView
+            android:id="@+id/widget_next_suffix"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="5dp"
+            android:fontFamily="serif"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:includeFontPadding="false" />
         </LinearLayout>
       </LinearLayout>
     </LinearLayout>
   </FrameLayout>
 
-  <LinearLayout android:id="@+id/widget_prayer_strip" android:layout_width="match_parent" android:layout_height="78dp" android:orientation="horizontal">
-    <TextView android:id="@+id/widget_prayer_fajr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_asr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
-    <TextView android:id="@+id/widget_prayer_isha" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="4dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="9sp" android:autoSizeStepGranularity="1sp" />
+  <LinearLayout
+    android:id="@+id/widget_prayer_strip"
+    android:layout_width="match_parent"
+    android:layout_height="82dp"
+    android:orientation="horizontal">
+    <TextView android:id="@+id/widget_prayer_fajr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:padding="5dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp" android:autoSizeStepGranularity="1sp" />
+    <TextView android:id="@+id/widget_prayer_dhuhr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="5dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp" android:autoSizeStepGranularity="1sp" />
+    <TextView android:id="@+id/widget_prayer_asr" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="5dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp" android:autoSizeStepGranularity="1sp" />
+    <TextView android:id="@+id/widget_prayer_maghrib" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="5dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp" android:autoSizeStepGranularity="1sp" />
+    <TextView android:id="@+id/widget_prayer_isha" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="4dp" android:gravity="center" android:padding="5dp" android:textStyle="bold" android:maxLines="3" android:includeFontPadding="false" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp" android:autoSizeStepGranularity="1sp" />
   </LinearLayout>
+
   <TextView android:id="@+id/widget_location" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" android:textSize="1sp" />
 </LinearLayout>
