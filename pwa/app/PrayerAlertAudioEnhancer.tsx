@@ -85,7 +85,6 @@ async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: s
       badge: `${scopedBase}/notification-badge.png` || "/notification-badge.png",
       tag: `wopt-local-${prayer}-${kind}`,
       silent: false,
-      vibrate: kind === "prayer" ? [300, 120, 300] : [180, 100, 180],
       requireInteraction: kind === "prayer",
       data: { url: `${scopedBase}/` || "/", prayer, kind },
     });
