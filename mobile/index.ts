@@ -1,4 +1,4 @@
 import { registerRootComponent } from "expo";
-import AppWithEmail from "./AppWithEmail";
+import StoreControlledRoot from "./StoreControlledRoot";
 
-registerRootComponent(AppWithEmail);
+registerRootComponent(StoreControlledRoot);
