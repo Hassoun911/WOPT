@@ -200,6 +200,8 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
   const readerAtBottom = useRef(false);
   const readerViewportHeight = useRef(0);
   const readerContentHeight = useRef(0);
+  const readerLastScrollY = useRef(0);
+  const readerScrollDirection = useRef<"up" | "down" | null>(null);
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
 
@@ -974,8 +976,21 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
             onScroll={({ nativeEvent }) => {
               readerViewportHeight.current = nativeEvent.layoutMeasurement.height;
               readerContentHeight.current = nativeEvent.contentSize.height;
-              readerAtTop.current = nativeEvent.contentOffset.y <= 8;
-              readerAtBottom.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
+              const y = nativeEvent.contentOffset.y;
+              if (y > readerLastScrollY.current + 1) readerScrollDirection.current = "down";
+              else if (y < readerLastScrollY.current - 1) readerScrollDirection.current = "up";
+              readerLastScrollY.current = y;
+              readerAtTop.current = y <= 8;
+              readerAtBottom.current = y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
+            }}
+            onScrollEndDrag={() => {
+              const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+              if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) {
+                turnReaderPage(1);
+              } else if (readerScrollDirection.current === "up" && (readerAtTop.current || contentFits)) {
+                turnReaderPage(-1);
+              }
+              readerScrollDirection.current = null;
             }}
           >
             {spreadMode ? <View style={styles.bookSpread}>{spreadLeftPage ? <View style={styles.bookPageSlot}>{renderMushafPage(spreadLeftPage)}</View> : <View style={[styles.bookPageSlot, styles.blankBookPage]} /> }<View style={styles.bookGutter} /><View style={styles.bookPageSlot}>{renderMushafPage(spreadRightPage)}</View></View> : renderMushafPage(currentPage)}

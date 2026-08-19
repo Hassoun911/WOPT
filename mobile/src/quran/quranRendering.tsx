@@ -65,7 +65,7 @@ export function useQuranAppearance() {
         const saved = await AsyncStorage.getItem(APPEARANCE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved) as Partial<QuranAppearance>;
-          setAppearanceState({ ...DEFAULT_QURAN_APPEARANCE, ...parsed });
+          setAppearanceState({ ...DEFAULT_QURAN_APPEARANCE, ...parsed, browseMode: "vertical" });
         }
       } catch {}
       setReady(true);
