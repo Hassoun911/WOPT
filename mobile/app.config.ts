@@ -10,12 +10,13 @@ const config: ExpoConfig = {
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     infoPlist: {
       UIBackgroundModes: ["remote-notification", "audio"],
-      NSLocationWhenInUseUsageDescription: "Hassoun uses your location to automatically select the correct local prayer times and email alert time zone.",
-      NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation."
+      NSLocationWhenInUseUsageDescription: "Hassoun uses your location to support location-aware features and prayer-time settings when you choose to use them.",
+      NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation.",
+      NSSpeechRecognitionUsageDescription: "Hassoun uses speech recognition only when you choose Qur’an recitation practice so your recitation can be compared on your device."
     }
   },
   android: {
@@ -28,7 +29,7 @@ const config: ExpoConfig = {
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
       "android.permission.RECEIVE_BOOT_COMPLETED",
-      "android.permission.USE_EXACT_ALARM",
+      "android.permission.SCHEDULE_EXACT_ALARM",
       "android.permission.FOREGROUND_SERVICE",
       "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
       "android.permission.VIBRATE",
