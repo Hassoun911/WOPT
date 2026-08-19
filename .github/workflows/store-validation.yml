@@ -120,7 +120,6 @@ jobs:
         run: |
           test -f mobile/ios/Hassoun/PrivacyInfo.xcprivacy || find mobile/ios -name PrivacyInfo.xcprivacy -print -quit | grep .
           grep -R "NSSpeechRecognitionUsageDescription" mobile/ios/*/Info.plist
-          grep -R "QuranAudioModule" mobile/ios/Pods/Target\ Support\ Files mobile/ios/Pods/Manifest.lock mobile/ios/Podfile.lock || true
           grep -q "QuranAudio" mobile/ios/Podfile.lock
           grep -q "QuranSpeech" mobile/ios/Podfile.lock
           grep -q "PrayerAudio" mobile/ios/Podfile.lock
@@ -131,13 +130,21 @@ jobs:
           test -n "$WORKSPACE"
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); schemes=d.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')
           test -n "$SCHEME"
+          set +e
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build 2>&1 | tee /tmp/hassoun-xcode.log
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            echo "========== HASSOUN XCODE COMPILER ERRORS =========="
+            grep -nE '(^|[[:space:]])(error:|fatal error:)|SwiftCompile|CompileSwift' /tmp/hassoun-xcode.log | tail -n 160 || true
+            echo "===================================================="
+            exit "$STATUS"
+          fi
 
   backend:
     runs-on: ubuntu-latest
