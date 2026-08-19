@@ -35,6 +35,7 @@ import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
 import { handleGames } from "./games";
+import { getPublicRuntimeConfig } from "./runtimeConfig";
 import { duePrayerEvents } from "./schedule";
 import {
   getSubscriberPreferences,
@@ -232,6 +233,8 @@ export default {
           emailDeliveryConfigured: emailDeliveryConfigured(env),
           automaticLocation: true
         });
+      } else if (request.method === "GET" && url.pathname === "/app/runtime") {
+        response = await getPublicRuntimeConfig(env);
       } else if (request.method === "POST" && url.pathname === "/subscriptions/expo") {
         response = await registerExpo(request, env);
       } else if (request.method === "POST" && url.pathname === "/subscriptions/web") {
