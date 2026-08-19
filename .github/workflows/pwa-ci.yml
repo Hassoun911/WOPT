@@ -2,7 +2,7 @@ name: PWA build validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, work/hassoun-1.0-store-admin]
     paths:
       - "pwa/**"
       - ".github/workflows/pwa-ci.yml"
