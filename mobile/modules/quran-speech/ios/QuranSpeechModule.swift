@@ -35,12 +35,13 @@ public class QuranSpeechModule: Module {
     }
 
     Function("getStatus") {
+      let errorValue: Any = self.lastError.map { $0 as Any } ?? NSNull()
       return [
         "available": SFSpeechRecognizer.authorizationStatus() != .denied && SFSpeechRecognizer.authorizationStatus() != .restricted,
         "state": self.state,
         "transcript": self.transcript,
         "partialTranscript": self.partialTranscript,
-        "error": self.lastError ?? NSNull()
+        "error": errorValue
       ] as [String: Any]
     }
 
