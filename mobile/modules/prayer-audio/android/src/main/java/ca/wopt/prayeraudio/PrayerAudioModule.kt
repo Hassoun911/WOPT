@@ -37,6 +37,11 @@ class PrayerAudioModule : Module() {
       mapOf("scheduled" to result.scheduled, "exact" to result.exact)
     }
 
+    AsyncFunction("restoreExactPrayerAlarms") {
+      PrayerAlarmScheduler.restoreSchedule(context)
+      mapOf("exact" to PrayerAlarmScheduler.canScheduleExactAlarms(context))
+    }
+
     AsyncFunction("scheduleTestPrayerAlarm") { prayer: String, delaySeconds: Int ->
       val exact = PrayerAlarmScheduler.scheduleTest(context, prayer, delaySeconds)
       mapOf("exact" to exact)
