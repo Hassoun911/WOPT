@@ -1,5 +1,6 @@
 name: One-time Admin CRM UI expansion
 
+# One-shot branch-local migration. The script deletes this workflow after applying.
 on:
   push:
     branches:
