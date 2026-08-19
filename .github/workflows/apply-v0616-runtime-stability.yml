@@ -1,0 +1,156 @@
+name: Apply Hassoun v0.6.16 Runtime Stability
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-v0616-runtime-stability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Quran radio recovery and reader continuous scroll
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str, label: str):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Missing patch target: {label}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          service = 'mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt'
+          quran = 'mobile/src/quran/QuranV3.tsx'
+
+          replace_once(service,
+              'import android.os.Build\nimport android.os.IBinder\nimport android.os.PowerManager\n',
+              'import android.os.Build\nimport android.os.Handler\nimport android.os.IBinder\nimport android.os.Looper\nimport android.os.PowerManager\n',
+              'service Handler imports')
+
+          replace_once(service,
+              '''  private var rangeReciterBase = ""\n  private var rangeReciterName = "Hassoun"\n''',
+              '''  private var rangeReciterBase = ""\n  private var rangeReciterName = "Hassoun"\n  private val mainHandler = Handler(Looper.getMainLooper())\n  private var retryCount = 0\n  private var resumePositionMs = 0\n''',
+              'service recovery state')
+
+          replace_once(service,
+              '''  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {\n    when (intent?.action) {\n''',
+              '''  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {\n    if (intent == null) {\n      if (restorePlaybackState()) {\n        playCurrent(resumePositionMs)\n      } else {\n        stopSelf()\n      }\n      return START_STICKY\n    }\n\n    when (intent.action) {\n''',
+              'sticky restart restore')
+
+          replace_once(service,
+              '''        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        if (queue.isNotEmpty()) playCurrent() else stopPlayback(true)\n''',
+              '''        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        retryCount = 0\n        resumePositionMs = 0\n        savePlaybackState()\n        if (queue.isNotEmpty()) playCurrent() else stopPlayback(true)\n''',
+              'queue persist start')
+
+          replace_once(service,
+              '''        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        if (rangeActive) playCurrent() else stopPlayback(true)\n''',
+              '''        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f).coerceIn(0.5f, 2.0f)\n        retryCount = 0\n        resumePositionMs = 0\n        savePlaybackState()\n        if (rangeActive) playCurrent() else stopPlayback(true)\n''',
+              'range persist start')
+
+          replace_once(service,
+              '''      ACTION_REPEAT -> {\n        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        publishSnapshot()\n        updateNotification()\n      }\n''',
+              '''      ACTION_REPEAT -> {\n        repeatQueue = intent.getBooleanExtra(EXTRA_REPEAT, false)\n        savePlaybackState()\n        publishSnapshot()\n        updateNotification()\n      }\n''',
+              'repeat persist')
+
+          replace_once(service,
+              '''  override fun onBind(intent: Intent?): IBinder? = null\n\n  override fun onDestroy() {\n''',
+              '''  override fun onBind(intent: Intent?): IBinder? = null\n\n  override fun onTaskRemoved(rootIntent: Intent?) {\n    savePlaybackState()\n    super.onTaskRemoved(rootIntent)\n  }\n\n  override fun onDestroy() {\n    if (state == "playing" || state == "loading") savePlaybackState()\n''',
+              'service task recovery')
+
+          replace_once(service,
+              '''  private fun playCurrent() {\n    val item = currentItem() ?: run {\n''',
+              '''  private fun playCurrent(startPositionMs: Int = 0) {\n    val item = currentItem() ?: run {\n''',
+              'playCurrent resume parameter')
+
+          replace_once(service,
+              '''    next.setDataSource(item.url)\n    next.setOnPreparedListener { mediaPlayer ->\n      applySpeed(mediaPlayer)\n      mediaPlayer.start()\n      state = "playing"\n      publishSnapshot()\n      updateNotification()\n    }\n''',
+              '''    next.setOnPreparedListener { mediaPlayer ->\n      applySpeed(mediaPlayer)\n      val seekTo = startPositionMs.coerceAtLeast(0)\n      if (seekTo > 0) runCatching { mediaPlayer.seekTo(seekTo) }\n      mediaPlayer.start()\n      retryCount = 0\n      resumePositionMs = 0\n      state = "playing"\n      savePlaybackState()\n      publishSnapshot()\n      updateNotification()\n    }\n''',
+              'prepared restore')
+
+          replace_once(service,
+              '''    next.setOnCompletionListener {\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        playCurrent()\n      } else if (repeatQueue && currentQueueSize() > 0) {\n        queueIndex = 0\n        playCurrent()\n      } else {\n        state = "completed"\n        publishSnapshot()\n        updateNotification()\n      }\n    }\n    next.setOnErrorListener { _, _, _ ->\n      // A failed network item should not kill a long continuous range. Skip it\n      // when another ayah remains; surface an error only at the end.\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        playCurrent()\n      } else {\n        state = "error"\n        publishSnapshot()\n        updateNotification()\n      }\n      true\n    }\n    next.prepareAsync()\n''',
+              '''    next.setOnCompletionListener {\n      retryCount = 0\n      resumePositionMs = 0\n      if (queueIndex + 1 < currentQueueSize()) {\n        queueIndex += 1\n        savePlaybackState()\n        playCurrent()\n      } else if (repeatQueue && currentQueueSize() > 0) {\n        queueIndex = 0\n        savePlaybackState()\n        playCurrent()\n      } else {\n        state = "completed"\n        clearSavedPlayback()\n        publishSnapshot()\n        updateNotification()\n      }\n    }\n    next.setOnErrorListener { _, _, _ ->\n      retryOrAdvance()\n      true\n    }\n    runCatching {\n      next.setDataSource(item.url)\n      next.prepareAsync()\n    }.onFailure {\n      retryOrAdvance()\n    }\n''',
+              'radio retry pipeline')
+
+          replace_once(service,
+              '''  private fun pausePlayback() {\n    player?.let {\n''',
+              '''  private fun retryOrAdvance() {\n    resumePositionMs = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)\n    releasePlayer()\n    if (retryCount < MAX_STREAM_RETRIES) {\n      retryCount += 1\n      state = "loading"\n      savePlaybackState()\n      publishSnapshot()\n      updateNotification()\n      mainHandler.postDelayed({ playCurrent(resumePositionMs) }, 1200L * retryCount)\n      return\n    }\n    retryCount = 0\n    resumePositionMs = 0\n    if (queueIndex + 1 < currentQueueSize()) {\n      queueIndex += 1\n      savePlaybackState()\n      playCurrent()\n    } else if (repeatQueue && currentQueueSize() > 0) {\n      queueIndex = 0\n      savePlaybackState()\n      playCurrent()\n    } else {\n      state = "error"\n      publishSnapshot()\n      updateNotification()\n    }\n  }\n\n  private fun pausePlayback() {\n    player?.let {\n''',
+              'retry helper')
+
+          replace_once(service,
+              '''        state = "paused"\n        publishSnapshot()\n''',
+              '''        state = "paused"\n        savePlaybackState()\n        publishSnapshot()\n''',
+              'pause persist')
+
+          replace_once(service,
+              '''    state = "playing"\n    publishSnapshot()\n''',
+              '''    state = "playing"\n    savePlaybackState()\n    publishSnapshot()\n''',
+              'resume persist')
+
+          replace_once(service,
+              '''    rangeReciterName = "Hassoun"\n    state = "idle"\n    publishSnapshot()\n''',
+              '''    rangeReciterName = "Hassoun"\n    retryCount = 0\n    resumePositionMs = 0\n    state = "idle"\n    clearSavedPlayback()\n    publishSnapshot()\n''',
+              'stop clears recovery')
+
+          replace_once(service,
+              '''  private fun releasePlayer() {\n''',
+              '''  private fun savePlaybackState() {\n    if (!rangeActive) return\n    val position = runCatching { player?.currentPosition ?: resumePositionMs }.getOrDefault(resumePositionMs)\n    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit()\n      .putBoolean("rangeActive", rangeActive)\n      .putInt("rangeStart", rangeStartAbsolute)\n      .putInt("rangeEnd", rangeEndAbsolute)\n      .putString("reciterBase", rangeReciterBase)\n      .putString("reciterName", rangeReciterName)\n      .putInt("queueIndex", queueIndex)\n      .putBoolean("repeat", repeatQueue)\n      .putFloat("speed", speed)\n      .putString("state", state)\n      .putInt("positionMs", position.coerceAtLeast(0))\n      .apply()\n  }\n\n  private fun restorePlaybackState(): Boolean {\n    val prefs = getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)\n    if (!prefs.getBoolean("rangeActive", false)) return false\n    val savedState = prefs.getString("state", "idle") ?: "idle"\n    if (savedState !in setOf("playing", "loading")) return false\n    rangeStartAbsolute = prefs.getInt("rangeStart", 1).coerceAtLeast(1)\n    rangeEndAbsolute = prefs.getInt("rangeEnd", rangeStartAbsolute).coerceAtLeast(rangeStartAbsolute)\n    rangeReciterBase = prefs.getString("reciterBase", "").orEmpty().trimEnd('/')\n    rangeReciterName = prefs.getString("reciterName", "Hassoun").orEmpty().ifBlank { "Hassoun" }\n    queueIndex = prefs.getInt("queueIndex", 0).coerceIn(0, (rangeEndAbsolute - rangeStartAbsolute).coerceAtLeast(0))\n    repeatQueue = prefs.getBoolean("repeat", false)\n    speed = prefs.getFloat("speed", 1.0f).coerceIn(0.5f, 2.0f)\n    resumePositionMs = prefs.getInt("positionMs", 0).coerceAtLeast(0)\n    retryCount = 0\n    rangeActive = rangeReciterBase.isNotBlank()\n    state = "loading"\n    return rangeActive\n  }\n\n  private fun clearSavedPlayback() {\n    getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE).edit().clear().apply()\n  }\n\n  private fun releasePlayer() {\n''',
+              'playback persistence helpers')
+
+          replace_once(service,
+              '''    private const val CHANNEL_ID = "hassoun-quran-audio"\n    private const val NOTIFICATION_ID = 4821\n''',
+              '''    private const val CHANNEL_ID = "hassoun-quran-audio"\n    private const val NOTIFICATION_ID = 4821\n    private const val PLAYBACK_PREFS = "hassoun-quran-playback-v2"\n    private const val MAX_STREAM_RETRIES = 3\n''',
+              'service recovery constants')
+
+          # Always open the reader in vertical continuous browsing, regardless of
+          # whether the user entered from Surah, Juz, Page, Search, or Bookmark.
+          replace_once(quran,
+              '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n  const surahs = allSurahs();\n''',
+              '''  const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();\n\n  useEffect(() => {\n    if (screen === "reader" && appearance.browseMode !== "vertical") {\n      setAppearance((current) => ({ ...current, browseMode: "vertical" }));\n    }\n  }, [screen, appearance.browseMode]);\n\n  const surahs = allSurahs();\n''',
+              'force vertical reader browsing')
+
+          replace_once(quran,
+              '    if (Math.abs(dy) < 48) return;\n',
+              '    if (Math.abs(dy) < 24) return;\n',
+              'reader edge scroll threshold')
+          PY
+
+      - name: Validate patched sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'MAX_STREAM_RETRIES = 3' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+          grep -q 'restorePlaybackState()' mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt
+          grep -q 'browseMode: "vertical"' mobile/src/quran/QuranV3.tsx
+          cd mobile
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+          npx tsc --noEmit
+
+      - name: Commit runtime fixes and trigger APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'trigger=%s\nreason=v0.6.16-alarm-radio-reader-stability\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .github/v067-build-trigger.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            mobile/modules/quran-audio/android/src/main/java/ca/wopt/quranaudio/QuranAudioService.kt \
+            mobile/src/quran/QuranV3.tsx \
+            .github/v067-build-trigger.txt
+          git commit -m "Fix Qur’an radio recovery and continuous reader scroll v0.6.16"
+          git push origin HEAD:main
