@@ -1,2 +1,2 @@
-trigger=2026-08-19T15:42:00Z
-reason=v0.6.15-safe-spacing-readable-layouts
+trigger=2026-08-19T16:15:00Z
+reason=v0.6.16-alarm-radio-reader-stability
