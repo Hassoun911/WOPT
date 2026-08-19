@@ -45,6 +45,11 @@ private final class HassounQuranPlayer: NSObject {
     removeObservers()
   }
 
+  private func bridgeValue(_ value: String?) -> Any {
+    guard let value else { return NSNull() }
+    return value
+  }
+
   private func configureAudioSession() {
     let session = AVAudioSession.sharedInstance()
     do {
@@ -312,9 +317,9 @@ private final class HassounQuranPlayer: NSObject {
       "positionMs": Int(currentSeconds() * 1000),
       "durationMs": Int(durationSeconds() * 1000),
       "speed": Double(requestedSpeed),
-      "url": item?.url ?? NSNull(),
-      "title": item?.title ?? NSNull(),
-      "subtitle": item?.subtitle ?? NSNull(),
+      "url": bridgeValue(item?.url),
+      "title": bridgeValue(item?.title),
+      "subtitle": bridgeValue(item?.subtitle),
       "queueIndex": queueIndex,
       "queueSize": currentQueueSize(),
       "repeat": repeatQueue,
