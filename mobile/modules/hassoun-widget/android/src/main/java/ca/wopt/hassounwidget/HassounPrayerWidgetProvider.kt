@@ -64,7 +64,13 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     private val prayerKeys = listOf("fajr", "dhuhr", "asr", "maghrib", "isha")
     private val englishNames = mapOf("fajr" to "Fajr", "dhuhr" to "Dhuhr", "asr" to "Asr", "maghrib" to "Maghrib", "isha" to "Isha")
     private val arabicNames = mapOf("fajr" to "الفجر", "dhuhr" to "الظهر", "asr" to "العصر", "maghrib" to "المغرب", "isha" to "العشاء")
-    private val prayerSymbols = mapOf("fajr" to "☼", "dhuhr" to "☀", "asr" to "☀", "maghrib" to "☾", "isha" to "☾")
+    private val prayerIcons = mapOf(
+      "fajr" to R.drawable.ic_widget_fajr,
+      "dhuhr" to R.drawable.ic_widget_dhuhr,
+      "asr" to R.drawable.ic_widget_asr,
+      "maghrib" to R.drawable.ic_widget_maghrib,
+      "isha" to R.drawable.ic_widget_isha
+    )
     private val toronto = TimeZone.getTimeZone("America/Toronto")
 
     fun updateAll(context: Context) {
@@ -166,6 +172,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_next_name, if (locale == "ar") "افتح Hassoun" else "Open Hassoun")
         views.setTextViewText(R.id.widget_next_secondary, if (locale == "ar") "للمزامنة" else "to sync prayer times")
         views.setTextViewText(R.id.widget_next_time, "")
+        if (!isLockScreen) views.setTextViewText(R.id.widget_next_suffix, "")
         views.setViewVisibility(R.id.widget_countdown, View.GONE)
         views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
       } else {
@@ -174,7 +181,12 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         val secondaryName = if (locale == "ar") englishNames[next.key] ?: next.key else arabicNames[next.key] ?: next.key
         views.setTextViewText(R.id.widget_next_secondary, if (showArabicNames) secondaryName else "")
         views.setViewVisibility(R.id.widget_next_secondary, if (showArabicNames) View.VISIBLE else View.GONE)
-        views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
+        if (isLockScreen) {
+          views.setTextViewText(R.id.widget_next_time, formatClock(next.timeText, locale))
+        } else {
+          views.setTextViewText(R.id.widget_next_time, formatClockMain(next.timeText))
+          views.setTextViewText(R.id.widget_next_suffix, formatClockSuffix(next.timeText))
+        }
 
         val timeSp = when (layout) {
           "vertical" -> when (timeSize) { "small" -> 25f; "medium" -> 28f; "xlarge" -> 34f; else -> 31f }
@@ -190,6 +202,15 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
+        if (!isLockScreen) {
+          val suffixSp = when (layout) {
+            "vertical" -> 9f
+            "square" -> 7.5f
+            "slim", "compact", "next" -> 6.5f
+            else -> 11f
+          }
+          views.setTextViewTextSize(R.id.widget_next_suffix, TypedValue.COMPLEX_UNIT_SP, suffixSp)
+        }
 
         val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
         if (showCountdown) {
@@ -270,20 +291,39 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       prayerKeys.zip(ids).forEach { (key, id) ->
         val name = englishNames[key] ?: key
         val arabic = arabicNames[key] ?: ""
-        val symbol = prayerSymbols[key] ?: "•"
         val time = formatClock(day.optString(key, "--:--"), locale)
         val title = when (layout) {
           "vertical" -> when {
-            locale == "ar" && showArabic -> "$symbol   $arabic     $name     $time"
-            locale == "ar" -> "$symbol   $name     $time"
-            showArabic -> "$symbol   $name     $arabic     $time"
-            else -> "$symbol   $name     $time"
+            locale == "ar" && showArabic -> "$arabic  •  $name
+$time"
+            locale == "ar" -> "$name
+$time"
+            showArabic -> "$name  •  $arabic
+$time"
+            else -> "$name
+$time"
           }
-          "slim", "compact", "next" -> "$symbol\n$name\n$time"
-          "square" -> if (showArabic) "$symbol\n$name • $arabic\n$time" else "$symbol\n$name\n$time"
-          else -> if (showArabic) "$symbol\n$name • $arabic\n$time" else "$symbol\n$name\n$time"
+          "slim", "compact", "next" -> "$name
+$time"
+          "square" -> if (showArabic) "$name
+$arabic
+$time" else "$name
+$time"
+          else -> if (showArabic) "$name
+$arabic
+$time" else "$name
+$time"
         }
         views.setTextViewText(id, title)
+        val icon = prayerIcons[key] ?: 0
+        if (layout == "vertical") {
+          views.setTextViewCompoundDrawables(id, icon, 0, 0, 0)
+          views.setInt(id, "setCompoundDrawablePadding", 8)
+        } else {
+          views.setTextViewCompoundDrawables(id, 0, icon, 0, 0)
+          views.setInt(id, "setCompoundDrawablePadding", 3)
+        }
+
         val active = highlightNext && key == nextKey
         views.setTextColor(id, if (active) activeText else baseText)
         val chipBackground = when {
@@ -294,10 +334,10 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
         views.setInt(id, "setBackgroundResource", chipBackground)
         val stripSp = if (lockScreen) 9.5f else when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 8.2f; "medium" -> 9f; "xlarge" -> 10.7f; else -> 9.8f }
-          "square" -> when (timeSize) { "small" -> 5.2f; "medium" -> 5.8f; "xlarge" -> 7f; else -> 6.4f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 4.2f; "medium" -> 4.8f; "xlarge" -> 5.8f; else -> 5.3f }
-          else -> when (timeSize) { "small" -> 7f; "medium" -> 7.8f; "xlarge" -> 9.5f; else -> 8.7f }
+          "vertical" -> when (timeSize) { "small" -> 8.4f; "medium" -> 9.2f; "xlarge" -> 10.4f; else -> 9.8f }
+          "square" -> when (timeSize) { "small" -> 5.0f; "medium" -> 5.6f; "xlarge" -> 6.6f; else -> 6.1f }
+          "slim", "compact", "next" -> when (timeSize) { "small" -> 4.0f; "medium" -> 4.5f; "xlarge" -> 5.4f; else -> 5.0f }
+          else -> when (timeSize) { "small" -> 7.2f; "medium" -> 8.0f; "xlarge" -> 9.2f; else -> 8.6f }
         }
         views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, stripSp)
       }
@@ -320,7 +360,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       val subtext = if (light) Color.rgb(148, 104, 45) else Color.rgb(218, 193, 132)
       val ids = listOf(
         R.id.widget_header, R.id.widget_brand_subtitle, R.id.widget_next_name,
-        R.id.widget_next_secondary, R.id.widget_next_time, R.id.widget_date,
+        R.id.widget_next_secondary, R.id.widget_next_time, R.id.widget_next_suffix, R.id.widget_date,
         R.id.widget_hijri, R.id.widget_location
       )
       ids.forEach { views.setTextColor(it, text) }
@@ -391,6 +431,20 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
       }
+    }
+
+    private fun formatClockMain(raw: String): String {
+      val parts = raw.split(":")
+      if (parts.size != 2) return raw
+      val hour24 = parts[0].toIntOrNull() ?: return raw
+      val minute = parts[1].toIntOrNull() ?: return raw
+      val hour = when (val h = hour24 % 12) { 0 -> 12; else -> h }
+      return String.format(Locale.US, "%d:%02d", hour, minute)
+    }
+
+    private fun formatClockSuffix(raw: String): String {
+      val hour24 = raw.substringBefore(":").toIntOrNull() ?: return ""
+      return if (hour24 >= 12) "p.m." else "a.m."
     }
 
     private fun formatClock(raw: String, locale: String): String {

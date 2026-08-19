@@ -1,2 +1,2 @@
-trigger=2026-08-19T04:39:00Z
-reason=premium-soft-ivory-large-proportions-v0611
+trigger=2026-08-19T05:11:14Z
+reason=v0.6.11-premium-widget-structure
