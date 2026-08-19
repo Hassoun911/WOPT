@@ -1,0 +1,32 @@
+name: One-time Admin CRM UI expansion
+
+on:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - ".github/workflows/one-time-admin-ui-expansion.yml"
+      - ".github/scripts/one-time-admin-ui-expansion.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-one-time-admin-ui-expansion
+  cancel-in-progress: false
+
+jobs:
+  expand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+          fetch-depth: 0
+      - run: python3 .github/scripts/one-time-admin-ui-expansion.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add administrator and game moderation CRM panels"
+          git push origin HEAD:work/store-crm-2026-08-19
