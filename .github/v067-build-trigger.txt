@@ -1,2 +1,2 @@
-trigger=2026-08-18T23:50:00Z
-reason=retry-after-expo-font-dependency-fix
+trigger=2026-08-18T20:04:00-04:00
+reason=retry-after-worker-dev-dependency-fix
