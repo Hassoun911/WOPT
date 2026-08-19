@@ -4,46 +4,52 @@ import { loadPhonePrayerAlertPreferences, type PrayerAlertPreferences } from "./
 import { buildPrayerEvents } from "./events";
 import type { PrayerKey, PrayerTimes } from "./types";
 
-let firstLaunchAlarmCheckStarted = false;
+let exactAlarmSetupStarted = false;
 let exactAlarmSettingsOpenedThisSession = false;
 
 async function restoreExactAlarmsIfAvailable() {
-  if (Platform.OS !== "android" || !PrayerAudio) return;
+  if (Platform.OS !== "android" || !PrayerAudio) return false;
   try {
-    if (PrayerAudio.canScheduleExactAlarms()) {
-      await PrayerAudio.restoreExactPrayerAlarms();
-    }
+    if (!PrayerAudio.canScheduleExactAlarms()) return false;
+    await PrayerAudio.restoreExactPrayerAlarms();
+    return true;
   } catch {
-    // The next schedule refresh or Test Adhan can retry without crashing startup.
+    return false;
+  }
+}
+
+async function requestExactAlarmAccessIfNeeded() {
+  if (Platform.OS !== "android" || !PrayerAudio) return;
+  if (await restoreExactAlarmsIfAvailable()) return;
+  if (AppState.currentState !== "active" || exactAlarmSettingsOpenedThisSession) return;
+
+  exactAlarmSettingsOpenedThisSession = true;
+  try {
+    PrayerAudio.openExactAlarmSettings();
+  } catch {
+    // Alerts settings and Test Adhan remain a manual recovery path.
   }
 }
 
 function startFirstLaunchExactAlarmSetup() {
-  if (Platform.OS !== "android" || !PrayerAudio || firstLaunchAlarmCheckStarted) return;
-  const prayerAudio = PrayerAudio;
-  firstLaunchAlarmCheckStarted = true;
+  if (Platform.OS !== "android" || !PrayerAudio || exactAlarmSetupStarted) return;
+  exactAlarmSetupStarted = true;
 
-  setTimeout(() => {
-    void (async () => {
-      try {
-        if (prayerAudio.canScheduleExactAlarms()) {
-          await prayerAudio.restoreExactPrayerAlarms();
-          return;
-        }
-        if (!exactAlarmSettingsOpenedThisSession) {
-          exactAlarmSettingsOpenedThisSession = true;
-          prayerAudio.openExactAlarmSettings();
-        }
-      } catch {
-        // Alerts settings and Test Adhan remain the recovery path.
-      }
-    })();
-  }, 1200);
+  // Do not launch Android special-access UI while React Native is still mounting.
+  // Waiting until the Activity is active makes this reliable on Samsung/Android 14+.
+  const timer = setTimeout(() => {
+    void requestExactAlarmAccessIfNeeded();
+  }, 1800);
 
   AppState.addEventListener("change", (state) => {
     if (state !== "active") return;
-    void restoreExactAlarmsIfAvailable();
+    void restoreExactAlarmsIfAvailable().then((granted) => {
+      if (!granted) void requestExactAlarmAccessIfNeeded();
+    });
   });
+
+  // Keep the timer referenced until it fires; it is intentionally process-lifetime setup.
+  void timer;
 }
 
 startFirstLaunchExactAlarmSetup();
