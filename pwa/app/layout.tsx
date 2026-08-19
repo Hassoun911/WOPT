@@ -8,6 +8,7 @@ import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
+import RuntimeControlOverlay from "./RuntimeControlOverlay";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 import WebPushRegistration from "./WebPushRegistration";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
+        <RuntimeControlOverlay />
         <EmailManageRedirect />
         <NavEnhancer />
         <PrayerAlertAudioEnhancer />
