@@ -2,6 +2,8 @@
 
 import type { CSSProperties, FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import AdminUsersPanel from "./AdminUsersPanel";
+import AdminGamesPanel from "./AdminGamesPanel";
 
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 const TOKEN_KEY = "wopt:admin-token:v2";
@@ -24,7 +26,7 @@ type Subscriber = { public_id: string; email: string; display_name?: string | nu
 type PushCampaign = { public_id: string; name: string; category: string; title_en: string; status: string; target_platform: string; target_locale: string; scheduled_at?: string | null; sent_at?: string | null; delivery_count?: number; sent_count?: number; failed_count?: number };
 type EmailCampaign = { public_id: string; name: string; category: string; subject_en?: string; status: string; target_locale: string; scheduled_at?: string | null; sent_count?: number; failed_count?: number; delivery_count?: number };
 type Control = { settings: Setting[]; content: ContentItem[]; prayerOverrides: PrayerOverride[]; supportSummary: Array<{ status: string; count: number }>; releaseChecks: ReleaseCheck[]; activity: Activity[] };
-type ViewName = "overview" | "control" | "content" | "prayer" | "subscribers" | "support" | "push" | "email" | "release" | "audit";
+type ViewName = "overview" | "control" | "content" | "prayer" | "subscribers" | "users" | "games" | "support" | "push" | "email" | "release" | "audit";
 
 async function api<T>(path: string, init: RequestInit = {}, token?: string | null): Promise<T> {
   const headers = new Headers(init.headers);
@@ -235,7 +237,8 @@ export default function AdminControlCenter() {
 
   const nav: Array<[ViewName, string, string]> = [
     ["overview", "Overview", "⌂"], ["control", "App Control", "⚙"], ["content", "Content", "✎"], ["prayer", "Prayer Times", "◷"],
-    ["subscribers", "Subscribers", "◎"], ["support", "Support", "✉"], ["push", "Push", "↗"], ["email", "Email", "@"], ["release", "Store Release", "✓"], ["audit", "Audit", "≡"]
+    ["subscribers", "Subscribers", "◎"], ["users", "Administrators", "♙"], ["games", "Game Rooms", "◉"], ["support", "Support", "✉"],
+    ["push", "Push", "↗"], ["email", "Email", "@"], ["release", "Store Release", "✓"], ["audit", "Audit", "≡"]
   ];
 
   const supportOpen = control.supportSummary.find((row) => row.status === "open")?.count ?? 0;
@@ -271,6 +274,10 @@ export default function AdminControlCenter() {
       {view === "prayer" ? <div style={S.twoCols}><Card title="Prayer-time override" subtitle="Safely override one official Windsor time. The source JSON stays unchanged."><form onSubmit={savePrayer} style={S.form}><Field label="Date"><input type="date" value={prayerForm.dateKey} onChange={(e) => setPrayerForm({ ...prayerForm, dateKey: e.target.value })} required style={S.input} /></Field><div style={S.formGrid}><Field label="Prayer"><select value={prayerForm.prayer} onChange={(e) => setPrayerForm({ ...prayerForm, prayer: e.target.value })} style={S.input}>{["fajr", "dhuhr", "asr", "maghrib", "isha"].map((p) => <option key={p}>{p}</option>)}</select></Field><Field label="24-hour time"><input type="time" value={prayerForm.time} onChange={(e) => setPrayerForm({ ...prayerForm, time: e.target.value })} required style={S.input} /></Field></div><Field label="Reason / source note"><textarea value={prayerForm.reason} onChange={(e) => setPrayerForm({ ...prayerForm, reason: e.target.value })} style={S.textarea} /></Field><button style={S.primary}>Save override</button></form></Card><Card title="Active overrides" subtitle="These are merged over the official schedule"><div style={S.scrollList}>{control.prayerOverrides.map((item) => <div key={`${item.date_key}:${item.prayer}`} style={S.contentRowStatic}><div><strong>{item.date_key} • {item.prayer}</strong><div style={S.mutedSmall}>{item.time_value}{item.reason ? ` • ${item.reason}` : ""}</div></div><button onClick={() => void deletePrayer(item)} style={S.dangerSmall}>Remove</button></div>)}</div></Card></div> : null}
 
       {view === "subscribers" ? <Card title="Subscribers & linked devices" subtitle="Search prayer-email subscribers and their device links" actions={<input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} style={S.search} />}><div style={S.tableWrap}><table style={S.table}><thead><tr><th>Email</th><th>Status</th><th>Location</th><th>Timezone</th><th>Language</th><th>Devices</th></tr></thead><tbody>{filteredSubscribers.map((row) => <tr key={row.public_id}><td><strong>{row.email}</strong><br /><span style={S.mutedSmall}>{row.display_name}</span></td><td><Pill tone={row.status === "active" ? "good" : "warn"}>{row.status}</Pill></td><td>{[row.city, row.region, row.country_name].filter(Boolean).join(", ") || "—"}</td><td>{row.timezone}</td><td>{row.locale}</td><td>{row.linked_devices ?? 0}</td></tr>)}</tbody></table></div></Card> : null}
+
+      {view === "users" ? <AdminUsersPanel token={token} /> : null}
+
+      {view === "games" ? <AdminGamesPanel token={token} /> : null}
 
       {view === "support" ? <Card title="Support CRM" subtitle="Every in-app support request is stored here even if email delivery fails"><div style={S.ticketGrid}>{tickets.map((ticket) => <article key={ticket.public_id} style={S.ticket}><div style={S.cardHead}><div><strong>{ticket.subject}</strong><div style={S.mutedSmall}>{ticket.name || "User"} • {ticket.email} • {formatWhen(ticket.created_at)}</div></div><Pill tone={ticket.priority === "urgent" || ticket.priority === "high" ? "bad" : ticket.status === "resolved" ? "good" : "warn"}>{ticket.priority} • {ticket.status}</Pill></div><p style={S.ticketMessage}>{ticket.message}</p><div style={S.ticketMeta}>{ticket.platform || "unknown"} • v{ticket.app_version || "?"}{ticket.assigned_name || ticket.assigned_username ? ` • assigned to ${ticket.assigned_name || ticket.assigned_username}` : ""}</div><div style={S.buttonRow}><button onClick={() => void updateTicket(ticket, { status: "in_progress", assignToMe: true })} style={S.secondary}>Take</button><button onClick={() => void updateTicket(ticket, { status: "resolved", assignToMe: true })} style={S.primarySmall}>Resolve</button><button onClick={() => void updateTicket(ticket, { priority: "high" })} style={S.warnSmall}>High priority</button></div></article>)}</div></Card> : null}
 
