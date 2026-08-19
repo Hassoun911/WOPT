@@ -1,4 +1,4 @@
-import { getAdminDashboard, listAdminSubscribers } from "./adminData";
+import { getAdminDashboard } from "./adminData";
 import {
   createAppContent,
   getAdminCrmOverview,
@@ -28,6 +28,7 @@ import {
   listRestrictedAuditLog,
   listRestrictedEmailCampaigns,
   listRestrictedPushCampaigns,
+  listRestrictedSubscribers,
   updateRestrictedAppSetting,
   updateRestrictedSubscriberStatus
 } from "./adminRestricted";
@@ -272,7 +273,7 @@ export default {
       } else if (request.method === "GET" && url.pathname === "/admin/dashboard") {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
-        response = await listAdminSubscribers(request, env, url);
+        response = await listRestrictedSubscribers(request, env, url);
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
         response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3]);
       } else if (request.method === "GET" && url.pathname === "/admin/crm/overview") {
