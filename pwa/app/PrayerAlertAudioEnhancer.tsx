@@ -79,7 +79,7 @@ async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: s
     const body = kind === "prayer"
       ? `${name} is now (${time}) in Windsor.`
       : `${kind === "twenty" ? "20" : "10"} minutes until ${name} (${time}).`;
-    await registration.showNotification(title, {
+    const options = {
       body,
       icon: `${scopedBase}/icon-192.png` || "/icon-192.png",
       badge: `${scopedBase}/notification-badge.png` || "/notification-badge.png",
@@ -89,7 +89,8 @@ async function showLocalNotification(prayer: PrayerKey, kind: AlertKind, time: s
       vibrate: kind === "prayer" ? [300, 120, 300] : [180, 100, 180],
       requireInteraction: kind === "prayer",
       data: { url: `${scopedBase}/` || "/", prayer, kind },
-    });
+    };
+    await registration.showNotification(title, options);
   } catch {
     // Audio alert can still continue if notification display fails.
   }
