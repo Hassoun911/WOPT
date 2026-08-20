@@ -36,7 +36,9 @@ if (-not (Test-Path '.env')) {
   if ([string]::IsNullOrWhiteSpace($apiKey)) { throw 'Namecheap API key is required.' }
 
   $bearerBytes = New-Object byte[] 48
-  [Security.Cryptography.RandomNumberGenerator]::Fill($bearerBytes)
+  $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($bearerBytes) }
+  finally { $rng.Dispose() }
   $bearer = [Convert]::ToBase64String($bearerBytes).Replace('+','-').Replace('/','_').TrimEnd('=')
 
   $publicIp = (Invoke-RestMethod -Uri 'https://api.ipify.org?format=text' -TimeoutSec 15).Trim()
