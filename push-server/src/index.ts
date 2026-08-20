@@ -59,7 +59,22 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}) {
 
 function corsHeaders(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
-  const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";
+  const isAdminVercelOrigin = (() => {
+    if (!origin) return false;
+    try {
+      const url = new URL(origin);
+      return url.protocol === "https:" && url.hostname.endsWith(".vercel.app") && url.hostname.startsWith("hassoun-admin-");
+    } catch {
+      return false;
+    }
+  })();
+  const allowedOrigins = new Set([
+    env.ALLOWED_WEB_ORIGIN,
+    "https://admin.hassoun.app",
+    "https://crm.hassoun.app",
+    "https://hassoun-admin-crm.vercel.app"
+  ]);
+  const allowed = origin && (allowedOrigins.has(origin) || isAdminVercelOrigin) ? origin : "null";
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",
