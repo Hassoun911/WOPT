@@ -176,7 +176,7 @@ export async function bootstrapAdmin(request: Request, env: Env) {
   }
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  const iterations = 100_000;
   const digest = await passwordDigest(password, salt, iterations);
   const publicId = crypto.randomUUID();
   await env.DB.prepare(
@@ -235,7 +235,7 @@ export async function changeAdminPassword(request: Request, env: Env) {
   if (!password) return json({ error: "Password must be at least 10 characters" }, 400);
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  const iterations = 100_000;
   const digest = await passwordDigest(password, salt, iterations);
   await env.DB.prepare(
     `UPDATE admin_users SET password_hash = ?, password_salt = ?, password_iterations = ?,
