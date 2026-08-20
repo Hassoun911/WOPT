@@ -6,6 +6,8 @@ const ADMIN_ORIGINS = new Set([
   "https://hassoun-admin-crm.vercel.app"
 ]);
 
+const BACKEND_VERSION = "reset-fix-2026-08-20-1";
+
 function withAdminCors(request: Request, response: Response, env: Env) {
   const origin = request.headers.get("Origin");
   if (!origin || (origin !== env.ALLOWED_WEB_ORIGIN && !ADMIN_ORIGINS.has(origin))) {
@@ -26,6 +28,15 @@ function withAdminCors(request: Request, response: Response, env: Env) {
 
 export default {
   async fetch(request: Request, env: Env) {
+    const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/health") {
+      return withAdminCors(
+        request,
+        Response.json({ ok: true, service: "wopt-prayer-push", backendVersion: BACKEND_VERSION }),
+        env
+      );
+    }
+
     const response = await worker.fetch(request, env);
     return withAdminCors(request, response, env);
   },
