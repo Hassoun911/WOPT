@@ -67,7 +67,7 @@ const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "128kb" }));
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "hassoun-namecheap-connector", clientIp, allowedDomains: [...allowedDomains] }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "hassoun-namecheap-connector" }));
 
 app.use("/mcp", (req, res, next) => {
   const auth = req.header("authorization") || "";
