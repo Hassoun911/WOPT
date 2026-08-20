@@ -56,9 +56,10 @@ export async function updateRestrictedAppSetting(request: Request, env: Env, key
   return updateAppSetting(request, env, key);
 }
 
-export async function updateRestrictedSubscriberStatus(request: Request, env: Env, publicId: string) {
+export async function updateRestrictedSubscriberStatus(request: Request, env: Env, publicId: string | undefined) {
   const auth = await requireOperator(request, env);
   if (!auth.admin) return auth.response!;
+  if (!publicId) return json({ error: "Subscriber id is required" }, 400);
   return updateSubscriberStatus(request, env, publicId);
 }
 
