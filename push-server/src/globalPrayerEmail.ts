@@ -11,7 +11,7 @@ const OFFSETS = [
 type AlertKind = (typeof OFFSETS)[number]["kind"];
 
 type SubscriberPreferenceRow = {
-  id: number; public_id: string; email: string; locale: Locale; latitude: number; longitude: number; timezone: string;
+  id: number; public_id: string; email: string; display_name: string | null; locale: Locale; latitude: number; longitude: number; timezone: string;
   country_code: string | null; country_name: string | null; region: string | null; city: string | null;
   calculation_method: number | null; madhab: "standard" | "hanafi"; prayer: PrayerKey;
   email_twenty: number; email_ten: number; email_athan: number;
@@ -74,10 +74,13 @@ function prayerLabel(prayer: PrayerKey, locale: Locale) {
 function locationLabel(subscriber: Subscriber) {
   return [subscriber.city, subscriber.region, subscriber.country_name].filter(Boolean).join(", ") || "your location";
 }
+function publicAppUrl(env: Env) {
+  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT/").replace(/\/$/, "");
+}
 
 async function subscribersWithPreferences(env: Env) {
   const { results } = await env.DB.prepare(
-    `SELECT s.id, s.public_id, s.email, s.locale, s.latitude, s.longitude, s.timezone,
+    `SELECT s.id, s.public_id, s.email, s.display_name, s.locale, s.latitude, s.longitude, s.timezone,
             s.country_code, s.country_name, s.region, s.city, s.calculation_method, s.madhab,
             p.prayer, p.email_twenty, p.email_ten, p.email_athan
      FROM email_subscribers s
@@ -89,7 +92,7 @@ async function subscribersWithPreferences(env: Env) {
   for (const row of results) {
     let subscriber = grouped.get(row.id);
     if (!subscriber) {
-      subscriber = { id: row.id, public_id: row.public_id, email: row.email, locale: row.locale, latitude: row.latitude, longitude: row.longitude, timezone: row.timezone, country_code: row.country_code, country_name: row.country_name, region: row.region, city: row.city, calculation_method: row.calculation_method, madhab: row.madhab, preferences: {} };
+      subscriber = { id: row.id, public_id: row.public_id, email: row.email, display_name: row.display_name, locale: row.locale, latitude: row.latitude, longitude: row.longitude, timezone: row.timezone, country_code: row.country_code, country_name: row.country_name, region: row.region, city: row.city, calculation_method: row.calculation_method, madhab: row.madhab, preferences: {} };
       grouped.set(row.id, subscriber);
     }
     subscriber.preferences[row.prayer] = { email_twenty: row.email_twenty, email_ten: row.email_ten, email_athan: row.email_athan };
@@ -156,7 +159,9 @@ async function queuePrayerEmail(env: Env, subscriber: Subscriber, day: CachedPra
     eventId, kind, prayer, prayerLabel: prayerLabel(prayer, subscriber.locale), prayerTime,
     prayerDate: day.prayer_date,
     prayerTimes: { fajr: day.fajr, dhuhr: day.dhuhr, asr: day.asr, maghrib: day.maghrib, isha: day.isha },
-    locationLabel: locationLabel(subscriber), timezone: subscriber.timezone, manageUrl, upcomingEvent
+    displayName: subscriber.display_name,
+    locationLabel: locationLabel(subscriber), timezone: subscriber.timezone,
+    appUrl: publicAppUrl(env), manageUrl, upcomingEvent
   };
   await env.DB.prepare(`INSERT OR IGNORE INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES (?, ?, ?, ?, 'prayer', 'prayer_alert', ?, ?)`).bind(delivery.id, subscriber.id, subscriber.email, subscriber.locale, JSON.stringify(data), eventId).run();
   return true;
