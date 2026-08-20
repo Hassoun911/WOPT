@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
+const API = "/api";
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API}${path}`, {
