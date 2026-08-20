@@ -34,11 +34,22 @@ if (-not (Test-Path (Join-Path $pushServer 'node_modules'))) {
 }
 
 Write-Host 'Checking Cloudflare login...' -ForegroundColor Yellow
-$whoami = & npx.cmd wrangler whoami 2>&1
-if ($LASTEXITCODE -ne 0 -or ($whoami -join "`n") -match 'not authenticated|not logged in|login') {
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$whoami = (& npx.cmd wrangler whoami 2>&1 | Out-String)
+$whoamiExit = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorAction
+
+if ($whoamiExit -ne 0 -or $whoami -match 'not authenticated|not logged in|login required') {
   Write-Host 'A Cloudflare browser login will open. Approve it, then return here.' -ForegroundColor Yellow
+  $previousErrorAction = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
   & npx.cmd wrangler login
-  if ($LASTEXITCODE -ne 0) { throw 'Cloudflare login failed.' }
+  $loginExit = $LASTEXITCODE
+  $ErrorActionPreference = $previousErrorAction
+  if ($loginExit -ne 0) { throw 'Cloudflare login failed.' }
+} else {
+  Write-Host 'Cloudflare login is active.' -ForegroundColor Green
 }
 
 $username = Read-Host 'Owner username [hassoun911]'
@@ -57,8 +68,12 @@ if ($password.Length -lt 10) { throw 'Password must be at least 10 characters.' 
 
 $bootstrapKey = New-RandomSecret 40
 Write-Host 'Installing one-time bootstrap secret in the Worker...' -ForegroundColor Yellow
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 $bootstrapKey | & npx.cmd wrangler secret put ADMIN_BOOTSTRAP_KEY
-if ($LASTEXITCODE -ne 0) { throw 'Unable to install ADMIN_BOOTSTRAP_KEY.' }
+$secretExit = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorAction
+if ($secretExit -ne 0) { throw 'Unable to install ADMIN_BOOTSTRAP_KEY.' }
 
 $body = @{
   username = $username.Trim().ToLowerInvariant()
