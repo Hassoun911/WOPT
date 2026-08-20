@@ -114,37 +114,62 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
 }
 
 export async function resetAdminPassword(request: Request, env: Env) {
-  const body = await bodyJson(request);
-  const token = typeof body.token === "string" ? body.token : "";
-  const password = validPassword(body.password);
-  if (!token || !password) return json({ error: "A valid reset token and password are required" }, 400);
+  try {
+    const body = await bodyJson(request);
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    const password = validPassword(body.password);
+    if (!token || !password) {
+      return json({ error: "A valid reset token and password are required" }, 400);
+    }
 
-  const tokenHash = await sha256Hex(token);
-  const reset = await env.DB.prepare(
-    `SELECT r.id, r.admin_user_id, a.email, r.token_hash, r.expires_at
-     FROM admin_password_resets r
-     JOIN admin_users a ON a.id = r.admin_user_id
-     WHERE r.token_hash = ? AND r.consumed_at IS NULL AND r.expires_at > CURRENT_TIMESTAMP
-       AND a.status = 'active'
-     LIMIT 1`
-  ).bind(tokenHash).first<AdminResetRow>();
-  if (!reset) return json({ error: "This password reset link is invalid or expired" }, 403);
+    const tokenHash = await sha256Hex(token);
+    const reset = await env.DB.prepare(
+      `SELECT r.id, r.admin_user_id, a.email, r.token_hash, r.expires_at
+       FROM admin_password_resets r
+       JOIN admin_users a ON a.id = r.admin_user_id
+       WHERE r.token_hash = ? AND r.consumed_at IS NULL AND r.expires_at > CURRENT_TIMESTAMP
+         AND a.status = 'active'
+       LIMIT 1`
+    ).bind(tokenHash).first<AdminResetRow>();
+    if (!reset) {
+      return json({ error: "This password reset link is invalid or expired. Request a new reset link and use the newest email." }, 403);
+    }
 
-  const salt = randomToken(24);
-  const iterations = 100_000;
-  const digest = await passwordDigest(password, salt, iterations);
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE admin_users SET password_hash = ?, password_salt = ?, password_iterations = ?,
-       must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-    ).bind(digest, salt, iterations, reset.admin_user_id),
-    env.DB.prepare(
+    const salt = randomToken(24);
+    const iterations = 100_000;
+    let digest: string;
+    try {
+      digest = await passwordDigest(password, salt, iterations);
+    } catch (error) {
+      console.error("Admin reset password hashing failed", error);
+      return json({ error: "Password security processing failed. Please try again." }, 500);
+    }
+
+    const userUpdate = await env.DB.prepare(
+      `UPDATE admin_users
+       SET password_hash = ?, password_salt = ?, password_iterations = ?,
+           must_change_password = 0, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    ).bind(digest, salt, iterations, reset.admin_user_id).run();
+    if (!userUpdate.success) {
+      return json({ error: "Could not update the admin password." }, 500);
+    }
+
+    const resetUpdate = await env.DB.prepare(
       "UPDATE admin_password_resets SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?"
-    ).bind(reset.id),
-    env.DB.prepare(
-      "UPDATE admin_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE admin_user_id = ? AND revoked_at IS NULL"
-    ).bind(reset.admin_user_id)
-  ]);
+    ).bind(reset.id).run();
+    if (!resetUpdate.success) {
+      return json({ error: "Password changed, but the reset token could not be finalized. Please sign in and change the password again." }, 500);
+    }
 
-  return json({ ok: true, signInAgain: true });
+    await env.DB.prepare(
+      "UPDATE admin_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE admin_user_id = ? AND revoked_at IS NULL"
+    ).bind(reset.admin_user_id).run();
+
+    return json({ ok: true, signInAgain: true });
+  } catch (error) {
+    console.error("Admin password reset failed", error);
+    const message = error instanceof Error ? error.message : "Unknown reset failure";
+    return json({ error: `Password reset failed: ${message}` }, 500);
+  }
 }
