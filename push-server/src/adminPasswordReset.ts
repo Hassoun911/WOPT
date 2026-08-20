@@ -88,13 +88,23 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
   ).bind(email).first<{ id: number; email: string }>();
   if (!admin) return accepted;
 
+  // Invalidate older reset tokens and prevent stale queued reset emails from being delivered later.
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE admin_password_resets SET consumed_at = CURRENT_TIMESTAMP
+       WHERE admin_user_id = ? AND consumed_at IS NULL`
+    ).bind(admin.id),
+    env.DB.prepare(
+      `UPDATE email_outbox
+       SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+       WHERE recipient_email = ? COLLATE NOCASE
+         AND kind = 'admin_password_reset'
+         AND status = 'pending'`
+    ).bind(admin.email)
+  ]);
+
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
-  await env.DB.prepare(
-    `UPDATE admin_password_resets SET consumed_at = CURRENT_TIMESTAMP
-     WHERE admin_user_id = ? AND consumed_at IS NULL`
-  ).bind(admin.id).run();
-
   await env.DB.prepare(
     `INSERT INTO admin_password_resets (admin_user_id, token_hash, expires_at)
      VALUES (?, ?, datetime('now', '+1 hour'))`
