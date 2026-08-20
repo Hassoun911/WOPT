@@ -47,9 +47,13 @@ export async function getPublicRuntimeConfig(env: Env) {
   const settings: Record<string, unknown> = {};
   let settingsUpdatedAt: string | null = null;
   for (const row of settingsResult.results) {
-    try { settings[row.setting_key] = JSON.parse(row.value_json); }
-    catch { settings[row.setting_key] = row.value_json; }
-    if (!settingsUpdatedAt || row.updated_at > settingsUpdatedAt) settingsUpdatedAt = row.updated_at;
+    const key = row.setting_key;
+    const raw = row.value_json;
+    const updatedAt = row.updated_at;
+    if (typeof key !== "string" || typeof raw !== "string") continue;
+    try { settings[key] = JSON.parse(raw); }
+    catch { settings[key] = raw; }
+    if (typeof updatedAt === "string" && (!settingsUpdatedAt || updatedAt > settingsUpdatedAt)) settingsUpdatedAt = updatedAt;
   }
 
   const featuredContent = contentResult.results.map((row) => {
