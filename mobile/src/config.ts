@@ -1,5 +1,5 @@
-export const WINDSOR_TIME_ZONE = "America/Toronto";
-export const CITY_LABEL = "Windsor, Ontario";
+export const WINDSOR_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto";
+export const CITY_LABEL = "Current location";
 export const SCHEDULE_URL =
   "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
 export const PRAYER_API_URL = "https://wopt-prayer-push.wopt-windsor.workers.dev/prayer-times";
