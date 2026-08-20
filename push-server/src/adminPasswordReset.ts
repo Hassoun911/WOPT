@@ -69,8 +69,8 @@ function validPassword(value: unknown) {
   return typeof value === "string" && value.length >= 10 && value.length <= 200 ? value : null;
 }
 
-function publicAppUrl(env: Env) {
-  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/Hassoun/").replace(/\/$/, "");
+function publicAppUrl() {
+  return "https://admin.hassoun.app";
 }
 
 export async function requestAdminPasswordReset(request: Request, env: Env) {
@@ -99,7 +99,7 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
      VALUES (?, ?, datetime('now', '+1 hour'))`
   ).bind(admin.id, tokenHash).run();
 
-  const resetUrl = `${publicAppUrl(env)}/admin/reset/?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${publicAppUrl()}/admin/reset/?token=${encodeURIComponent(token)}`;
   await env.DB.prepare(
     `INSERT INTO email_outbox (
        recipient_email, locale, kind, template_key, template_data_json, idempotency_key
