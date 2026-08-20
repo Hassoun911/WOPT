@@ -131,7 +131,7 @@ export async function resetAdminPassword(request: Request, env: Env) {
   if (!reset) return json({ error: "This password reset link is invalid or expired" }, 403);
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  const iterations = 100_000;
   const digest = await passwordDigest(password, salt, iterations);
   await env.DB.batch([
     env.DB.prepare(
