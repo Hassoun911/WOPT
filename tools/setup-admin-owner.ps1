@@ -33,23 +33,18 @@ if (-not (Test-Path (Join-Path $pushServer 'node_modules'))) {
   npm.cmd ci --ignore-scripts --no-audit --no-fund
 }
 
-Write-Host 'Checking Cloudflare login...' -ForegroundColor Yellow
-$previousErrorAction = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$whoami = (& npx.cmd wrangler whoami 2>&1 | Out-String)
-$whoamiExit = $LASTEXITCODE
-$ErrorActionPreference = $previousErrorAction
-
-if ($whoamiExit -ne 0 -or $whoami -match 'not authenticated|not logged in|login required') {
-  Write-Host 'A Cloudflare browser login will open. Approve it, then return here.' -ForegroundColor Yellow
-  $previousErrorAction = $ErrorActionPreference
-  $ErrorActionPreference = 'Continue'
-  & npx.cmd wrangler login
-  $loginExit = $LASTEXITCODE
-  $ErrorActionPreference = $previousErrorAction
-  if ($loginExit -ne 0) { throw 'Cloudflare login failed.' }
-} else {
-  Write-Host 'Cloudflare login is active.' -ForegroundColor Green
+Write-Host 'Opening Cloudflare login...' -ForegroundColor Yellow
+Write-Host 'Approve the browser login if Cloudflare asks, then return here.' -ForegroundColor Gray
+$oldNativePreference = $null
+if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+  $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+  $PSNativeCommandUseErrorActionPreference = $false
+}
+try {
+  cmd.exe /d /c "npx.cmd wrangler login"
+  if ($LASTEXITCODE -ne 0) { throw 'Cloudflare login failed.' }
+} finally {
+  if ($null -ne $oldNativePreference) { $PSNativeCommandUseErrorActionPreference = $oldNativePreference }
 }
 
 $username = Read-Host 'Owner username [hassoun911]'
@@ -68,12 +63,14 @@ if ($password.Length -lt 10) { throw 'Password must be at least 10 characters.' 
 
 $bootstrapKey = New-RandomSecret 40
 Write-Host 'Installing one-time bootstrap secret in the Worker...' -ForegroundColor Yellow
-$previousErrorAction = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$bootstrapKey | & npx.cmd wrangler secret put ADMIN_BOOTSTRAP_KEY
-$secretExit = $LASTEXITCODE
-$ErrorActionPreference = $previousErrorAction
-if ($secretExit -ne 0) { throw 'Unable to install ADMIN_BOOTSTRAP_KEY.' }
+$bootstrapFile = Join-Path $env:TEMP ("hassoun-bootstrap-" + [Guid]::NewGuid().ToString('N') + '.txt')
+try {
+  [IO.File]::WriteAllText($bootstrapFile, $bootstrapKey, (New-Object Text.UTF8Encoding($false)))
+  cmd.exe /d /c "type `"$bootstrapFile`" | npx.cmd wrangler secret put ADMIN_BOOTSTRAP_KEY"
+  if ($LASTEXITCODE -ne 0) { throw 'Unable to install ADMIN_BOOTSTRAP_KEY.' }
+} finally {
+  Remove-Item $bootstrapFile -Force -ErrorAction SilentlyContinue
+}
 
 $body = @{
   username = $username.Trim().ToLowerInvariant()
