@@ -6,9 +6,13 @@ function Find-Cloudflared {
   if ($cmd) { return $cmd.Source }
 
   $candidates = @(
+    (Join-Path $PSScriptRoot 'cloudflared.exe'),
     "$env:ProgramFiles\cloudflared\cloudflared.exe",
     "$env:ProgramFiles\Cloudflare\cloudflared.exe",
-    "$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe"
+    "$env:ProgramFiles\Cloudflare\Cloudflared\cloudflared.exe",
+    "${env:ProgramFiles(x86)}\Cloudflare\cloudflared.exe",
+    "$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe",
+    "$env:LOCALAPPDATA\Programs\cloudflared\cloudflared.exe"
   )
 
   foreach ($candidate in $candidates) {
@@ -25,19 +29,14 @@ function Find-Cloudflared {
 }
 
 $cloudflared = Find-Cloudflared
-if (-not $cloudflared) {
-  if (Get-Command winget -ErrorAction SilentlyContinue) {
-    Write-Host 'Installing Cloudflare Tunnel client...'
-    winget install --id Cloudflare.cloudflared --accept-package-agreements --accept-source-agreements
-    Start-Sleep -Seconds 2
-    $cloudflared = Find-Cloudflared
-  }
-}
 
 if (-not $cloudflared) {
-  Write-Host 'cloudflared is installed or was requested, but Windows still cannot locate cloudflared.exe.' -ForegroundColor Red
-  Write-Host 'Close all PowerShell windows, open a new PowerShell window, and run this script again.' -ForegroundColor Yellow
-  exit 1
+  $localExe = Join-Path $PSScriptRoot 'cloudflared.exe'
+  $downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
+  Write-Host 'cloudflared was not available in PATH. Downloading the official Cloudflare Windows binary...' -ForegroundColor Yellow
+  Invoke-WebRequest -Uri $downloadUrl -OutFile $localExe -UseBasicParsing
+  if (-not (Test-Path $localExe)) { throw 'Cloudflare Tunnel download failed.' }
+  $cloudflared = $localExe
 }
 
 Write-Host "Using cloudflared: $cloudflared" -ForegroundColor Green
