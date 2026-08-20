@@ -54,7 +54,10 @@ export async function getAdminCrmOverview(request: Request, env: Env) {
 
   const release: Record<string, unknown> = {};
   for (const row of versions.results) {
-    try { release[row.setting_key] = JSON.parse(row.value_json); } catch { release[row.setting_key] = row.value_json; }
+    const key = row.setting_key;
+    const raw = row.value_json;
+    if (typeof key !== "string" || typeof raw !== "string") continue;
+    try { release[key] = JSON.parse(raw); } catch { release[key] = raw; }
   }
 
   return json({ ok: true, content: content ?? {}, admins: admins ?? {}, audit: auditCount ?? {}, release });
@@ -67,8 +70,9 @@ export async function listAppSettings(request: Request, env: Env) {
     `SELECT setting_key, value_json, description, updated_at FROM app_settings ORDER BY setting_key`
   ).all<Record<string, string>>();
   const settings = results.map((row) => {
-    let value: unknown = row.value_json;
-    try { value = JSON.parse(row.value_json); } catch {}
+    const raw = typeof row.value_json === "string" ? row.value_json : "";
+    let value: unknown = raw;
+    try { value = JSON.parse(raw); } catch {}
     return { key: row.setting_key, value, description: row.description, updatedAt: row.updated_at };
   });
   return json({ ok: true, settings });
