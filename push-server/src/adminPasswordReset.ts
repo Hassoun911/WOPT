@@ -1,5 +1,6 @@
 import type { Env } from "./types";
 
+// Password-reset flow is deployed from the protected working branch.
 type AdminResetRow = {
   id: number;
   admin_user_id: number;
