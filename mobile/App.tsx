@@ -33,7 +33,7 @@ import {
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
-import { loadPrayerTimes } from "./src/prayerData";
+import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
@@ -62,14 +62,14 @@ const PRAYER_ICONS: Record<PrayerKey, string> = {
   isha: "🌙"
 };
 
-function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date()) {
-  const currentKey = windsorDateKey(now);
+function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date(), timeZone = WINDSOR_TIME_ZONE) {
+  const currentKey = windsorDateKey(now, timeZone);
   for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
     const dateKey = addDateDays(currentKey, dayOffset);
     const day = prayerTimes[dateKey];
     if (!day) continue;
     for (const prayer of PRAYER_KEYS) {
-      const target = windsorLocalToDate(dateKey, day[prayer]);
+      const target = windsorLocalToDate(dateKey, day[prayer], timeZone);
       const deltaMs = target.getTime() - now.getTime();
       if (deltaMs <= 0) continue;
       const secondsRemaining = Math.max(1, Math.ceil(deltaMs / 1000));
@@ -86,10 +86,10 @@ function countdownLabel(seconds: number, locale: "en" | "ar") {
   return locale === "ar" ? `${hours ? `${hours} س ` : ""}${minutes} د` : `${hours ? `${hours}h ` : ""}${minutes}m`;
 }
 
-function hijriDateLabel(date: Date, locale: "en" | "ar") {
+function hijriDateLabel(date: Date, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {
   try {
     return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
-      day: "numeric", month: "long", year: "numeric", timeZone: WINDSOR_TIME_ZONE
+      day: "numeric", month: "long", year: "numeric", timeZone
     }).format(date);
   } catch { return ""; }
 }
@@ -97,6 +97,7 @@ function hijriDateLabel(date: Date, locale: "en" | "ar") {
 export default function App({ onOpenEmailAlerts }: AppProps) {
   const [now, setNow] = useState(new Date());
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>({});
+  const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);
   const [live, setLive] = useState(false);
   const [locale, setLocale] = useState<"en" | "ar">("en");
   const [alertsEnabled, setAlertsEnabled] = useState(false);
@@ -110,9 +111,11 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [phoneAlertPreferences, setPhoneAlertPreferences] = useState<PrayerAlertPreferences>(DEFAULT_PHONE_PRAYER_ALERTS);
   const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);
 
-  const todayKey = windsorDateKey(now);
+  const prayerTimeZone = prayerLocation?.timezone || WINDSOR_TIME_ZONE;
+  const prayerLocationLabel = prayerLocation?.label || CITY_LABEL;
+  const todayKey = windsorDateKey(now, prayerTimeZone);
   const today = prayerTimes[todayKey];
-  const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);
+  const next = useMemo(() => nextPrayerFor(prayerTimes, now, prayerTimeZone), [now, prayerTimes, prayerTimeZone]);
   const badge = badgeForWins(quizStats.totalWins);
   const upcomingBadge = nextBadge(quizStats.totalWins);
   const islamicTimeline = useMemo(() => islamicEventTimeline(todayKey), [todayKey]);
@@ -137,14 +140,15 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       setLocale(chosenLocale);
       setAlertsEnabled(savedAlerts === "on");
       setPrayerTimes(loaded.prayerTimes);
+      setPrayerLocation(loaded.location);
       setLive(loaded.live);
       setQuizStats(storedQuizStats);
       setPhoneAlertPreferences(savedPhoneAlertPreferences);
       setBusy(false);
       if (savedAlerts === "on") {
-        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);
+        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label });
         setScheduledCount(result.count);
-        await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);
+        await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);
         void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
       }
     })();
@@ -164,22 +168,22 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       setNow(new Date());
       void loadQuizStats().then(setQuizStats).catch(() => undefined);
       if (!alertsEnabled || !Object.keys(prayerTimes).length) return;
-      void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences)
+      void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })
         .then((result) => setScheduledCount(result.count))
         .catch(() => undefined);
-      void scheduleIslamicEventReminders(windsorDateKey(new Date()), locale).catch(() => undefined);
+      void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences]);
+  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);
 
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
     setLocale(nextLocale);
     await AsyncStorage.setItem(STORAGE_KEYS.locale, nextLocale);
     if (alertsEnabled) {
-      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences);
+      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });
       setScheduledCount(result.count);
-      await scheduleIslamicEventReminders(todayKey, nextLocale).catch(() => undefined);
+      await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);
     }
   };
 
@@ -198,12 +202,12 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         setPhoneAlertPreferences(preferences);
         await savePhonePrayerAlertPreferences(preferences);
       }
-      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences);
+      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });
       if (!result.granted) {
         Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive prayer alerts.");
         return;
       }
-      await scheduleIslamicEventReminders(todayKey, locale).catch(() => undefined);
+      await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);
       setAlertsEnabled(true);
       setScheduledCount(result.count);
       void registerDeviceForServerPush(locale).catch(() => undefined);
@@ -228,7 +232,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         setScheduledCount(0);
         return;
       }
-      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences);
+      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });
       setScheduledCount(result.count);
     } finally {
       setAlertPreferencesBusy(false);
@@ -266,18 +270,18 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   };
 
   if (busy && !today) {
-    return <SafeAreaView style={styles.loading} edges={["top", "bottom", "left", "right"]}><ActivityIndicator color="#0b5b47" size="large" /><Text style={styles.loadingText}>Loading Windsor prayer times…</Text></SafeAreaView>;
+    return <SafeAreaView style={styles.loading} edges={["top", "bottom", "left", "right"]}><ActivityIndicator color="#0b5b47" size="large" /><Text style={styles.loadingText}>Loading prayer times for your current location…</Text></SafeAreaView>;
   }
 
-  const date = windsorLocalToDate(todayKey, "12:00");
+  const date = windsorLocalToDate(todayKey, "12:00", prayerTimeZone);
   const shortDate = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(date);
-  const hijriDate = hijriDateLabel(date, locale);
+  const hijriDate = hijriDateLabel(date, locale, prayerTimeZone);
 
   const header = (
     <View style={styles.header}>
       <Pressable onPress={() => setActiveTab("more")} style={styles.menuButton}><Text style={styles.menuIcon}>☰</Text></Pressable>
       <Image source={require("./assets/hassoun-logo.png")} style={styles.headerLogo} />
-      <View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text></View>
+      <View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>📍 {prayerLocationLabel} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text></View>
       <Pressable onPress={toggleLocale} style={styles.languageButton}><Text style={styles.languageText}>{locale === "en" ? "AR" : "EN"}</Text></Pressable>
     </View>
   );
@@ -307,7 +311,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <Pressable onPress={() => setActiveTab("events")} style={styles.eventsEntryCard}><View style={styles.eventsEntryIcon}><Text style={styles.eventsEntryEmoji}>🌙</Text></View><View style={styles.eventsEntryCopy}><Text style={styles.eventsEntryEyebrow}>{locale === "ar" ? "التقويم الإسلامي" : "ISLAMIC CALENDAR"}</Text><Text style={styles.eventsEntryTitle}>{locale === "ar" ? "المناسبات الإسلامية" : "Islamic Events"}</Text><Text style={styles.eventsEntryText}>{upcomingIslamicEvent ? `${locale === "ar" ? "القادمة" : "Next"}: ${upcomingIslamicEvent.name[locale]} • ${islamicEventCountdown(upcomingIslamicDays ?? 0, locale)}` : (locale === "ar" ? "شاهد مناسبات السنة" : "View the full year")}</Text></View><Text style={styles.eventsEntryArrow}>›</Text></Pressable>
 
       <View style={styles.inspirationCard}><View style={styles.inspirationIcon}><Text style={styles.inspirationEmoji}>🏮</Text></View><View style={styles.inspirationCopy}><Text style={styles.inspirationEyebrow}>{locale === "ar" ? "إلهام اليوم" : "DAILY INSPIRATION"}</Text><Text style={styles.inspirationText}>{locale === "ar" ? "بذكر الله تطمئن القلوب." : "Hearts find comfort in the remembrance of Allah."}</Text><Text style={styles.inspirationRef}>Qur’an 13:28</Text></View></View>
-      <Text style={styles.footer}>Official Windsor Islamic Association schedule • America/Toronto</Text>
+      <Text style={styles.footer}>{prayerLocation?.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer times calculated for current GPS location"} • {prayerTimeZone}</Text>
     </ScrollView>
   );
 
