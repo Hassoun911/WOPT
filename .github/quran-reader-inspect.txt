@@ -1,0 +1,218 @@
+
+---
+
+0189:     available: Boolean(QuranAudio),
+0190:     state: "idle",
+0191:     positionMs: 0,
+0192:     durationMs: 0,
+0193:     speed: 1
+0194:   });
+0195:   const completionRef = useRef<string | null>(null);
+0196:   const appNavHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+0197:   const verticalGestureStartY = useRef<number | null>(null);
+0198:   const readerTapStart = useRef<{ x: number; y: number; time: number } | null>(null);
+0199:   const readerAtTop = useRef(true);
+0200:   const readerAtBottom = useRef(false);
+0201:   const readerViewportHeight = useRef(0);
+0202:   const readerContentHeight = useRef(0);
+0203:   const readerLastScrollY = useRef(0);
+0204:   const readerScrollDirection = useRef<"up" | "down" | null>(null);
+0205: 
+0206:   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
+0207: 
+0208:   useEffect(() => {
+0209:     if (screen === "reader" && appearance.browseMode !== "vertical") {
+0210:       setAppearance((current) => ({ ...current, browseMode: "vertical" }));
+0211:     }
+0212:   }, [screen, appearance.browseMode]);
+0213: 
+0214:   const surahs = allSurahs();
+0215:   const pages = allPages();
+0216:   const pageNumbers = useMemo(() => Array.from({ length: 604 }, (_item, index) => index + 1), []);
+0217:   const juzStarts = useMemo(() => {
+
+---
+
+0240:   const selectedIsPlaying = selectedIsActive && audioStatus.state === "playing";
+0241:   const selectedIsPaused = selectedIsActive && audioStatus.state === "paused";
+0242:   const selectedIsLooping = selectedIsActive && repeatQueue && audioQueue.length === 1;
+0243:   const selectedIsBookmarked = Boolean(selectedAyah && bookmarks.includes(refKey(selectedAyah)));
+0244:   const autoSpread = width >= 700;
+0245:   const spreadMode = appearance.bookMode === "spread" || (appearance.bookMode === "auto" && autoSpread);
+0246:   const visibleReaderPages = (() => {
+0247:     if (!spreadMode) return [currentPage];
+0248:     const left = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
+0249:     return left >= 604 ? [604] : [left, left + 1];
+0250:   })();
+0251:   const activeAyahOnVisiblePage = Boolean(
+0252:     activeAyah && visibleReaderPages.includes(pageForAyah(activeAyah.surah, activeAyah.ayah) ?? -1)
+0253:   );
+0254:   // MULTI_SURAH_PLAY_CHOOSER_V061
+0255:   // A Mushaf page may contain the end of one Surah plus one or more new Surahs.
+0256:   // Keep one playback choice per visible Surah, starting at the first ayah the
+0257:   // user can actually see on this page/spread.
+0258:   const visibleReaderSurahChoices = (() => {
+0259:     const firstVisible = new Map<number, QuranAyah>();
+0260:     for (const page of visibleReaderPages) {
+0261:       for (const ayah of pageAyahsFor(page, pages)) {
+
+---
+
+0332:     setScreen("reader");
+0333:   };
+0334: 
+0335:   const openPage = (page: number) => {
+0336:     const safe = clamp(page, 1, 604);
+0337:     const start = pages[safe - 1];
+0338:     if (!start) return;
+0339:     const next = { surah: start.surah, ayah: start.ayah };
+0340:     readerAtTop.current = true;
+0341:     readerAtBottom.current = false;
+0342:     setPosition(next);
+0343:     setSelectedAyah(null);
+0344:     setReaderPlayChooserOpen(false);
+0345:     persistLast(next);
+0346:   };
+0347: 
+0348:   const openJuz = (juz: number, from: Screen = screen) => {
+0349:     const start = juzStarts.find((item) => item.juz === clamp(juz, 1, 30));
+0350:     if (!start) return;
+0351:     openReader(start.surah, start.ayah, from);
+0352:   };
+0353: 
+0354:   const openMushafPageFrom = (page: number, from: Screen = screen) => {
+0355:     const start = pages[clamp(page, 1, 604) - 1];
+0356:     if (!start) return;
+0357:     openReader(start.surah, start.ayah, from);
+0358:   };
+0359: 
+0360:   const turnReaderPage = (direction: -1 | 1) => {
+0361:     if (spreadMode) {
+0362:       const left = currentPage === 1 ? 1 : currentPage % 2 === 0 ? currentPage : currentPage - 1;
+0363:       openPage(direction > 0 ? Math.min(604, left + 2) : Math.max(1, left - 2));
+0364:       return;
+0365:     }
+0366:     openPage(clamp(currentPage + direction, 1, 604));
+0367:   };
+0368: 
+0369:   const readerPanResponder = useMemo(
+0370:     () => PanResponder.create({
+0371:       onStartShouldSetPanResponder: () => false,
+0372:       onMoveShouldSetPanResponderCapture: (_event, gestureState) => {
+0373:         if (appearance.browseMode !== "horizontal") return false;
+0374:         const horizontal = Math.abs(gestureState.dx);
+0375:         const vertical = Math.abs(gestureState.dy);
+
+---
+
+0386:         turnReaderPage(gestureState.dx > 0 ? 1 : -1);
+0387:       }
+0388:     }),
+0389:     [appearance.browseMode, currentPage, spreadMode]
+0390:   );
+0391: 
+0392:   const handleVerticalTouchStart = (event: { nativeEvent: { pageY: number } }) => {
+0393:     if (appearance.browseMode !== "vertical") return;
+0394:     verticalGestureStartY.current = event.nativeEvent.pageY;
+0395:   };
+0396: 
+0397:   const handleVerticalTouchEnd = (event: { nativeEvent: { pageY: number } }) => {
+0398:     if (appearance.browseMode !== "vertical") {
+0399:       verticalGestureStartY.current = null;
+0400:       return;
+0401:     }
+0402:     const start = verticalGestureStartY.current;
+0403:     verticalGestureStartY.current = null;
+0404:     if (start == null) return;
+0405:     const dy = event.nativeEvent.pageY - start;
+0406:     if (Math.abs(dy) < 24) return;
+0407: 
+0408:     // A Mushaf page that fits entirely inside the viewport never produces enough
+0409:     // scroll events to mark itself as "at bottom". Treat it as both scroll edges
+0410:     // so an upward/downward page gesture always works. This applies regardless of
+0411:     // whether the reader was opened from Surah, Juz, Pages, Search or Bookmark.
+0412:     const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+0413:     if (dy < 0 && (readerAtBottom.current || contentFits)) turnReaderPage(1);
+0414:     else if (dy > 0 && (readerAtTop.current || contentFits)) turnReaderPage(-1);
+0415:   };
+0416: 
+0417: 
+0418:   const handleReaderSurfaceTouchStart = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+0419:     readerTapStart.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, time: Date.now() };
+0420:   };
+0421: 
+0422:   const handleReaderSurfaceTouchEnd = (event: { nativeEvent: { pageX: number; pageY: number } }) => {
+0423:     const start = readerTapStart.current;
+0424:     readerTapStart.current = null;
+0425:     if (!start) return;
+0426:     const dx = event.nativeEvent.pageX - start.x;
+0427:     const dy = event.nativeEvent.pageY - start.y;
+
+---
+
+0941:             </View>
+0942:           );
+0943:         })}
+0944:         <View style={styles.pageBottom}><Text style={styles.pageNumber}>{num(page)}</Text></View>
+0945:       </View>
+0946:     );
+0947:   };
+0948: 
+0949:   const spreadLeftPage = currentPage === 1 ? null : currentPage % 2 === 0 ? currentPage : currentPage - 1;
+0950:   const spreadRightPage = currentPage === 1 ? 1 : Math.min(604, (spreadLeftPage ?? 1) + 1);
+0951:   const previousBookPage = spreadMode ? Math.max(1, (spreadLeftPage ?? 2) - 2) : currentPage - 1;
+0952:   const nextBookPage = spreadMode ? Math.min(604, (spreadLeftPage ?? 0) + 2) : currentPage + 1;
+0953: 
+0954:   const reader = readerSurah ? (
+0955:     <View style={styles.flex}>
+0956:       {topBar(ar ? readerSurah.nameArabic : readerSurah.nameTransliterated, tr(`Page ${currentPage} • Juz ${currentJuz}`, `الصفحة ${num(currentPage)} • الجزء ${num(currentJuz)}`))}
+0957:       {audioPrefs.readerMode === "mushaf" ? (
+0958:         <View style={styles.readerBody} onTouchStart={handleReaderSurfaceTouchStart} onTouchEnd={handleReaderSurfaceTouchEnd} {...readerPanResponder.panHandlers}>
+0959:           <ScrollView
+0960:             key={`mushaf-${currentPage}-${appearance.browseMode}`}
+0961:             style={styles.flex}
+0962:             contentContainerStyle={[styles.bookCanvas, spreadMode && styles.bookCanvasSpread]}
+0963:             showsVerticalScrollIndicator={false}
+0964:             nestedScrollEnabled
+0965:             scrollEventThrottle={16}
+0966:             onLayout={({ nativeEvent }) => {
+0967:               readerViewportHeight.current = nativeEvent.layout.height;
+0968:               readerAtBottom.current = readerContentHeight.current <= nativeEvent.layout.height + 12;
+0969:             }}
+0970:             onContentSizeChange={(_width, height) => {
+0971:               readerContentHeight.current = height;
+0972:               readerAtBottom.current = height <= readerViewportHeight.current + 12;
+0973:             }}
+0974:             onTouchStart={handleVerticalTouchStart}
+0975:             onTouchEnd={handleVerticalTouchEnd}
+0976:             onScroll={({ nativeEvent }) => {
+0977:               readerViewportHeight.current = nativeEvent.layoutMeasurement.height;
+0978:               readerContentHeight.current = nativeEvent.contentSize.height;
+0979:               const y = nativeEvent.contentOffset.y;
+0980:               if (y > readerLastScrollY.current + 1) readerScrollDirection.current = "down";
+0981:               else if (y < readerLastScrollY.current - 1) readerScrollDirection.current = "up";
+0982:               readerLastScrollY.current = y;
+0983:               readerAtTop.current = y <= 8;
+0984:               readerAtBottom.current = y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
+0985:             }}
+0986:             onScrollEndDrag={() => {
+0987:               const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+0988:               if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) {
+0989:                 turnReaderPage(1);
+0990:               } else if (readerScrollDirection.current === "up" && (readerAtTop.current || contentFits)) {
+0991:                 turnReaderPage(-1);
+0992:               }
+0993:               readerScrollDirection.current = null;
+0994:             }}
+0995:           >
+0996:             {spreadMode ? <View style={styles.bookSpread}>{spreadLeftPage ? <View style={styles.bookPageSlot}>{renderMushafPage(spreadLeftPage)}</View> : <View style={[styles.bookPageSlot, styles.blankBookPage]} /> }<View style={styles.bookGutter} /><View style={styles.bookPageSlot}>{renderMushafPage(spreadRightPage)}</View></View> : renderMushafPage(currentPage)}
+0997:           </ScrollView>
+0998:         </View>
+0999:       ) : (
+1000:         <ScrollView style={styles.flex} contentContainerStyle={styles.studyWrap} showsVerticalScrollIndicator={false}><View style={styles.studySurahHeader}><Text style={styles.studySurahArabic}>{readerSurah.nameArabic}</Text>{!ar ? <Text style={styles.studySurahEnglish}>{readerSurah.nameTransliterated} • {readerSurah.nameEnglish}</Text> : null}</View>{readerAyahs.map((ayah) => { const playing = activeAyah?.surah === ayah.surah && activeAyah?.ayah === ayah.ayah && audioPrefs.highlightAudio; return <Pressable key={refKey(ayah)} onPress={() => { setSelectedAyah(ayah); persistLast({ surah: ayah.surah, ayah: ayah.ayah }); }} style={[styles.studyAyah, playing && styles.studyPlaying]}><View style={styles.studyTop}><View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Text style={styles.ayahPill}>{num(ayah.ayah)}</Text>{bookmarks.includes(refKey(ayah)) ? <Text style={{ fontSize: 16 }}>🔖</Text> : null}</View><Pressable onPress={() => playAyah(ayah)} style={styles.smallPlay}><Text>▶️</Text></Pressable></View><Text style={[styles.studyArabic, { fontSize: appearance.fontSize, lineHeight: Math.round(appearance.fontSize * appearance.lineHeightMultiplier) }]}>{ayah.text}</Text></Pressable>; })}</ScrollView>
+1001:       )}
+1002:       {selectedAyah ? (
+1003:         <View style={styles.ayahActions}>
+1004:           <View style={styles.actionHeader}>
+1005:             <View style={styles.actionDot} />
+1006:             <Text style={styles.actionRef} numberOfLines={1}>{ar ? getSurah(selectedAyah.surah)?.nameArabic : getSurah(selectedAyah.surah)?.nameTransliterated} • {tr("Ayah", "الآية")} {num(selectedAyah.ayah)}</Text>
