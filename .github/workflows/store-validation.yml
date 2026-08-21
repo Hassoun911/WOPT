@@ -32,7 +32,8 @@ jobs:
           python .github/scripts/fix-hassoun-sadaqah-admin-alerts.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- mobile/src/SettingsHub.tsx mobile/App.tsx mobile/src/prayerData.ts mobile/src/notifications.ts mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt mobile/app.config.ts mobile/package.json mobile/package-lock.json pwa/app/admin/AdminControlCenter.tsx push-server/src/adminEmail.ts push-server/src/index.ts push-server/src/emailDelivery.ts
+          git add -- mobile/src/SettingsHub.tsx mobile/App.tsx mobile/src/prayerData.ts mobile/src/notifications.ts mobile/app.config.ts mobile/package.json mobile/package-lock.json pwa/app/admin/AdminControlCenter.tsx push-server/src/adminEmail.ts push-server/src/index.ts push-server/src/emailDelivery.ts
+          git add -f -- mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
           git diff --cached --quiet && exit 0
           git commit -m "Finish Hassoun Sadaqah admin alerts and widget fixes"
           git push origin HEAD:work/store-crm-2026-08-19
