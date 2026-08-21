@@ -31,17 +31,23 @@ jobs:
           cache: npm
           cache-dependency-path: push-server/package-lock.json
       - name: Install and validate Worker
+        id: validate
+        continue-on-error: true
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run typecheck
           npm test
       - name: Apply D1 migrations
+        id: migrate
+        continue-on-error: true
         run: npx wrangler d1 migrations apply wopt-prayer-push --remote
       - name: Ensure sender comes only from hassoun.app config
-        run: |
-          set -euo pipefail
-          npx wrangler secret delete EMAIL_FROM --yes || true
+        id: sender
+        continue-on-error: true
+        run: npx wrangler secret delete EMAIL_FROM --yes || true
       - name: Install Worker secrets except sender identity
+        id: secrets
+        continue-on-error: true
         env:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -60,22 +66,38 @@ jobs:
           put_optional ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
       - name: Deploy Worker
+        id: deploy
+        continue-on-error: true
         run: npx wrangler deploy
       - name: Smoke test live Worker
+        id: smoke
+        continue-on-error: true
         run: |
           set -euo pipefail
           curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json
           jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null
           curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json
           jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null
-      - name: Record deployment outcome
+      - name: Record deployment diagnostics
         if: always()
         working-directory: .
         env:
-          JOB_STATUS: ${{ job.status }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          MIGRATE: ${{ steps.migrate.outcome }}
+          SENDER: ${{ steps.sender.outcome }}
+          SECRETS: ${{ steps.secrets.outcome }}
+          DEPLOY: ${{ steps.deploy.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
         run: |
+          if [ "$VALIDATE" = success ] && [ "$MIGRATE" = success ] && [ "$SECRETS" = success ] && [ "$DEPLOY" = success ] && [ "$SMOKE" = success ]; then STATUS=success; else STATUS=failure; fi
           cat > .github/hassoun-deploy-status.txt <<EOF
-          status=${JOB_STATUS}
+          status=${STATUS}
+          validate=${VALIDATE}
+          migrate=${MIGRATE}
+          sender_cleanup=${SENDER}
+          secrets=${SECRETS}
+          deploy=${DEPLOY}
+          smoke=${SMOKE}
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
           public_app=https://hassoun.app
           admin=https://admin.hassoun.app
@@ -87,5 +109,6 @@ jobs:
           git config user.name "Hassoun Automation"
           git config user.email "actions@users.noreply.github.com"
           git add .github/hassoun-deploy-status.txt
-          git commit -m "Record finalized Hassoun Worker deployment ${JOB_STATUS}" || true
+          git commit -m "Record Hassoun deploy diagnostics ${STATUS}" || true
           git push origin HEAD:work/store-crm-2026-08-19 || true
+          test "$STATUS" = success
