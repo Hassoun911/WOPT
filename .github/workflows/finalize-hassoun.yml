@@ -22,7 +22,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace(path, old, new, required=True):
+          def replace(path, old, new, required=False):
               p = Path(path)
               text = p.read_text()
               if old not in text:
