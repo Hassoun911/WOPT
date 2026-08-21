@@ -90,15 +90,49 @@ async function cachedLocation() {
   }
 }
 
-export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {
-  const bundled = bundledSchedule as PrayerFile;
+/** Fast, network-free startup data. Use this before requesting GPS/network. */
+export async function loadInitialPrayerTimes(): Promise<LoadedPrayerTimes> {
   const cached = await cachedLocation();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || WINDSOR_TIME_ZONE;
+  if (cached) {
+    return {
+      prayerTimes: cached.prayerTimes,
+      live: false,
+      location: { ...cached.location, source: "saved" }
+    };
+  }
+  const bundled = bundledSchedule as PrayerFile;
+  return {
+    prayerTimes: bundled.prayer_times,
+    live: false,
+    location: {
+      latitude: 42.3149,
+      longitude: -83.0364,
+      timezone: WINDSOR_TIME_ZONE,
+      label: CITY_LABEL,
+      source: "saved"
+    }
+  };
+}
+
+/** Refresh GPS and live prayer data. Safe to run after the UI is already visible. */
+export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {
+  const fallback = await loadInitialPrayerTimes();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || fallback.location.timezone || WINDSOR_TIME_ZONE;
 
   try {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) throw new Error("Location permission is not granted");
-    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    const existingPermission = await Location.getForegroundPermissionsAsync();
+    const permission = existingPermission.granted ? existingPermission : await Location.requestForegroundPermissionsAsync();
+    if (!permission.granted) return fallback;
+
+    let position: Location.LocationObject;
+    try {
+      position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    } catch {
+      const last = await Location.getLastKnownPositionAsync();
+      if (!last) return fallback;
+      position = last;
+    }
+
     const latitude = position.coords.latitude;
     const longitude = position.coords.longitude;
     const months = monthPair(timezone);
@@ -116,11 +150,6 @@ export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {
     await AsyncStorage.setItem(STORAGE_KEYS.locationSchedule, JSON.stringify({ prayerTimes, location, savedAt: new Date().toISOString() } satisfies CachedLocationPayload));
     return { prayerTimes, live: true, location };
   } catch {
-    if (cached) return { prayerTimes: cached.prayerTimes, live: false, location: { ...cached.location, source: "saved" } };
-    return {
-      prayerTimes: bundled.prayer_times,
-      live: false,
-      location: { latitude: 42.3149, longitude: -83.0364, timezone: WINDSOR_TIME_ZONE, label: CITY_LABEL, source: "saved" }
-    };
+    return fallback;
   }
 }
