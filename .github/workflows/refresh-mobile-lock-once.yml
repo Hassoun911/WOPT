@@ -1,0 +1,40 @@
+name: Refresh mobile package lock once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-refresh-mobile-lock-once
+  cancel-in-progress: true
+
+jobs:
+  refresh-lock:
+    if: github.event.head_commit.message != 'Refresh mobile package lock for GPS support'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate package lock only
+        working-directory: mobile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit refreshed lock if changed
+        run: |
+          if git diff --quiet -- mobile/package-lock.json; then
+            echo "Package lock is already current."
+            exit 0
+          fi
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/package-lock.json
+          git commit -m "Refresh mobile package lock for GPS support"
+          git push origin HEAD:work/hassoun-1.0-store-admin
