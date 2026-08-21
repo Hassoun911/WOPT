@@ -1,0 +1,40 @@
+name: Fix Hassoun email logo once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Use exported Hassoun icon in all emails'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Fix email logo URLs
+        shell: python
+        run: |
+          from pathlib import Path
+          paths = [Path('push-server/src/prayerEmailTemplate.ts'), Path('push-server/src/emailDelivery.ts')]
+          for p in paths:
+              s = p.read_text()
+              s = s.replace('https://hassoun.app/hassoun-logo.png', 'https://hassoun.app/icon-192.png')
+              s = s.replace('https://hassoun911.github.io/WOPT/assets/hassoun-logo.png', 'https://hassoun.app/icon-192.png')
+              p.write_text(s)
+      - name: Commit email logo fix
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- push-server/src/prayerEmailTemplate.ts push-server/src/emailDelivery.ts; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git add push-server/src/prayerEmailTemplate.ts push-server/src/emailDelivery.ts
+          git commit -m "Use exported Hassoun icon in all emails"
+          git push origin HEAD:work/hassoun-1.0-store-admin
