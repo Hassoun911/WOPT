@@ -1,0 +1,75 @@
+name: Final Email Audit And Admin Test Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/final-email-audit-test-once.yml]
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - name: Install and validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Apply migrations and force Hassoun sender
+        working-directory: push-server
+        run: |
+          npx wrangler d1 migrations apply wopt-prayer-push --remote
+          printf '%s' 'Hassoun <notifications@hassoun.app>' | npx wrangler secret put EMAIL_FROM
+          npx wrangler deploy
+      - name: Audit email-related D1 structures and enqueue one owner-admin test
+        working-directory: push-server
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name, sql FROM sqlite_schema WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscriber%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%subscription%') ORDER BY name;" > /tmp/email-schema.json
+          test_key="final-admin-email-test-2026-08-21-v1"
+          data='{"kind":"athan","prayer":"dhuhr","prayerLabel":"Dhuhr","prayerTime":"13:35","prayerDate":"2026-08-21","prayerTimes":{"fajr":"05:13","dhuhr":"13:36","asr":"17:27","maghrib":"20:30","isha":"21:56"},"displayName":"Hassoun Admin","locationLabel":"Windsor, Ontario","timezone":"America/Toronto","appUrl":"https://hassoun.app","manageUrl":"https://hassoun.app/email/manage/","upcomingEvent":{"emoji":"🌙","daysLeft":5,"nameEn":"Upcoming Islamic Event","nameAr":"مناسبة إسلامية قادمة","descriptionEn":"This confirms the final Hassoun event reminder section, rich branding and app links.","descriptionAr":"هذا يؤكد قسم تذكير المناسبات وتصميم Hassoun وروابط التطبيق."},"lastActivity":{"label":"📖 Qur’an study","detail":"Continue where you left off and keep learning with Hassoun.","occurredAt":"2026-08-21T15:11:00Z"}}'
+          escaped_data="$(printf '%s' "$data" | sed "s/'/''/g")"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT OR IGNORE INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key, scheduled_at, status) SELECT NULL, NULL, email, 'en', 'prayer', 'prayer_alert', '${escaped_data}', '${test_key}', CURRENT_TIMESTAMP, 'pending' FROM admin_users WHERE role='owner' AND status='active' ORDER BY id LIMIT 1;"
+          sleep 75
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, attempts, CASE WHEN sent_at IS NULL THEN 0 ELSE 1 END AS sent FROM email_outbox WHERE idempotency_key='${test_key}' LIMIT 1;" > /tmp/test-status.json
+          python3 - <<'PY'
+          import json, subprocess
+          schema=json.load(open('/tmp/email-schema.json'))
+          rows=[]
+          for block in schema: rows += block.get('results',[])
+          report=['email_pipeline=audited','sender=notifications@hassoun.app','test_recipient=owner_admin_only','tables:']
+          for row in rows:
+              name=row.get('name','')
+              if not name or name.startswith('sqlite_'): continue
+              safe=''.join(c for c in name if c.isalnum() or c=='_')
+              raw=subprocess.check_output(['npx','wrangler','d1','execute','wopt-prayer-push','--remote','--json','--command',f'SELECT COUNT(*) AS count FROM {safe};'],text=True)
+              blocks=json.loads(raw); count=(blocks[0].get('results') or [{}])[0].get('count',0) if blocks else 0
+              columns=[]
+              sql=row.get('sql') or ''
+              report.append(f'- {safe}: {count}')
+              report.append(f'  schema={sql.replace(chr(10)," ")[:1500]}')
+          status=json.load(open('/tmp/test-status.json'))
+          result=(status[0].get('results') or [{}])[0] if status else {}
+          report += [f"test_status={result.get('status','missing')}",f"test_attempts={result.get('attempts',0)}",f"test_sent={result.get('sent',0)}"]
+          open('../.github/email-system-audit.txt','w').write('\n'.join(report)+'\n')
+          PY
+      - name: Commit audit result
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/email-system-audit.txt
+          git commit -m "Record final Hassoun email audit and admin test" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
