@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -44,7 +44,7 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: ""
           NEXT_PUBLIC_PUSH_API_URL: "https://wopt-prayer-push.wopt-windsor.workers.dev"
 
-      - name: Verify exported routes
+      - name: Verify exported routes and custom-domain assets
         run: |
           test -f out/index.html
           test -f out/quran/index.html
@@ -52,6 +52,8 @@ jobs:
           test -f out/manifest.webmanifest
           test -f out/sw.js
           test -f out/CNAME
+          test -f out/icon-192.png
+          test -f out/property-cousins-sponsor.jpg
           grep -qx 'hassoun.app' out/CNAME
 
       - name: Configure Pages
@@ -72,3 +74,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Checkout verification branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Record hassoun.app deployment on current branch
+        run: |
+          cat > .github/pwa-pages-status.txt <<EOF
+          hassoun_app_pages=ready
+          custom_domain=hassoun.app
+          root_base_path=ready
+          gps_location_bootstrap=ready
+          email_assets=ready
+          deployed_url=${{ steps.deployment.outputs.page_url }}
+          verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          source_commit=${{ github.sha }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/pwa-pages-status.txt
+          git commit -m "Record hassoun.app Pages deployment" || true
+          git push origin HEAD:${GITHUB_REF_NAME} || true
