@@ -1,1 +1,1 @@
-Final validation trigger for GPS prayer times, ticker, game history, and Android store build.
+Fresh final Android validation requested 2026-08-21 for GPS prayer times, CRM ticker, game session history, mobile UI polish, and current working-branch changes.
