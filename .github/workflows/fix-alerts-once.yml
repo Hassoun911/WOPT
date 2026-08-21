@@ -1,0 +1,75 @@
+name: Fix Alerts Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/fix-alerts-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch alerts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # notifications.ts: add explicit event reminder cancellation
+          p=Path('mobile/src/notifications.ts'); s=p.read_text()
+          marker='export async function scheduleIslamicEventReminders(todayKey: string, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {'
+          if 'export async function disableIslamicEventReminders()' not in s:
+              insert='''export async function disableIslamicEventReminders() {\n  const scheduled = await Notifications.getAllScheduledNotificationsAsync();\n  const eventIdentifiers = scheduled.filter((request) => {\n    const data = request.content.data as Record<string, unknown> | null | undefined;\n    return data?.kind === ISLAMIC_EVENT_KIND;\n  }).map((request) => request.identifier);\n  await Promise.all(eventIdentifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));\n  await AsyncStorage.removeItem(ISLAMIC_EVENT_MARKER_KEY);\n}\n\n'''
+              s=s.replace(marker,insert+marker)
+          p.write_text(s)
+
+          # App.tsx: event reminder preference and real controls
+          p=Path('mobile/App.tsx'); s=p.read_text()
+          s=s.replace('import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";', 'import { disableIslamicEventReminders, disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";')
+          if 'ISLAMIC_EVENT_ALERTS_KEY' not in s:
+              s=s.replace('type AppProps = {', 'const ISLAMIC_EVENT_ALERTS_KEY = "hassoun:islamic-event-reminders:enabled:v1";\n\ntype AppProps = {')
+          if 'const [islamicEventAlertsEnabled' not in s:
+              s=s.replace('  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);', '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);\n  const [islamicEventAlertsEnabled, setIslamicEventAlertsEnabled] = useState(true);\n  const [islamicEventAlertsBusy, setIslamicEventAlertsBusy] = useState(false);')
+          old='''      const [savedLocale, savedAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([\n        AsyncStorage.getItem(STORAGE_KEYS.locale),\n        AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),\n        loadPhonePrayerAlertPreferences(),\n        loadPrayerTimes(),\n        loadQuizStats()\n      ]);'''
+          new='''      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([\n        AsyncStorage.getItem(STORAGE_KEYS.locale),\n        AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),\n        AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),\n        loadPhonePrayerAlertPreferences(),\n        loadPrayerTimes(),\n        loadQuizStats()\n      ]);'''
+          s=s.replace(old,new)
+          s=s.replace('      setAlertsEnabled(savedAlerts === "on");', '      setAlertsEnabled(savedAlerts === "on");\n      const eventAlertsEnabled = savedEventAlerts !== "off";\n      setIslamicEventAlertsEnabled(eventAlertsEnabled);')
+          s=s.replace('        await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);', '        if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);')
+          s=s.replace('      void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);', '      if (islamicEventAlertsEnabled) void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);')
+          s=s.replace('  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);', '  }, [alertsEnabled, islamicEventAlertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);')
+          s=s.replace('      await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);', '      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);')
+          s=s.replace('      await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);', '      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);')
+          anchor='''  const togglePrayerAudio = async (prayer: PrayerKey) => {'''
+          if 'const toggleIslamicEventAlerts' not in s:
+              fn='''  const toggleIslamicEventAlerts = async (enabled: boolean) => {\n    setIslamicEventAlertsBusy(true);\n    try {\n      if (!enabled) {\n        await disableIslamicEventReminders();\n        await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, "off");\n        setIslamicEventAlertsEnabled(false);\n        return;\n      }\n      const result = await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone);\n      if (!result.granted) {\n        Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive Islamic event reminders.");\n        return;\n      }\n      await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, "on");\n      setIslamicEventAlertsEnabled(true);\n    } catch (error) {\n      Alert.alert("Event reminder error", String(error));\n    } finally {\n      setIslamicEventAlertsBusy(false);\n    }\n  };\n\n'''
+              s=s.replace(anchor,fn+anchor)
+          oldcard='''      <Pressable onPress={() => setActiveTab("events")} style={styles.emailCard}>\n        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View><View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "إشعار قبل ١٥ يوماً من المناسبة الإسلامية القادمة." : "A reminder appears when the next Islamic event is 15 days away."}</Text></View><Text style={styles.settingArrow}>›</Text>\n      </Pressable>'''
+          newcard='''      <View style={styles.emailCard}>\n        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View>\n        <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "ينبهك Hassoun قبل ١٥ يوماً من المناسبة القادمة. هذا إعداد مستقل عن صفحة المناسبات." : "Hassoun can remind you 15 days before the next Islamic event. This is a real alert setting, separate from the Events page."}</Text><Pressable onPress={() => setActiveTab("events")}><Text style={styles.eventSettingsLink}>{locale === "ar" ? "عرض كل المناسبات ←" : "View all Islamic events →"}</Text></Pressable></View>\n        <Switch value={islamicEventAlertsEnabled} onValueChange={(value) => void toggleIslamicEventAlerts(value)} disabled={islamicEventAlertsBusy} trackColor={{ false: "#d9ddd9", true: "#95c3b4" }} thumbColor={islamicEventAlertsEnabled ? "#0b5b47" : "#f8faf8"} />\n      </View>'''
+          s=s.replace(oldcard,newcard)
+          if 'eventSettingsLink:' not in s:
+              s=s.replace('  emailLogo: { width: 41, height: 41 },', '  emailLogo: { width: 41, height: 41 },\n  eventSettingsLink: { color: "#0b654f", fontSize: 10.5, fontWeight: "900", marginTop: 7 },')
+          p.write_text(s)
+
+          # AppWithEmail.tsx: error boundary so email feature cannot crash app
+          p=Path('mobile/AppWithEmail.tsx'); s=p.read_text()
+          s=s.replace('import { useEffect, useState } from "react";', 'import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";')
+          if 'class EmailFeatureBoundary' not in s:
+              boundary='''\nclass EmailFeatureBoundary extends Component<{ children: ReactNode; locale: "en" | "ar"; onClose: () => void }, { failed: boolean }> {\n  state = { failed: false };\n  static getDerivedStateFromError() { return { failed: true }; }\n  componentDidCatch(error: Error, info: ErrorInfo) { console.warn("Hassoun email alerts UI error", error, info.componentStack); }\n  render() {\n    if (!this.state.failed) return this.props.children;\n    return <View style={styles.emailErrorCard}><BrandMark size={58}/><Text style={styles.emailErrorTitle}>{this.props.locale === "ar" ? "تعذر فتح تنبيهات البريد" : "Email alerts could not open"}</Text><Text style={styles.emailErrorText}>{this.props.locale === "ar" ? "لم يتوقف Hassoun. أغلق هذه الشاشة وحاول مرة أخرى أو استخدم اتصل بنا إذا استمرت المشكلة." : "Hassoun is still running. Close this screen and try again, or use Contact us if the problem continues."}</Text><Pressable onPress={this.props.onClose} style={styles.emailErrorButton}><Text style={styles.emailErrorButtonText}>{this.props.locale === "ar" ? "إغلاق" : "Close safely"}</Text></Pressable></View>;\n  }\n}\n'''
+              s=s.replace('function RuntimeBlock',boundary+'\nfunction RuntimeBlock')
+          s=s.replace('<EmailSignupCard locale={locale} onComplete={completeSignup} />', '<EmailFeatureBoundary locale={locale} onClose={() => setVisible(false)}><EmailSignupCard locale={locale} onComplete={completeSignup} /></EmailFeatureBoundary>')
+          if 'emailErrorCard:' not in s:
+              s=s.replace('const styles = StyleSheet.create({', 'const styles = StyleSheet.create({\n  emailErrorCard: { margin: 18, padding: 22, borderRadius: 22, backgroundColor: "#fff8ed", borderWidth: 1, borderColor: "#e7d4a7", alignItems: "center" },\n  emailErrorTitle: { color: "#173f35", fontSize: 20, fontWeight: "900", marginTop: 12, textAlign: "center" },\n  emailErrorText: { color: "#6e756e", fontSize: 12, lineHeight: 19, textAlign: "center", marginTop: 8 },\n  emailErrorButton: { marginTop: 16, minHeight: 46, paddingHorizontal: 18, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" },\n  emailErrorButtonText: { color: "#fff", fontSize: 13, fontWeight: "900" },')
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add mobile/App.tsx mobile/AppWithEmail.tsx mobile/src/notifications.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Alerts stability and Islamic event reminder controls"
+          git push origin HEAD:work/hassoun-1.0-store-admin
