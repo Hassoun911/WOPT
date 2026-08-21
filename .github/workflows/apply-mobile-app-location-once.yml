@@ -1,0 +1,70 @@
+name: Apply mobile App GPS context once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Apply current GPS location throughout mobile App'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch App location context
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path("mobile/App.tsx")
+          s = p.read_text()
+          pairs = [
+            ('import { loadPrayerTimes } from "./src/prayerData";', 'import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";'),
+            ('function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date()) {\n  const currentKey = windsorDateKey(now);', 'function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date(), timeZone = WINDSOR_TIME_ZONE) {\n  const currentKey = windsorDateKey(now, timeZone);'),
+            ('      const target = windsorLocalToDate(dateKey, day[prayer]);', '      const target = windsorLocalToDate(dateKey, day[prayer], timeZone);'),
+            ('function hijriDateLabel(date: Date, locale: "en" | "ar") {', 'function hijriDateLabel(date: Date, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {'),
+            ('      day: "numeric", month: "long", year: "numeric", timeZone: WINDSOR_TIME_ZONE', '      day: "numeric", month: "long", year: "numeric", timeZone'),
+            ('  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>({});\n  const [live, setLive] = useState(false);', '  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>({});\n  const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);\n  const [live, setLive] = useState(false);'),
+            ('  const todayKey = windsorDateKey(now);\n  const today = prayerTimes[todayKey];\n  const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);', '  const prayerTimeZone = prayerLocation?.timezone || WINDSOR_TIME_ZONE;\n  const prayerLocationLabel = prayerLocation?.label || CITY_LABEL;\n  const todayKey = windsorDateKey(now, prayerTimeZone);\n  const today = prayerTimes[todayKey];\n  const next = useMemo(() => nextPrayerFor(prayerTimes, now, prayerTimeZone), [now, prayerTimes, prayerTimeZone]);'),
+            ('      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);', '      setPrayerTimes(loaded.prayerTimes);\n      setPrayerLocation(loaded.location);\n      setLive(loaded.live);'),
+            ('schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences)', 'schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label })'),
+            ('scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale)', 'scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone)'),
+            ('schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences)', 'schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })'),
+            ('scheduleIslamicEventReminders(windsorDateKey(new Date()), locale)', 'scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone)'),
+            ('  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences]);', '  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);'),
+            ('schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences)', 'schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })'),
+            ('scheduleIslamicEventReminders(todayKey, nextLocale)', 'scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone)'),
+            ('schedulePrayerNotifications(prayerTimes, locale, preferences)', 'schedulePrayerNotifications(prayerTimes, locale, preferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })'),
+            ('scheduleIslamicEventReminders(todayKey, locale)', 'scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone)'),
+            ('schedulePrayerNotifications(prayerTimes, locale, nextPreferences)', 'schedulePrayerNotifications(prayerTimes, locale, nextPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })'),
+            ('Loading Windsor prayer times…', 'Loading prayer times for your current location…'),
+            ('  const date = windsorLocalToDate(todayKey, "12:00");', '  const date = windsorLocalToDate(todayKey, "12:00", prayerTimeZone);'),
+            ('  const hijriDate = hijriDateLabel(date, locale);', '  const hijriDate = hijriDateLabel(date, locale, prayerTimeZone);'),
+            ('<View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text></View>', '<View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>📍 {prayerLocationLabel} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text></View>'),
+            ('<Text style={styles.footer}>Official Windsor Islamic Association schedule • America/Toronto</Text>', '<Text style={styles.footer}>{prayerLocation?.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer times calculated for current GPS location"} • {prayerTimeZone}</Text>')
+          ]
+          changed = 0
+          for old, new in pairs:
+              if old in s:
+                  s = s.replace(old, new)
+                  changed += 1
+              else:
+                  print("SKIP", old[:100])
+          print("Applied replacements:", changed, "/", len(pairs))
+          p.write_text(s)
+      - name: Commit App GPS context
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- mobile/App.tsx; then
+            echo "No App changes to commit."
+            exit 0
+          fi
+          git add mobile/App.tsx
+          git commit -m "Apply current GPS location throughout mobile App"
+          git push origin HEAD:work/hassoun-1.0-store-admin
