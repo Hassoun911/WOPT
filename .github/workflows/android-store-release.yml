@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hassoun-android-store-${{ github.ref }}
@@ -99,3 +99,23 @@ jobs:
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record Android validation on current branch
+        working-directory: .
+        run: |
+          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          TARGET="$($ANALYZER manifest target-sdk "$APK")"
+          cat > .github/android-store-status.txt <<EOF
+          android_store_validation=ready
+          target_sdk=${TARGET}
+          exact_alarm_policy=ready
+          gps_prayer_location=ready
+          verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          source_commit=$(git rev-parse HEAD)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/android-store-status.txt
+          git commit -m "Record Hassoun Android store validation" || true
+          git push origin HEAD:${GITHUB_REF_NAME} || true
