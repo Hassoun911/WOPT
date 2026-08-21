@@ -1,0 +1,28 @@
+new_email_system_audit=ready
+sender_domain=hassoun.app
+legacy_domain_allowed=no
+test_recipient=owner_admin_only
+test_ok=true
+test_status=pending
+test_sent=false
+tables:
+- admin_users: 1
+  columns=id,public_id,username,email,display_name,password_hash,password_salt,password_iterations,must_change_password,role,status,created_at,updated_at,last_signed_in_at
+- email_campaigns: 0
+  columns=id,public_id,name,template_key,category,audience,target_locale,target_country_code,target_city,target_timezone,target_filter_json,status,scheduled_at,started_at,sent_at,created_by_admin_id,created_at,updated_at
+- email_deliveries: 26
+  columns=id,event_id,campaign_id,subscriber_id,recipient_email,template_key,provider_message_id,status,error_code,error_message,sent_at,delivered_at,created_at,notification_kind,prayer,scheduled_for,subject_snapshot
+- email_outbox: 36
+  columns=id,delivery_id,subscriber_id,recipient_email,locale,kind,template_key,template_data_json,idempotency_key,scheduled_at,status,attempts,last_error,sent_at,created_at,updated_at
+- email_subscribers: 1
+  columns=id,public_id,email,display_name,locale,latitude,longitude,timezone,country_code,country_name,region,city,calculation_method,madhab,location_updated_at,status,verification_token_hash,verification_expires_at,manage_token_hash,verified_at,unsubscribed_at,created_at,updated_at,installation_id
+- email_templates: 4
+  columns=id,template_key,name,category,subject_en,subject_ar,html_en,html_ar,text_en,text_ar,enabled,created_at,updated_at
+- subscriber_activity: 0
+  columns=id,subscriber_id,installation_id,activity_key,activity_label,detail,platform,occurred_at
+- subscriber_email_preferences: 1
+  columns=subscriber_id,prayer_alerts,daily_prayer_schedule,religious_occasions,daily_content,announcements,community_events,marketing,updated_at
+- subscriber_prayer_preferences: 5
+  columns=subscriber_id,prayer,email_twenty,email_ten,email_athan,updated_at
+- subscriptions: 2
+  columns=id,installation_id,provider,platform,locale,address,web_p256dh,web_auth,enabled,app_version,created_at,updated_at,notify_twenty,notify_ten,notify_athan,subscriber_id,notify_announcements,notify_community_events,notify_marketing,latitude,longitude,timezone,country_code,city,location_updated_at
