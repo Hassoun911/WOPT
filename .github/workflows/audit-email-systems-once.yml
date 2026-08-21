@@ -1,0 +1,54 @@
+name: Audit Email Systems Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/audit-email-systems-once.yml]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Inspect remote D1 email tables without exposing addresses
+        working-directory: push-server
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name, sql FROM sqlite_schema WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscriber%' OR lower(name) LIKE '%subscription%') ORDER BY name;" > /tmp/schema.json
+          python3 - <<'PY'
+          import json, subprocess
+          schema=json.load(open('/tmp/schema.json'))
+          rows=[]
+          for block in schema:
+              rows.extend(block.get('results',[]))
+          tables=[r['name'] for r in rows if r.get('name') and not r['name'].startswith('sqlite_')]
+          report=['email_system_audit=remote_d1','tables:']
+          for table in tables:
+              safe=''.join(ch for ch in table if ch.isalnum() or ch=='_')
+              raw=subprocess.check_output(['npx','wrangler','d1','execute','wopt-prayer-push','--remote','--json','--command',f'SELECT COUNT(*) AS count FROM {safe};'],text=True)
+              data=json.loads(raw)
+              count=data[0].get('results',[{}])[0].get('count',0) if data else 0
+              report.append(f'- {safe}: {count}')
+          # Only structural column names for likely old/new subscriber tables; no data rows.
+          report.append('schemas:')
+          for r in rows:
+              report.append(f"- {r['name']}: {r.get('sql','').replace(chr(10),' ')[:1200]}")
+          open('../.github/email-system-audit.txt','w').write('\n'.join(report)+'\n')
+          PY
+      - name: Commit audit report
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/email-system-audit.txt
+          git commit -m "Record remote Hassoun email system audit" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
