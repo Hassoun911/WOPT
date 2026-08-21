@@ -268,7 +268,7 @@ export default {
       } else if (request.method === "GET" && url.pathname === "/games/history") {
         response = await listGameHistory(url, env);
       } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/finish$/.test(url.pathname)) {
-        response = await finishGameSession(request, env, url.pathname.split("/")[3]);
+        response = await finishGameSession(request, env, url.pathname.split("/")[3] ?? "");
       } else if (url.pathname.startsWith("/games/")) {
         response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
       } else if (request.method === "POST" && url.pathname === "/support/contact") {
@@ -302,13 +302,13 @@ export default {
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listRestrictedSubscribers(request, env, url);
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
-        response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3]);
+        response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3] ?? "");
       } else if (request.method === "GET" && /^\/admin\/subscribers\/[^/]+\/360$/.test(url.pathname)) {
-        response = await getAdminUser360(request, env, url.pathname.split("/")[3]);
+        response = await getAdminUser360(request, env, url.pathname.split("/")[3] ?? "");
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/profile$/.test(url.pathname)) {
-        response = await updateAdminSubscriberProfile(request, env, url.pathname.split("/")[3]);
+        response = await updateAdminSubscriberProfile(request, env, url.pathname.split("/")[3] ?? "");
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/preferences$/.test(url.pathname)) {
-        response = await updateAdminSubscriberPreferences(request, env, url.pathname.split("/")[3]);
+        response = await updateAdminSubscriberPreferences(request, env, url.pathname.split("/")[3] ?? "");
       } else if (request.method === "GET" && url.pathname === "/admin/devices") {
         response = await listAdminDevices360(request, env, url);
       } else if (request.method === "POST" && /^\/admin\/devices\/\d+$/.test(url.pathname)) {
