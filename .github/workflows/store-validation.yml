@@ -127,7 +127,7 @@ jobs:
       - name: Compile iOS app for simulator
         working-directory: mobile/ios
         run: |
-          WORKSPACE=$(find . -maxdepth 2 -name '*.xcworkspace' -print -quit)
+          WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
           test -n "$WORKSPACE"
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); schemes=d.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')
           test -n "$SCHEME"
