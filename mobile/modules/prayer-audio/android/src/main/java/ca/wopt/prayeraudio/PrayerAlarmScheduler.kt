@@ -30,7 +30,7 @@ object PrayerAlarmScheduler {
     val future = JSONArray()
     for (index in 0 until incoming.length()) {
       val event = incoming.getJSONObject(index)
-      if (event.getLong("scheduledAtMs") > now) future.put(event)
+      if (event.getLong("scheduledAtMs") > now + 1000L) future.put(event)
     }
 
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -78,6 +78,7 @@ object PrayerAlarmScheduler {
   private fun scheduleOne(context: Context, event: JSONObject, exact: Boolean) {
     val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val triggerAt = event.getLong("scheduledAtMs")
+    if (triggerAt <= System.currentTimeMillis() + 1000L) return
     val intent = requireNotNull(pendingIntent(context, event, PendingIntent.FLAG_UPDATE_CURRENT))
 
     if (exact) {
@@ -90,11 +91,13 @@ object PrayerAlarmScheduler {
   private fun pendingIntent(context: Context, event: JSONObject, mode: Int): PendingIntent? {
     val eventId = event.optString("id")
     val prayer = event.optString("prayer")
+    val scheduledAtMs = event.optLong("scheduledAtMs", 0L)
     val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
       action = ACTION_PRAYER_ALARM
       data = Uri.parse("wopt-prayer://${Uri.encode(eventId)}")
       putExtra("eventId", eventId)
       putExtra("prayer", prayer)
+      putExtra("scheduledAtMs", scheduledAtMs)
     }
     return PendingIntent.getBroadcast(
       context,
