@@ -68,11 +68,14 @@ jobs:
           jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null
           curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json
           jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null
-      - name: Record deployment success
+      - name: Record deployment outcome
+        if: always()
         working-directory: .
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
           cat > .github/hassoun-deploy-status.txt <<EOF
-          status=ready
+          status=${JOB_STATUS}
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
           public_app=https://hassoun.app
           admin=https://admin.hassoun.app
@@ -84,5 +87,5 @@ jobs:
           git config user.name "Hassoun Automation"
           git config user.email "actions@users.noreply.github.com"
           git add .github/hassoun-deploy-status.txt
-          git commit -m "Record finalized Hassoun Worker deployment"
-          git push origin HEAD:work/store-crm-2026-08-19
+          git commit -m "Record finalized Hassoun Worker deployment ${JOB_STATUS}" || true
+          git push origin HEAD:work/store-crm-2026-08-19 || true
