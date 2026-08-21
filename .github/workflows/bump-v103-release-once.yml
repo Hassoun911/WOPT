@@ -1,0 +1,39 @@
+name: Bump Hassoun v1.0.3 release once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/bump-v103-release-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Bump mobile release
+        run: |
+          cd mobile
+          npm version 1.0.3 --no-git-tag-version --allow-same-version
+          cd ..
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('mobile/app.config.ts'); s=p.read_text(); s=re.sub(r'version: "1\.0\.\d+"','version: "1.0.3"',s,count=1); s=re.sub(r'versionCode: \d+','versionCode: 44',s,count=1); p.write_text(s)
+          p=Path('.github/workflows/android-store-release.yml'); s=p.read_text(); s=re.sub(r'1\.0\.\d+','1.0.3',s); s=re.sub(r'android_version_code=\d+','android_version_code=44',s); p.write_text(s)
+          PY
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/package.json mobile/package-lock.json mobile/app.config.ts .github/workflows/android-store-release.yml
+          git commit -m "Bump Hassoun Android to 1.0.3 build 44" || true
+          git pull --rebase --autostash origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
