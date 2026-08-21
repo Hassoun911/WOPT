@@ -43,6 +43,7 @@ import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
 import { handleGames } from "./games";
+import { finishGameSession, listGameHistory } from "./gameHistory";
 import { getPublicRuntimeConfig } from "./runtimeConfig";
 import { duePrayerEvents } from "./schedule";
 import {
@@ -264,6 +265,10 @@ export default {
         response = await registerWeb(request, env);
       } else if (request.method === "DELETE" && url.pathname === "/subscriptions") {
         response = await unsubscribe(request, env);
+      } else if (request.method === "GET" && url.pathname === "/games/history") {
+        response = await listGameHistory(url, env);
+      } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/finish$/.test(url.pathname)) {
+        response = await finishGameSession(request, env, url.pathname.split("/")[3]);
       } else if (url.pathname.startsWith("/games/")) {
         response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
       } else if (request.method === "POST" && url.pathname === "/support/contact") {
