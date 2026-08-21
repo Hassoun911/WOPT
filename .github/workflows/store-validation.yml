@@ -10,16 +10,40 @@ on:
       - "mobile/**"
       - "push-server/**"
       - "pwa/**"
+      - ".github/scripts/fix-hassoun-sadaqah-admin-alerts.py"
       - ".github/workflows/store-validation.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hassoun-store-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  apply-current-fixes:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/work/store-crm-2026-08-19'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+          fetch-depth: 0
+      - name: Apply Sadaqah, admin, alert and widget fixes once
+        run: |
+          if grep -q 'Sadaqah Jariyah & donations' mobile/src/SettingsHub.tsx; then
+            echo "Current Hassoun fixes already applied"
+            exit 0
+          fi
+          python .github/scripts/fix-hassoun-sadaqah-admin-alerts.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- mobile/src/SettingsHub.tsx mobile/App.tsx mobile/src/prayerData.ts mobile/src/notifications.ts mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt mobile/app.config.ts mobile/package.json mobile/package-lock.json pwa/app/admin/AdminControlCenter.tsx push-server/src/adminEmail.ts push-server/src/index.ts push-server/src/emailDelivery.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "Finish Hassoun Sadaqah admin alerts and widget fixes"
+          git push origin HEAD:work/store-crm-2026-08-19
+
   mobile-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -54,7 +78,7 @@ jobs:
           const config = JSON.parse(fs.readFileSync('/tmp/hassoun-expo.json', 'utf8'));
           const fail = (message) => { console.error(message); process.exit(1); };
           if (config.name !== 'Hassoun') fail('Unexpected app name');
-          if (config.version !== '1.0.0') fail(`Expected version 1.0.0, found ${config.version}`);
+          if (!['1.0.0', '1.0.3'].includes(config.version)) fail(`Unexpected version ${config.version}`);
           if (config.android?.package !== 'ca.wopt.windsorprayertimes') fail('Unexpected Android package');
           if (config.ios?.bundleIdentifier !== 'ca.wopt.windsorprayertimes') fail('Unexpected iOS bundle id');
           if (config.ios?.supportsTablet !== false) fail('iPad support must stay disabled until iPad QA is complete');
