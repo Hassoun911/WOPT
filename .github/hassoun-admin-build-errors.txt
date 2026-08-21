@@ -1,0 +1,9 @@
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+
+added 508 packages in 15s
+
+> windsor-prayer-times@0.1.0 build
+> bash scripts/build-verified.sh
+
+build-verified.sh requires GNU timeout.
