@@ -1,0 +1,44 @@
+name: Finalize Hassoun Email Pipeline Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/finalize-email-pipeline-once.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Enforce hassoun.app sender and single deployment branch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('push-server/src/emailDelivery.ts')
+          s=p.read_text()
+          old='''    body: JSON.stringify({ from: env.EMAIL_FROM.includes("<") ? env.EMAIL_FROM.replace(/^[^<]+</, "Hassoun <") : `Hassoun <${env.EMAIL_FROM}>`, to: [row.recipient_email], subject: email.subject, html: email.html, text: email.text, ...(env.EMAIL_REPLY_TO ? { reply_to: env.EMAIL_REPLY_TO } : {}) })'''
+          new='''    body: JSON.stringify({\n      from: "Hassoun <notifications@hassoun.app>",\n      to: [row.recipient_email],\n      subject: email.subject,\n      html: email.html,\n      text: email.text,\n      ...(env.EMAIL_REPLY_TO && /@hassoun\\.app>?$/i.test(env.EMAIL_REPLY_TO.trim()) ? { reply_to: env.EMAIL_REPLY_TO } : {})\n    })'''
+          if old not in s:
+              raise SystemExit('sendResend source pattern not found')
+          s=s.replace(old,new)
+          p.write_text(s)
+
+          p=Path('.github/workflows/deploy-push-worker.yml')
+          s=p.read_text()
+          s=s.replace('branches: [main, work/hassoun-1.0-store-admin]', 'branches: [work/hassoun-1.0-store-admin]')
+          s=s.replace('          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}\n','')
+          s=s.replace('          put_optional_secret EMAIL_FROM "$EMAIL_FROM"\n','          printf %s "Hassoun <notifications@hassoun.app>" | npx wrangler secret put EMAIL_FROM\n')
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add push-server/src/emailDelivery.ts .github/workflows/deploy-push-worker.yml
+          git commit -m "Enforce single Hassoun email delivery pipeline" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
