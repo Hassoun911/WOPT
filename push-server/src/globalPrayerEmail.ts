@@ -183,11 +183,21 @@ async function claimPrayerEmail(env: Env, subscriber: Subscriber, eventId: strin
   return env.DB.prepare("SELECT id FROM email_deliveries WHERE event_id = ? AND subscriber_id = ? LIMIT 1").bind(eventId, subscriber.id).first<{ id: number }>();
 }
 
+async function latestSubscriberActivity(env: Env, subscriberId: number) {
+  return env.DB.prepare(
+    `SELECT activity_label, detail, occurred_at
+     FROM subscriber_activity
+     WHERE subscriber_id = ?
+     ORDER BY occurred_at DESC, id DESC LIMIT 1`
+  ).bind(subscriberId).first<{ activity_label: string; detail: string | null; occurred_at: string }>();
+}
+
 async function queuePrayerEmail(env: Env, subscriber: Subscriber, day: CachedPrayerDay, prayer: PrayerKey, kind: AlertKind, prayerTime: string, targetMs: number) {
   const eventId = `email:${subscriber.id}:${day.prayer_date}:${prayer}:${kind}`;
   const delivery = await claimPrayerEmail(env, subscriber, eventId, kind, prayer, new Date(targetMs).toISOString());
   if (!delivery) return false;
   const manageUrl = await subscriberManageUrl(env, subscriber.public_id, subscriber.email);
+  const recentActivity = await latestSubscriberActivity(env, subscriber.id);
   const nextEvent = upcomingIslamicEvent(day.prayer_date);
   const upcomingEvent = nextEvent && nextEvent.daysLeft >= 0 && nextEvent.daysLeft <= 15 ? {
     id: nextEvent.id,
@@ -205,7 +215,8 @@ async function queuePrayerEmail(env: Env, subscriber: Subscriber, day: CachedPra
     prayerTimes: { fajr: day.fajr, dhuhr: day.dhuhr, asr: day.asr, maghrib: day.maghrib, isha: day.isha },
     displayName: subscriber.display_name,
     locationLabel: locationLabel(subscriber), timezone: subscriber.timezone,
-    appUrl: publicAppUrl(env), manageUrl, upcomingEvent
+    appUrl: publicAppUrl(env), manageUrl, upcomingEvent,
+    lastActivity: recentActivity ? { label: recentActivity.activity_label, detail: recentActivity.detail, occurredAt: recentActivity.occurred_at } : null
   };
   await env.DB.prepare(`INSERT OR IGNORE INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES (?, ?, ?, ?, 'prayer', 'prayer_alert', ?, ?)`).bind(delivery.id, subscriber.id, subscriber.email, subscriber.locale, JSON.stringify(data), eventId).run();
   return true;

@@ -26,7 +26,7 @@ const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
 };
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const ICONS: Record<PrayerKey, string> = { fajr: "🌅", dhuhr: "☀️", asr: "🌤️", maghrib: "🌇", isha: "🌙" };
-const HASSOUN_LOGO = "https://hassoun911.github.io/WOPT/assets/hassoun-logo.png";
+const HASSOUN_LOGO = "https://hassoun.app/hassoun-logo.png";
 const PROPERTY_COUSINS_LOGO = "https://hassoun.app/property-cousins-sponsor.jpg";
 const PROPERTY_COUSINS_SITE = "https://thepropertycousins.net/";
 const PROPERTY_COUSINS_ADDRESS = "2055 Sandwich W Pkwy Unit 1200, Windsor, ON N9H 2M8";
