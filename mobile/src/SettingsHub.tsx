@@ -19,8 +19,10 @@ import HassounWidget, { type HassounWidgetAppearance, type HassounWidgetCountdow
 import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering";
 import { submitSupportMessage } from "./support";
 import BrandMark from "./BrandMark";
+import FeatureGuidePage from "./FeatureGuidePage";
+import AboutHassounPage from "./AboutHassounPage";
 
-type SettingsPage = "root" | "about" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";
+type SettingsPage = "root" | "about" | "guide" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";
 
 type Props = {
   locale: "en" | "ar";
@@ -113,6 +115,7 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
       </Section>
 
       <Section title={t("HELP & SUPPORT", "المساعدة والدعم")}>
+        <Row emoji="🧭" title={t("Learn the App", "تعرّف على التطبيق")} text={t("Easy feature guide with search, steps, examples, emojis and troubleshooting", "دليل سهل للميزات مع البحث والخطوات والأمثلة والإيموجي وحل المشاكل")} onPress={() => setPage("guide")} />
         <Row emoji="✉️" title={t("Contact us", "اتصل بنا")} text={t("Send Hassoun support a message from inside the app", "أرسل رسالة إلى دعم Hassoun من داخل التطبيق")} onPress={() => setPage("contact")} />
         <Row emoji="🔐" title={t("Permissions", "الأذونات")} text={t("Why Hassoun requests location, notifications, alarms and microphone", "لماذا يطلب Hassoun الموقع والتنبيهات والمنبهات والميكروفون")} onPress={() => setPage("permissions")} />
         <Row emoji="ℹ️" title={t("About Hassoun", "حول Hassoun")} text={t(`Version ${appVersion} • Prayer • Qur’an • Knowledge`, `الإصدار ${appVersion} • الصلاة • القرآن • المعرفة`)} onPress={() => setPage("about")} />
@@ -262,18 +265,11 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
     );
   }
 
+  if (page === "guide") return <FeatureGuidePage locale={locale} onBack={() => setPage("root")} />;
+
   if (page === "contact") return <ContactPage locale={locale} version={appVersion} onBack={() => setPage("root")} />;
 
-  if (page === "about") {
-    return (
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-        <BackHeader title={t("About Hassoun", "حول Hassoun")} onBack={() => setPage("root")} />
-        <View style={styles.aboutHero}><Text style={styles.aboutMoon}>☪</Text><Text style={styles.aboutTitle}>Hassoun</Text><Text style={styles.aboutTagline}>{t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة")}</Text><Text style={styles.version}>v{appVersion}</Text></View>
-        <LegalCard title={t("Our purpose", "هدفنا")}><Text style={styles.legalText}>{t("Hassoun brings prayer times, Adhan, Qur’an reading and listening, memorization tools and Islamic learning into one calm, easy-to-use experience.", "يجمع Hassoun مواقيت الصلاة والأذان وقراءة القرآن والاستماع إليه وأدوات الحفظ والتعلم الإسلامي في تجربة سهلة وواضحة.")}</Text></LegalCard>
-        <LegalCard title={t("Sources", "المصادر")}><Text style={styles.legalText}>{t("Windsor prayer times use the official Windsor Islamic Association schedule. Qur’an text and recitation features use verified Qur’anic data and recognized public Qur’an services where indicated in the app.", "تستخدم مواقيت وندسور الجدول الرسمي لجمعية وندسور الإسلامية. تستخدم ميزات نص القرآن والتلاوة بيانات قرآنية موثقة وخدمات قرآن عامة معروفة حيث يشار إليها داخل التطبيق.")}</Text></LegalCard>
-      </ScrollView>
-    );
-  }
+  if (page === "about") return <AboutHassounPage locale={locale} version={appVersion} onBack={() => setPage("root")} />;
 
   if (page === "permissions") {
     return (

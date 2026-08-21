@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import TickerControl from "./TickerControl";
+import AboutGuideControl from "./AboutGuideControl";
 
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 const TOKEN_KEY = "wopt:admin-token:v1";
@@ -15,7 +16,7 @@ type Content = { public_id: string; content_type: string; title_en: string; titl
 type TeamMember = { public_id: string; username: string; email: string; display_name?: string | null; role: string; status: string; last_signed_in_at?: string | null };
 type Audit = { id: number; action: string; entity_type: string; entity_id?: string | null; summary?: string | null; created_at: string; username?: string | null; display_name?: string | null };
 type Campaign = { public_id: string; name: string; title_en: string; status: string; target_platform: string; scheduled_at?: string | null; sent_at?: string | null; sent_count?: number; failed_count?: number };
-type View = "dashboard" | "subscribers" | "content" | "control" | "push" | "ticker" | "team" | "audit";
+type View = "dashboard" | "subscribers" | "content" | "control" | "push" | "ticker" | "aboutguide" | "team" | "audit";
 
 async function api<T>(path: string, init: RequestInit = {}, token?: string | null): Promise<T> {
   const headers = new Headers(init.headers);
@@ -144,7 +145,7 @@ export default function CrmDashboard() {
 
   const tabs: { key: View; label: string }[] = [
     { key: "dashboard", label: "Dashboard" }, { key: "subscribers", label: "Users" }, { key: "content", label: "Content" },
-    { key: "control", label: "App Control" }, { key: "push", label: "Push" }, { key: "ticker", label: "Ticker" }, { key: "team", label: "Admins" }, { key: "audit", label: "Audit" }
+    { key: "control", label: "App Control" }, { key: "push", label: "Push" }, { key: "ticker", label: "Ticker" }, { key: "aboutguide", label: "About & Guide" }, { key: "team", label: "Admins" }, { key: "audit", label: "Audit" }
   ];
 
   return <main style={s.page}>
@@ -183,6 +184,8 @@ export default function CrmDashboard() {
       <div style={s.panel}><h2 style={s.panelTitle}>Recent campaigns</h2><div style={s.cardList}>{campaigns.slice(0,30).map(x => <div key={x.public_id} style={s.contentCard}><div><strong>{x.title_en || x.name}</strong><div style={s.subtle}>{x.target_platform} · {x.scheduled_at ? new Date(x.scheduled_at).toLocaleString() : "—"}</div></div><Badge tone={statusTone(x.status)}>{x.status}</Badge></div>)}</div></div></div></section> : null}
 
     {view === "ticker" ? <TickerControl /> : null}
+
+    {view === "aboutguide" ? <AboutGuideControl token={token} /> : null}
 
     {view === "team" ? <section><Title eyebrow="SECURITY & ACCESS" title="Admin team" />{admin.role !== "owner" ? <div style={s.panel}>Only the owner can manage admin roles and access.</div> : <div style={s.tableWrap}><table style={s.table}><thead><tr><Th>Admin</Th><Th>Role</Th><Th>Status</Th><Th>Last sign-in</Th><Th>Control</Th></tr></thead><tbody>{team.map(x => <tr key={x.public_id}><Td><strong>{x.display_name || x.username}</strong><div style={s.subtle}>{x.email}</div></Td><Td>{x.role}</Td><Td><Badge tone={statusTone(x.status)}>{x.status}</Badge></Td><Td>{x.last_signed_in_at ? new Date(x.last_signed_in_at).toLocaleString() : "Never"}</Td><Td>{x.role === "owner" || x.public_id === admin.public_id ? <span style={s.subtle}>Protected</span> : <div style={s.inline}><select style={s.smallSelect} value={x.role} onChange={(e) => { const role = e.target.value; void run(async () => { await api(`/admin/team/${x.public_id}`, { method: "POST", body: JSON.stringify({ role }) }, token); }, "Admin role updated"); }}><option value="admin">admin</option><option value="editor">editor</option></select><button style={x.status === "active" ? s.dangerTiny : s.tiny} onClick={() => void run(async () => { await api(`/admin/team/${x.public_id}`, { method: "POST", body: JSON.stringify({ status: x.status === "active" ? "disabled" : "active" }) }, token); }, "Admin access updated")}>{x.status === "active" ? "Disable" : "Enable"}</button></div>}</Td></tr>)}</tbody></table></div>}</section> : null}
 
