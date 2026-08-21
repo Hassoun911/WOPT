@@ -1,5 +1,6 @@
 import worker from "./index";
 import { recordSubscriberActivity } from "./activity";
+import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import type { Env } from "./types";
 
@@ -13,7 +14,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "gps-prayer-email-activity-2026-08-20-2";
+const BACKEND_VERSION = "gps-prayer-email-activity-games-2026-08-20-3";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -67,6 +68,13 @@ export default {
       } catch (error) {
         console.error("Activity tracking failed", error);
         return withCors(request, Response.json({ error: "Activity unavailable" }, { status: 500 }), env);
+      }
+    }
+    if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/action$/.test(url.pathname)) {
+      const body = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
+      if (body.type === "finish") {
+        const code = url.pathname.split("/")[3] ?? "";
+        return withCors(request, await finishGameSession(request, env, code), env);
       }
     }
     return withCors(request, await worker.fetch(request, env), env);
