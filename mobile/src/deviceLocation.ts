@@ -1,7 +1,12 @@
-import { PermissionsAndroid, Platform } from "react-native";
-import PrayerAudio, { type NativeDeviceLocation } from "../modules/prayer-audio";
+import * as Location from "expo-location";
 
-export type DetectedPrayerLocation = NativeDeviceLocation & {
+export type DetectedPrayerLocation = {
+  latitude: number;
+  longitude: number;
+  city?: string | null;
+  region?: string | null;
+  countryCode?: string | null;
+  countryName?: string | null;
   timezone: string;
 };
 
@@ -10,25 +15,35 @@ function deviceTimeZone() {
 }
 
 export async function detectPrayerLocation(): Promise<DetectedPrayerLocation | null> {
-  if (Platform.OS !== "android" || !PrayerAudio) return null;
+  const permission = await Location.requestForegroundPermissionsAsync();
+  if (!permission.granted) return null;
 
-  const granted = await PermissionsAndroid.request(
-    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    {
-      title: "Use your location for prayer times",
-      message: "Hassoun uses your current location to automatically select the correct local prayer times and email alert time zone.",
-      buttonPositive: "Allow",
-      buttonNegative: "Not now"
-    }
-  );
+  const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  const latitude = position.coords.latitude;
+  const longitude = position.coords.longitude;
 
-  if (granted !== PermissionsAndroid.RESULTS.GRANTED) return null;
-
-  const location = await PrayerAudio.getCurrentDeviceLocation();
-  if (!location) return null;
+  let city: string | null = null;
+  let region: string | null = null;
+  let countryCode: string | null = null;
+  let countryName: string | null = null;
+  try {
+    const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const place = places[0];
+    city = place?.city || place?.subregion || null;
+    region = place?.region || null;
+    countryCode = place?.isoCountryCode || null;
+    countryName = place?.country || null;
+  } catch {
+    // Coordinates and timezone remain enough to calculate accurate prayer times.
+  }
 
   return {
-    ...location,
+    latitude,
+    longitude,
+    city,
+    region,
+    countryCode,
+    countryName,
     timezone: deviceTimeZone()
   };
 }
