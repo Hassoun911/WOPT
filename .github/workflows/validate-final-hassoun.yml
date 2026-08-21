@@ -38,9 +38,10 @@ jobs:
         continue-on-error: true
         working-directory: pwa
         run: |
-          npm ci --include=dev --no-audit --no-fund
-          npx tsc --noEmit
-          npm run build
+          set +e
+          (npm ci --include=dev --no-audit --no-fund && npx tsc --noEmit && npm run build) 2>&1 | tee /tmp/hassoun-admin.log
+          STATUS=${PIPESTATUS[0]}
+          exit "$STATUS"
       - name: Validate mobile TypeScript
         id: mobile_ts
         continue-on-error: true
@@ -62,7 +63,11 @@ jobs:
         id: ios_build
         continue-on-error: true
         working-directory: mobile/ios
-        run: xcodebuild -workspace Hassoun.xcworkspace -scheme Hassoun -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+        run: |
+          set +e
+          xcodebuild -workspace Hassoun.xcworkspace -scheme Hassoun -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee /tmp/hassoun-ios.log
+          STATUS=${PIPESTATUS[0]}
+          exit "$STATUS"
       - name: Record validation diagnostics
         if: always()
         working-directory: .
@@ -85,9 +90,15 @@ jobs:
           source_commit=$(git rev-parse HEAD)
           checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
+          if [ -f /tmp/hassoun-admin.log ]; then
+            grep -E 'Type error|Error:|error TS|Failed to compile|Build error|Module not found|Cannot find|Property .* does not exist' /tmp/hassoun-admin.log | tail -n 120 > .github/hassoun-admin-build-errors.txt || true
+          fi
+          if [ -f /tmp/hassoun-ios.log ]; then
+            grep -E '(^|[[:space:]])(error:|fatal error:)|SwiftCompile|CompileSwift|BUILD FAILED|The following build commands failed' /tmp/hassoun-ios.log | tail -n 180 > .github/hassoun-ios-build-errors.txt || true
+          fi
           git config user.name "Hassoun Automation"
           git config user.email "actions@users.noreply.github.com"
-          git add .github/hassoun-final-validation-status.txt
-          git commit -m "Record Hassoun validation diagnostics ${STATUS}" || true
+          git add .github/hassoun-final-validation-status.txt .github/hassoun-admin-build-errors.txt .github/hassoun-ios-build-errors.txt 2>/dev/null || true
+          git commit -m "Record Hassoun build errors ${STATUS}" || true
           git push origin HEAD:work/store-crm-2026-08-19 || true
           test "$STATUS" = success
