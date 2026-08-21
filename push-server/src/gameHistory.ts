@@ -1,7 +1,7 @@
 import type { Env } from "./types";
 
 type RoomRow = { code: string; game_type: "trivia" | "imposter" | "clue"; category: "islamic" | "sports"; status: "lobby" | "playing" | "finished"; host_player_id: string; state_json: string; created_at: string };
-type PlayerRow = { player_id: string; name: string; score: number };
+type PlayerRow = { player_id: string; name: string; score: number; is_host: number };
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -9,6 +9,35 @@ function json(data: unknown, status = 200) {
 
 function validPlayerId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value);
+}
+
+function publicFinishedRoom(room: RoomRow, players: PlayerRow[]) {
+  let state: Record<string, unknown> = {};
+  try { state = JSON.parse(room.state_json || "{}"); } catch {}
+  return {
+    room: {
+      code: room.code,
+      gameType: room.game_type,
+      category: room.category,
+      status: "finished" as const,
+      hostPlayerId: room.host_player_id,
+      state: {
+        phase: "results",
+        round: typeof state.round === "number" ? state.round : 0,
+        endsAt: null,
+        activePlayerId: state.activePlayerId ?? null,
+        lastResult: state.lastResult ?? null
+      },
+      private: {},
+      players: players.map((player) => ({
+        id: player.player_id,
+        name: player.name,
+        score: player.score,
+        isHost: player.is_host === 1
+      }))
+    },
+    saved: true
+  };
 }
 
 export async function finishGameSession(request: Request, env: Env, code: string) {
@@ -19,7 +48,7 @@ export async function finishGameSession(request: Request, env: Env, code: string
   if (!room) return json({ error: "Room not found" }, 404);
   if (room.host_player_id !== body.playerId) return json({ error: "Only the host can end the game" }, 403);
 
-  const playerRows = await env.DB.prepare("SELECT player_id, name, score FROM game_players WHERE room_code = ? ORDER BY joined_at ASC")
+  const playerRows = await env.DB.prepare("SELECT player_id, name, score, is_host FROM game_players WHERE room_code = ? ORDER BY joined_at ASC")
     .bind(code).all<PlayerRow>();
   const players = playerRows.results ?? [];
   if (!players.length) return json({ error: "No players in this room" }, 409);
@@ -53,9 +82,8 @@ export async function finishGameSession(request: Request, env: Env, code: string
     if (statements.length) await env.DB.batch(statements);
   }
 
-  const updatedRoom = await env.DB.prepare("SELECT code, game_type, category, status, host_player_id, state_json FROM game_rooms WHERE code = ?")
-    .bind(code).first<Record<string, unknown>>();
-  return json({ ok: true, room: updatedRoom, saved: true });
+  const finishedRoom: RoomRow = { ...room, status: "finished", state_json: JSON.stringify(state) };
+  return json(publicFinishedRoom(finishedRoom, players));
 }
 
 export async function listGameHistory(url: URL, env: Env) {
