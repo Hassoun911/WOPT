@@ -1,0 +1,42 @@
+name: Fix MultiplayerGames null guard once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/fix-multiplayer-null-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Move finished-game controls into active room screen
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('mobile/src/MultiplayerGames.tsx')
+          s = p.read_text()
+          bad = '''        {room.status === "finished" ? <View style={styles.playCard}><Text style={styles.resultIcon}>🏁</Text><Text style={styles.playTitle}>{t("Game saved to session history", "تم حفظ اللعبة في سجل الجلسات")}</Text><Text style={styles.playText}>{t("Your scores, players and result are now saved. Leave the room to see the new history card.", "تم حفظ النتائج واللاعبين. اخرج من الغرفة لرؤية بطاقة السجل الجديدة.")}</Text><Pressable onPress={leaveRoom} style={styles.primary}><Text style={styles.primaryText}>{t("View game history", "عرض سجل الألعاب")}</Text></Pressable></View> : room.status === "playing" && isHost ? <Pressable onPress={() => void act("finish")} disabled={busy} style={styles.finishButton}><Text style={styles.finishButtonText}>🏁 {t("End game & save results", "إنهاء اللعبة وحفظ النتيجة")}</Text></Pressable> : null}\n\n'''
+          if bad not in s:
+              raise SystemExit('expected misplaced finished-game block not found')
+          s = s.replace(bad, '', 1)
+          anchor = '''      <View style={styles.roomHero}><Text style={styles.roomHeroIcon}>{META[room.gameType].icon}</Text><View style={styles.headerCopy}><Text style={styles.roomHeroTitle}>{ar ? META[room.gameType].ar : META[room.gameType].en}</Text><Text style={styles.roomHeroMeta}>{room.category === "islamic" ? `☾ ${t("Islamic", "إسلامي")}` : `⚽ ${t("Sports", "رياضة")}`} • {room.players.length}/12</Text></View></View>\n\n'''
+          good = anchor + '''      {room.status === "finished" ? <View style={styles.playCard}><Text style={styles.resultIcon}>🏁</Text><Text style={styles.playTitle}>{t("Game saved to session history", "تم حفظ اللعبة في سجل الجلسات")}</Text><Text style={styles.playText}>{t("Your scores, players and result are now saved. Leave the room to see the new history card.", "تم حفظ النتائج واللاعبين. اخرج من الغرفة لرؤية بطاقة السجل الجديدة.")}</Text><Pressable onPress={leaveRoom} style={styles.primary}><Text style={styles.primaryText}>{t("View game history", "عرض سجل الألعاب")}</Text></Pressable></View> : room.status === "playing" && isHost ? <Pressable onPress={() => void act("finish")} disabled={busy} style={styles.finishButton}><Text style={styles.finishButtonText}>🏁 {t("End game & save results", "إنهاء اللعبة وحفظ النتيجة")}</Text></Pressable> : null}\n\n'''
+          if anchor not in s:
+              raise SystemExit('room hero anchor not found')
+          s = s.replace(anchor, good, 1)
+          p.write_text(s)
+      - name: Commit fix
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/src/MultiplayerGames.tsx
+          git commit -m "Fix multiplayer finished-game null handling"
+          git push origin HEAD:work/hassoun-1.0-store-admin
