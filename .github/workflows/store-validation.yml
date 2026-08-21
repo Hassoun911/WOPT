@@ -6,34 +6,183 @@ on:
   push:
     branches:
       - work/store-crm-2026-08-19
+    paths:
+      - "mobile/**"
+      - "push-server/**"
+      - "pwa/**"
+      - ".github/workflows/store-validation.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: hassoun-store-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-current-fixes:
+  mobile-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      NODE_ENV: production
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: work/store-crm-2026-08-19
-          fetch-depth: 0
-      - name: Apply current Hassoun fixes
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install and type-check mobile app
+        working-directory: mobile
         run: |
-          if grep -q 'Sadaqah Jariyah & donations' mobile/src/SettingsHub.tsx; then
-            echo "Current Hassoun fixes already applied"
-            exit 0
+          npm ci --include=dev --no-audit --no-fund
+          npm run quran:data
+          npx tsc --noEmit
+      - name: Validate Expo store configuration
+        working-directory: mobile
+        run: |
+          npx expo config --type public --json > /tmp/hassoun-expo.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('/tmp/hassoun-expo.json', 'utf8'));
+          const fail = (message) => { console.error(message); process.exit(1); };
+          if (config.name !== 'Hassoun') fail('Unexpected app name');
+          if (config.version !== '1.0.3') fail(`Expected version 1.0.3, found ${config.version}`);
+          if (config.android?.versionCode !== 44) fail(`Expected Android versionCode 44, found ${config.android?.versionCode}`);
+          if (config.android?.package !== 'ca.wopt.windsorprayertimes') fail('Unexpected Android package');
+          if (config.ios?.bundleIdentifier !== 'ca.wopt.windsorprayertimes') fail('Unexpected iOS bundle id');
+          if (config.ios?.supportsTablet !== false) fail('iPad support must stay disabled until iPad QA is complete');
+          const permissions = new Set(config.android?.permissions || []);
+          if (!permissions.has('android.permission.SCHEDULE_EXACT_ALARM')) fail('SCHEDULE_EXACT_ALARM is required');
+          if (permissions.has('android.permission.USE_EXACT_ALARM')) fail('USE_EXACT_ALARM must not be present in store build');
+          if (config.ios?.privacyManifests?.NSPrivacyTracking !== false) fail('iOS privacy manifest must explicitly disable tracking');
+          NODE
+      - name: Clean Android prebuild
+        working-directory: mobile
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Validate Android API and permissions
+        run: |
+          ! grep -R "android.permission.USE_EXACT_ALARM" mobile/android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.SCHEDULE_EXACT_ALARM" mobile/android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" mobile/android/app/src/main/AndroidManifest.xml
+          grep -R -E "targetSdk(Version)?[^0-9]*36|targetSdkVersion[^0-9]*36" mobile/android mobile/node_modules/expo mobile/node_modules/react-native | head -n 1
+      - name: Build release APK and AAB for validation
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
+      - name: Verify validation artifacts
+        run: |
+          test -s mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -s mobile/android/app/build/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-1.0.3-validation-android-${{ github.run_number }}
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
+
+  mobile-ios:
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install and type-check mobile app
+        working-directory: mobile
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npm run quran:data
+          npx tsc --noEmit
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Clean iOS prebuild
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --clean --no-install
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install
+      - name: Verify iOS privacy and native modules
+        run: |
+          test -f mobile/ios/Hassoun/PrivacyInfo.xcprivacy || find mobile/ios -name PrivacyInfo.xcprivacy -print -quit | grep .
+          grep -R "NSSpeechRecognitionUsageDescription" mobile/ios/*/Info.plist
+          grep -q "QuranAudio" mobile/ios/Podfile.lock
+          grep -q "QuranSpeech" mobile/ios/Podfile.lock
+          grep -q "PrayerAudio" mobile/ios/Podfile.lock
+      - name: Compile iOS app for simulator
+        working-directory: mobile/ios
+        run: |
+          WORKSPACE=$(find . -maxdepth 2 -name '*.xcworkspace' -print -quit)
+          test -n "$WORKSPACE"
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); schemes=d.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')
+          test -n "$SCHEME"
+          set +e
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee /tmp/hassoun-xcode.log
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            echo "========== HASSOUN XCODE COMPILER ERRORS =========="
+            grep -nE '(^|[[:space:]])(error:|fatal error:)|SwiftCompile|CompileSwift' /tmp/hassoun-xcode.log | tail -n 160 || true
+            echo "===================================================="
+            exit "$STATUS"
           fi
-          python .github/scripts/fix-hassoun-sadaqah-admin-alerts.py
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- mobile/src/SettingsHub.tsx mobile/App.tsx mobile/src/prayerData.ts mobile/src/notifications.ts mobile/app.config.ts mobile/package.json mobile/package-lock.json pwa/app/admin/AdminControlCenter.tsx push-server/src/adminEmail.ts push-server/src/index.ts push-server/src/emailDelivery.ts
-          git add -f -- mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          git diff --cached --quiet && exit 0
-          git commit -m "Finish Hassoun Sadaqah admin alerts and widget fixes"
-          git push origin HEAD:work/store-crm-2026-08-19
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - name: Install backend
+        working-directory: push-server
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Type-check backend
+        working-directory: push-server
+        run: npx tsc --noEmit
+      - name: Run backend tests
+        working-directory: push-server
+        run: npm test
+
+  admin-pwa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install Admin/PWA dependencies
+        working-directory: pwa
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Type-check Admin CRM
+        working-directory: pwa
+        run: npx tsc --noEmit
+      - name: Build PWA and Admin CRM
+        working-directory: pwa
+        run: npm run build
