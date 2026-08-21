@@ -339,6 +339,9 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     const next = { surah: start.surah, ayah: start.ayah };
     readerAtTop.current = true;
     readerAtBottom.current = false;
+    readerLastScrollY.current = 0;
+    readerScrollDirection.current = null;
+    verticalGestureStartY.current = null;
     setPosition(next);
     setSelectedAyah(null);
     setReaderPlayChooserOpen(false);
@@ -370,20 +373,38 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     () => PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponderCapture: (_event, gestureState) => {
-        if (appearance.browseMode !== "horizontal") return false;
         const horizontal = Math.abs(gestureState.dx);
         const vertical = Math.abs(gestureState.dy);
-        return horizontal > 12 && horizontal > vertical * 1.15;
+
+        if (appearance.browseMode === "horizontal") {
+          return horizontal >= 24 && horizontal > vertical * 1.25;
+        }
+
+        if (appearance.browseMode !== "vertical") return false;
+        if (vertical < 20 || vertical <= horizontal * 1.15) return false;
+
+        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+        if (gestureState.dy < 0) return readerAtBottom.current || contentFits;
+        if (gestureState.dy > 0) return readerAtTop.current || contentFits;
+        return false;
       },
-      onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: (_event, gestureState) => {
-        if (appearance.browseMode !== "horizontal") return;
-        const distance = Math.abs(gestureState.dx);
-        const speed = Math.abs(gestureState.vx);
-        if (distance < 48 && speed < 0.35) return;
-        // Arabic-book direction: higher / next pages live to the left.
-        // Swipe right to advance to the next page; swipe left to go back.
-        turnReaderPage(gestureState.dx > 0 ? 1 : -1);
+        if (appearance.browseMode === "horizontal") {
+          if (Math.abs(gestureState.dx) < 40) return;
+          turnReaderPage(gestureState.dx > 0 ? 1 : -1);
+          return;
+        }
+
+        if (appearance.browseMode !== "vertical" || Math.abs(gestureState.dy) < 32) return;
+        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
+        if (gestureState.dy < 0 && (readerAtBottom.current || contentFits)) {
+          turnReaderPage(1);
+        } else if (gestureState.dy > 0 && (readerAtTop.current || contentFits)) {
+          turnReaderPage(-1);
+        }
+      },
+      onPanResponderTerminate: () => {
+        verticalGestureStartY.current = null;
       }
     }),
     [appearance.browseMode, currentPage, spreadMode]
