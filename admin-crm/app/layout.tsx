@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Hassoun Admin CRM",
-  description: "Hassoun Owner Control Center"
+  description: "Hassoun Owner Control Center",
+  viewport: "width=device-width, initial-scale=1, viewport-fit=cover"
 };
 
 const apiProxyBootstrap = `
