@@ -10,12 +10,7 @@ type UpcomingEvent = {
   descriptionEn?: string;
   descriptionAr?: string;
 };
-
-type LastActivity = {
-  label?: string;
-  detail?: string;
-  occurredAt?: string;
-};
+type LastActivity = { label?: string; detail?: string; occurredAt?: string };
 
 const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
   fajr: { en: "Fajr", ar: "الفجر" },
@@ -24,8 +19,8 @@ const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
   maghrib: { en: "Maghrib", ar: "المغرب" },
   isha: { en: "Isha", ar: "العشاء" }
 };
-const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const ICONS: Record<PrayerKey, string> = { fajr: "🌅", dhuhr: "☀️", asr: "🌤️", maghrib: "🌇", isha: "🌙" };
+const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const HASSOUN_LOGO = "https://hassoun.app/icon-192.png";
 const PROPERTY_COUSINS_LOGO = "https://hassoun.app/property-cousins-sponsor.jpg";
 const PROPERTY_COUSINS_SITE = "https://thepropertycousins.net/";
@@ -33,7 +28,7 @@ const PROPERTY_COUSINS_ADDRESS = "2055 Sandwich W Pkwy Unit 1200, Windsor, ON N9
 const PROPERTY_COUSINS_PHONE = "(519) 970-0202";
 
 function esc(value: unknown) {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function time12(value: unknown) {
@@ -41,8 +36,7 @@ function time12(value: unknown) {
   const match = text.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return text;
   const hour = Number(match[1]);
-  const suffix = hour >= 12 ? "PM" : "AM";
-  return `${hour % 12 || 12}:${match[2]} ${suffix}`;
+  return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
 function dateLabel(dateKey: string, locale: Locale) {
@@ -61,8 +55,11 @@ function hijriLabel(dateKey: string, locale: Locale) {
   } catch { return ""; }
 }
 
-function button(url: string, label: string, background = "#0b654f") {
-  return `<a href="${esc(url)}" style="display:inline-block;background:${background};color:#fff;text-decoration:none;border-radius:14px;padding:13px 17px;font-size:13px;font-weight:900;margin:4px">${esc(label)}</a>`;
+function cta(url: string, label: string, secondary = false) {
+  const bg = secondary ? "#f2ede2" : "#0b654f";
+  const fg = secondary ? "#17483d" : "#ffffff";
+  const border = secondary ? "1px solid #ddd5c7" : "1px solid #0b654f";
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 9px"><tr><td><a href="${esc(url)}" style="display:block;background:${bg};color:${fg};border:${border};text-decoration:none;text-align:center;border-radius:14px;padding:14px 16px;font-size:14px;font-weight:800">${esc(label)}</a></td></tr></table>`;
 }
 
 export function prayerDashboardEmail(data: Record<string, unknown>, locale: Locale): PrayerEmailRendered {
@@ -76,46 +73,54 @@ export function prayerDashboardEmail(data: Record<string, unknown>, locale: Loca
   const location = String(data.locationLabel ?? t("your current location", "موقعك الحالي"));
   const displayName = String(data.displayName ?? "").trim();
   const firstName = displayName ? displayName.split(/\s+/)[0] : "";
-  const greeting = firstName ? t(`Assalamu Alaikum ${firstName} 👋`, `السلام عليكم ${firstName} 👋`) : t("Assalamu Alaikum 👋", "السلام عليكم 👋");
-  const appUrl = String(data.appUrl || "https://hassoun.app/").replace(/\/$/, "");
+  const greeting = firstName ? t(`Assalamu Alaikum ${firstName}`, `السلام عليكم ${firstName}`) : t("Assalamu Alaikum", "السلام عليكم");
+  const appUrl = String(data.appUrl || "https://hassoun.app").replace(/\/$/, "");
   const manageUrl = String(data.manageUrl ?? "");
   const prayerTimes = (data.prayerTimes && typeof data.prayerTimes === "object" ? data.prayerTimes : {}) as PrayerTimes;
   const event = (data.upcomingEvent && typeof data.upcomingEvent === "object" ? data.upcomingEvent : null) as UpcomingEvent | null;
   const lastActivity = (data.lastActivity && typeof data.lastActivity === "object" ? data.lastActivity : null) as LastActivity | null;
 
   const subject = ar
-    ? kind === "twenty" ? `🕌 ${prayer} بعد ٢٠ دقيقة • استعد للصلاة` : kind === "ten" ? `⏰ ${prayer} بعد ١٠ دقائق • Hassoun` : `🕌 حان وقت ${prayer} • حيّ على الصلاة`
-    : kind === "twenty" ? `🕌 ${prayer} in 20 minutes — prepare for prayer` : kind === "ten" ? `⏰ ${prayer} in 10 minutes — Hassoun` : `🕌 It’s time for ${prayer} — Hayya ‘ala-s-Salah`;
+    ? kind === "twenty" ? `🕌 ${prayer} بعد ٢٠ دقيقة` : kind === "ten" ? `⏰ ${prayer} بعد ١٠ دقائق` : `🕌 حان وقت ${prayer}`
+    : kind === "twenty" ? `🕌 ${prayer} in 20 minutes` : kind === "ten" ? `⏰ ${prayer} in 10 minutes` : `🕌 It’s time for ${prayer}`;
 
   const heroKicker = kind === "twenty" ? t("20 MINUTES TO PRAYER", "متبقي ٢٠ دقيقة") : kind === "ten" ? t("10 MINUTES TO PRAYER", "متبقي ١٠ دقائق") : t("IT’S PRAYER TIME", "حان وقت الصلاة");
   const intro = kind === "athan"
-    ? t("May Allah accept your prayer. Open Hassoun after Salah for Qur’an, daily learning, Islamic events and games.", "تقبّل الله صلاتك. افتح Hassoun بعد الصلاة للقرآن والتعلّم اليومي والمناسبات والألعاب الإسلامية.")
+    ? t("May Allah accept your prayer. Take a quiet moment for Salah, then return to Hassoun for Qur’an and beneficial learning.", "تقبّل الله صلاتك. خذ لحظة هادئة للصلاة، ثم عد إلى Hassoun للقرآن والعلم النافع.")
     : t("A gentle reminder to prepare, make wudu and step away from distractions before prayer begins.", "تذكير لطيف للاستعداد والوضوء والابتعاد عن المشتتات قبل دخول وقت الصلاة.");
 
-  const rows = PRAYERS.map((key) => {
+  const scheduleRows = PRAYERS.map((key) => {
     const active = key === prayerKey;
-    return `<td width="20%" style="padding:3px"><div style="border-radius:14px;border:1px solid ${active ? "#0b654f" : "#e7dfd1"};background:${active ? "#0b654f" : "#fffdf8"};padding:9px 3px;text-align:center"><div style="font-size:17px">${ICONS[key]}</div><div style="font-size:10px;font-weight:900;color:${active ? "#fff" : "#173f35"};margin-top:4px">${esc(NAMES[key][locale])}</div><div style="font-size:10px;font-weight:900;color:${active ? "#f6d97f" : "#31584d"};margin-top:4px">${esc(time12(prayerTimes[key]))}</div></div></td>`;
+    return `<tr><td style="padding:0 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #ece6dc"><tr><td width="46" style="padding:12px 0;font-size:20px">${ICONS[key]}</td><td style="padding:12px 0;text-align:${ar ? "right" : "left"}"><div style="font-size:14px;font-weight:800;color:${active ? "#0b654f" : "#294e45"}">${esc(NAMES[key][locale])}</div><div style="font-size:11px;color:#8d958f;margin-top:2px">${esc(NAMES[key][ar ? "en" : "ar"])}</div></td><td align="${ar ? "left" : "right"}" style="padding:12px 0"><span style="display:inline-block;min-width:82px;text-align:center;border-radius:12px;padding:8px 10px;background:${active ? "#0b654f" : "#f4f1ea"};color:${active ? "#fff" : "#31574d"};font-size:13px;font-weight:900">${esc(time12(prayerTimes[key]))}</span></td></tr></table></td></tr>`;
   }).join("");
 
   const eventBlock = event && typeof event.daysLeft === "number" && event.daysLeft >= 0 && event.daysLeft <= 15
-    ? `<tr><td style="padding:0 22px 18px"><div style="background:#fff4cf;border:1px solid #e2c56b;border-radius:18px;padding:16px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1px;color:#98752e;font-weight:900">${esc(t("🌙 UPCOMING ISLAMIC EVENT", "🌙 المناسبة الإسلامية القادمة"))}</div><div style="font-size:19px;font-weight:900;color:#173f35;margin-top:5px">${esc(event.emoji || "🌙")} ${esc(ar ? event.nameAr : event.nameEn)}</div><div style="font-size:13px;color:#5f6f69;margin-top:6px;line-height:1.5">${esc(ar ? event.descriptionAr : event.descriptionEn)}</div><div style="margin-top:9px;font-size:12px;font-weight:900;color:#0b654f">${esc(ar ? `متبقي ${event.daysLeft} يوم` : `${event.daysLeft} days remaining`)}</div></div></td></tr>`
+    ? `<tr><td style="padding:18px 22px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff6dc;border:1px solid #ead18a;border-radius:18px"><tr><td style="padding:16px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a762d;font-weight:900">${esc(t("UPCOMING ISLAMIC EVENT", "المناسبة الإسلامية القادمة"))}</div><div style="font-size:18px;font-weight:900;color:#173f35;margin-top:6px">${esc(event.emoji || "🌙")} ${esc(ar ? event.nameAr : event.nameEn)}</div><div style="font-size:13px;color:#64716c;line-height:1.55;margin-top:7px">${esc(ar ? event.descriptionAr : event.descriptionEn)}</div><div style="font-size:12px;color:#0b654f;font-weight:900;margin-top:9px">${esc(ar ? `متبقي ${event.daysLeft} يوم` : `${event.daysLeft} days remaining`)}</div></td></tr></table></td></tr>`
     : "";
 
   const activityBlock = lastActivity?.label
-    ? `<tr><td style="padding:0 22px 18px"><div style="background:#eef5f2;border-radius:18px;padding:16px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;color:#9a7a39;font-weight:900;letter-spacing:1px">${esc(t("WELCOME BACK", "مرحباً بعودتك"))}</div><div style="font-size:16px;color:#173f35;font-weight:900;margin-top:5px">${esc(lastActivity.label)}</div>${lastActivity.detail ? `<div style="font-size:12px;color:#61736c;margin-top:5px">${esc(lastActivity.detail)}</div>` : ""}</div></td></tr>`
+    ? `<tr><td style="padding:14px 22px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef5f2;border:1px solid #dbe8e2;border-radius:18px"><tr><td style="padding:15px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#8f743a;font-weight:900">${esc(t("WELCOME BACK", "مرحباً بعودتك"))}</div><div style="font-size:15px;color:#173f35;font-weight:900;margin-top:6px">${esc(lastActivity.label)}</div>${lastActivity.detail ? `<div style="font-size:12px;color:#65756f;line-height:1.5;margin-top:5px">${esc(lastActivity.detail)}</div>` : ""}</td></tr></table></td></tr>`
     : "";
 
-  const ctas = `<tr><td align="center" style="padding:0 18px 18px">${button(`${appUrl}/`, t("✨ Open Hassoun", "✨ افتح Hassoun"))}${button(`${appUrl}/quran`, t("📖 Read Qur’an", "📖 اقرأ القرآن"), "#9a7628")}${button(`${appUrl}/?open=quiz`, t("🧠 Play & Learn", "🧠 العب وتعلّم"), "#31584d")}</td></tr>`;
+  const actions = `<tr><td style="padding:20px 22px 4px">${cta(`${appUrl}/`, t("Open Hassoun", "افتح Hassoun"))}${cta(`${appUrl}/quran/`, t("Read Qur’an", "اقرأ القرآن"), true)}${manageUrl ? `<div style="text-align:center;padding:7px 0 2px"><a href="${esc(manageUrl)}" style="color:#0b654f;font-size:12px;font-weight:800;text-decoration:underline">${esc(t("Manage prayer email alerts", "إدارة تنبيهات الصلاة عبر البريد"))}</a></div>` : ""}</td></tr>`;
 
-  const manage = manageUrl ? `<tr><td align="center" style="padding:0 22px 18px"><a href="${esc(manageUrl)}" style="color:#0b654f;font-size:12px;font-weight:800">${esc(t("Manage my prayer email alerts", "إدارة تنبيهات الصلاة عبر البريد"))}</a></td></tr>` : "";
+  const sponsor = `<tr><td style="padding:18px 22px 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f1e6;border-radius:18px"><tr><td align="center" style="padding:16px"><div style="font-size:10px;letter-spacing:1.1px;color:#806a42;font-weight:900">${esc(t("THIS PROJECT IS SADAQAH JARIYAH", "هذا المشروع صدقة جارية"))}</div><div style="font-size:11px;line-height:1.55;color:#6f6b62;margin:7px 0 12px">${esc(t("Hassoun is built to help Muslims stay connected to Salah, Qur’an and beneficial knowledge.", "تم بناء Hassoun لمساعدة المسلمين على المحافظة على الصلاة والقرآن والعلم النافع."))}</div><a href="${PROPERTY_COUSINS_SITE}" style="text-decoration:none"><img src="${PROPERTY_COUSINS_LOGO}" width="170" alt="The Property Cousins Realty Inc." style="display:block;width:170px;max-width:100%;height:auto;margin:0 auto 8px;border:0"><div style="font-size:11px;font-weight:900;color:#173f35">THE PROPERTY COUSINS REALTY INC.</div></a><div style="font-size:10px;line-height:1.5;color:#817b70;margin-top:5px">${PROPERTY_COUSINS_ADDRESS}<br>${PROPERTY_COUSINS_PHONE}</div></td></tr></table></td></tr>`;
 
-  const sponsor = `<tr><td style="padding:20px 22px;background:#f8f1e4;border-top:1px solid #eadfc9;text-align:center"><div style="font-size:11px;letter-spacing:1.2px;color:#806a42;font-weight:900">${esc(t("THIS PROJECT IS SADAQAH JARIYAH", "هذا المشروع صدقة جارية"))}</div><p style="margin:7px auto 14px;max-width:500px;color:#5e675f;font-size:12px;line-height:1.55">${esc(t("Hassoun is built as an ongoing charity to help Muslims stay connected to Salah, Qur’an and beneficial Islamic knowledge. Please make dua for everyone who supports it.", "تم بناء Hassoun كصدقة جارية لمساعدة المسلمين على المحافظة على الصلاة والقرآن والعلم النافع. نسألكم الدعاء لكل من يدعم هذا المشروع."))}</p><div style="font-size:10px;color:#8c806c;font-weight:800;margin-bottom:8px">${esc(t("Proudly sponsored by", "برعاية"))}</div><a href="${PROPERTY_COUSINS_SITE}" style="text-decoration:none"><img src="${PROPERTY_COUSINS_LOGO}" alt="The Property Cousins Realty Inc." width="210" style="display:block;max-width:210px;width:100%;height:auto;margin:0 auto 10px;border:0"><div style="font-size:13px;color:#173f35;font-weight:900">THE PROPERTY COUSINS REALTY INC.</div></a><div style="font-size:11px;color:#756d60;line-height:1.55;margin-top:5px">${PROPERTY_COUSINS_ADDRESS}<br>${PROPERTY_COUSINS_PHONE}</div></td></tr>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media only screen and (max-width:620px){.outer{padding:0!important}.card{border-radius:0!important;border-left:0!important;border-right:0!important}.hero-pad{padding:22px 18px!important}.header-pad{padding:17px 18px!important}}</style></head><body style="margin:0;background:#f1ede5;font-family:Arial,Helvetica,sans-serif;color:#173f35"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="outer" style="background:#f1ede5;padding:18px 8px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="card" style="max-width:600px;background:#fffdf9;border:1px solid #ded7cb;border-radius:24px;overflow:hidden" dir="${ar ? "rtl" : "ltr"}"><tr><td class="header-pad" style="padding:18px 22px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td width="58"><img src="${HASSOUN_LOGO}" width="50" height="50" alt="Hassoun" style="display:block;border-radius:14px;border:0"></td><td style="padding-${ar ? "right" : "left"}:10px;text-align:${ar ? "right" : "left"}"><div style="font-size:12px;font-weight:900;letter-spacing:1.7px;color:#9b762f">HASSOUN</div><div style="font-size:12px;color:#70807a;margin-top:3px">${esc(t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة"))}</div></td><td align="${ar ? "left" : "right"}" style="font-size:10px;color:#8f958f">📍 ${esc(location)}</td></tr></table></td></tr><tr><td class="hero-pad" style="background:#0b654f;padding:26px 22px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.4px;color:#f0d27a;font-weight:900">${esc(heroKicker)}</div><div style="font-size:14px;color:#d8e9e3;font-weight:700;margin-top:8px">${esc(greeting)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:7px"><tr><td><div style="font-size:34px;line-height:1.1;color:#fff;font-weight:900">${esc(prayer)}</div><div style="font-size:14px;color:#c8ddd6;margin-top:4px">${esc(NAMES[prayerKey][ar ? "en" : "ar"])}</div></td><td align="${ar ? "left" : "right"}" valign="bottom"><div style="font-size:28px;color:#fff;font-weight:900;white-space:nowrap">${esc(prayerTime)}</div></td></tr></table><div style="border-top:1px solid rgba(255,255,255,.18);margin-top:18px;padding-top:13px;font-size:13px;line-height:1.55;color:#dcebe6">${esc(intro)}</div></td></tr><tr><td style="padding:18px 22px 9px;text-align:${ar ? "right" : "left"}"><div style="font-size:11px;color:#9b762f;font-weight:900;letter-spacing:1px">${esc(t("TODAY’S PRAYERS", "صلوات اليوم"))}</div><div style="font-size:17px;color:#173f35;font-weight:900;margin-top:5px">${esc(dateLabel(prayerDate, locale))}</div>${hijriLabel(prayerDate, locale) ? `<div style="font-size:12px;color:#7b8782;margin-top:4px">🌙 ${esc(hijriLabel(prayerDate, locale))}</div>` : ""}</td></tr>${scheduleRows}${eventBlock}${activityBlock}${actions}${sponsor}</table><div style="max-width:600px;text-align:center;padding:12px 10px 20px;color:#99958d;font-size:10px">Hassoun • ${esc(location)}</div></td></tr></table></body></html>`;
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f2ede3;font-family:Arial,Helvetica,sans-serif;color:#173f35"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f2ede3;padding:20px 10px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fffdf8;border:1px solid #ded5c5;border-radius:26px;overflow:hidden" dir="${ar ? "rtl" : "ltr"}"><tr><td style="padding:18px 22px"><table role="presentation" width="100%"><tr><td width="58"><img src="${HASSOUN_LOGO}" width="52" height="52" alt="Hassoun" style="display:block;border-radius:15px;background:#003d33"></td><td style="padding-${ar ? "right" : "left"}:11px;text-align:${ar ? "right" : "left"}"><div style="font-size:12px;font-weight:900;letter-spacing:2px;color:#a0782c">HASSOUN</div><div style="font-size:12px;color:#65756f;margin-top:2px">${esc(t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة"))}</div></td><td style="text-align:${ar ? "left" : "right"};font-size:10px;color:#8e9189">📍 ${esc(location)}</td></tr></table></td></tr><tr><td style="background:#075b48;padding:23px 22px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.5px;color:#eed27d;font-weight:900">${esc(heroKicker)}</div><div style="font-size:15px;color:#d7e7e1;font-weight:700;margin-top:8px">${esc(greeting)}</div><table role="presentation" width="100%"><tr><td><div style="font-size:31px;color:#fff;font-weight:900;margin-top:7px">${esc(prayer)}</div><div style="font-size:13px;color:#c8ded7;margin-top:4px">${esc(NAMES[prayerKey][ar ? "en" : "ar"])}</div></td><td style="text-align:${ar ? "left" : "right"};vertical-align:bottom"><div style="font-size:28px;color:#fff;font-weight:900">${esc(prayerTime)}</div></td></tr></table><div style="height:1px;background:rgba(255,255,255,.16);margin:17px 0 10px"></div><div style="font-size:12px;color:#d7e7e1">${esc(dateLabel(prayerDate, locale))} • ${esc(hijriLabel(prayerDate, locale))}</div></td></tr><tr><td style="padding:18px 22px 12px;text-align:${ar ? "right" : "left"}"><p style="margin:0;color:#355c52;font-size:15px;line-height:1.65;font-weight:700">${esc(intro)}</p></td></tr><tr><td style="padding:8px 18px 18px"><div style="font-size:12px;font-weight:900;padding:0 4px 8px">${esc(t("Today’s prayer schedule", "جدول صلوات اليوم"))}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${rows}</tr></table></td></tr><tr><td style="padding:0 22px 18px"><div style="background:#edf5f1;border-radius:18px;padding:15px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;color:#9a7a39;font-weight:900;letter-spacing:1px">${esc(t("💚 DAILY REMINDER", "💚 تذكير اليوم"))}</div><div style="font-size:17px;line-height:1.6;color:#244d42;font-weight:800;margin-top:5px">${esc(t("Hearts find comfort in the remembrance of Allah.", "ألا بذكر الله تطمئن القلوب."))}</div><div style="font-size:10px;color:#73837d;margin-top:4px">Qur’an 13:28</div></div></td></tr>${activityBlock}${eventBlock}${ctas}${manage}${sponsor}<tr><td style="padding:14px 22px 20px;text-align:center;color:#97958d;font-size:10px;line-height:1.5">${esc(t("Prayer times follow your current saved prayer location. Windsor uses the official local source; other locations use GPS-based calculations. Islamic-event dates may vary by local moon sighting.", "مواقيت الصلاة تتبع موقع الصلاة المحفوظ لديك. تستخدم وندسور المصدر المحلي الرسمي، بينما تستخدم المواقع الأخرى حسابات مبنية على GPS. قد تختلف تواريخ المناسبات حسب رؤية الهلال المحلية."))}</td></tr></table></td></tr></table></body></html>`;
+  const text = [
+    greeting,
+    `${prayer} — ${prayerTime}`,
+    intro,
+    `${t("Location", "الموقع")}: ${location}`,
+    `${t("Date", "التاريخ")}: ${dateLabel(prayerDate, locale)}`,
+    ...PRAYERS.map((key) => `${NAMES[key][locale]}: ${time12(prayerTimes[key])}`),
+    event ? `${t("Upcoming", "القادمة")}: ${ar ? event.nameAr : event.nameEn}` : "",
+    lastActivity?.label ? `${t("Last activity", "آخر نشاط")}: ${lastActivity.label}` : "",
+    `${t("Open Hassoun", "افتح Hassoun")}: ${appUrl}`,
+    manageUrl ? `${t("Manage alerts", "إدارة التنبيهات")}: ${manageUrl}` : "",
+    `The Property Cousins Realty Inc. — ${PROPERTY_COUSINS_ADDRESS} — ${PROPERTY_COUSINS_PHONE}`
+  ].filter(Boolean).join("\n");
 
-  const scheduleText = PRAYERS.map((key) => `${NAMES[key][locale]} ${time12(prayerTimes[key])}`).join(" • ");
-  const eventText = event && typeof event.daysLeft === "number" && event.daysLeft <= 15 ? `\n${event.emoji || "🌙"} ${ar ? event.nameAr : event.nameEn} — ${event.daysLeft} ${t("days", "يوم")}` : "";
-  const activityText = lastActivity?.label ? `\n${t("Last time in Hassoun", "آخر نشاط في Hassoun")}: ${lastActivity.label}${lastActivity.detail ? ` — ${lastActivity.detail}` : ""}` : "";
-  const text = `${greeting}\n${subject}\n${prayerTime} • ${location}\n${dateLabel(prayerDate, locale)} • ${hijriLabel(prayerDate, locale)}\n${scheduleText}${activityText}${eventText}\n\n${t("Open Hassoun", "افتح Hassoun")}: ${appUrl}/\n${t("This project is Sadaqah Jariyah, sponsored by The Property Cousins Realty Inc.", "هذا المشروع صدقة جارية برعاية The Property Cousins Realty Inc.")}\n${PROPERTY_COUSINS_ADDRESS} • ${PROPERTY_COUSINS_PHONE}${manageUrl ? `\n${manageUrl}` : ""}`;
   return { subject, html, text };
 }
