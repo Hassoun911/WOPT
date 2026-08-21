@@ -1,0 +1,7 @@
+status=failure
+branch=work/store-crm-2026-08-19
+source_commit=a09785815d7ed05c6f56d3249fcea5b4997b03d0
+backend=validated_in_job
+admin_pwa=validated_in_job
+ios_workspace=Hassoun.xcworkspace
+checked_at=2026-08-21T16:28:02Z
