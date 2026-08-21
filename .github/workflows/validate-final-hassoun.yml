@@ -90,15 +90,11 @@ jobs:
           source_commit=$(git rev-parse HEAD)
           checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
-          if [ -f /tmp/hassoun-admin.log ]; then
-            grep -E 'Type error|Error:|error TS|Failed to compile|Build error|Module not found|Cannot find|Property .* does not exist' /tmp/hassoun-admin.log | tail -n 120 > .github/hassoun-admin-build-errors.txt || true
-          fi
-          if [ -f /tmp/hassoun-ios.log ]; then
-            grep -E '(^|[[:space:]])(error:|fatal error:)|SwiftCompile|CompileSwift|BUILD FAILED|The following build commands failed' /tmp/hassoun-ios.log | tail -n 180 > .github/hassoun-ios-build-errors.txt || true
-          fi
+          if [ -f /tmp/hassoun-admin.log ]; then tail -n 240 /tmp/hassoun-admin.log > .github/hassoun-admin-build-errors.txt; fi
+          if [ -f /tmp/hassoun-ios.log ]; then tail -n 300 /tmp/hassoun-ios.log > .github/hassoun-ios-build-errors.txt; fi
           git config user.name "Hassoun Automation"
           git config user.email "actions@users.noreply.github.com"
           git add .github/hassoun-final-validation-status.txt .github/hassoun-admin-build-errors.txt .github/hassoun-ios-build-errors.txt 2>/dev/null || true
-          git commit -m "Record Hassoun build errors ${STATUS}" || true
+          git commit -m "Record Hassoun full build tails ${STATUS}" || true
           git push origin HEAD:work/store-crm-2026-08-19 || true
           test "$STATUS" = success
