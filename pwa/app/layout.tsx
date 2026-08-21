@@ -11,6 +11,7 @@ import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
 import RuntimeControlOverlay from "./RuntimeControlOverlay";
+import ScrollingTicker from "./ScrollingTicker";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 import WebPushRegistration from "./WebPushRegistration";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <LocationPrayerBootstrap />
         <ActivityTracker />
+        <ScrollingTicker />
         {children}
         <RuntimeControlOverlay />
         <EmailManageRedirect />
