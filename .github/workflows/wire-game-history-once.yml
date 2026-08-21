@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           p = Path('push-server/src/games.ts')
           s = p.read_text()
-          marker = '''async function action(request: Request, env: Env, code: string) {\n'''
+          marker = 'async function action(request: Request, env: Env, code: string) {\n'
           helpers = r'''async function saveGameHistory(env: Env, room: RoomRow, players: PlayerRow[]) {
   const winningScore = players.reduce((max, player) => Math.max(max, player.score), 0);
   const winners = players.filter((player) => player.score === winningScore);
@@ -78,7 +78,7 @@ async function gameHistory(env: Env, playerId: string) {
               if marker not in s: raise SystemExit('action marker missing')
               s = s.replace(marker, helpers + marker, 1)
 
-          old = '''  } else if ((actionType === "clue_correct" || actionType === "clue_skip") && room.game_type === "clue") {\n'''
+          old = '  } else if ((actionType === "clue_correct" || actionType === "clue_skip") && room.game_type === "clue") {\n'
           finish = r'''  } else if (actionType === "finish") {
     if (!isHost) return json({ error: "Only the host can end the game" }, 403);
     if (room.status === "finished") return json(publicRoom(room, players, body.playerId));
@@ -89,15 +89,15 @@ async function gameHistory(env: Env, playerId: string) {
     await saveGameHistory(env, finishedRoom, players);
   } else if ((actionType === "clue_correct" || actionType === "clue_skip") && room.game_type === "clue") {
 '''
-          if finish not in s:
+          if 'actionType === "finish"' not in s:
               if old not in s: raise SystemExit('finish insertion anchor missing')
               s = s.replace(old, finish, 1)
 
-          route_anchor = '''export async function handleGames(request: Request, env: Env, url: URL): Promise<Response | null> {\n'''
-          history_route = '''export async function handleGames(request: Request, env: Env, url: URL): Promise<Response | null> {\n  if (request.method === "GET" && url.pathname === "/games/history") return gameHistory(env, url.searchParams.get("playerId") ?? "");\n'''
-          if history_route not in s:
+          route_anchor = 'export async function handleGames(request: Request, env: Env, url: URL): Promise<Response | null> {\n'
+          history_line = '  if (request.method === "GET" && url.pathname === "/games/history") return gameHistory(env, url.searchParams.get("playerId") ?? "");\n'
+          if history_line not in s:
               if route_anchor not in s: raise SystemExit('route marker missing')
-              s = s.replace(route_anchor, history_route, 1)
+              s = s.replace(route_anchor, route_anchor + history_line, 1)
           p.write_text(s)
       - name: Commit
         run: |
