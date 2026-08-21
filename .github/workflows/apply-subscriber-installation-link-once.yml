@@ -1,0 +1,54 @@
+name: Apply subscriber installation link once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Make activity tracking independent of push permission'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch subscriber installation linking
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('push-server/src/subscribers.ts')
+          s = p.read_text()
+          old = '''async function linkInstallation(env: Env, subscriberId: number, value: unknown) {\n  const installationId = cleanText(value, 128);\n  if (!installationId || !/^[A-Za-z0-9_-]{16,128}$/.test(installationId)) return;\n  await env.DB.prepare(\n    "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"\n  ).bind(subscriberId, installationId).run();\n}'''
+          new = '''async function linkInstallation(env: Env, subscriberId: number, value: unknown) {\n  const installationId = cleanText(value, 128);\n  if (!installationId || !/^[A-Za-z0-9_-]{16,128}$/.test(installationId)) return;\n  await env.DB.batch([\n    env.DB.prepare(\n      "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"\n    ).bind(subscriberId, installationId),\n    env.DB.prepare(\n      "UPDATE email_subscribers SET installation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"\n    ).bind(installationId, subscriberId)\n  ]);\n}'''
+          if old not in s and 'UPDATE email_subscribers SET installation_id' not in s:
+              raise SystemExit('linkInstallation anchor missing')
+          if 'UPDATE email_subscribers SET installation_id' not in s:
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          a = Path('push-server/src/activity.ts')
+          x = a.read_text()
+          old_query = '''  const subscription = await env.DB.prepare(\n    `SELECT subscriber_id FROM subscriptions\n     WHERE installation_id = ? AND subscriber_id IS NOT NULL AND enabled = 1\n     ORDER BY updated_at DESC LIMIT 1`\n  ).bind(body.installationId).first<{ subscriber_id: number }>();\n\n  // Activity can be reported before a person signs up for email. In that case\n  // there is intentionally nothing to store yet; the endpoint remains a no-op.\n  if (!subscription?.subscriber_id) return json({ ok: true, linked: false });\n\n  await env.DB.prepare('''
+          new_query = '''  const directSubscriber = await env.DB.prepare(\n    `SELECT id AS subscriber_id FROM email_subscribers\n     WHERE installation_id = ? AND status = 'active'\n     ORDER BY updated_at DESC LIMIT 1`\n  ).bind(body.installationId).first<{ subscriber_id: number }>();\n  const subscription = directSubscriber ?? await env.DB.prepare(\n    `SELECT subscriber_id FROM subscriptions\n     WHERE installation_id = ? AND subscriber_id IS NOT NULL AND enabled = 1\n     ORDER BY updated_at DESC LIMIT 1`\n  ).bind(body.installationId).first<{ subscriber_id: number }>();\n\n  // Activity can be reported before a person signs up for email. In that case\n  // there is intentionally nothing to store yet; the endpoint remains a no-op.\n  if (!subscription?.subscriber_id) return json({ ok: true, linked: false });\n\n  await env.DB.prepare('''
+          if old_query not in x and 'const directSubscriber' not in x:
+              raise SystemExit('activity resolver anchor missing')
+          if 'const directSubscriber' not in x:
+              x = x.replace(old_query, new_query, 1)
+          a.write_text(x)
+      - name: Commit direct subscriber installation link
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- push-server/src/subscribers.ts push-server/src/activity.ts; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git add push-server/src/subscribers.ts push-server/src/activity.ts
+          git commit -m "Make activity tracking independent of push permission"
+          git push origin HEAD:work/hassoun-1.0-store-admin
