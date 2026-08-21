@@ -24,6 +24,8 @@ const ISLAMIC_EVENT_KIND = "islamic-event-15-day";
 const ISLAMIC_EVENT_MARKER_KEY = "hassoun:islamic-event:last-scheduled:v1";
 
 export type PrayerScheduleContext = { timeZone?: string; locationLabel?: string };
+
+export type PrayerScheduleContext = { timeZone?: string; locationLabel?: string };
 let notificationScheduleQueue: Promise<void> = Promise.resolve();
 
 export type PrayerNotificationContext = { timeZone?: string; locationLabel?: string };

@@ -4,6 +4,7 @@ import { loadPhonePrayerAlertPreferences, type PrayerAlertPreferences } from "./
 import { buildPrayerEvents } from "./events";
 import { WINDSOR_TIME_ZONE } from "./config";
 import { WINDSOR_TIME_ZONE } from "./config";
+import { WINDSOR_TIME_ZONE } from "./config";
 import type { PrayerKey, PrayerTimes } from "./types";
 
 let exactAlarmSetupStarted = false;
