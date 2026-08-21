@@ -1,0 +1,50 @@
+name: Hassoun Public Brand Guard
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - "mobile/**"
+      - "pwa/**"
+      - "push-server/src/**"
+      - "push-server/migrations/**"
+      - ".github/workflows/hassoun-brand-guard.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  public-branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject Xuber branding in public app/email source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE 'xuber(\.ca)?' mobile pwa push-server/src \
+            --exclude-dir=node_modules \
+            --exclude-dir=.next \
+            --exclude-dir=android \
+            --exclude-dir=ios \
+            --exclude='*.lock'; then
+            echo 'Xuber branding is not allowed in Hassoun public source.' >&2
+            exit 1
+          fi
+      - name: Verify Hassoun email branding contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'https://hassoun.app/assets/hassoun-logo.png' push-server/src/emailDelivery.ts
+          grep -q 'Hassoun <' push-server/src/emailDelivery.ts
+          grep -q 'Legacy prayer-email pipeline retired' push-server/src/emailDelivery.ts
+          grep -q "idempotency_key.startsWith(\"email:\")" push-server/src/emailDelivery.ts
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.3"' mobile/app.config.ts
+          grep -q 'versionCode: 44' mobile/app.config.ts
