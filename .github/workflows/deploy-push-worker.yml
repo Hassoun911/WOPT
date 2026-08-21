@@ -113,7 +113,7 @@ jobs:
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
 
-      - name: Smoke test Worker, CRM runtime, and multiplayer
+      - name: Smoke test Worker, GPS prayer API, activity, CRM runtime, and multiplayer
         run: |
           set -euo pipefail
 
@@ -125,6 +125,19 @@ jobs:
             test "$attempt" -lt 15
             sleep 2
           done
+
+          curl -fsS "${PUSH_WORKER_URL}/prayer-times?lat=42.3149&lng=-83.0364&timezone=America%2FToronto&year=2026&month=8" -o /tmp/windsor-prayers.json
+          jq -e '.source == "windsor_islamic_association" and (.prayer_times | type == "object") and (.prayer_times | length > 0)' /tmp/windsor-prayers.json >/dev/null
+
+          curl -fsS "${PUSH_WORKER_URL}/prayer-times?lat=43.6532&lng=-79.3832&timezone=America%2FToronto&year=2026&month=8" -o /tmp/global-prayers.json
+          jq -e '.source == "aladhan" and (.prayer_times | type == "object") and (.prayer_times | length > 0)' /tmp/global-prayers.json >/dev/null
+
+          activity_installation="smokeactivity$(date +%s)$RANDOM"
+          curl -fsS -X POST "${PUSH_WORKER_URL}/activity" \
+            -H 'Content-Type: application/json' \
+            --data "{\"installationId\":\"${activity_installation}\",\"activity\":\"app_open\",\"platform\":\"smoke\"}" \
+            -o /tmp/activity.json
+          jq -e '.ok == true' /tmp/activity.json >/dev/null
 
           for attempt in $(seq 1 15); do
             if curl -fsS "${PUSH_WORKER_URL}/app/runtime" -o /tmp/runtime.json \
@@ -149,16 +162,20 @@ jobs:
             sleep 2
           done
 
-          echo "Worker, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
+          echo "Worker, GPS prayer API, activity API, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
 
       - name: Record backend verification on current branch
         working-directory: .
         run: |
           code="$(jq -r '.room.code' /tmp/game-room.json)"
+          backend_version="$(jq -r '.backendVersion // "unknown"' /tmp/health.json)"
           cat > .github/games-backend-status.txt <<EOF
           games_backend=ready
           crm_runtime=ready
+          gps_prayer_api=ready
+          activity_api=ready
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
+          backend_version=${backend_version}
           verified_room_code=${code}
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           source_commit=$(git rev-parse HEAD)
