@@ -1,0 +1,46 @@
+name: Inspect Quran reader once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/inspect-quran-reader-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Capture reader navigation code
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('mobile/src/quran/QuranV3.tsx')
+          s=p.read_text()
+          needles=['verticalGestureStartY','readerAtTop','readerAtBottom','readerScrollDirection','onScroll','goToPage','currentPage - 1','currentPage + 1']
+          lines=s.splitlines()
+          idx=set()
+          for i,line in enumerate(lines):
+              if any(n in line for n in needles):
+                  idx.update(range(max(0,i-8), min(len(lines),i+14)))
+          out=[]
+          last=-2
+          for i in sorted(idx):
+              if i>last+1: out.append('\n---\n')
+              out.append(f'{i+1:04d}: {lines[i]}')
+              last=i
+          Path('.github/quran-reader-inspect.txt').write_text('\n'.join(out))
+          PY
+          git restore mobile || true
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add .github/quran-reader-inspect.txt
+          git commit -m "Record Quran reader navigation inspection" || true
+          git pull --rebase --autostash origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
