@@ -35,7 +35,7 @@ import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStat
 import { reportHassounActivity } from "./src/activity";
 import { disableIslamicEventReminders, disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
-import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";
+import { loadInitialPrayerTimes, loadPrayerTimes, type PrayerLocation } from "./src/prayerData";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
@@ -144,12 +144,12 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1_000);
     void (async () => {
-      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([
+      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, initial, storedQuizStats] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.locale),
         AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),
         AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),
         loadPhonePrayerAlertPreferences(),
-        loadPrayerTimes(),
+        loadInitialPrayerTimes(),
         loadQuizStats()
       ]);
       const chosenLocale = savedLocale === "ar" ? "ar" : "en";
@@ -157,18 +157,25 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       setAlertsEnabled(savedAlerts === "on");
       const eventAlertsEnabled = savedEventAlerts !== "off";
       setIslamicEventAlertsEnabled(eventAlertsEnabled);
-      setPrayerTimes(loaded.prayerTimes);
-      setPrayerLocation(loaded.location);
-      setLive(loaded.live);
+      setPrayerTimes(initial.prayerTimes);
+      setPrayerLocation(initial.location);
+      setLive(false);
       setQuizStats(storedQuizStats);
       setPhoneAlertPreferences(savedPhoneAlertPreferences);
       setBusy(false);
-      if (savedAlerts === "on") {
-        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label });
-        setScheduledCount(result.count);
-        if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);
-        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
-      }
+
+      // Refresh GPS/network after the cached UI is already visible.
+      void loadPrayerTimes().then(async (fresh) => {
+        setPrayerTimes(fresh.prayerTimes);
+        setPrayerLocation(fresh.location);
+        setLive(fresh.live);
+        if (savedAlerts === "on") {
+          const result = await schedulePrayerNotifications(fresh.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: fresh.location.timezone, locationLabel: fresh.location.label });
+          setScheduledCount(result.count);
+          if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), fresh.location.timezone), chosenLocale, fresh.location.timezone).catch(() => undefined);
+          void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
+        }
+      }).catch(() => undefined);
     })();
     return () => clearInterval(timer);
   }, []);
