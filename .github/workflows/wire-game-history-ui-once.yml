@@ -1,0 +1,53 @@
+name: Wire game history UI once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.event.head_commit.message != 'Add saved session history cards to Games'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch multiplayer UI
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('mobile/src/MultiplayerGames.tsx')
+          s = p.read_text()
+          imp = 'import GameHistoryCards from "./GameHistoryCards";\n'
+          anchor = 'import BrandMark from "./BrandMark";\n'
+          if imp not in s:
+              s = s.replace(anchor, anchor + imp)
+          root_anchor = '''        {(Object.keys(META) as MultiplayerGameType[]).map((id) => {\n          const item = META[id];\n          return <Pressable key={id} onPress={() => setGame(id)} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{item.icon}</Text></View><View style={styles.gameCopy}><Text style={styles.gameTitle}>{ar ? item.ar : item.en}</Text><Text style={styles.gameNote}>{ar ? item.noteAr : item.noteEn}</Text><View style={styles.topicRow}><Text style={styles.topicPill}>☾ {t("Islamic", "إسلامي")}</Text><Text style={styles.topicPill}>⚽ {t("Sports", "رياضة")}</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>;\n        })}\n'''
+          root_add = root_anchor + '        <GameHistoryCards locale={locale} />\n'
+          if '<GameHistoryCards locale={locale}' not in s:
+              if root_anchor not in s: raise SystemExit('root history anchor missing')
+              s = s.replace(root_anchor, root_add, 1)
+          error_anchor = '''      {error ? <Text style={styles.error}>{error}</Text> : null}\n'''
+          controls = '''      {room.status === "finished" ? <View style={styles.playCard}><Text style={styles.resultIcon}>🏁</Text><Text style={styles.playTitle}>{t("Game saved to session history", "تم حفظ اللعبة في سجل الجلسات")}</Text><Text style={styles.playText}>{t("Your scores, players and result are now saved. Leave the room to see the new history card.", "تم حفظ النتائج واللاعبين. اخرج من الغرفة لرؤية بطاقة السجل الجديدة.")}</Text><Pressable onPress={leaveRoom} style={styles.primary}><Text style={styles.primaryText}>{t("View game history", "عرض سجل الألعاب")}</Text></Pressable></View> : room.status === "playing" && isHost ? <Pressable onPress={() => void act("finish")} disabled={busy} style={styles.finishButton}><Text style={styles.finishButtonText}>🏁 {t("End game & save results", "إنهاء اللعبة وحفظ النتيجة")}</Text></Pressable> : null}\n\n'''
+          if 'End game & save results' not in s:
+              if error_anchor not in s: raise SystemExit('error anchor missing')
+              s = s.replace(error_anchor, controls + error_anchor, 1)
+          style_anchor = '''  playCard: { marginTop: 12, borderRadius: 24, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 16 },'''
+          if 'finishButton:' not in s:
+              replacement = '''  finishButton: { marginTop: 14, minHeight: 50, borderRadius: 16, backgroundColor: "#efe6d4", borderWidth: 1, borderColor: "#d7c299", alignItems: "center", justifyContent: "center", paddingHorizontal: 14 }, finishButtonText: { color: "#715628", fontSize: 12, fontWeight: "900" },\n''' + style_anchor
+              if style_anchor not in s: raise SystemExit('style anchor missing')
+              s = s.replace(style_anchor, replacement, 1)
+          p.write_text(s)
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- mobile/src/MultiplayerGames.tsx; then exit 0; fi
+          git add mobile/src/MultiplayerGames.tsx
+          git commit -m "Add saved session history cards to Games"
+          git push origin HEAD:work/hassoun-1.0-store-admin
