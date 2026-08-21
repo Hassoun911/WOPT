@@ -4,7 +4,7 @@ name: Deploy Hassoun Push Worker
 on:
   workflow_dispatch:
   push:
-    branches: [main, work/hassoun-1.0-store-admin]
+    branches: [work/hassoun-1.0-store-admin]
     paths:
       - "push-server/**"
       - ".github/workflows/deploy-push-worker.yml"
@@ -79,7 +79,6 @@ jobs:
         env:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
           ADMIN_BOOTSTRAP_KEY: ${{ secrets.ADMIN_BOOTSTRAP_KEY }}
@@ -107,7 +106,7 @@ jobs:
 
           put_required_secret VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
           put_optional_secret RESEND_API_KEY "$RESEND_API_KEY"
-          put_optional_secret EMAIL_FROM "$EMAIL_FROM"
+          printf '%s' 'Hassoun <notifications@hassoun.app>' | npx wrangler secret put EMAIL_FROM
           put_optional_secret EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
           put_optional_secret EMAIL_LINK_SECRET "$EMAIL_LINK_SECRET"
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
