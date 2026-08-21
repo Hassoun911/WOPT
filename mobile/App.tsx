@@ -18,6 +18,7 @@ import QuizGamesHub from "./src/QuizGamesHub";
 import IslamicEventsPage from "./src/IslamicEventsPage";
 import { islamicEventCountdown, islamicEventTimeline } from "./src/islamicEvents";
 import SettingsHub from "./src/SettingsHub";
+import ScrollingTicker from "./src/ScrollingTicker";
 import HassounWidget from "./modules/hassoun-widget";
 import QuranAudio, { type QuranAudioStatus } from "./modules/quran-audio";
 import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
@@ -397,7 +398,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
-      <StatusBar style="dark" /><View style={styles.flex}>{body}</View>
+      <StatusBar style="dark" /><ScrollingTicker /><View style={styles.flex}>{body}</View>
       {(activeTab !== "quran" || !quranOwnsAudioSurface) && globalQuranAudio.state !== "idle" && globalQuranAudio.state !== "error" ? <View style={styles.globalAudioBar}><View style={styles.globalAudioCopy}><Text style={styles.globalAudioEyebrow}>{locale === "ar" ? "تشغيل القرآن" : "QUR’AN AUDIO"}</Text><Text numberOfLines={1} style={styles.globalAudioTitle}>{globalQuranAudio.title || (locale === "ar" ? "القرآن الكريم" : "Qur’an playback")}</Text>{globalQuranAudio.subtitle ? <Text numberOfLines={1} style={styles.globalAudioMeta}>{globalQuranAudio.subtitle}</Text> : null}</View><Pressable onPress={() => QuranAudio?.previous()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>‹</Text></Pressable><Pressable onPress={() => globalQuranAudio.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()} style={styles.globalAudioMain}><Text style={styles.globalAudioMainText}>{globalQuranAudio.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable><Pressable onPress={() => QuranAudio?.next()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>›</Text></Pressable><Pressable onPress={() => QuranAudio?.stop()} style={styles.globalAudioStop}><Text style={styles.globalAudioStopText}>■</Text></Pressable></View> : null}
       {(activeTab !== "quran" || quranAppNavVisible) ? <View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.tab; return <Pressable key={item.tab} onPress={() => setActiveTab(item.tab)} style={[styles.navItem, active && styles.navItemActive]}><Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text><Text style={[styles.navLabel, active && styles.navLabelActive]}>{locale === "ar" ? item.ar : item.en}</Text></Pressable>; })}</View> : null}
     </SafeAreaView>
