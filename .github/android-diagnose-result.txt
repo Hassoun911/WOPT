@@ -1,20 +1,20 @@
 exit_code=0
-source_commit=af7c43719821312fa898348e264b775e4e3d70de
-verified_at=2026-08-21T05:25:39Z
+source_commit=783f0a8d64384fa115741e634f8dc05058b6c1de
+verified_at=2026-08-21T06:11:37Z
 
 npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 489 packages in 9s
+added 489 packages in 8s
 
-> windsor-prayer-times-mobile@1.0.1 pretypecheck
+> windsor-prayer-times-mobile@1.0.2 pretypecheck
 > npm run quran:data
 
 
-> windsor-prayer-times-mobile@1.0.1 quran:data
+> windsor-prayer-times-mobile@1.0.2 quran:data
 > node scripts/fetch-quran-data.mjs
 
 WOPT Quran data ready: 6236 ayahs, 114 surahs, 604 pages.
 
-> windsor-prayer-times-mobile@1.0.1 typecheck
+> windsor-prayer-times-mobile@1.0.2 typecheck
 > tsc --noEmit
 
