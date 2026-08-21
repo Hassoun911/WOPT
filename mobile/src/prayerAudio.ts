@@ -3,6 +3,7 @@ import PrayerAudio from "../modules/prayer-audio";
 import { loadPhonePrayerAlertPreferences, type PrayerAlertPreferences } from "./alertPreferences";
 import { buildPrayerEvents } from "./events";
 import { WINDSOR_TIME_ZONE } from "./config";
+import { WINDSOR_TIME_ZONE } from "./config";
 import type { PrayerKey, PrayerTimes } from "./types";
 
 let exactAlarmSetupStarted = false;

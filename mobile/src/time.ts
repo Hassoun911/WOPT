@@ -53,7 +53,7 @@ export function localToDateInZone(dateKey: string, time: string, timeZone = WIND
 // Compatibility aliases for code that still explicitly needs Windsor time.
 export function windsorDateKey(date = new Date()) { return dateKeyInZone(date, WINDSOR_TIME_ZONE); }
 export function windsorSecondsSinceMidnight(date = new Date()) { return secondsSinceMidnightInZone(date, WINDSOR_TIME_ZONE); }
-export function windsorLocalToDate(dateKey: string, time: string) { return localToDateInZone(dateKey, time, WINDSOR_TIME_ZONE); }
+export function windsorLocalToDate(dateKey: string, time: string, timeZone = WINDSOR_TIME_ZONE) { return localToDateInZone(dateKey, time, WINDSOR_TIME_ZONE); }
 
 export function timeToMinutes(time: string) {
   const [hour = 0, minute = 0] = time.split(":").map(Number);
