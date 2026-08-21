@@ -75,7 +75,9 @@ function updateVisibleLocation(label: string, source: string) {
     ["Times verified for Windsor", source === "windsor_islamic_association" ? "Times verified for Windsor" : "Prayer times for your current location"],
     ["تم التحقق من مواقيت وندسور", source === "windsor_islamic_association" ? "تم التحقق من مواقيت وندسور" : "مواقيت الصلاة حسب موقعك الحالي"],
     ["Windsor Islamic Association • Adhan time", source === "windsor_islamic_association" ? "Windsor Islamic Association • Adhan time" : "Current GPS location • Prayer time"],
-    ["الجمعية الإسلامية في وندسور • وقت الأذان", source === "windsor_islamic_association" ? "الجمعية الإسلامية في وندسور • وقت الأذان" : "موقعك الحالي • وقت الصلاة"]
+    ["الجمعية الإسلامية في وندسور • وقت الأذان", source === "windsor_islamic_association" ? "الجمعية الإسلامية في وندسور • وقت الأذان" : "موقعك الحالي • وقت الصلاة"],
+    ["Times verified for Windsor", source === "windsor_islamic_association" ? "Times verified for Windsor" : "GPS prayer times verified for this location"],
+    ["Official Windsor Islamic Association schedule", source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer schedule for current GPS location"]
   ];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
@@ -85,6 +87,14 @@ function updateVisibleLocation(label: string, source: string) {
     for (const [from, to] of replacements) text = text.replaceAll(from, to);
     if (text !== node.nodeValue) node.nodeValue = text;
   }
+}
+
+function locationAwareNotificationOptions(options: NotificationOptions | undefined, location: SavedLocation | null) {
+  if (!options || !location?.label) return options;
+  const body = typeof options.body === "string"
+    ? options.body.replaceAll("Windsor, Ontario", location.label).replaceAll("وندسور، أونتاريو", location.label)
+    : options.body;
+  return { ...options, body };
 }
 
 export default function LocationPrayerBootstrap() {
@@ -115,8 +125,6 @@ export default function LocationPrayerBootstrap() {
 
     const originalDateTimeFormat = Intl.DateTimeFormat;
     const deviceTimezone = originalDateTimeFormat().resolvedOptions().timeZone || "America/Toronto";
-    // Legacy page helpers explicitly ask for America/Toronto. Redirect those calls
-    // to the device's current timezone so dates/countdowns remain correct while travelling.
     Intl.DateTimeFormat = function(locales?: Intl.LocalesArgument, options?: Intl.DateTimeFormatOptions) {
       const next = options?.timeZone === "America/Toronto" && deviceTimezone !== "America/Toronto"
         ? { ...options, timeZone: deviceTimezone }
@@ -155,6 +163,14 @@ export default function LocationPrayerBootstrap() {
       }
     }) as typeof window.fetch;
 
+    const registrationPrototype = typeof ServiceWorkerRegistration !== "undefined" ? ServiceWorkerRegistration.prototype : null;
+    const originalShowNotification = registrationPrototype?.showNotification;
+    if (registrationPrototype && originalShowNotification) {
+      registrationPrototype.showNotification = function(title: string, options?: NotificationOptions) {
+        return originalShowNotification.call(this, title, locationAwareNotificationOptions(options, latest));
+      };
+    }
+
     const observer = new MutationObserver(() => {
       if (latest?.label) updateVisibleLocation(latest.label, latest.source);
     });
@@ -175,6 +191,7 @@ export default function LocationPrayerBootstrap() {
     return () => {
       window.fetch = nativeFetch;
       Intl.DateTimeFormat = originalDateTimeFormat;
+      if (registrationPrototype && originalShowNotification) registrationPrototype.showNotification = originalShowNotification;
       observer.disconnect();
       document.removeEventListener("visibilitychange", refreshIfMoved);
     };
