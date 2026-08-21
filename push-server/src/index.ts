@@ -9,6 +9,13 @@ import {
 } from "./adminCrm";
 import { createAdminTeamMember } from "./adminTeamCreate";
 import {
+  getAdminUser360,
+  listAdminDevices360,
+  updateAdminDevice360,
+  updateAdminSubscriberPreferences,
+  updateAdminSubscriberProfile
+} from "./adminUser360";
+import {
   dispatchDueAdminEmailCampaigns,
   refreshAdminEmailCampaignStatuses
 } from "./adminEmail";
@@ -291,6 +298,16 @@ export default {
         response = await listRestrictedSubscribers(request, env, url);
       } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
         response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "GET" && /^\/admin\/subscribers\/[^/]+\/360$/.test(url.pathname)) {
+        response = await getAdminUser360(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/profile$/.test(url.pathname)) {
+        response = await updateAdminSubscriberProfile(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/preferences$/.test(url.pathname)) {
+        response = await updateAdminSubscriberPreferences(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "GET" && url.pathname === "/admin/devices") {
+        response = await listAdminDevices360(request, env, url);
+      } else if (request.method === "POST" && /^\/admin\/devices\/\d+$/.test(url.pathname)) {
+        response = await updateAdminDevice360(request, env, Number(url.pathname.split("/")[3]));
       } else if (request.method === "GET" && url.pathname === "/admin/crm/overview") {
         response = await getAdminCrmOverview(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/settings") {
