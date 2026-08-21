@@ -92,18 +92,18 @@ jobs:
           fi
           echo "$PERMISSIONS" | grep -q "android.permission.SCHEDULE_EXACT_ALARM"
 
-      - name: Upload Hassoun 1.0.2 APK
+      - name: Upload Hassoun 1.0.3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.2-android-apk
+          name: hassoun-1.0.3-android-apk
           path: mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Hassoun 1.0.2 AAB
+      - name: Upload Hassoun 1.0.3 AAB
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.2-android-aab
+          name: hassoun-1.0.3-android-aab
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
@@ -116,16 +116,23 @@ jobs:
           TARGET="$($ANALYZER manifest target-sdk "$APK")"
           cat > .github/android-store-status.txt <<EOF
           android_store_validation=ready
-          app_version=1.0.2
-          android_version_code=43
+          app_version=1.0.3
+          android_version_code=44
           target_sdk=${TARGET}
           exact_alarm_policy=ready
           startup_adhan_guard=ready
           quran_bidirectional_navigation=ready
           quran_horizontal_browsing=ready
           gps_prayer_location=ready
-          apk_artifact=hassoun-1.0.2-android-apk
-          aab_artifact=hassoun-1.0.2-android-aab
+          al_hafiz_classroom=ready
+          islamic_events_full_hijri_year=ready
+          settings_feature_guide=ready
+          sadaqah_about_page=ready
+          alert_center_stability=ready
+          islamic_event_alert_controls=ready
+          widget_fast_start=ready
+          apk_artifact=hassoun-1.0.3-android-apk
+          aab_artifact=hassoun-1.0.3-android-aab
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           source_commit=$(git rev-parse HEAD)
           EOF
