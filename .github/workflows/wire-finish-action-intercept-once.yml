@@ -1,0 +1,53 @@
+name: Wire finish action intercept once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.event.head_commit.message != 'Route multiplayer finish action to history service'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch Worker router
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('push-server/src/index.ts')
+          s = p.read_text()
+          anchor = '''      } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/finish$/.test(url.pathname)) {
+        response = await finishGameSession(request, env, url.pathname.split("/")[3]);
+      } else if (url.pathname.startsWith("/games/")) {
+        response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
+'''
+          replacement = '''      } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/finish$/.test(url.pathname)) {
+        response = await finishGameSession(request, env, url.pathname.split("/")[3]);
+      } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/action$/.test(url.pathname)) {
+        const actionBody = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
+        response = actionBody.type === "finish"
+          ? await finishGameSession(request, env, url.pathname.split("/")[3])
+          : ((await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404));
+      } else if (url.pathname.startsWith("/games/")) {
+        response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
+'''
+          if 'actionBody.type === "finish"' not in s:
+              if anchor not in s: raise SystemExit('finish route anchor missing')
+              s = s.replace(anchor, replacement, 1)
+          p.write_text(s)
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- push-server/src/index.ts; then exit 0; fi
+          git add push-server/src/index.ts
+          git commit -m "Route multiplayer finish action to history service"
+          git pull --rebase origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
