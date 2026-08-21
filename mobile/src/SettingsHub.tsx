@@ -29,7 +29,7 @@ type Props = {
   onOpenEmailAlerts?: () => void;
 };
 
-const PUBLIC_BASE = "https://hassoun911.github.io/WOPT";
+const PUBLIC_BASE = "https://hassoun.app";
 
 const WIDGET_THEME_META: Record<HassounWidgetTheme, { bg: string; fg: string; muted: string; accent: string; border: string }> = {
   emerald: { bg: "#0B654F", fg: "#FFFFFF", muted: "#C7DDD6", accent: "#F0D27A", border: "#D2B25A" },

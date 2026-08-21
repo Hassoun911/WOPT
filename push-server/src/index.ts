@@ -72,7 +72,8 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}) {
 
 function corsHeaders(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
-  const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";
+  const allowedOrigins = new Set((env.ALLOWED_WEB_ORIGIN || "https://hassoun.app,https://admin.hassoun.app").split(",").map((value) => value.trim()).filter(Boolean));
+  const allowed = origin && allowedOrigins.has(origin) ? origin : "null";
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",

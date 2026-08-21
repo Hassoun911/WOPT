@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
-const LOGO = "https://hassoun911.github.io/WOPT/assets/hassoun-logo.png";
+const LOGO = "https://hassoun.app/assets/hassoun-logo.png";
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 type Prayer = (typeof PRAYERS)[number];
 

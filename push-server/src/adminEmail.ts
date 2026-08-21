@@ -194,7 +194,7 @@ export async function sendAdminEmailTest(request: Request, env: Env) {
   const textBody = chosenHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 20_000);
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO email_templates (template_key, name, category, subject_en, subject_ar, html_en, html_ar, text_en, text_ar, enabled) VALUES (?, ?, 'system', ?, ?, ?, ?, ?, ?, 1)`).bind(templateKey, "Admin-only test", subjectEn, subjectAr, htmlEn, htmlAr, textBody, textBody),
-    env.DB.prepare(`INSERT INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES (NULL, NULL, ?, ?, 'system', ?, '{}', ?)`).bind(auth.admin.email, locale, templateKey, `admin-test:${publicId}`)
+    env.DB.prepare(`INSERT INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES (NULL, NULL, ?, ?, 'announcement', ?, '{}', ?)`).bind(auth.admin.email, locale, templateKey, `admin-test:${publicId}`)
   ]);
   await logAdmin(env, auth.admin.id, "admin_email_test", publicId, { recipient: auth.admin.email, locale });
   return json({ ok: true, recipient: auth.admin.email, queued: true });
