@@ -1,0 +1,184 @@
+name: Apply mobile location context once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-mobile-location-context-once
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Apply GPS context across mobile prayer scheduling'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Apply targeted location context changes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new))
+
+          # time.ts: make the existing helpers location-timezone aware.
+          replace("mobile/src/time.ts",
+            'function partsInZone(date: Date, timeZone = WINDSOR_TIME_ZONE) {',
+            'function partsInZone(date: Date, timeZone = WINDSOR_TIME_ZONE) {')
+          replace("mobile/src/time.ts",
+            'export function windsorDateKey(date = new Date()) {\n  const parts = partsInZone(date);',
+            'export function windsorDateKey(date = new Date(), timeZone = WINDSOR_TIME_ZONE) {\n  const parts = partsInZone(date, timeZone);')
+          replace("mobile/src/time.ts",
+            'export function windsorSecondsSinceMidnight(date = new Date()) {\n  const parts = partsInZone(date);',
+            'export function windsorSecondsSinceMidnight(date = new Date(), timeZone = WINDSOR_TIME_ZONE) {\n  const parts = partsInZone(date, timeZone);')
+          replace("mobile/src/time.ts",
+            'export function windsorLocalToDate(dateKey: string, time: string) {',
+            'export function windsorLocalToDate(dateKey: string, time: string, timeZone = WINDSOR_TIME_ZONE) {')
+          replace("mobile/src/time.ts",
+            '    const actual = partsInZone(new Date(instantMs));',
+            '    const actual = partsInZone(new Date(instantMs), timeZone);')
+
+          # events.ts: calculate scheduled instants in the active prayer timezone.
+          replace("mobile/src/events.ts",
+            'import { addDateDays, windsorDateKey, windsorLocalToDate } from "./time";',
+            'import { WINDSOR_TIME_ZONE } from "./config";\nimport { addDateDays, windsorDateKey, windsorLocalToDate } from "./time";')
+          replace("mobile/src/events.ts",
+            'export function buildPrayerEvents(prayerTimes: PrayerTimes, days: number, now = new Date()) {\n  const events: PrayerEvent[] = [];\n  const today = windsorDateKey(now);',
+            'export function buildPrayerEvents(prayerTimes: PrayerTimes, days: number, now = new Date(), timeZone = WINDSOR_TIME_ZONE) {\n  const events: PrayerEvent[] = [];\n  const today = windsorDateKey(now, timeZone);')
+          replace("mobile/src/events.ts",
+            '      const prayerDate = windsorLocalToDate(dateKey, prayerTime);',
+            '      const prayerDate = windsorLocalToDate(dateKey, prayerTime, timeZone);')
+
+          # prayerAudio.ts: exact Android alarms use the active location timezone.
+          replace("mobile/src/prayerAudio.ts",
+            'import type { PrayerKey, PrayerTimes } from "./types";',
+            'import { WINDSOR_TIME_ZONE } from "./config";\nimport type { PrayerKey, PrayerTimes } from "./types";')
+          replace("mobile/src/prayerAudio.ts",
+            '  suppliedPreferences?: PrayerAlertPreferences\n): Promise<AndroidPrayerAudioResult> {',
+            '  suppliedPreferences?: PrayerAlertPreferences,\n  timeZone = WINDSOR_TIME_ZONE\n): Promise<AndroidPrayerAudioResult> {')
+          replace("mobile/src/prayerAudio.ts",
+            '  const events = buildPrayerEvents(prayerTimes, 30)',
+            '  const events = buildPrayerEvents(prayerTimes, 30, new Date(), timeZone)')
+
+          # notifications.ts: local notification labels + timestamps follow GPS location.
+          replace("mobile/src/notifications.ts",
+            'const ISLAMIC_EVENT_MARKER_KEY = "hassoun:islamic-event:last-scheduled:v1";',
+            'const ISLAMIC_EVENT_MARKER_KEY = "hassoun:islamic-event:last-scheduled:v1";\n\nexport type PrayerScheduleContext = { timeZone?: string; locationLabel?: string };')
+          replace("mobile/src/notifications.ts",
+            'export async function scheduleIslamicEventReminders(todayKey: string, locale: "en" | "ar") {',
+            'export async function scheduleIslamicEventReminders(todayKey: string, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {')
+          replace("mobile/src/notifications.ts",
+            '    const reminderDate = windsorLocalToDate(reminderDateKey, "09:00");',
+            '    const reminderDate = windsorLocalToDate(reminderDateKey, "09:00", timeZone);')
+          replace("mobile/src/notifications.ts",
+            'function notificationContent(event: PrayerEvent, locale: "en" | "ar") {',
+            'function notificationContent(event: PrayerEvent, locale: "en" | "ar", locationLabel = CITY_LABEL) {')
+          replace("mobile/src/notifications.ts",
+            'body: `${time} • ${CITY_LABEL}`',
+            'body: `${time} • ${locationLabel}`')
+          replace("mobile/src/notifications.ts",
+            '  suppliedPreferences?: PrayerAlertPreferences\n) {',
+            '  suppliedPreferences?: PrayerAlertPreferences,\n  context: PrayerScheduleContext = {}\n) {')
+          replace("mobile/src/notifications.ts",
+            '  const events = buildPrayerEvents(prayerTimes, days)',
+            '  const timeZone = context.timeZone || WINDSOR_TIME_ZONE;\n  const locationLabel = context.locationLabel || CITY_LABEL;\n  const events = buildPrayerEvents(prayerTimes, days, new Date(), timeZone)')
+          replace("mobile/src/notifications.ts",
+            '      content: notificationContent(event, locale),',
+            '      content: notificationContent(event, locale, locationLabel),')
+          replace("mobile/src/notifications.ts",
+            '  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes, preferences);',
+            '  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes, preferences, timeZone);')
+          replace("mobile/src/notifications.ts",
+            '  preferences?: PrayerAlertPreferences\n) {\n  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences));',
+            '  preferences?: PrayerAlertPreferences,\n  context: PrayerScheduleContext = {}\n) {\n  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences, context));')
+
+          # App.tsx: retain loaded location and show/schedule against it.
+          replace("mobile/App.tsx",
+            'import { loadPrayerTimes } from "./src/prayerData";',
+            'import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";')
+          replace("mobile/App.tsx",
+            'function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date()) {\n  const currentKey = windsorDateKey(now);',
+            'function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date(), timeZone = WINDSOR_TIME_ZONE) {\n  const currentKey = windsorDateKey(now, timeZone);')
+          replace("mobile/App.tsx",
+            '      const target = windsorLocalToDate(dateKey, day[prayer]);',
+            '      const target = windsorLocalToDate(dateKey, day[prayer], timeZone);')
+          replace("mobile/App.tsx",
+            'function hijriDateLabel(date: Date, locale: "en" | "ar") {',
+            'function hijriDateLabel(date: Date, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {')
+          replace("mobile/App.tsx",
+            '      day: "numeric", month: "long", year: "numeric", timeZone: WINDSOR_TIME_ZONE',
+            '      day: "numeric", month: "long", year: "numeric", timeZone')
+          replace("mobile/App.tsx",
+            '  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>({});\n  const [live, setLive] = useState(false);',
+            '  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>({});\n  const [prayerLocation, setPrayerLocation] = useState<PrayerLocation | null>(null);\n  const [live, setLive] = useState(false);')
+          replace("mobile/App.tsx",
+            '  const todayKey = windsorDateKey(now);\n  const today = prayerTimes[todayKey];\n  const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);',
+            '  const prayerTimeZone = prayerLocation?.timezone || WINDSOR_TIME_ZONE;\n  const prayerLocationLabel = prayerLocation?.label || CITY_LABEL;\n  const todayKey = windsorDateKey(now, prayerTimeZone);\n  const today = prayerTimes[todayKey];\n  const next = useMemo(() => nextPrayerFor(prayerTimes, now, prayerTimeZone), [now, prayerTimes, prayerTimeZone]);')
+          replace("mobile/App.tsx",
+            '      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);',
+            '      setPrayerTimes(loaded.prayerTimes);\n      setPrayerLocation(loaded.location);\n      setLive(loaded.live);')
+          replace("mobile/App.tsx",
+            '        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);',
+            '        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label });')
+          replace("mobile/App.tsx",
+            '        await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);',
+            '        await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);')
+          replace("mobile/App.tsx",
+            '      void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences)',
+            '      void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })')
+          replace("mobile/App.tsx",
+            '      void scheduleIslamicEventReminders(windsorDateKey(new Date()), locale).catch(() => undefined);',
+            '      void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);')
+          replace("mobile/App.tsx",
+            '  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences]);',
+            '  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);')
+          replace("mobile/App.tsx",
+            '      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences);',
+            '      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });')
+          replace("mobile/App.tsx",
+            '      await scheduleIslamicEventReminders(todayKey, nextLocale).catch(() => undefined);',
+            '      await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);')
+          replace("mobile/App.tsx",
+            '      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences);',
+            '      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });')
+          replace("mobile/App.tsx",
+            '      await scheduleIslamicEventReminders(todayKey, locale).catch(() => undefined);',
+            '      await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);')
+          replace("mobile/App.tsx",
+            '      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences);',
+            '      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });')
+          replace("mobile/App.tsx",
+            'Loading Windsor prayer times…',
+            'Loading prayer times for your current location…')
+          replace("mobile/App.tsx",
+            '  const date = windsorLocalToDate(todayKey, "12:00");',
+            '  const date = windsorLocalToDate(todayKey, "12:00", prayerTimeZone);')
+          replace("mobile/App.tsx",
+            '  const hijriDate = hijriDateLabel(date, locale);',
+            '  const hijriDate = hijriDateLabel(date, locale, prayerTimeZone);')
+          replace("mobile/App.tsx",
+            '<View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text></View>',
+            '<View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>📍 {prayerLocationLabel} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text></View>')
+          replace("mobile/App.tsx",
+            '<Text style={styles.footer}>Official Windsor Islamic Association schedule • America/Toronto</Text>',
+            '<Text style={styles.footer}>{prayerLocation?.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer times calculated for current GPS location"} • {prayerTimeZone}</Text>')
+
+      - name: Commit location context changes
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/App.tsx mobile/src/time.ts mobile/src/events.ts mobile/src/notifications.ts mobile/src/prayerAudio.ts
+          git commit -m "Apply GPS context across mobile prayer scheduling"
+          git push origin HEAD:work/hassoun-1.0-store-admin
