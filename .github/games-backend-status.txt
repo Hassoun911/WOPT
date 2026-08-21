@@ -1,6 +1,6 @@
 games_backend=ready
 crm_runtime=ready
 worker=https://wopt-prayer-push.wopt-windsor.workers.dev
-verified_room_code=Y4VJBJ
-verified_at=2026-08-20T21:08:53Z
-source_commit=4c29aa7604dd88387a8968bb101a298767b5c16e
+verified_room_code=G7MQW7
+verified_at=2026-08-21T01:14:02Z
+source_commit=e8dde6f7d51250a9e942bc17bd4247d2de03d80b
