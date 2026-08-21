@@ -1,0 +1,60 @@
+name: Apply prayer email activity personalization once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Feed real recent activity into prayer emails'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch prayer email activity payload
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('push-server/src/globalPrayerEmail.ts')
+          s = p.read_text()
+          helper_anchor = 'async function queuePrayerEmail(env: Env, subscriber: Subscriber, day: CachedPrayerDay, prayer: PrayerKey, kind: AlertKind, prayerTime: string, targetMs: number) {'
+          helper = '''async function latestSubscriberActivity(env: Env, subscriberId: number) {\n  return env.DB.prepare(\n    `SELECT activity_label, detail, occurred_at\n     FROM subscriber_activity\n     WHERE subscriber_id = ?\n     ORDER BY occurred_at DESC, id DESC LIMIT 1`\n  ).bind(subscriberId).first<{ activity_label: string; detail: string | null; occurred_at: string }>();\n}\n\n'''
+          if 'async function latestSubscriberActivity' not in s:
+              if helper_anchor not in s:
+                  raise SystemExit('queuePrayerEmail anchor missing')
+              s = s.replace(helper_anchor, helper + helper_anchor, 1)
+          manage_anchor = '  const manageUrl = await subscriberManageUrl(env, subscriber.public_id, subscriber.email);\n'
+          if 'const recentActivity = await latestSubscriberActivity' not in s:
+              if manage_anchor not in s:
+                  raise SystemExit('manageUrl anchor missing')
+              s = s.replace(manage_anchor, manage_anchor + '  const recentActivity = await latestSubscriberActivity(env, subscriber.id);\n', 1)
+          data_anchor = '    appUrl: publicAppUrl(env), manageUrl, upcomingEvent\n'
+          data_replacement = '    appUrl: publicAppUrl(env), manageUrl, upcomingEvent,\n    lastActivity: recentActivity ? { label: recentActivity.activity_label, detail: recentActivity.detail, occurredAt: recentActivity.occurred_at } : null\n'
+          if 'lastActivity: recentActivity ?' not in s:
+              if data_anchor not in s:
+                  raise SystemExit('email data anchor missing')
+              s = s.replace(data_anchor, data_replacement, 1)
+          p.write_text(s)
+
+          t = Path('push-server/src/prayerEmailTemplate.ts')
+          x = t.read_text()
+          x = x.replace('const HASSOUN_LOGO = "https://hassoun911.github.io/WOPT/assets/hassoun-logo.png";', 'const HASSOUN_LOGO = "https://hassoun.app/hassoun-logo.png";')
+          t.write_text(x)
+      - name: Commit prayer email activity personalization
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- push-server/src/globalPrayerEmail.ts push-server/src/prayerEmailTemplate.ts; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git add push-server/src/globalPrayerEmail.ts push-server/src/prayerEmailTemplate.ts
+          git commit -m "Feed real recent activity into prayer emails"
+          git push origin HEAD:work/hassoun-1.0-store-admin
