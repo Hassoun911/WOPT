@@ -1,0 +1,46 @@
+name: Fix Quran bidirectional scrolling once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/fix-quran-bidirectional-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch Quran reader edge navigation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('mobile/src/quran/QuranV3.tsx')
+          s=p.read_text()
+
+          old='''    readerAtTop.current = true;\n    readerAtBottom.current = false;\n    setPosition(next);'''
+          new='''    readerAtTop.current = true;\n    readerAtBottom.current = false;\n    readerLastScrollY.current = 0;\n    readerScrollDirection.current = null;\n    verticalGestureStartY.current = null;\n    setPosition(next);'''
+          if old not in s:
+              raise SystemExit('openPage reset anchor not found')
+          s=s.replace(old,new,1)
+
+          pattern=r'''  const readerPanResponder = useMemo\(\n.*?\n  \);\n\n  const handleVerticalTouchStart'''
+          replacement='''  const readerPanResponder = useMemo(\n    () => PanResponder.create({\n      onStartShouldSetPanResponder: () => false,\n      onMoveShouldSetPanResponderCapture: (_event, gestureState) => {\n        const horizontal = Math.abs(gestureState.dx);\n        const vertical = Math.abs(gestureState.dy);\n\n        if (appearance.browseMode === "horizontal") {\n          return horizontal >= 24 && horizontal > vertical * 1.25;\n        }\n\n        if (appearance.browseMode !== "vertical") return false;\n        if (vertical < 20 || vertical <= horizontal * 1.15) return false;\n\n        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n        if (gestureState.dy < 0) return readerAtBottom.current || contentFits;\n        if (gestureState.dy > 0) return readerAtTop.current || contentFits;\n        return false;\n      },\n      onPanResponderRelease: (_event, gestureState) => {\n        if (appearance.browseMode === "horizontal") {\n          if (Math.abs(gestureState.dx) < 40) return;\n          turnReaderPage(gestureState.dx > 0 ? 1 : -1);\n          return;\n        }\n\n        if (appearance.browseMode !== "vertical" || Math.abs(gestureState.dy) < 32) return;\n        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n        if (gestureState.dy < 0 && (readerAtBottom.current || contentFits)) {\n          turnReaderPage(1);\n        } else if (gestureState.dy > 0 && (readerAtTop.current || contentFits)) {\n          turnReaderPage(-1);\n        }\n      },\n      onPanResponderTerminate: () => {\n        verticalGestureStartY.current = null;\n      }\n    }),\n    [appearance.browseMode, currentPage, spreadMode]\n  );\n\n  const handleVerticalTouchStart'''
+          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1:
+              raise SystemExit(f'pan responder block replacement count={n}')
+          p.write_text(s2)
+          PY
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/src/quran/QuranV3.tsx
+          git commit -m "Fix Quran forward and backward page scrolling"
+          git pull --rebase --autostash origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
