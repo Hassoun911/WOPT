@@ -1,0 +1,33 @@
+name: Update mobile lock version once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/update-mobile-lock-version-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refresh package lock metadata
+        run: |
+          cd mobile
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          cd ..
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git add mobile/package-lock.json
+          git commit -m "Sync mobile lockfile for 1.0.1" || true
+          git pull --rebase --autostash origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
