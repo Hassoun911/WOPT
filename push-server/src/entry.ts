@@ -1,5 +1,6 @@
 import worker from "./index";
 import { recordSubscriberActivity } from "./activity";
+import { auditEmailSystemsOnce, sendOwnerAdminEmailTestOnce } from "./emailAuditOnce";
 import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import type { Env } from "./types";
@@ -14,7 +15,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "gps-prayer-email-activity-games-2026-08-20-3";
+const BACKEND_VERSION = "gps-prayer-email-audit-2026-08-21-1";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -53,6 +54,12 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") {
       return withCors(request, Response.json({ ok: true, service: "wopt-prayer-push", backendVersion: BACKEND_VERSION }), env);
+    }
+    if (request.method === "GET" && url.pathname === "/internal/email-audit-once-20260821") {
+      return auditEmailSystemsOnce(env);
+    }
+    if (request.method === "POST" && url.pathname === "/internal/email-test-owner-once-20260821") {
+      return sendOwnerAdminEmailTestOnce(env);
     }
     if (request.method === "GET" && url.pathname === "/prayer-times") {
       try {
