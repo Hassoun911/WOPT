@@ -1,0 +1,106 @@
+name: Validate finalized Hassoun branch
+
+on:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - ".github/workflows/validate-final-hassoun.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install GNU timeout for verified web build
+        run: brew install coreutils
+      - name: Validate backend
+        id: backend
+        continue-on-error: true
+        working-directory: push-server
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npx tsc --noEmit
+          npm test
+      - name: Validate Admin/PWA
+        id: admin
+        continue-on-error: true
+        working-directory: pwa
+        env:
+          PATH: /opt/homebrew/opt/coreutils/libexec/gnubin:/usr/local/opt/coreutils/libexec/gnubin:${{ env.PATH }}
+        run: |
+          set +e
+          (npm ci --include=dev --no-audit --no-fund && npx tsc --noEmit && npm run build) 2>&1 | tee /tmp/hassoun-admin.log
+          STATUS=${PIPESTATUS[0]}
+          exit "$STATUS"
+      - name: Validate mobile TypeScript
+        id: mobile_ts
+        continue-on-error: true
+        working-directory: mobile
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npm run quran:data
+          npx tsc --noEmit
+      - name: Prebuild iOS and install pods
+        id: ios_pods
+        continue-on-error: true
+        working-directory: mobile
+        run: |
+          npx expo prebuild --platform ios --clean --no-install
+          cd ios
+          pod install
+          test -f Hassoun.xcworkspace/contents.xcworkspacedata
+          xcodebuild -resolvePackageDependencies -workspace Hassoun.xcworkspace -scheme Hassoun 2>&1 | tee /tmp/hassoun-ios-resolve.log
+      - name: Compile iOS CocoaPods workspace
+        id: ios_build
+        continue-on-error: true
+        working-directory: mobile/ios
+        run: |
+          set +e
+          xcodebuild -workspace Hassoun.xcworkspace -scheme Hassoun -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee /tmp/hassoun-ios.log
+          STATUS=${PIPESTATUS[0]}
+          exit "$STATUS"
+      - name: Record validation diagnostics
+        if: always()
+        working-directory: .
+        env:
+          BACKEND: ${{ steps.backend.outcome }}
+          ADMIN: ${{ steps.admin.outcome }}
+          MOBILE_TS: ${{ steps.mobile_ts.outcome }}
+          IOS_PODS: ${{ steps.ios_pods.outcome }}
+          IOS_BUILD: ${{ steps.ios_build.outcome }}
+        run: |
+          if [ "$BACKEND" = success ] && [ "$ADMIN" = success ] && [ "$MOBILE_TS" = success ] && [ "$IOS_PODS" = success ] && [ "$IOS_BUILD" = success ]; then STATUS=success; else STATUS=failure; fi
+          cat > .github/hassoun-final-validation-status.txt <<EOF
+          status=${STATUS}
+          backend=${BACKEND}
+          admin_pwa=${ADMIN}
+          mobile_typescript=${MOBILE_TS}
+          ios_prebuild_pods=${IOS_PODS}
+          ios_compile=${IOS_BUILD}
+          ios_workspace=Hassoun.xcworkspace
+          source_commit=$(git rev-parse HEAD)
+          checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          if [ -f /tmp/hassoun-admin.log ]; then tail -n 240 /tmp/hassoun-admin.log > .github/hassoun-admin-build-errors.txt; fi
+          if [ -f /tmp/hassoun-ios-resolve.log ]; then cat /tmp/hassoun-ios-resolve.log > .github/hassoun-ios-resolve.txt; fi
+          if [ -f /tmp/hassoun-ios.log ]; then tail -n 350 /tmp/hassoun-ios.log > .github/hassoun-ios-build-errors.txt; fi
+          git config user.name "Hassoun Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/hassoun-final-validation-status.txt .github/hassoun-admin-build-errors.txt .github/hassoun-ios-resolve.txt .github/hassoun-ios-build-errors.txt 2>/dev/null || true
+          git commit -m "Record Hassoun validation after package resolution ${STATUS}" || true
+          git push origin HEAD:work/store-crm-2026-08-19 || true
+          test "$STATUS" = success

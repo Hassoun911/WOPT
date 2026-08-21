@@ -496,7 +496,7 @@ export default function QuranPage() {
           <div className="mushaf-text" dir="rtl" style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight }}>
             {verses.map((verse) => {
               const selected = selectedKeys.includes(verse.verse_key);
-              const words = verse.words?.length ? verse.words : verseText(verse).split(/\s+/).map((text, index) => ({ position: index + 1, text_uthmani: text }));
+              const words: QuranWord[] = verse.words?.length ? verse.words : verseText(verse).split(/\s+/).map((text, index) => ({ position: index + 1, text_uthmani: text }));
               return (
                 <span
                   className={`mushaf-ayah ${selected ? "selected" : ""} ${playingKey === verse.verse_key ? "playing" : ""}`}
@@ -573,7 +573,7 @@ export default function QuranPage() {
 
             <div className={`memorize-text stage-${memorizeStep}`} dir="rtl">
               {focusVerses.map((verse) => {
-                const words = verse.words?.length ? verse.words : verseText(verse).split(/\s+/).map((text, index) => ({ position: index + 1, text_uthmani: text }));
+                const words: QuranWord[] = verse.words?.length ? verse.words : verseText(verse).split(/\s+/).map((text, index) => ({ position: index + 1, text_uthmani: text }));
                 return <div className={playingKey === verse.verse_key ? "playing" : ""} key={verse.verse_key}>
                   <p className="memory-arabic">
                     {memorizeStep === "hidden" ? <button className="reveal-ayah" type="button" onClick={(event) => event.currentTarget.classList.toggle("revealed")}>Tap to reveal {verse.verse_key}<span>{verseText(verse)} ۝{arabicNumber(verse.verse_number)}</span></button> : words.map((word, index) => <span className={memorizeStep === "first" && index > 0 ? "memory-hidden-word" : ""} key={index}>{word.text_uthmani || word.text} </span>)}

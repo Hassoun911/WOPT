@@ -90,7 +90,7 @@ function linkSecret(env: Env) {
 }
 
 function publicAppUrl(env: Env) {
-  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT/").replace(/\/$/, "");
+  return (env.PUBLIC_APP_URL || "https://hassoun.app/").replace(/\/$/, "");
 }
 
 function publicApiUrl(env: Env) {

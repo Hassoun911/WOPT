@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 const TOKEN_KEY = "wopt:admin-token:v1";
 
-type Admin = { username: string; display_name?: string | null; role: string };
+type Admin = { username: string; email: string; display_name?: string | null; role: string };
 type EmailCampaign = {
   public_id: string;
   name: string;
@@ -97,6 +97,30 @@ export default function AdminEmailPage() {
     }
   };
 
+  const sendTest = async () => {
+    if (!token) return;
+    setBusy(true);
+    setError("");
+    setResult("");
+    try {
+      const payload = await api<{ recipient: string }>("/admin/email/test", {
+        method: "POST",
+        body: JSON.stringify({
+          subjectEn: subjectEn || "Hassoun admin test email",
+          htmlEn: `<div style="font-family:Arial,sans-serif;line-height:1.65;color:#173f35"><p>${(messageEn || "This is a Hassoun admin email test.").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p></div>`,
+          subjectAr: subjectAr || undefined,
+          htmlAr: messageAr ? `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8;color:#173f35"><p>${messageAr.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p></div>` : undefined,
+          locale: locale === "ar" ? "ar" : "en"
+        })
+      }, token);
+      setResult(`Test email sent only to admin: ${payload.recipient}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to send admin test email");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const schedule = async (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
@@ -154,7 +178,7 @@ export default function AdminEmailPage() {
           <label style={s.label}>Time zone filter (optional)</label><input value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="America/Toronto" style={s.input} />
           <label style={s.label}>Schedule (blank = send now)</label><input type="datetime-local" value={scheduledLocal} onChange={(e) => setScheduledLocal(e.target.value)} style={s.input} />
           {result ? <p style={s.success}>{result}</p> : null}
-          <button disabled={busy || !subjectEn || !messageEn} style={s.primary}>{busy ? "Saving…" : scheduledLocal ? "Schedule email" : "Send email now"}</button>
+          <button type="button" onClick={() => void sendTest()} disabled={busy} style={s.secondaryButton}>Send test to admin only{admin.email ? ` (${admin.email})` : ""}</button><button disabled={busy || !subjectEn || !messageEn} style={s.primary}>{busy ? "Saving…" : scheduledLocal ? "Schedule email" : "Send email now"}</button>
         </form>
 
         <section style={s.card}><div style={s.titleRow}><h2 style={s.h2}>Recent campaigns</h2><button onClick={() => token && void loadCampaigns(token)} style={s.secondaryButton}>Refresh</button></div><div>{campaigns.map((campaign) => <div key={campaign.public_id} style={s.campaign}><div><strong>{campaign.name}</strong><div style={s.small}>{campaign.subject_en}</div><div style={s.small}>{campaign.category} • {campaign.target_locale}{campaign.target_city ? ` • ${campaign.target_city}` : ""}</div></div><div style={{ textAlign: "right" }}><span style={s.badge}>{campaign.status}</span><div style={s.small}>{campaign.sent_count || 0} sent • {campaign.pending_count || 0} pending • {campaign.failed_count || 0} failed</div></div></div>)}</div>{!campaigns.length ? <p style={s.muted}>No email campaigns yet.</p> : null}</section>

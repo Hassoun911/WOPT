@@ -1,0 +1,9 @@
+status=failure
+backend=success
+admin_pwa=failure
+mobile_typescript=success
+ios_prebuild_pods=success
+ios_compile=failure
+ios_workspace=Hassoun.xcworkspace
+source_commit=3e956ff45f7168a54f9e3d684843c4ea97db1507
+checked_at=2026-08-21T16:40:45Z

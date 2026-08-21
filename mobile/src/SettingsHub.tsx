@@ -20,7 +20,7 @@ import { ReaderSettingsSheet, useQuranAppearance } from "./quran/quranRendering"
 import { submitSupportMessage } from "./support";
 import BrandMark from "./BrandMark";
 
-type SettingsPage = "root" | "about" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";
+type SettingsPage = "root" | "about" | "donation" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";
 
 type Props = {
   locale: "en" | "ar";
@@ -29,7 +29,7 @@ type Props = {
   onOpenEmailAlerts?: () => void;
 };
 
-const PUBLIC_BASE = "https://hassoun911.github.io/WOPT";
+const PUBLIC_BASE = "https://hassoun.app";
 
 const WIDGET_THEME_META: Record<HassounWidgetTheme, { bg: string; fg: string; muted: string; accent: string; border: string }> = {
   emerald: { bg: "#0B654F", fg: "#FFFFFF", muted: "#C7DDD6", accent: "#F0D27A", border: "#D2B25A" },
@@ -74,6 +74,9 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
   const [readerOpen, setReaderOpen] = useState(false);
   const { appearance, setAppearance, reset } = useQuranAppearance();
   const appVersion = Constants.expoConfig?.version ?? "0.5.0";
+  const pushApiUrl = String(Constants.expoConfig?.extra?.pushApiUrl ?? "https://wopt-prayer-push.wopt-windsor.workers.dev");
+  const configuredDonationUrl = String(Constants.expoConfig?.extra?.donationUrl ?? "").trim();
+  const [sadaqahConfig, setSadaqahConfig] = useState<Record<string, unknown>>({ enabled: true, donationEnabled: Boolean(configuredDonationUrl), donationUrl: configuredDonationUrl, dedicationEn: "For Abdul Jalil Hassoun and Salwa Hassoun", dedicationAr: "عن عبد الجليل حسون وسلمى حسون" });
 
   const [widgetPrefs, setWidgetPrefs] = useState<HassounWidgetPreferences>(() => ({ ...HassounWidget.getPreferences(), locale }));
   const widgetCapabilities = useMemo(() => HassounWidget.getCapabilities(), [page]);
@@ -83,6 +86,15 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
     setWidgetPrefs(next);
     HassounWidget.setPreferences(next);
   }, [locale]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${pushApiUrl}/config`).then((response) => response.ok ? response.json() : null).then((payload) => {
+      const remote = payload?.control?.settings?.sadaqah_jariyah;
+      if (active && remote && typeof remote === "object") setSadaqahConfig((previous) => ({ ...previous, ...remote }));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [pushApiUrl]);
 
   useEffect(() => {
     if (page !== "widgets") return;
@@ -117,6 +129,8 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
         <Row emoji="🔐" title={t("Permissions", "الأذونات")} text={t("Why Hassoun requests location, notifications, alarms and microphone", "لماذا يطلب Hassoun الموقع والتنبيهات والمنبهات والميكروفون")} onPress={() => setPage("permissions")} />
         <Row emoji="ℹ️" title={t("About Hassoun", "حول Hassoun")} text={t(`Version ${appVersion} • Prayer • Qur’an • Knowledge`, `الإصدار ${appVersion} • الصلاة • القرآن • المعرفة`)} onPress={() => setPage("about")} />
       </Section>
+
+      <Section title={t("SADAQAH JARIYAH", "صدقة جارية")}><Row emoji="🤲" title={t("Sadaqah Jariyah & donations", "الصدقة الجارية والتبرع")} text={t("For Abdul Jalil Hassoun and Salwa Hassoun • Join the ongoing charity", "عن عبد الجليل حسون وسلمى حسون • شارك في الصدقة الجارية")} onPress={() => setPage("donation")} /></Section>
 
       <Section title={t("PRIVACY & LEGAL", "الخصوصية والقانون")}>
         <Row emoji="🛡️" title={t("Privacy Policy", "سياسة الخصوصية")} text={t("What data Hassoun uses and how it is protected", "ما البيانات التي يستخدمها Hassoun وكيف تتم حمايتها")} onPress={() => setPage("privacy")} />
@@ -268,9 +282,24 @@ export default function SettingsHub({ locale, onToggleLocale, onOpenAlerts, onOp
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
         <BackHeader title={t("About Hassoun", "حول Hassoun")} onBack={() => setPage("root")} />
-        <View style={styles.aboutHero}><Text style={styles.aboutMoon}>☪</Text><Text style={styles.aboutTitle}>Hassoun</Text><Text style={styles.aboutTagline}>{t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة")}</Text><Text style={styles.version}>v{appVersion}</Text></View>
+        <View style={styles.aboutHero}><Image source={require("../assets/hassoun-logo.png")} style={styles.aboutLogo} resizeMode="contain" /><Text style={styles.aboutTitle}>Hassoun</Text><Text style={styles.aboutTagline}>{t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة")}</Text><Text style={styles.version}>v{appVersion}</Text></View>
         <LegalCard title={t("Our purpose", "هدفنا")}><Text style={styles.legalText}>{t("Hassoun brings prayer times, Adhan, Qur’an reading and listening, memorization tools and Islamic learning into one calm, easy-to-use experience.", "يجمع Hassoun مواقيت الصلاة والأذان وقراءة القرآن والاستماع إليه وأدوات الحفظ والتعلم الإسلامي في تجربة سهلة وواضحة.")}</Text></LegalCard>
+        <LegalCard title={t("Sadaqah Jariyah", "صدقة جارية")}><Text style={styles.legalText}>{t("Hassoun is dedicated as Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. We ask Allah to accept every prayer reminder, Qur’an verse read, lesson learned and beneficial use through this app as ongoing charity for them.", "تطبيق Hassoun مُهدى كصدقة جارية عن عبد الجليل حسون وسلمى حسون. نسأل الله أن يتقبل كل تذكير بالصلاة وكل آية تُقرأ وكل علم نافع واستفادة من هذا التطبيق في ميزان صدقتهما الجارية.")}</Text><Pressable onPress={() => setPage("donation")} style={styles.inlineButton}><Text style={styles.inlineButtonText}>{t("Be part of this Sadaqah Jariyah", "شارك في هذه الصدقة الجارية")}</Text></Pressable></LegalCard>
         <LegalCard title={t("Sources", "المصادر")}><Text style={styles.legalText}>{t("Windsor prayer times use the official Windsor Islamic Association schedule. Qur’an text and recitation features use verified Qur’anic data and recognized public Qur’an services where indicated in the app.", "تستخدم مواقيت وندسور الجدول الرسمي لجمعية وندسور الإسلامية. تستخدم ميزات نص القرآن والتلاوة بيانات قرآنية موثقة وخدمات قرآن عامة معروفة حيث يشار إليها داخل التطبيق.")}</Text></LegalCard>
+      </ScrollView>
+    );
+  }
+
+  if (page === "donation") {
+    const donationUrl = String(sadaqahConfig.donationUrl ?? configuredDonationUrl ?? "").trim();
+    const donationEnabled = sadaqahConfig.enabled !== false && sadaqahConfig.donationEnabled !== false && Boolean(donationUrl);
+    return (
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+        <BackHeader title={t("Sadaqah Jariyah", "صدقة جارية")} onBack={() => setPage("root")} />
+        <View style={styles.aboutHero}><Image source={require("../assets/hassoun-logo.png")} style={styles.aboutLogo} resizeMode="contain" /><Text style={styles.aboutTitle}>Hassoun</Text><Text style={styles.aboutTagline}>{t("An ongoing charity", "صدقة جارية")}</Text></View>
+        <LegalCard title={t("For Abdul Jalil Hassoun & Salwa Hassoun", "عن عبد الجليل حسون وسلمى حسون")}><Text style={styles.legalText}>{t("This app is offered as Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. May Allah accept it, multiply its benefit, and make every beneficial use a continuing reward for them.", "هذا التطبيق صدقة جارية عن عبد الجليل حسون وسلمى حسون. نسأل الله أن يتقبله ويضاعف نفعه وأن يجعل كل استفادة منه أجراً مستمراً لهما.")}</Text></LegalCard>
+        <LegalCard title={t("Join the Sadaqah", "شارك في الصدقة")}><Text style={styles.legalText}>{t("You can contribute a donation to help maintain and improve Hassoun so its prayer, Qur’an and learning tools can continue benefiting people.", "يمكنك المساهمة بتبرع للمساعدة في استمرار وتطوير Hassoun حتى تبقى أدوات الصلاة والقرآن والتعلم نافعة للناس.")}</Text>{donationEnabled ? <Pressable onPress={() => Linking.openURL(donationUrl)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{t("Donate as Sadaqah Jariyah", "تبرع كصدقة جارية")}</Text></Pressable> : <Text style={styles.formNote}>{t("The donation link is being prepared. It will appear automatically when enabled by Hassoun administration.", "يجري تجهيز رابط التبرع وسيظهر تلقائياً عند تفعيله من إدارة Hassoun.")}</Text>}</LegalCard>
+        <Text style={styles.formNote}>{t("Donations are voluntary and support Hassoun’s continuing charitable purpose.", "التبرعات اختيارية وتدعم استمرار هدف Hassoun كصدقة جارية.")}</Text>
       </ScrollView>
     );
   }
@@ -387,6 +416,7 @@ const styles = StyleSheet.create({
   updated: { color: "#8a948f", fontSize: 10, marginBottom: 14 },
   aboutHero: { alignItems: "center", backgroundColor: "#0b654f", borderRadius: 26, padding: 24, marginBottom: 13 },
   aboutMoon: { color: "#f2cc72", fontSize: 45 },
+  aboutLogo: { width: 92, height: 92, marginBottom: 4 },
   aboutTitle: { color: "#fff", fontSize: 28, fontWeight: "900", marginTop: 3 },
   aboutTagline: { color: "#c8e1d8", fontSize: 11, marginTop: 3 },
   version: { color: "#f1d58c", fontSize: 10, fontWeight: "800", marginTop: 10 },

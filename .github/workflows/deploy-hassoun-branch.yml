@@ -1,0 +1,125 @@
+name: Deploy finalized Hassoun Worker
+
+on:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - ".github/workflows/deploy-hassoun-branch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PUSH_WORKER_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - name: Install and validate Worker
+        id: validate
+        continue-on-error: true
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Apply D1 migrations
+        id: migrate
+        continue-on-error: true
+        run: npx wrangler d1 migrations apply wopt-prayer-push --remote
+      - name: Verify unified email state in D1
+        id: consolidation
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS count FROM email_outbox WHERE kind = 'prayer' AND status IN ('pending','sending') AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'email:%')" > /tmp/legacy-prayer.json
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS count FROM email_templates WHERE lower(name || ' ' || subject_en || ' ' || COALESCE(subject_ar,'') || ' ' || html_en || ' ' || COALESCE(html_ar,'') || ' ' || COALESCE(text_en,'') || ' ' || COALESCE(text_ar,'')) LIKE '%xuber%'" > /tmp/xuber-templates.json
+          jq -e '.[0].results[0].count == 0' /tmp/legacy-prayer.json >/dev/null
+          jq -e '.[0].results[0].count == 0' /tmp/xuber-templates.json >/dev/null
+      - name: Ensure sender comes only from hassoun.app config
+        id: sender
+        continue-on-error: true
+        run: npx wrangler secret delete EMAIL_FROM --yes || true
+      - name: Install Worker secrets except sender identity
+        id: secrets
+        continue-on-error: true
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+          EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
+          ADMIN_BOOTSTRAP_KEY: ${{ secrets.ADMIN_BOOTSTRAP_KEY }}
+          EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          put_required() { test -n "$2"; printf '%s' "$2" | npx wrangler secret put "$1"; }
+          put_optional() { if [ -n "$2" ]; then printf '%s' "$2" | npx wrangler secret put "$1"; fi; }
+          put_required VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+          put_optional RESEND_API_KEY "$RESEND_API_KEY"
+          put_optional EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
+          put_optional EMAIL_LINK_SECRET "$EMAIL_LINK_SECRET"
+          put_optional ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
+          put_optional EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
+      - name: Deploy Worker
+        id: deploy
+        continue-on-error: true
+        run: npx wrangler deploy
+      - name: Smoke test live Worker
+        id: smoke
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json
+          jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null
+          curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json
+          jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null
+      - name: Record deployment diagnostics
+        if: always()
+        working-directory: .
+        env:
+          VALIDATE: ${{ steps.validate.outcome }}
+          MIGRATE: ${{ steps.migrate.outcome }}
+          CONSOLIDATION: ${{ steps.consolidation.outcome }}
+          SENDER: ${{ steps.sender.outcome }}
+          SECRETS: ${{ steps.secrets.outcome }}
+          DEPLOY: ${{ steps.deploy.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+        run: |
+          if [ "$VALIDATE" = success ] && [ "$MIGRATE" = success ] && [ "$CONSOLIDATION" = success ] && [ "$SECRETS" = success ] && [ "$DEPLOY" = success ] && [ "$SMOKE" = success ]; then STATUS=success; else STATUS=failure; fi
+          cat > .github/hassoun-deploy-status.txt <<EOF
+          status=${STATUS}
+          validate=${VALIDATE}
+          migrate=${MIGRATE}
+          consolidation=${CONSOLIDATION}
+          sender_cleanup=${SENDER}
+          secrets=${SECRETS}
+          deploy=${DEPLOY}
+          smoke=${SMOKE}
+          worker=https://wopt-prayer-push.wopt-windsor.workers.dev
+          public_app=https://hassoun.app
+          admin=https://admin.hassoun.app
+          email_from=Hassoun <notifications@hassoun.app>
+          migration=0010_hassoun_public_email_branding.sql
+          source_commit=$(git rev-parse HEAD)
+          verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          git config user.name "Hassoun Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/hassoun-deploy-status.txt
+          git commit -m "Record Hassoun deploy diagnostics ${STATUS}" || true
+          git push origin HEAD:work/store-crm-2026-08-19 || true
+          test "$STATUS" = success

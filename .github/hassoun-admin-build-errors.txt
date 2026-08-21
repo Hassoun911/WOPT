@@ -1,0 +1,10 @@
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm error code ENOENT
+npm error syscall spawn sh
+npm error path /Users/runner/work/WOPT/WOPT/pwa/node_modules/sharp
+npm error errno -2
+npm error enoent spawn sh ENOENT
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /Users/runner/work/WOPT/WOPT/pwa/.sites-runtime/npm-cache/_logs/2026-08-21T16_39_10_587Z-debug-0.log

@@ -1,0 +1,68 @@
+name: Apply Hassoun current-task fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - .github/scripts/fix-hassoun-sadaqah-admin-alerts.py
+      - .github/workflows/apply-hassoun-sadaqah-admin-alerts.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out working branch
+        uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+          fetch-depth: 0
+
+      - name: Apply fixes
+        run: python .github/scripts/fix-hassoun-sadaqah-admin-alerts.py
+
+      - name: Validate changed TypeScript structure
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          checks = {
+              'mobile/src/SettingsHub.tsx': ['Sadaqah Jariyah', 'hassoun-logo.png', 'donationUrl'],
+              'mobile/App.tsx': ['islamicEventAlertsEnabled', 'loadCachedPrayerTimes', 'cancelIslamicEventReminders'],
+              'pwa/app/admin/AdminControlCenter.tsx': ['Send test to admin only', 'sadaqah_jariyah'],
+              'push-server/src/adminEmail.ts': ['sendAdminEmailTest'],
+              'push-server/src/index.ts': ['/admin/email/test'],
+          }
+          for file, needles in checks.items():
+              text = Path(file).read_text()
+              missing = [needle for needle in needles if needle not in text]
+              if missing:
+                  raise SystemExit(f'{file} missing {missing}')
+          PY
+
+      - name: Install and typecheck mobile
+        working-directory: mobile
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Install and typecheck worker
+        working-directory: push-server
+        run: |
+          npm ci
+          npm run typecheck --if-present
+
+      - name: Commit applied fixes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- mobile/src/SettingsHub.tsx mobile/App.tsx mobile/src/prayerData.ts mobile/src/notifications.ts mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt mobile/app.config.ts mobile/package.json mobile/package-lock.json pwa/app/admin/AdminControlCenter.tsx push-server/src/adminEmail.ts push-server/src/index.ts push-server/src/emailDelivery.ts
+          git commit -m "Finish Hassoun Sadaqah admin alerts and widget fixes"
+          git push origin HEAD:work/store-crm-2026-08-19

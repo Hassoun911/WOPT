@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { anyPrayerAlertEnabled, type PrayerAlertPreferences } from "./alertPreferences";
 import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import { getInstallationId } from "./installation";
+import { getRemoteControlConfig } from "./remoteControlStore";
 
 export type EmailAlertChoices = PrayerAlertPreferences;
 
@@ -26,6 +27,9 @@ function apiBase() {
 }
 
 export async function getEmailBackendStatus() {
+  if (!getRemoteControlConfig().features.emailAlerts) {
+    return { emailSignup: false, emailDeliveryConfigured: false, automaticLocation: false };
+  }
   const response = await fetch(`${apiBase()}/config`);
   if (!response.ok) throw new Error(`Hassoun service unavailable (${response.status})`);
   return await response.json() as {
@@ -41,6 +45,9 @@ export async function subscribeToPrayerEmails(
   choices: EmailAlertChoices,
   detectedLocation?: DetectedPrayerLocation | null
 ) {
+  if (!getRemoteControlConfig().features.emailAlerts) {
+    throw new Error("Prayer email alerts are temporarily unavailable.");
+  }
   const location = detectedLocation ?? await detectPrayerLocation();
   if (!location) throw new Error("Location permission is required so Hassoun can use your local prayer times.");
 

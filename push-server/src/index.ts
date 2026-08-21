@@ -3,7 +3,8 @@ import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
   listAdminEmailCampaigns,
-  refreshAdminEmailCampaignStatuses
+  refreshAdminEmailCampaignStatuses,
+  sendAdminEmailTest
 } from "./adminEmail";
 import {
   bootstrapAdmin,
@@ -18,6 +19,33 @@ import {
   dispatchDueAdminPushCampaigns,
   listAdminPushCampaigns
 } from "./adminPush";
+import {
+  applyPrayerOverrides,
+  deleteAdminContent,
+  deletePrayerOverride,
+  getAdminControlOverview,
+  getPublicControlConfig,
+  listReleaseChecks,
+  listSupportTickets,
+  saveAdminContent,
+  saveAdminSetting,
+  savePrayerOverride,
+  updateReleaseCheck,
+  updateSupportTicket
+} from "./adminControl";
+import {
+  createAdminUser,
+  listAdminUsers,
+  resetAdminUserPassword,
+  revokeAdminUserSessions,
+  updateAdminUser
+} from "./adminUsers";
+import {
+  closeAdminGameRoom,
+  deleteAdminGameRoom,
+  inspectAdminGameRoom,
+  listAdminGameRooms
+} from "./adminGames";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -44,11 +72,12 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}) {
 
 function corsHeaders(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
-  const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";
+  const allowedOrigins = new Set((env.ALLOWED_WEB_ORIGIN || "https://hassoun.app,https://admin.hassoun.app").split(",").map((value) => value.trim()).filter(Boolean));
+  const allowed = origin && allowedOrigins.has(origin) ? origin : "null";
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     Vary: "Origin"
   };
 }
@@ -178,8 +207,9 @@ async function loadSchedule(env: Env) {
   if (!response.ok) throw new Error(`Schedule fetch failed: ${response.status}`);
   const data = (await response.json()) as PrayerFile;
   if (!data.prayer_times) throw new Error("Schedule is missing prayer_times");
-  cachedSchedule = { expiresAt: Date.now() + 300_000, data };
-  return data;
+  const merged = await applyPrayerOverrides(env, data);
+  cachedSchedule = { expiresAt: Date.now() + 300_000, data: merged };
+  return merged;
 }
 
 async function runScheduled(env: Env, scheduledTime: number) {
@@ -214,11 +244,13 @@ export default {
       if (request.method === "GET" && url.pathname === "/health") {
         response = json({ ok: true, service: "wopt-prayer-push" });
       } else if (request.method === "GET" && url.pathname === "/config") {
+        const control = await getPublicControlConfig(env);
         response = json({
           vapidPublicKey: env.VAPID_PUBLIC_KEY,
           emailSignup: true,
           emailDeliveryConfigured: emailDeliveryConfigured(env),
-          automaticLocation: true
+          automaticLocation: false,
+          control
         });
       } else if (request.method === "POST" && url.pathname === "/subscriptions/expo") {
         response = await registerExpo(request, env);
@@ -258,6 +290,24 @@ export default {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listAdminSubscribers(request, env, url);
+      } else if (request.method === "GET" && url.pathname === "/admin/users") {
+        response = await listAdminUsers(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users") {
+        response = await createAdminUser(request, env);
+      } else if (request.method === "PATCH" && url.pathname === "/admin/users") {
+        response = await updateAdminUser(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users/password") {
+        response = await resetAdminUserPassword(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/users/revoke-sessions") {
+        response = await revokeAdminUserSessions(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/games/rooms") {
+        response = await listAdminGameRooms(request, env, url);
+      } else if (request.method === "GET" && url.pathname === "/admin/games/room") {
+        response = await inspectAdminGameRoom(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/games/rooms/close") {
+        response = await closeAdminGameRoom(request, env);
+      } else if (request.method === "DELETE" && url.pathname === "/admin/games/rooms") {
+        response = await deleteAdminGameRoom(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
         response = await createAdminPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
@@ -266,6 +316,31 @@ export default {
         response = await createAdminEmailCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
         response = await listAdminEmailCampaigns(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/email/test") {
+        response = await sendAdminEmailTest(request, env);
+        if (response.status < 300) await processEmailOutbox(env);
+      } else if (request.method === "GET" && url.pathname === "/admin/control") {
+        response = await getAdminControlOverview(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/settings") {
+        response = await saveAdminSetting(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/content") {
+        response = await saveAdminContent(request, env);
+      } else if (request.method === "DELETE" && url.pathname === "/admin/control/content") {
+        response = await deleteAdminContent(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/control/prayer-overrides") {
+        response = await savePrayerOverride(request, env);
+        cachedSchedule = null;
+      } else if (request.method === "DELETE" && url.pathname === "/admin/control/prayer-overrides") {
+        response = await deletePrayerOverride(request, env, url);
+        cachedSchedule = null;
+      } else if (request.method === "GET" && url.pathname === "/admin/support/tickets") {
+        response = await listSupportTickets(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/support/tickets") {
+        response = await updateSupportTicket(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/release/checks") {
+        response = await listReleaseChecks(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/release/checks") {
+        response = await updateReleaseCheck(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }

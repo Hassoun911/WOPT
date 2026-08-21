@@ -1,40 +1,20 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import BrandMark from "./BrandMark";
-import { islamicDateLabelForEvent, islamicEventCountdown, islamicEventsForGregorianYear, islamicEventTimeline, type IslamicEventOccurrence } from "./islamicEvents";
+import FeatureUnavailable from "./FeatureUnavailable";
+import IslamicEventsPageCore from "./IslamicEventsPageCore";
+import { useRemoteControl } from "./remoteControlStore";
 
 type Props = { locale: "en" | "ar"; todayKey: string; onBack: () => void };
 
-function EventMini({ event, locale, label }: { event: IslamicEventOccurrence | null; locale: "en" | "ar"; label: string }) {
-  if (!event) return null;
-  const date = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }).format(new Date(`${event.dateKey}T12:00:00Z`));
-  return <View style={styles.miniCard}><Text style={styles.miniLabel}>{label}</Text><Text style={styles.miniEmoji}>{event.emoji}</Text><Text style={styles.miniTitle}>{event.name[locale]}</Text><Text style={styles.miniDate}>{date}</Text></View>;
+export default function IslamicEventsPage(props: Props) {
+  const control = useRemoteControl();
+  if (!control.features.islamicEvents) {
+    return (
+      <FeatureUnavailable
+        locale={props.locale}
+        titleEn="Islamic Events are temporarily unavailable"
+        titleAr="المناسبات الإسلامية غير متاحة مؤقتاً"
+        onBack={props.onBack}
+      />
+    );
+  }
+  return <IslamicEventsPageCore {...props} />;
 }
-
-export default function IslamicEventsPage({ locale, todayKey, onBack }: Props) {
-  const ar = locale === "ar";
-  const t = (en: string, arabic: string) => ar ? arabic : en;
-  const year = Number(todayKey.slice(0, 4));
-  const events = islamicEventsForGregorianYear(year);
-  const timeline = islamicEventTimeline(todayKey);
-  const next = timeline.next;
-  const days = timeline.daysUntilNext ?? 0;
-  return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.copy}><Text style={styles.eyebrow}>HASSOUN • {t("ISLAMIC EVENTS", "المناسبات الإسلامية")}</Text><Text style={styles.title}>{t("Islamic Calendar", "التقويم الإسلامي")}</Text><Text style={styles.subtitle}>{t("Last event, what is coming next, and the full year at a glance.", "آخر مناسبة وما هو قادم وجميع مناسبات السنة في مكان واحد.")}</Text></View></View>
-      {next ? <View style={styles.nextHero}><View style={styles.nextGlow}><Text style={styles.nextEmoji}>{next.emoji}</Text></View><View style={styles.copy}><Text style={styles.nextLabel}>{t("NEXT ISLAMIC EVENT", "المناسبة الإسلامية القادمة")}</Text><Text style={styles.nextTitle}>{next.name[locale]}</Text><Text style={styles.nextHijri}>{islamicDateLabelForEvent(next, locale)}</Text><Text style={styles.nextDescription}>{next.description[locale]}</Text></View><View style={styles.counter}><Text style={styles.counterNumber}>{islamicEventCountdown(days, locale)}</Text><Text style={styles.counterLabel}>{t("remaining", "متبقي")}</Text></View></View> : null}
-      <View style={styles.twoCol}><EventMini event={timeline.previous} locale={locale} label={t("LAST EVENT", "آخر مناسبة")} /><EventMini event={timeline.next} locale={locale} label={t("COMING UP", "القادمة")} /></View>
-      <View style={styles.sectionHead}><Text style={styles.sectionTitle}>{t(`${year} Islamic Events`, `المناسبات الإسلامية ${new Intl.NumberFormat("ar").format(year)}`)}</Text><Text style={styles.sectionMeta}>{events.length} {t("dates", "تواريخ")}</Text></View>
-      <View style={styles.list}>{events.map((event) => {
-        const past = event.dateKey < todayKey;
-        const isNext = next?.id === event.id && next.dateKey === event.dateKey;
-        const date = new Intl.DateTimeFormat(ar ? "ar-CA" : "en-CA", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${event.dateKey}T12:00:00Z`));
-        return <View key={`${event.id}-${event.dateKey}`} style={[styles.eventRow, isNext && styles.eventRowNext, past && styles.eventRowPast]}><View style={[styles.eventIcon, isNext && styles.eventIconNext]}><Text style={styles.eventEmoji}>{event.emoji}</Text></View><View style={styles.copy}><View style={styles.eventTitleRow}><Text style={styles.eventTitle}>{event.name[locale]}</Text>{isNext ? <Text style={styles.nextPill}>{t("NEXT", "القادمة")}</Text> : null}</View><Text style={styles.eventDate}>{date} • {islamicDateLabelForEvent(event, locale)}</Text><Text style={styles.eventDescription}>{event.description[locale]}</Text>{event.note ? <Text style={styles.eventNote}>ⓘ {event.note[locale]}</Text> : null}</View></View>;
-      })}</View>
-      <View style={styles.notice}><BrandMark size={36} /><Text style={styles.noticeText}>{t("Hijri dates are calculated as an estimate for reliable on-device display. Ramadan, Eid and other dates may shift by a day based on local moon sighting and local religious authority announcements.", "تُحسب التواريخ الهجرية كتقدير لضمان عرضها على الجهاز. قد تتغير بداية رمضان والعيد وبعض المناسبات يوماً بحسب رؤية الهلال وإعلانات الجهات الإسلامية المحلية.")}</Text></View>
-    </ScrollView>
-  );
-}
-
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#f7f4ec" }, screen: { padding: 17, paddingBottom: 38 }, header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 15 }, back: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd9d0", alignItems: "center", justifyContent: "center" }, backText: { color: "#0b654f", fontSize: 30, lineHeight: 32 }, copy: { flex: 1 }, eyebrow: { color: "#a17c36", fontSize: 8, fontWeight: "900", letterSpacing: 1 }, title: { color: "#173f35", fontSize: 25, fontWeight: "900", marginTop: 3 }, subtitle: { color: "#77837e", fontSize: 9, lineHeight: 14, marginTop: 2 }, nextHero: { borderRadius: 26, backgroundColor: "#075a46", borderWidth: 1, borderColor: "#2a7b65", padding: 15, flexDirection: "row", alignItems: "center", gap: 11 }, nextGlow: { width: 62, height: 62, borderRadius: 22, backgroundColor: "rgba(255,255,255,.1)", alignItems: "center", justifyContent: "center" }, nextEmoji: { fontSize: 31 }, nextLabel: { color: "#e5c66e", fontSize: 7, fontWeight: "900", letterSpacing: 1 }, nextTitle: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 3 }, nextHijri: { color: "#d2e3dc", fontSize: 8, marginTop: 2 }, nextDescription: { color: "#c7dbd4", fontSize: 8, lineHeight: 12, marginTop: 4 }, counter: { width: 86, minHeight: 72, borderRadius: 21, backgroundColor: "#f1d888", alignItems: "center", justifyContent: "center", padding: 6 }, counterNumber: { color: "#17483c", fontSize: 13, lineHeight: 17, fontWeight: "900", textAlign: "center" }, counterLabel: { color: "#587066", fontSize: 6, fontWeight: "900", marginTop: 2 }, twoCol: { flexDirection: "row", gap: 8, marginTop: 10 }, miniCard: { flex: 1, minHeight: 116, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0ddd4", padding: 11 }, miniLabel: { color: "#9a7b3f", fontSize: 6.5, fontWeight: "900", letterSpacing: .8 }, miniEmoji: { fontSize: 23, marginTop: 7 }, miniTitle: { color: "#173f35", fontSize: 11, fontWeight: "900", marginTop: 5 }, miniDate: { color: "#85908b", fontSize: 7, marginTop: 3 }, sectionHead: { marginTop: 21, marginBottom: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, sectionTitle: { color: "#173f35", fontSize: 18, fontWeight: "900" }, sectionMeta: { color: "#897c61", fontSize: 8, fontWeight: "800" }, list: { gap: 8 }, eventRow: { borderRadius: 21, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2ded5", padding: 12, flexDirection: "row", gap: 10 }, eventRowNext: { borderColor: "#d7ba66", backgroundColor: "#fffaf0" }, eventRowPast: { opacity: .68 }, eventIcon: { width: 45, height: 45, borderRadius: 15, backgroundColor: "#edf4f0", alignItems: "center", justifyContent: "center" }, eventIconNext: { backgroundColor: "#f5e6b6" }, eventEmoji: { fontSize: 22 }, eventTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 }, eventTitle: { color: "#173f35", fontSize: 12, fontWeight: "900", flexShrink: 1 }, nextPill: { color: "#fff", backgroundColor: "#0b654f", borderRadius: 99, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 3, fontSize: 5.5, fontWeight: "900" }, eventDate: { color: "#9a7b3f", fontSize: 7.5, fontWeight: "800", marginTop: 3 }, eventDescription: { color: "#78847f", fontSize: 8, lineHeight: 12, marginTop: 4 }, eventNote: { color: "#8b806c", fontSize: 7, lineHeight: 11, marginTop: 5 }, notice: { marginTop: 14, borderRadius: 19, backgroundColor: "#e8f3ee", padding: 13, flexDirection: "row", gap: 9, alignItems: "center" }, noticeText: { flex: 1, color: "#5f756d", fontSize: 8, lineHeight: 13 }
-});

@@ -144,6 +144,16 @@ export async function scheduleIslamicEventReminders(todayKey: string, locale: "e
   return { granted: true, scheduled: true, identifier, eventKey };
 }
 
+export async function cancelIslamicEventReminders() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const islamic = scheduled.filter((request) => {
+    const data = request.content.data as Record<string, unknown> | null | undefined;
+    return data?.kind === ISLAMIC_EVENT_KIND;
+  });
+  await Promise.all(islamic.map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
+  await AsyncStorage.removeItem(ISLAMIC_EVENT_MARKER_KEY);
+}
+
 function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
   const prayer = NAMES[event.prayer][locale];
   const time = formatPrayerTime(event.prayerTime, locale);
