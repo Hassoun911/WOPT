@@ -1,6 +1,9 @@
 games_backend=ready
 crm_runtime=ready
+gps_prayer_api=ready
+activity_api=ready
 worker=https://wopt-prayer-push.wopt-windsor.workers.dev
-verified_room_code=LAPW7Y
-verified_at=2026-08-21T01:45:25Z
-source_commit=203170ed58ee983130b20360495b2b2aceb57add
+backend_version=gps-prayer-email-activity-2026-08-20-2
+verified_room_code=BVRQ7C
+verified_at=2026-08-21T01:58:24Z
+source_commit=9e6aad54bc3a9b66f4be0f2e49a59e8ccfffcec3
