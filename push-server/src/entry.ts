@@ -1,4 +1,5 @@
 import worker from "./index";
+import { recordSubscriberActivity } from "./activity";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import type { Env } from "./types";
 
@@ -12,7 +13,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "gps-prayer-email-2026-08-20-1";
+const BACKEND_VERSION = "gps-prayer-email-activity-2026-08-20-2";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -40,12 +41,12 @@ function withCors(request: Request, response: Response, env: Env) {
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS" && url.pathname === "/prayer-times") {
+    if (request.method === "OPTIONS" && ["/prayer-times", "/activity"].includes(url.pathname)) {
       const origin = allowedOrigin(request, env);
       return new Response(null, { status: 204, headers: origin ? {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         Vary: "Origin"
       } : {} });
     }
@@ -58,6 +59,14 @@ export default {
       } catch (error) {
         console.error("GPS prayer time request failed", error);
         return withCors(request, Response.json({ error: "Prayer times unavailable" }, { status: 502 }), env);
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/activity") {
+      try {
+        return withCors(request, await recordSubscriberActivity(request, env), env);
+      } catch (error) {
+        console.error("Activity tracking failed", error);
+        return withCors(request, Response.json({ error: "Activity unavailable" }, { status: 500 }), env);
       }
     }
     return withCors(request, await worker.fetch(request, env), env);
