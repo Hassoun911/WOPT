@@ -4,6 +4,7 @@ import "./globals.css";
 import "./mobile-nav-fix.css";
 import "./quran.css";
 import "./direction-fixes.css";
+import ActivityTracker from "./ActivityTracker";
 import EmailManageRedirect from "./EmailManageRedirect";
 import LocationPrayerBootstrap from "./LocationPrayerBootstrap";
 import NavEnhancer from "./NavEnhancer";
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <LocationPrayerBootstrap />
+        <ActivityTracker />
         {children}
         <RuntimeControlOverlay />
         <EmailManageRedirect />
