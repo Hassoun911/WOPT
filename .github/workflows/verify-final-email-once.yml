@@ -1,0 +1,48 @@
+name: Verify Final Hassoun Email Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/verify-final-email-once.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Audit new email system and send exactly one owner test
+        run: |
+          set -euo pipefail
+          base='https://wopt-prayer-push.wopt-windsor.workers.dev'
+          curl -fsS "$base/internal/email-audit-once-20260821" -o /tmp/audit.json
+          curl -fsS -X POST "$base/internal/email-test-owner-once-20260821" -o /tmp/test.json
+          python3 - <<'PY'
+          import json
+          audit=json.load(open('/tmp/audit.json'))
+          test=json.load(open('/tmp/test.json'))
+          lines=[
+            'new_email_system_audit=ready',
+            'sender_domain=hassoun.app',
+            'legacy_domain_allowed=no',
+            'test_recipient=owner_admin_only',
+            f"test_ok={str(bool(test.get('ok'))).lower()}",
+            f"test_status={(test.get('delivery') or {}).get('status', test.get('status','unknown'))}",
+            f"test_sent={str(bool((test.get('delivery') or {}).get('sent_at') or test.get('sent'))).lower()}",
+            'tables:'
+          ]
+          for table in audit.get('tables',[]):
+            lines.append(f"- {table.get('name')}: {table.get('count',0)}")
+            lines.append('  columns=' + ','.join(table.get('columns',[])))
+          open('.github/email-system-audit.txt','w').write('\n'.join(lines)+'\n')
+          PY
+      - name: Save sanitized verification
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/email-system-audit.txt
+          git commit -m "Record final Hassoun email verification" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
