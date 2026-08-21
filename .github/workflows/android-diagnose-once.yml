@@ -32,17 +32,22 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund > /tmp/android-diagnose.log 2>&1
           code=$?
           if [ $code -eq 0 ]; then npm run typecheck >> /tmp/android-diagnose.log 2>&1; code=$?; fi
-          echo "exit_code=$code" > ../.github/android-diagnose-result.txt
-          echo "source_commit=$(git rev-parse HEAD)" >> ../.github/android-diagnose-result.txt
-          echo "verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ../.github/android-diagnose-result.txt
-          echo "" >> ../.github/android-diagnose-result.txt
-          tail -n 160 /tmp/android-diagnose.log >> ../.github/android-diagnose-result.txt
+          {
+            echo "exit_code=$code"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            tail -n 200 /tmp/android-diagnose.log
+          } > /tmp/android-diagnose-result.txt
           exit 0
       - name: Commit diagnostic result
+        shell: bash
         run: |
           git config user.name "Hassoun Build Bot"
           git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          git fetch origin work/hassoun-1.0-store-admin
+          git reset --hard origin/work/hassoun-1.0-store-admin
+          cp /tmp/android-diagnose-result.txt .github/android-diagnose-result.txt
           git add .github/android-diagnose-result.txt
-          git commit -m "Record Android diagnosis" || true
-          git pull --rebase origin work/hassoun-1.0-store-admin
+          git commit -m "Record Android diagnosis" || exit 0
           git push origin HEAD:work/hassoun-1.0-store-admin
