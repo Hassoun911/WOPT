@@ -32,13 +32,34 @@ jobs:
         response = await finishGameSession(request, env, url.pathname.split("/")[3]);
       } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/action$/.test(url.pathname)) {
         const actionBody = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
+        if (actionBody.type === "finish") {
+          const code = url.pathname.split("/")[3];
+          const finished = await finishGameSession(request, env, code);
+          if (!finished.ok) {
+            response = finished;
+          } else {
+            const roomUrl = new URL(request.url);
+            roomUrl.pathname = `/games/rooms/${code}`;
+            roomUrl.search = `?playerId=${encodeURIComponent(String(actionBody.playerId ?? ""))}`;
+            response = (await handleGames(new Request(roomUrl.toString(), { method: "GET" }), env, roomUrl)) ?? json({ error: "Not found" }, 404);
+          }
+        } else {
+          response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
+        }
+      } else if (url.pathname.startsWith("/games/")) {
+        response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
+'''
+          old_intercept = '''      } else if (request.method === "POST" && /^\/games\/rooms\/[A-Z2-9]{6}\/action$/.test(url.pathname)) {
+        const actionBody = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
         response = actionBody.type === "finish"
           ? await finishGameSession(request, env, url.pathname.split("/")[3])
           : ((await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404));
       } else if (url.pathname.startsWith("/games/")) {
         response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
 '''
-          if 'actionBody.type === "finish"' not in s:
+          if old_intercept in s:
+              s = s.replace(old_intercept, replacement.split('      } else if (request.method === "POST" && /^\\/games\\/rooms\\/[A-Z2-9]{6}\\/finish$/.test(url.pathname)) {\n        response = await finishGameSession(request, env, url.pathname.split("/")[3]);\n',1)[1], 1)
+          elif 'new Request(roomUrl.toString()' not in s:
               if anchor not in s: raise SystemExit('finish route anchor missing')
               s = s.replace(anchor, replacement, 1)
           p.write_text(s)
