@@ -1,0 +1,60 @@
+name: Wire game finish client once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.event.head_commit.message != 'Use dedicated game history finish endpoint'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch multiplayer client
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('mobile/src/MultiplayerGames.tsx')
+          s = p.read_text()
+          old = '''  const act = async (type: string, extra: Record<string, unknown> = {}) => {
+    if (!room || !playerId) return;
+    await withBusy(() => api(`/games/rooms/${room.code}/action`, { method: "POST", body: JSON.stringify({ playerId, type, ...extra }) }));
+  };
+'''
+          new = '''  const act = async (type: string, extra: Record<string, unknown> = {}) => {
+    if (!room || !playerId) return;
+    if (type === "finish") {
+      setBusy(true); setError(null);
+      try {
+        const response = await fetch(`${API_BASE}/games/rooms/${room.code}/finish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playerId }) });
+        const payload = await response.json() as { error?: string };
+        if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+        const refreshed = await api(`/games/rooms/${room.code}?playerId=${encodeURIComponent(playerId)}`);
+        setRoom(refreshed);
+      } catch (e) { setError(e instanceof Error ? e.message : t("Unable to save game", "تعذر حفظ اللعبة")); }
+      finally { setBusy(false); }
+      return;
+    }
+    await withBusy(() => api(`/games/rooms/${room.code}/action`, { method: "POST", body: JSON.stringify({ playerId, type, ...extra }) }));
+  };
+'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif 'type === "finish"' not in s:
+              raise SystemExit('act anchor missing')
+          p.write_text(s)
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "65694110+Hassoun911@users.noreply.github.com"
+          if git diff --quiet -- mobile/src/MultiplayerGames.tsx; then exit 0; fi
+          git add mobile/src/MultiplayerGames.tsx
+          git commit -m "Use dedicated game history finish endpoint"
+          git push origin HEAD:work/hassoun-1.0-store-admin
