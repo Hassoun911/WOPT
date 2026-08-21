@@ -1,0 +1,1 @@
+Trigger a clean Worker deployment so migration 0013_about_guide_donation.sql and public runtime settings are applied.
