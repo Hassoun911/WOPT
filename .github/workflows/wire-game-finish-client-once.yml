@@ -57,4 +57,5 @@ jobs:
           if git diff --quiet -- mobile/src/MultiplayerGames.tsx; then exit 0; fi
           git add mobile/src/MultiplayerGames.tsx
           git commit -m "Use dedicated game history finish endpoint"
+          git pull --rebase origin work/hassoun-1.0-store-admin
           git push origin HEAD:work/hassoun-1.0-store-admin
