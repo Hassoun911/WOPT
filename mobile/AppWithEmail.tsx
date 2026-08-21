@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { useEffect, useState } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -28,6 +28,17 @@ import {
   versionIsBelow,
   type HassounRuntimeConfig
 } from "./src/remoteConfig";
+
+
+class EmailFeatureBoundary extends Component<{ children: ReactNode; locale: "en" | "ar"; onClose: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.warn("Hassoun email alerts UI error", error, info.componentStack); }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <View style={styles.emailErrorCard}><BrandMark size={58}/><Text style={styles.emailErrorTitle}>{this.props.locale === "ar" ? "تعذر فتح تنبيهات البريد" : "Email alerts could not open"}</Text><Text style={styles.emailErrorText}>{this.props.locale === "ar" ? "لم يتوقف Hassoun. أغلق هذه الشاشة وحاول مرة أخرى أو استخدم اتصل بنا إذا استمرت المشكلة." : "Hassoun is still running. Close this screen and try again, or use Contact us if the problem continues."}</Text><Pressable onPress={this.props.onClose} style={styles.emailErrorButton}><Text style={styles.emailErrorButtonText}>{this.props.locale === "ar" ? "إغلاق" : "Close safely"}</Text></Pressable></View>;
+  }
+}
 
 function RuntimeBlock({ title, message }: { title: string; message: string }) {
   return (
@@ -200,7 +211,7 @@ function AppWithEmailShell() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <EmailSignupCard locale={locale} onComplete={completeSignup} />
+            <EmailFeatureBoundary locale={locale} onClose={() => setVisible(false)}><EmailSignupCard locale={locale} onComplete={completeSignup} /></EmailFeatureBoundary>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -217,6 +228,11 @@ export default function AppWithEmail() {
 }
 
 const styles = StyleSheet.create({
+  emailErrorCard: { margin: 18, padding: 22, borderRadius: 22, backgroundColor: "#fff8ed", borderWidth: 1, borderColor: "#e7d4a7", alignItems: "center" },
+  emailErrorTitle: { color: "#173f35", fontSize: 20, fontWeight: "900", marginTop: 12, textAlign: "center" },
+  emailErrorText: { color: "#6e756e", fontSize: 12, lineHeight: 19, textAlign: "center", marginTop: 8 },
+  emailErrorButton: { marginTop: 16, minHeight: 46, paddingHorizontal: 18, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" },
+  emailErrorButtonText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   root: { flex: 1 },
   runtimeBlock: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f6f0e5", paddingHorizontal: 28 },
   runtimeEyebrow: { color: "#9a8a70", fontSize: 10, fontWeight: "900", letterSpacing: 2, marginTop: 16 },

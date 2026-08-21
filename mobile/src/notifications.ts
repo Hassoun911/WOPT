@@ -96,6 +96,16 @@ export async function scheduleTestReminder(delaySeconds = 15) {
   return { granted: true, identifier };
 }
 
+export async function disableIslamicEventReminders() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const eventIdentifiers = scheduled.filter((request) => {
+    const data = request.content.data as Record<string, unknown> | null | undefined;
+    return data?.kind === ISLAMIC_EVENT_KIND;
+  }).map((request) => request.identifier);
+  await Promise.all(eventIdentifiers.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
+  await AsyncStorage.removeItem(ISLAMIC_EVENT_MARKER_KEY);
+}
+
 export async function scheduleIslamicEventReminders(todayKey: string, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {
   const granted = await requestNotificationPermission();
   if (!granted) return { granted: false, scheduled: false };

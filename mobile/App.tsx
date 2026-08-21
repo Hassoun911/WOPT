@@ -33,7 +33,7 @@ import {
 } from "./src/alertPreferences";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { reportHassounActivity } from "./src/activity";
-import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
+import { disableIslamicEventReminders, disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
 import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
@@ -43,6 +43,8 @@ import { addDateDays, formatPrayerTime, windsorDateKey, windsorLocalToDate } fro
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
 type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";
+
+const ISLAMIC_EVENT_ALERTS_KEY = "hassoun:islamic-event-reminders:enabled:v1";
 
 type AppProps = {
   onOpenEmailAlerts?: () => void;
@@ -112,6 +114,8 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
   const [phoneAlertPreferences, setPhoneAlertPreferences] = useState<PrayerAlertPreferences>(DEFAULT_PHONE_PRAYER_ALERTS);
   const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);
+  const [islamicEventAlertsEnabled, setIslamicEventAlertsEnabled] = useState(true);
+  const [islamicEventAlertsBusy, setIslamicEventAlertsBusy] = useState(false);
 
   const prayerTimeZone = prayerLocation?.timezone || WINDSOR_TIME_ZONE;
   const prayerLocationLabel = prayerLocation?.label || CITY_LABEL;
@@ -140,9 +144,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1_000);
     void (async () => {
-      const [savedLocale, savedAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([
+      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.locale),
         AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),
+        AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),
         loadPhonePrayerAlertPreferences(),
         loadPrayerTimes(),
         loadQuizStats()
@@ -150,6 +155,8 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       const chosenLocale = savedLocale === "ar" ? "ar" : "en";
       setLocale(chosenLocale);
       setAlertsEnabled(savedAlerts === "on");
+      const eventAlertsEnabled = savedEventAlerts !== "off";
+      setIslamicEventAlertsEnabled(eventAlertsEnabled);
       setPrayerTimes(loaded.prayerTimes);
       setPrayerLocation(loaded.location);
       setLive(loaded.live);
@@ -159,7 +166,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       if (savedAlerts === "on") {
         const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label });
         setScheduledCount(result.count);
-        await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);
+        if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);
         void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
       }
     })();
@@ -182,10 +189,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel })
         .then((result) => setScheduledCount(result.count))
         .catch(() => undefined);
-      void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);
+      if (islamicEventAlertsEnabled) void scheduleIslamicEventReminders(windsorDateKey(new Date(), prayerTimeZone), locale, prayerTimeZone).catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);
+  }, [alertsEnabled, islamicEventAlertsEnabled, locale, prayerTimes, phoneAlertPreferences, prayerLocationLabel, prayerTimeZone]);
 
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
@@ -194,7 +201,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     if (alertsEnabled) {
       const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences, { timeZone: prayerTimeZone, locationLabel: prayerLocationLabel });
       setScheduledCount(result.count);
-      await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);
+      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, nextLocale, prayerTimeZone).catch(() => undefined);
     }
   };
 
@@ -218,7 +225,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive prayer alerts.");
         return;
       }
-      await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);
+      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone).catch(() => undefined);
       setAlertsEnabled(true);
       setScheduledCount(result.count);
       void registerDeviceForServerPush(locale).catch(() => undefined);
@@ -247,6 +254,29 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       setScheduledCount(result.count);
     } finally {
       setAlertPreferencesBusy(false);
+    }
+  };
+
+  const toggleIslamicEventAlerts = async (enabled: boolean) => {
+    setIslamicEventAlertsBusy(true);
+    try {
+      if (!enabled) {
+        await disableIslamicEventReminders();
+        await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, "off");
+        setIslamicEventAlertsEnabled(false);
+        return;
+      }
+      const result = await scheduleIslamicEventReminders(todayKey, locale, prayerTimeZone);
+      if (!result.granted) {
+        Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive Islamic event reminders.");
+        return;
+      }
+      await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, "on");
+      setIslamicEventAlertsEnabled(true);
+    } catch (error) {
+      Alert.alert("Event reminder error", String(error));
+    } finally {
+      setIslamicEventAlertsBusy(false);
     }
   };
 
@@ -366,9 +396,11 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}</Text><Text style={styles.settingText}>{locale === "ar" ? "خصص Fajr وDhuhr وAsr وMaghrib وIsha بشكل مستقل، مع ٢٠ دقيقة أو ١٠ دقائق أو وقت الصلاة." : "Customize Fajr, Dhuhr, Asr, Maghrib and Isha independently with 20-minute, 10-minute and at-time emails."}</Text></View><Text style={styles.settingArrow}>›</Text>
       </Pressable>
 
-      <Pressable onPress={() => setActiveTab("events")} style={styles.emailCard}>
-        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View><View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "إشعار قبل ١٥ يوماً من المناسبة الإسلامية القادمة." : "A reminder appears when the next Islamic event is 15 days away."}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
+      <View style={styles.emailCard}>
+        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View>
+        <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "ينبهك Hassoun قبل ١٥ يوماً من المناسبة القادمة. هذا إعداد مستقل عن صفحة المناسبات." : "Hassoun can remind you 15 days before the next Islamic event. This is a real alert setting, separate from the Events page."}</Text><Pressable onPress={() => setActiveTab("events")}><Text style={styles.eventSettingsLink}>{locale === "ar" ? "عرض كل المناسبات ←" : "View all Islamic events →"}</Text></Pressable></View>
+        <Switch value={islamicEventAlertsEnabled} onValueChange={(value) => void toggleIslamicEventAlerts(value)} disabled={islamicEventAlertsBusy} trackColor={{ false: "#d9ddd9", true: "#95c3b4" }} thumbColor={islamicEventAlertsEnabled ? "#0b5b47" : "#f8faf8"} />
+      </View>
 
       <View style={styles.testCard}><Text style={styles.testTitle}>{locale === "ar" ? "اختبار النظام" : "System tests"}</Text><Text style={styles.testDescription}>{locale === "ar" ? "اختبر التنبيه والأذان دون تغيير ساعة الهاتف." : "Test notifications and locked-screen Adhan without changing the phone clock."}</Text><View style={styles.testRow}><Pressable onPress={testNotification} style={styles.testButton} disabled={busy || alertPreferencesBusy}><Text style={styles.testButtonIcon}>🔔</Text><Text style={styles.testButtonTitle}>{locale === "ar" ? "اختبار تنبيه" : "Test notification"}</Text><Text style={styles.testButtonMeta}>15 sec</Text></Pressable><Pressable onPress={testAdhan} style={[styles.testButton, styles.testButtonPrimary]} disabled={busy || alertPreferencesBusy}><Text style={styles.testButtonIcon}>🕌</Text><Text style={[styles.testButtonTitle, styles.testButtonPrimaryText]}>{locale === "ar" ? "اختبار الأذان" : "Test Adhan"}</Text><Text style={[styles.testButtonMeta, styles.testButtonPrimaryMeta]}>30 sec</Text></Pressable></View></View>
     </ScrollView>
@@ -419,6 +451,7 @@ const styles = StyleSheet.create({
   alertSavingText: { flex: 1, color: "#526d64", fontSize: 8.5, fontWeight: "800" },
   emailLogoWrap: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#003d33", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   emailLogo: { width: 41, height: 41 },
+  eventSettingsLink: { color: "#0b654f", fontSize: 10.5, fontWeight: "900", marginTop: 7 },
   flex: { flex: 1 }, safe: { flex: 1, backgroundColor: "#f7f4ec" }, loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f7f4ec", gap: 14 }, loadingText: { color: "#355c52", fontSize: 15 }, content: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 34 }, header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }, menuButton: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0ddd5" }, menuIcon: { color: "#173f35", fontSize: 21, fontWeight: "700" }, headerLogo: { width: 42, height: 42, borderRadius: 13, backgroundColor: "#003d33" }, brandText: { flex: 1 }, title: { color: "#173f35", fontSize: 17, fontWeight: "900" }, subtitle: { color: "#74817c", fontSize: 11, marginTop: 3 }, languageButton: { minWidth: 46, height: 42, borderWidth: 1, borderColor: "#d8d4ca", borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#fbf9f4" }, languageText: { color: "#0b5b47", fontWeight: "900", fontSize: 13 },
   dateHero: { minHeight: 116, flexDirection: "row", alignItems: "center", borderRadius: 24, backgroundColor: "#eee8dc", borderWidth: 1, borderColor: "#e0d8c8", padding: 16, overflow: "hidden" }, dateCopy: { flex: 1 }, datePrimary: { color: "#173f35", fontSize: 16, fontWeight: "900" }, dateHijri: { color: "#577269", fontSize: 12, fontWeight: "700", marginTop: 5 }, syncRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }, syncDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#20a269" }, syncDotSaved: { backgroundColor: "#d5a93b" }, syncText: { color: "#7b807a", fontSize: 9, fontWeight: "800" }, heroLogoShell: { width: 90, height: 84, borderRadius: 26, backgroundColor: "#003d33", alignItems: "center", justifyContent: "center", overflow: "hidden" }, heroLogo: { width: 82, height: 82 },
   eventCountdownCard: { marginTop: 13, borderRadius: 23, backgroundColor: "#fff6da", borderWidth: 1, borderColor: "#e2c872", padding: 13, flexDirection: "row", alignItems: "center", gap: 10 }, eventCountdownIcon: { width: 50, height: 50, borderRadius: 17, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" }, eventCountdownEmoji: { fontSize: 25 }, eventCountdownCopy: { flex: 1 }, eventCountdownEyebrow: { color: "#9d782d", fontSize: 9, fontWeight: "900", letterSpacing: 1 }, eventCountdownTitle: { color: "#173f35", fontSize: 15, fontWeight: "900", marginTop: 2 }, eventCountdownText: { color: "#66746e", fontSize: 11, lineHeight: 16, marginTop: 5 }, eventCountdownArrow: { color: "#0b654f", fontSize: 28 },
