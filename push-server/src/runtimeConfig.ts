@@ -10,7 +10,8 @@ const PUBLIC_SETTING_KEYS = [
   "games_enabled",
   "email_enabled",
   "community_content_enabled",
-  "system_banner"
+  "system_banner",
+  "scrolling_ticker"
 ] as const;
 
 function json(data: unknown, status = 200) {
