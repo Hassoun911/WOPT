@@ -9,6 +9,7 @@ let exactAlarmSetupStarted = false;
 
 function startFirstLaunchExactAlarmSetup() {
   if (Platform.OS !== "android" || !PrayerAudio || exactAlarmSetupStarted) return;
+  const nativePrayerAudio = PrayerAudio;
   exactAlarmSetupStarted = true;
 
   // SCHEDULE_EXACT_ALARM is a special Android access screen, not a normal
@@ -16,7 +17,7 @@ function startFirstLaunchExactAlarmSetup() {
   // to Alarms & reminders. Never restore/play saved alarms on app startup.
   setTimeout(() => {
     try {
-      if (PrayerAudio.canScheduleExactAlarms()) return;
+      if (nativePrayerAudio.canScheduleExactAlarms()) return;
       Alert.alert(
         "Allow Alarms & reminders",
         "Hassoun needs Alarms & reminders access so Adhan can play at the exact prayer time, including while your phone is locked.",
@@ -25,7 +26,7 @@ function startFirstLaunchExactAlarmSetup() {
           {
             text: "Enable",
             onPress: () => {
-              try { PrayerAudio.openExactAlarmSettings(); } catch {}
+              try { nativePrayerAudio.openExactAlarmSettings(); } catch {}
             }
           }
         ]
