@@ -313,9 +313,14 @@ function calculationMethod(value: unknown) {
 async function linkInstallation(env: Env, subscriberId: number, value: unknown) {
   const installationId = cleanText(value, 128);
   if (!installationId || !/^[A-Za-z0-9_-]{16,128}$/.test(installationId)) return;
-  await env.DB.prepare(
-    "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"
-  ).bind(subscriberId, installationId).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE subscriptions SET subscriber_id = ? WHERE installation_id = ?"
+    ).bind(subscriberId, installationId),
+    env.DB.prepare(
+      "UPDATE email_subscribers SET installation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).bind(installationId, subscriberId)
+  ]);
 }
 
 async function updateExistingSubscriber(

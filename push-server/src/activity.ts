@@ -34,7 +34,12 @@ export async function recordSubscriberActivity(request: Request, env: Env) {
   const detail = cleanText(body.detail, 180);
   const platform = cleanText(body.platform, 24);
 
-  const subscription = await env.DB.prepare(
+  const directSubscriber = await env.DB.prepare(
+    `SELECT id AS subscriber_id FROM email_subscribers
+     WHERE installation_id = ? AND status = 'active'
+     ORDER BY updated_at DESC LIMIT 1`
+  ).bind(body.installationId).first<{ subscriber_id: number }>();
+  const subscription = directSubscriber ?? await env.DB.prepare(
     `SELECT subscriber_id FROM subscriptions
      WHERE installation_id = ? AND subscriber_id IS NOT NULL AND enabled = 1
      ORDER BY updated_at DESC LIMIT 1`
