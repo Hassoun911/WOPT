@@ -92,18 +92,18 @@ jobs:
           fi
           echo "$PERMISSIONS" | grep -q "android.permission.SCHEDULE_EXACT_ALARM"
 
-      - name: Upload Hassoun 1.0.1 APK
+      - name: Upload Hassoun 1.0.2 APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.1-android-apk
+          name: hassoun-1.0.2-android-apk
           path: mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Hassoun 1.0.1 AAB
+      - name: Upload Hassoun 1.0.2 AAB
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.1-android-aab
+          name: hassoun-1.0.2-android-aab
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
@@ -116,15 +116,16 @@ jobs:
           TARGET="$($ANALYZER manifest target-sdk "$APK")"
           cat > .github/android-store-status.txt <<EOF
           android_store_validation=ready
-          app_version=1.0.1
-          android_version_code=42
+          app_version=1.0.2
+          android_version_code=43
           target_sdk=${TARGET}
           exact_alarm_policy=ready
           startup_adhan_guard=ready
           quran_bidirectional_navigation=ready
+          quran_horizontal_browsing=ready
           gps_prayer_location=ready
-          apk_artifact=hassoun-1.0.1-android-apk
-          aab_artifact=hassoun-1.0.1-android-aab
+          apk_artifact=hassoun-1.0.2-android-apk
+          aab_artifact=hassoun-1.0.2-android-aab
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           source_commit=$(git rev-parse HEAD)
           EOF
