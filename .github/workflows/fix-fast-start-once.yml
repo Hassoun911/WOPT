@@ -1,0 +1,39 @@
+name: Fix Fast Start Once
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths: [.github/workflows/fix-fast-start-once.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - name: Patch cache-first startup
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('mobile/App.tsx'); s=p.read_text()
+          s=s.replace('import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";', 'import { loadInitialPrayerTimes, loadPrayerTimes, type PrayerLocation } from "./src/prayerData";')
+          old='''      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([\n        AsyncStorage.getItem(STORAGE_KEYS.locale),\n        AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),\n        AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),\n        loadPhonePrayerAlertPreferences(),\n        loadPrayerTimes(),\n        loadQuizStats()\n      ]);'''
+          new='''      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, initial, storedQuizStats] = await Promise.all([\n        AsyncStorage.getItem(STORAGE_KEYS.locale),\n        AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),\n        AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),\n        loadPhonePrayerAlertPreferences(),\n        loadInitialPrayerTimes(),\n        loadQuizStats()\n      ]);'''
+          s=s.replace(old,new)
+          s=s.replace('      setPrayerTimes(loaded.prayerTimes);\n      setPrayerLocation(loaded.location);\n      setLive(loaded.live);', '      setPrayerTimes(initial.prayerTimes);\n      setPrayerLocation(initial.location);\n      setLive(false);')
+          oldblock='''      setBusy(false);\n      if (savedAlerts === "on") {\n        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: loaded.location.timezone, locationLabel: loaded.location.label });\n        setScheduledCount(result.count);\n        if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), loaded.location.timezone), chosenLocale, loaded.location.timezone).catch(() => undefined);\n        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }'''
+          newblock='''      setBusy(false);\n\n      // Refresh GPS/network after the cached UI is already visible.\n      void loadPrayerTimes().then(async (fresh) => {\n        setPrayerTimes(fresh.prayerTimes);\n        setPrayerLocation(fresh.location);\n        setLive(fresh.live);\n        if (savedAlerts === "on") {\n          const result = await schedulePrayerNotifications(fresh.prayerTimes, chosenLocale, savedPhoneAlertPreferences, { timeZone: fresh.location.timezone, locationLabel: fresh.location.label });\n          setScheduledCount(result.count);\n          if (eventAlertsEnabled) await scheduleIslamicEventReminders(windsorDateKey(new Date(), fresh.location.timezone), chosenLocale, fresh.location.timezone).catch(() => undefined);\n          void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n        }\n      }).catch(() => undefined);'''
+          s=s.replace(oldblock,newblock)
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "Hassoun Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add mobile/App.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Show cached prayer data immediately on cold start"
+          git push origin HEAD:work/hassoun-1.0-store-admin
