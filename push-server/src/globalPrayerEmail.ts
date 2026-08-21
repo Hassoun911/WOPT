@@ -1,6 +1,6 @@
 import { upcomingIslamicEvent } from "./islamicEvents";
 import { subscriberManageUrl } from "./subscribers";
-import type { Env, Locale, PrayerKey } from "./types";
+import type { Env, Locale, PrayerKey, PrayerTimes } from "./types";
 
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const OFFSETS = [
@@ -8,6 +8,8 @@ const OFFSETS = [
   { kind: "ten" as const, minutes: -10, field: "email_ten" as const },
   { kind: "athan" as const, minutes: 0, field: "email_athan" as const }
 ];
+const WINDSOR = { latitude: 42.3149, longitude: -83.0364 };
+const WINDSOR_RADIUS_KM = 45;
 type AlertKind = (typeof OFFSETS)[number]["kind"];
 
 type SubscriberPreferenceRow = {
@@ -22,10 +24,23 @@ type Subscriber = Omit<SubscriberPreferenceRow, "prayer" | "email_twenty" | "ema
 type CachedPrayerDay = { location_key: string; prayer_date: string; fajr: string; dhuhr: string; asr: string; maghrib: string; isha: string };
 type AlAdhanDay = { timings?: Record<string, string>; date?: { gregorian?: { date?: string } } };
 type AlAdhanResponse = { code?: number; data?: AlAdhanDay[] };
+type WindsorPrayerFile = { prayer_times?: PrayerTimes };
 
+function radians(value: number) { return value * Math.PI / 180; }
+function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const earth = 6371;
+  const dLat = radians(bLat - aLat);
+  const dLng = radians(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(radians(aLat)) * Math.cos(radians(bLat)) * Math.sin(dLng / 2) ** 2;
+  return earth * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+function isWindsor(subscriber: Subscriber) {
+  return distanceKm(subscriber.latitude, subscriber.longitude, WINDSOR.latitude, WINDSOR.longitude) <= WINDSOR_RADIUS_KM;
+}
 function methodFor(subscriber: Subscriber) { return subscriber.calculation_method ?? 3; }
 function locationKey(subscriber: Subscriber) {
-  return [subscriber.latitude.toFixed(4), subscriber.longitude.toFixed(4), subscriber.timezone, methodFor(subscriber), subscriber.madhab].join("|");
+  const source = isWindsor(subscriber) ? "windsor-official" : "global";
+  return [source, subscriber.latitude.toFixed(4), subscriber.longitude.toFixed(4), subscriber.timezone, methodFor(subscriber), subscriber.madhab].join("|");
 }
 function parseTiming(value: unknown) {
   if (typeof value !== "string") return null;
@@ -72,10 +87,11 @@ function prayerLabel(prayer: PrayerKey, locale: Locale) {
   return labels[prayer][locale];
 }
 function locationLabel(subscriber: Subscriber) {
+  if (isWindsor(subscriber)) return "Windsor, Ontario";
   return [subscriber.city, subscriber.region, subscriber.country_name].filter(Boolean).join(", ") || "your location";
 }
 function publicAppUrl(env: Env) {
-  return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/WOPT/").replace(/\/$/, "");
+  return (env.PUBLIC_APP_URL || "https://hassoun.app/").replace(/\/$/, "");
 }
 
 async function subscribersWithPreferences(env: Env) {
@@ -104,27 +120,55 @@ async function cachedDay(env: Env, subscriber: Subscriber, dateKey: string) {
   return env.DB.prepare(`SELECT location_key, prayer_date, fajr, dhuhr, asr, maghrib, isha FROM location_prayer_cache WHERE location_key = ? AND prayer_date = ? LIMIT 1`).bind(locationKey(subscriber), dateKey).first<CachedPrayerDay>();
 }
 
-async function fetchPrayerMonth(env: Env, subscriber: Subscriber, dateKey: string) {
-  const [yearText, monthText] = dateKey.split("-"); const year = Number(yearText); const month = Number(monthText);
-  if (!year || !month) throw new Error(`Invalid date key ${dateKey}`);
+function cacheStatement(env: Env, subscriber: Subscriber, prayerDate: string, day: { fajr: string; dhuhr: string; asr: string; maghrib: string; isha: string }, source: string) {
+  return env.DB.prepare(
+    `INSERT INTO location_prayer_cache (location_key, prayer_date, latitude, longitude, timezone, country_code, country_name, region, city, calculation_method, madhab, fajr, dhuhr, asr, maghrib, isha, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(location_key, prayer_date) DO UPDATE SET latitude=excluded.latitude, longitude=excluded.longitude, timezone=excluded.timezone, country_code=excluded.country_code, country_name=excluded.country_name, region=excluded.region, city=excluded.city, calculation_method=excluded.calculation_method, madhab=excluded.madhab, fajr=excluded.fajr, dhuhr=excluded.dhuhr, asr=excluded.asr, maghrib=excluded.maghrib, isha=excluded.isha, source=excluded.source, fetched_at=CURRENT_TIMESTAMP`
+  ).bind(locationKey(subscriber), prayerDate, subscriber.latitude, subscriber.longitude, subscriber.timezone, subscriber.country_code, subscriber.country_name, subscriber.region, subscriber.city, methodFor(subscriber), subscriber.madhab, day.fajr, day.dhuhr, day.asr, day.maghrib, day.isha, source);
+}
+
+async function fetchWindsorPrayerMonth(env: Env, subscriber: Subscriber, year: number, month: number) {
+  const response = await fetch(env.SCHEDULE_URL, { cf: { cacheEverything: true, cacheTtl: 3600 } });
+  if (!response.ok) throw new Error(`Windsor schedule fetch failed: ${response.status}`);
+  const payload = await response.json() as WindsorPrayerFile;
+  if (!payload.prayer_times) throw new Error("Windsor schedule is invalid");
+  const prefix = `${year}-${String(month).padStart(2, "0")}-`;
+  const statements: D1PreparedStatement[] = [];
+  for (const [prayerDate, day] of Object.entries(payload.prayer_times)) {
+    if (!prayerDate.startsWith(prefix)) continue;
+    if (!day?.fajr || !day.dhuhr || !day.asr || !day.maghrib || !day.isha) continue;
+    statements.push(cacheStatement(env, subscriber, prayerDate, day, "windsor_islamic_association"));
+  }
+  for (let index = 0; index < statements.length; index += 80) await env.DB.batch(statements.slice(index, index + 80));
+}
+
+async function fetchGlobalPrayerMonth(env: Env, subscriber: Subscriber, year: number, month: number) {
   const apiBase = (env.GLOBAL_PRAYER_API_BASE || "https://api.aladhan.com/v1").replace(/\/$/, "");
   const url = new URL(`${apiBase}/calendar/${year}/${month}`);
-  url.searchParams.set("latitude", String(subscriber.latitude)); url.searchParams.set("longitude", String(subscriber.longitude)); url.searchParams.set("method", String(methodFor(subscriber))); url.searchParams.set("school", subscriber.madhab === "hanafi" ? "1" : "0");
+  url.searchParams.set("latitude", String(subscriber.latitude));
+  url.searchParams.set("longitude", String(subscriber.longitude));
+  url.searchParams.set("method", String(methodFor(subscriber)));
+  url.searchParams.set("school", subscriber.madhab === "hanafi" ? "1" : "0");
   const response = await fetch(url.toString(), { headers: { Accept: "application/json" }, cf: { cacheEverything: true, cacheTtl: 21_600 } });
   if (!response.ok) throw new Error(`Global prayer API failed: ${response.status}`);
   const payload = await response.json() as AlAdhanResponse;
   if (payload.code !== 200 || !Array.isArray(payload.data)) throw new Error("Global prayer API returned an invalid calendar");
-  const key = locationKey(subscriber); const statements: D1PreparedStatement[] = [];
-  for (const day of payload.data) {
-    const prayerDate = gregorianDateKey(day.date?.gregorian?.date); const fajr = parseTiming(day.timings?.Fajr); const dhuhr = parseTiming(day.timings?.Dhuhr); const asr = parseTiming(day.timings?.Asr); const maghrib = parseTiming(day.timings?.Maghrib); const isha = parseTiming(day.timings?.Isha);
+  const statements: D1PreparedStatement[] = [];
+  for (const item of payload.data) {
+    const prayerDate = gregorianDateKey(item.date?.gregorian?.date);
+    const fajr = parseTiming(item.timings?.Fajr); const dhuhr = parseTiming(item.timings?.Dhuhr); const asr = parseTiming(item.timings?.Asr); const maghrib = parseTiming(item.timings?.Maghrib); const isha = parseTiming(item.timings?.Isha);
     if (!prayerDate || !fajr || !dhuhr || !asr || !maghrib || !isha) continue;
-    statements.push(env.DB.prepare(
-      `INSERT INTO location_prayer_cache (location_key, prayer_date, latitude, longitude, timezone, country_code, country_name, region, city, calculation_method, madhab, fajr, dhuhr, asr, maghrib, isha, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aladhan')
-       ON CONFLICT(location_key, prayer_date) DO UPDATE SET latitude=excluded.latitude, longitude=excluded.longitude, timezone=excluded.timezone, country_code=excluded.country_code, country_name=excluded.country_name, region=excluded.region, city=excluded.city, calculation_method=excluded.calculation_method, madhab=excluded.madhab, fajr=excluded.fajr, dhuhr=excluded.dhuhr, asr=excluded.asr, maghrib=excluded.maghrib, isha=excluded.isha, source=excluded.source, fetched_at=CURRENT_TIMESTAMP`
-    ).bind(key, prayerDate, subscriber.latitude, subscriber.longitude, subscriber.timezone, subscriber.country_code, subscriber.country_name, subscriber.region, subscriber.city, methodFor(subscriber), subscriber.madhab, fajr, dhuhr, asr, maghrib, isha));
+    statements.push(cacheStatement(env, subscriber, prayerDate, { fajr, dhuhr, asr, maghrib, isha }, "aladhan"));
   }
   for (let index = 0; index < statements.length; index += 80) await env.DB.batch(statements.slice(index, index + 80));
+}
+
+async function fetchPrayerMonth(env: Env, subscriber: Subscriber, dateKey: string) {
+  const [yearText, monthText] = dateKey.split("-"); const year = Number(yearText); const month = Number(monthText);
+  if (!year || !month) throw new Error(`Invalid date key ${dateKey}`);
+  if (isWindsor(subscriber)) await fetchWindsorPrayerMonth(env, subscriber, year, month);
+  else await fetchGlobalPrayerMonth(env, subscriber, year, month);
 }
 
 async function ensureDay(env: Env, subscriber: Subscriber, dateKey: string) {
