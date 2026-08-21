@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import BrandMark from "./BrandMark";
-import { islamicDateLabelForEvent, islamicEventCountdown, islamicEventsForGregorianYear, islamicEventTimeline, type IslamicEventOccurrence } from "./islamicEvents";
+import { daysBetweenDateKeys, hijriPartsForDateKey, islamicDateLabelForEvent, islamicEventCountdown, islamicEventsForGregorianYear, islamicEventTimeline, type IslamicEventOccurrence } from "./islamicEvents";
 
 type Props = { locale: "en" | "ar"; todayKey: string; onBack: () => void };
 
@@ -19,11 +19,19 @@ function EventMini({ event, locale, label }: { event: IslamicEventOccurrence | n
 export default function IslamicEventsPage({ locale, todayKey, onBack }: Props) {
   const ar = locale === "ar";
   const t = (en: string, arabic: string) => ar ? arabic : en;
-  const year = Number(todayKey.slice(0, 4));
-  const events = islamicEventsForGregorianYear(year);
+  const gregorianYear = Number(todayKey.slice(0, 4));
+  const currentHijriYear = hijriPartsForDateKey(todayKey).year;
+  const allNearbyEvents = [
+    ...islamicEventsForGregorianYear(gregorianYear - 1),
+    ...islamicEventsForGregorianYear(gregorianYear),
+    ...islamicEventsForGregorianYear(gregorianYear + 1)
+  ].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  const events = allNearbyEvents.filter((event) => event.hijriYear === currentHijriYear);
+  const upcomingEvents = events.filter((event) => event.dateKey >= todayKey);
+  const pastEvents = events.filter((event) => event.dateKey < todayKey).reverse();
   const timeline = islamicEventTimeline(todayKey);
-  const next = timeline.next;
-  const days = timeline.daysUntilNext ?? 0;
+  const next = upcomingEvents[0] ?? timeline.next;
+  const days = next ? daysBetweenDateKeys(todayKey, next.dateKey) : 0;
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
@@ -56,11 +64,11 @@ export default function IslamicEventsPage({ locale, todayKey, onBack }: Props) {
       </View>
 
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>{t(`${year} Islamic Events`, `المناسبات الإسلامية ${new Intl.NumberFormat("ar").format(year)}`)}</Text>
-        <Text style={styles.sectionMeta}>{events.length} {t("dates", "تواريخ")}</Text>
+        <Text style={styles.sectionTitle}>{t(`Remaining events • ${currentHijriYear} AH`, `المناسبات المتبقية • ${new Intl.NumberFormat("ar").format(currentHijriYear)} هـ`)}</Text>
+        <Text style={styles.sectionMeta}>{upcomingEvents.length} {t("remaining", "متبقية")}</Text>
       </View>
 
-      <View style={styles.list}>{events.map((event) => {
+      <View style={styles.list}>{upcomingEvents.map((event) => {
         const past = event.dateKey < todayKey;
         const isNext = next?.id === event.id && next.dateKey === event.dateKey;
         const date = new Intl.DateTimeFormat(ar ? "ar-CA" : "en-CA", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${event.dateKey}T12:00:00Z`));
@@ -76,6 +84,29 @@ export default function IslamicEventsPage({ locale, todayKey, onBack }: Props) {
           </View>
         );
       })}</View>
+
+      {pastEvents.length ? (
+        <>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>{t(`Earlier in ${currentHijriYear} AH`, `مناسبات سابقة في ${new Intl.NumberFormat("ar").format(currentHijriYear)} هـ`)}</Text>
+            <Text style={styles.sectionMeta}>{pastEvents.length} {t("past", "سابقة")}</Text>
+          </View>
+          <View style={styles.list}>{pastEvents.map((event) => {
+            const date = new Intl.DateTimeFormat(ar ? "ar-CA" : "en-CA", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${event.dateKey}T12:00:00Z`));
+            return (
+              <View key={`past-${event.id}-${event.dateKey}`} style={[styles.eventRow, styles.eventRowPast]}>
+                <View style={styles.eventIcon}><Text style={styles.eventEmoji}>{event.emoji}</Text></View>
+                <View style={styles.copy}>
+                  <View style={styles.eventTitleRow}><Text style={styles.eventTitle}>{event.name[locale]}</Text><Text style={styles.pastPill}>{t("PAST", "سابقة")}</Text></View>
+                  <Text style={styles.eventDate}>{date} • {islamicDateLabelForEvent(event, locale)}</Text>
+                  <Text style={styles.eventDescription}>{event.description[locale]}</Text>
+                  {event.note ? <Text style={styles.eventNote}>ⓘ {event.note[locale]}</Text> : null}
+                </View>
+              </View>
+            );
+          })}</View>
+        </>
+      ) : null}
 
       <View style={styles.notice}><BrandMark size={36} /><Text style={styles.noticeText}>{t("Hijri dates are estimates for reliable on-device display. Ramadan, Eid and other dates can shift by a day based on local moon sighting and religious authority announcements.", "التواريخ الهجرية تقديرية للعرض على الجهاز. قد تتغير بداية رمضان والعيد وبعض المناسبات يوماً بحسب رؤية الهلال وإعلانات الجهات الإسلامية المحلية.")}</Text></View>
     </ScrollView>
@@ -123,6 +154,7 @@ const styles = StyleSheet.create({
   eventTitleRow: { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap" },
   eventTitle: { color: "#173f35", fontSize: 14, lineHeight: 18, fontWeight: "900", flexShrink: 1 },
   nextPill: { color: "#fff", backgroundColor: "#0b654f", borderRadius: 99, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 3, fontSize: 8, fontWeight: "900" },
+  pastPill: { color: "#725f3d", backgroundColor: "#eee7d8", borderRadius: 99, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 3, fontSize: 8, fontWeight: "900" },
   eventDate: { color: "#9a7b3f", fontSize: 10, fontWeight: "800", marginTop: 4 },
   eventDescription: { color: "#6f7f79", fontSize: 11, lineHeight: 16, marginTop: 5 },
   eventNote: { color: "#837865", fontSize: 10, lineHeight: 15, marginTop: 6 },
