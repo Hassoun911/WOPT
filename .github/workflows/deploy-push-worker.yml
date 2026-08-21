@@ -106,7 +106,6 @@ jobs:
 
           put_required_secret VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
           put_optional_secret RESEND_API_KEY "$RESEND_API_KEY"
-          printf '%s' 'Hassoun <notifications@hassoun.app>' | npx wrangler secret put EMAIL_FROM
           put_optional_secret EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
           put_optional_secret EMAIL_LINK_SECRET "$EMAIL_LINK_SECRET"
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
