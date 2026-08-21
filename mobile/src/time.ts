@@ -50,10 +50,10 @@ export function localToDateInZone(dateKey: string, time: string, timeZone = WIND
   return new Date(instantMs);
 }
 
-// Compatibility aliases for code that still explicitly needs Windsor time.
-export function windsorDateKey(date = new Date()) { return dateKeyInZone(date, WINDSOR_TIME_ZONE); }
-export function windsorSecondsSinceMidnight(date = new Date()) { return secondsSinceMidnightInZone(date, WINDSOR_TIME_ZONE); }
-export function windsorLocalToDate(dateKey: string, time: string, timeZone = WINDSOR_TIME_ZONE) { return localToDateInZone(dateKey, time, WINDSOR_TIME_ZONE); }
+// Compatibility aliases now accept an explicit prayer-location timezone.
+export function windsorDateKey(date = new Date(), timeZone = WINDSOR_TIME_ZONE) { return dateKeyInZone(date, timeZone); }
+export function windsorSecondsSinceMidnight(date = new Date(), timeZone = WINDSOR_TIME_ZONE) { return secondsSinceMidnightInZone(date, timeZone); }
+export function windsorLocalToDate(dateKey: string, time: string, timeZone = WINDSOR_TIME_ZONE) { return localToDateInZone(dateKey, time, timeZone); }
 
 export function timeToMinutes(time: string) {
   const [hour = 0, minute = 0] = time.split(":").map(Number);
