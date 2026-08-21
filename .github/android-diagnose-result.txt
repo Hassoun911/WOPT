@@ -1,10 +1,10 @@
-exit_code=1
-source_commit=26332c9eee936d401d0f455ab7ad479f2b3e8e47
-verified_at=2026-08-21T04:42:49Z
+exit_code=0
+source_commit=2894d54c700249dad5bf93e1fc8388d4089ff620
+verified_at=2026-08-21T04:52:03Z
 
 npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 489 packages in 8s
+added 489 packages in 6s
 
 > windsor-prayer-times-mobile@1.0.0 pretypecheck
 > npm run quran:data
@@ -18,5 +18,3 @@ WOPT Quran data ready: 6236 ayahs, 114 surahs, 604 pages.
 > windsor-prayer-times-mobile@1.0.0 typecheck
 > tsc --noEmit
 
-src/MultiplayerGames.tsx(179,10): error TS18047: 'room' is possibly 'null'.
-src/MultiplayerGames.tsx(179,580): error TS18047: 'room' is possibly 'null'.
