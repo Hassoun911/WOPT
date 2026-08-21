@@ -20,7 +20,6 @@
     "PUBLIC_APP_URL": "https://hassoun911.github.io/WOPT/",
     "PUBLIC_API_URL": "https://wopt-prayer-push.wopt-windsor.workers.dev",
     "GLOBAL_PRAYER_API_BASE": "https://api.aladhan.com/v1",
-    "EMAIL_FROM": "Hassoun <notifications@hassoun.app>",
     "VAPID_PUBLIC_KEY": "BNjENcU2OXt9nFVsqHm6Fs6tnq8iz3qJxSlK10u4PrXRqCffqHXArDb0F8eMVcW_EKItPBi09oY9l9txJkJdnWs",
     "VAPID_SUBJECT": "https://hassoun911.github.io/WOPT/"
   }
