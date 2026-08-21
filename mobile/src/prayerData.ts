@@ -9,11 +9,10 @@ function isPrayerFile(value: unknown): value is PrayerFile {
   return Boolean(candidate.prayer_times && typeof candidate.prayer_times === "object");
 }
 
-export async function loadPrayerTimes(): Promise<{ prayerTimes: PrayerTimes; live: boolean }> {
+export async function loadCachedPrayerTimes(): Promise<{ prayerTimes: PrayerTimes; live: false }> {
   const bundled = bundledSchedule as PrayerFile;
   const cached = await AsyncStorage.getItem(STORAGE_KEYS.schedule);
   let fallback = bundled.prayer_times;
-
   if (cached) {
     try {
       const parsed = JSON.parse(cached) as unknown;
@@ -22,6 +21,11 @@ export async function loadPrayerTimes(): Promise<{ prayerTimes: PrayerTimes; liv
       await AsyncStorage.removeItem(STORAGE_KEYS.schedule);
     }
   }
+  return { prayerTimes: fallback, live: false };
+}
+
+export async function loadPrayerTimes(): Promise<{ prayerTimes: PrayerTimes; live: boolean }> {
+  const fallback = (await loadCachedPrayerTimes()).prayerTimes;
 
   try {
     const response = await fetch(`${SCHEDULE_URL}?v=${Date.now()}`, {

@@ -365,7 +365,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
     private fun bindLaunchIntent(context: Context, views: RemoteViews) {
       val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
         ?: Intent(context, Class.forName("ca.wopt.windsorprayertimes.MainActivity"))
-      launch.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+      launch.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
       val pending = PendingIntent.getActivity(
         context,
         7200,

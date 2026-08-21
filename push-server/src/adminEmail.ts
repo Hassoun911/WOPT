@@ -179,6 +179,27 @@ export async function createAdminEmailCampaign(request: Request, env: Env) {
   return json({ ok: true, publicId, status: "scheduled", scheduledAt: when }, 201);
 }
 
+export async function sendAdminEmailTest(request: Request, env: Env) {
+  const auth = await requireAdmin(request, env);
+  if (!auth.admin) return auth.response!;
+  const body = await bodyJson(request);
+  const subjectEn = clean(body.subjectEn, 180) || "Hassoun admin test email";
+  const htmlEn = clean(body.htmlEn, 50_000) || "<p>This is a Hassoun admin email test.</p>";
+  const subjectAr = clean(body.subjectAr, 180);
+  const htmlAr = clean(body.htmlAr, 50_000);
+  const locale: Locale = body.locale === "ar" ? "ar" : "en";
+  const publicId = crypto.randomUUID();
+  const templateKey = `admin_test_${publicId.replace(/-/g, "")}`;
+  const chosenHtml = locale === "ar" && htmlAr ? htmlAr : htmlEn;
+  const textBody = chosenHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 20_000);
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO email_templates (template_key, name, category, subject_en, subject_ar, html_en, html_ar, text_en, text_ar, enabled) VALUES (?, ?, 'system', ?, ?, ?, ?, ?, ?, 1)`).bind(templateKey, "Admin-only test", subjectEn, subjectAr, htmlEn, htmlAr, textBody, textBody),
+    env.DB.prepare(`INSERT INTO email_outbox (delivery_id, subscriber_id, recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES (NULL, NULL, ?, ?, 'system', ?, '{}', ?)`).bind(auth.admin.email, locale, templateKey, `admin-test:${publicId}`)
+  ]);
+  await logAdmin(env, auth.admin.id, "admin_email_test", publicId, { recipient: auth.admin.email, locale });
+  return json({ ok: true, recipient: auth.admin.email, queued: true });
+}
+
 export async function listAdminEmailCampaigns(request: Request, env: Env) {
   const auth = await requireAdmin(request, env);
   if (!auth.admin) return auth.response!;

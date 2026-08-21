@@ -3,7 +3,8 @@ import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
   listAdminEmailCampaigns,
-  refreshAdminEmailCampaignStatuses
+  refreshAdminEmailCampaignStatuses,
+  sendAdminEmailTest
 } from "./adminEmail";
 import {
   bootstrapAdmin,
@@ -314,6 +315,9 @@ export default {
         response = await createAdminEmailCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
         response = await listAdminEmailCampaigns(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/email/test") {
+        response = await sendAdminEmailTest(request, env);
+        if (response.status < 300) await processEmailOutbox(env);
       } else if (request.method === "GET" && url.pathname === "/admin/control") {
         response = await getAdminControlOverview(request, env);
       } else if (request.method === "POST" && url.pathname === "/admin/control/settings") {

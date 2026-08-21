@@ -31,9 +31,9 @@ import {
   type PrayerAlertPreferences
 } from "./src/alertPreferences";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
-import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
+import { cancelIslamicEventReminders, disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
-import { loadPrayerTimes } from "./src/prayerData";
+import { loadCachedPrayerTimes, loadPrayerTimes } from "./src/prayerData";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
@@ -45,6 +45,8 @@ type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";
 type AppProps = {
   onOpenEmailAlerts?: () => void;
 };
+
+const ISLAMIC_EVENT_ALERTS_KEY = "hassoun:islamic-event-alerts:v1";
 
 const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
   fajr: { en: "Fajr", ar: "الفجر" },
@@ -102,6 +104,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [alertsEnabled, setAlertsEnabled] = useState(false);
   const [busy, setBusy] = useState(true);
   const [scheduledCount, setScheduledCount] = useState(0);
+  const [islamicEventAlertsEnabled, setIslamicEventAlertsEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [quranAppNavVisible, setQuranAppNavVisible] = useState(true);
   const [quranOwnsAudioSurface, setQuranOwnsAudioSurface] = useState(false);
@@ -126,28 +129,36 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1_000);
     void (async () => {
-      const [savedLocale, savedAlerts, savedPhoneAlertPreferences, loaded, storedQuizStats] = await Promise.all([
+      const [savedLocale, savedAlerts, savedEventAlerts, savedPhoneAlertPreferences, cached, storedQuizStats] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.locale),
         AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),
+        AsyncStorage.getItem(ISLAMIC_EVENT_ALERTS_KEY),
         loadPhonePrayerAlertPreferences(),
-        loadPrayerTimes(),
+        loadCachedPrayerTimes(),
         loadQuizStats()
       ]);
       const chosenLocale = savedLocale === "ar" ? "ar" : "en";
+      const eventAlertsOn = savedEventAlerts !== "off";
       setLocale(chosenLocale);
       setAlertsEnabled(savedAlerts === "on");
-      setPrayerTimes(loaded.prayerTimes);
-      setLive(loaded.live);
+      setIslamicEventAlertsEnabled(eventAlertsOn);
+      setPrayerTimes(cached.prayerTimes);
+      setLive(false);
       setQuizStats(storedQuizStats);
       setPhoneAlertPreferences(savedPhoneAlertPreferences);
       setBusy(false);
-      if (savedAlerts === "on") {
-        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);
-        setScheduledCount(result.count);
-        await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);
-        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
-      }
-    })();
+
+      void loadPrayerTimes().then(async (loaded) => {
+        setPrayerTimes(loaded.prayerTimes);
+        setLive(loaded.live);
+        if (savedAlerts === "on") {
+          const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);
+          setScheduledCount(result.count);
+          if (eventAlertsOn) await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);
+          void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
+        }
+      }).catch(() => undefined);
+    })().catch(() => setBusy(false));
     return () => clearInterval(timer);
   }, []);
 
@@ -167,10 +178,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences)
         .then((result) => setScheduledCount(result.count))
         .catch(() => undefined);
-      void scheduleIslamicEventReminders(windsorDateKey(new Date()), locale).catch(() => undefined);
+      if (islamicEventAlertsEnabled) void scheduleIslamicEventReminders(windsorDateKey(new Date()), locale).catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences]);
+  }, [alertsEnabled, islamicEventAlertsEnabled, locale, prayerTimes, phoneAlertPreferences]);
 
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
@@ -179,7 +190,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     if (alertsEnabled) {
       const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences);
       setScheduledCount(result.count);
-      await scheduleIslamicEventReminders(todayKey, nextLocale).catch(() => undefined);
+      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, nextLocale).catch(() => undefined);
     }
   };
 
@@ -203,7 +214,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive prayer alerts.");
         return;
       }
-      await scheduleIslamicEventReminders(todayKey, locale).catch(() => undefined);
+      if (islamicEventAlertsEnabled) await scheduleIslamicEventReminders(todayKey, locale).catch(() => undefined);
       setAlertsEnabled(true);
       setScheduledCount(result.count);
       void registerDeviceForServerPush(locale).catch(() => undefined);
@@ -241,6 +252,20 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       [prayer]: { ...phoneAlertPreferences[prayer], athan: !phoneAlertPreferences[prayer].athan }
     };
     await updatePhoneAlertPreferences(nextPreferences);
+  };
+
+  const toggleIslamicEventAlerts = async (enabled: boolean) => {
+    setIslamicEventAlertsEnabled(enabled);
+    await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, enabled ? "on" : "off");
+    try {
+      if (enabled) await scheduleIslamicEventReminders(todayKey, locale);
+      else await cancelIslamicEventReminders();
+    } catch (error) {
+      const rollback = !enabled;
+      setIslamicEventAlertsEnabled(rollback);
+      await AsyncStorage.setItem(ISLAMIC_EVENT_ALERTS_KEY, rollback ? "on" : "off");
+      Alert.alert(locale === "ar" ? "تعذر تحديث التنبيه" : "Could not update reminder", String(error));
+    }
   };
 
   const testNotification = async () => {
@@ -346,14 +371,14 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         {alertPreferencesBusy ? <View style={styles.alertSaving}><ActivityIndicator size="small" color="#0b654f" /><Text style={styles.alertSavingText}>{locale === "ar" ? "جارٍ تحديث التنبيهات على هذا الهاتف…" : "Updating this phone’s prayer schedule…"}</Text></View> : null}
       </View>
 
-      <Pressable onPress={onOpenEmailAlerts} disabled={!onOpenEmailAlerts} style={styles.emailCard}>
+      <Pressable onPress={() => { if (onOpenEmailAlerts) onOpenEmailAlerts(); else Alert.alert(locale === "ar" ? "تنبيهات البريد غير متاحة" : "Email alerts unavailable", locale === "ar" ? "أعد فتح Hassoun وحاول مرة أخرى." : "Reopen Hassoun and try again."); }} style={styles.emailCard}>
         <View style={styles.emailLogoWrap}><Image source={require("./assets/hassoun-logo.png")} style={styles.emailLogo} resizeMode="contain" /></View>
         <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات الصلاة عبر البريد" : "Prayer email alerts"}</Text><Text style={styles.settingText}>{locale === "ar" ? "خصص Fajr وDhuhr وAsr وMaghrib وIsha بشكل مستقل، مع ٢٠ دقيقة أو ١٠ دقائق أو وقت الصلاة." : "Customize Fajr, Dhuhr, Asr, Maghrib and Isha independently with 20-minute, 10-minute and at-time emails."}</Text></View><Text style={styles.settingArrow}>›</Text>
       </Pressable>
 
-      <Pressable onPress={() => setActiveTab("events")} style={styles.emailCard}>
-        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View><View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "إشعار قبل ١٥ يوماً من المناسبة الإسلامية القادمة." : "A reminder appears when the next Islamic event is 15 days away."}</Text></View><Text style={styles.settingArrow}>›</Text>
-      </Pressable>
+      <View style={styles.emailCard}>
+        <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View><View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "إشعار قبل ١٥ يوماً من المناسبة الإسلامية القادمة. شغّل أو أوقف التذكير من هنا." : "A reminder appears when the next Islamic event is 15 days away. Turn it on or off here."}</Text></View><Switch value={islamicEventAlertsEnabled} onValueChange={(value) => void toggleIslamicEventAlerts(value)} />
+      </View>
 
       <View style={styles.testCard}><Text style={styles.testTitle}>{locale === "ar" ? "اختبار النظام" : "System tests"}</Text><Text style={styles.testDescription}>{locale === "ar" ? "اختبر التنبيه والأذان دون تغيير ساعة الهاتف." : "Test notifications and locked-screen Adhan without changing the phone clock."}</Text><View style={styles.testRow}><Pressable onPress={testNotification} style={styles.testButton} disabled={busy || alertPreferencesBusy}><Text style={styles.testButtonIcon}>🔔</Text><Text style={styles.testButtonTitle}>{locale === "ar" ? "اختبار تنبيه" : "Test notification"}</Text><Text style={styles.testButtonMeta}>15 sec</Text></Pressable><Pressable onPress={testAdhan} style={[styles.testButton, styles.testButtonPrimary]} disabled={busy || alertPreferencesBusy}><Text style={styles.testButtonIcon}>🕌</Text><Text style={[styles.testButtonTitle, styles.testButtonPrimaryText]}>{locale === "ar" ? "اختبار الأذان" : "Test Adhan"}</Text><Text style={[styles.testButtonMeta, styles.testButtonPrimaryMeta]}>30 sec</Text></Pressable></View></View>
     </ScrollView>
