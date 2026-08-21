@@ -19,32 +19,18 @@ WHERE status = 'pending'
 
 -- Keep legacy template records for history, but make every visible label Hassoun.
 UPDATE email_templates
-SET name = REPLACE(REPLACE(REPLACE(name, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app'),
-    subject_en = REPLACE(REPLACE(REPLACE(subject_en, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app'),
-    subject_ar = CASE WHEN subject_ar IS NULL THEN NULL ELSE REPLACE(REPLACE(REPLACE(subject_ar, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app') END,
-    html_en = REPLACE(REPLACE(REPLACE(html_en, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app'),
-    html_ar = CASE WHEN html_ar IS NULL THEN NULL ELSE REPLACE(REPLACE(REPLACE(html_ar, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app') END,
-    text_en = CASE WHEN text_en IS NULL THEN NULL ELSE REPLACE(REPLACE(REPLACE(text_en, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app') END,
-    text_ar = CASE WHEN text_ar IS NULL THEN NULL ELSE REPLACE(REPLACE(REPLACE(text_ar, 'WOPT', 'Hassoun'), 'Xuber', 'Hassoun'), 'xuber.ca', 'hassoun.app') END,
+SET name = REPLACE(name, 'WOPT', 'Hassoun'),
+    subject_en = REPLACE(subject_en, 'WOPT', 'Hassoun'),
+    subject_ar = CASE WHEN subject_ar IS NULL THEN NULL ELSE REPLACE(subject_ar, 'WOPT', 'Hassoun') END,
+    html_en = REPLACE(html_en, 'WOPT', 'Hassoun'),
+    html_ar = CASE WHEN html_ar IS NULL THEN NULL ELSE REPLACE(html_ar, 'WOPT', 'Hassoun') END,
+    text_en = CASE WHEN text_en IS NULL THEN NULL ELSE REPLACE(text_en, 'WOPT', 'Hassoun') END,
+    text_ar = CASE WHEN text_ar IS NULL THEN NULL ELSE REPLACE(text_ar, 'WOPT', 'Hassoun') END,
     updated_at = CURRENT_TIMESTAMP
 WHERE name LIKE '%WOPT%'
-   OR name LIKE '%Xuber%'
-   OR name LIKE '%xuber.ca%'
    OR subject_en LIKE '%WOPT%'
-   OR subject_en LIKE '%Xuber%'
-   OR subject_en LIKE '%xuber.ca%'
    OR COALESCE(subject_ar, '') LIKE '%WOPT%'
-   OR COALESCE(subject_ar, '') LIKE '%Xuber%'
-   OR COALESCE(subject_ar, '') LIKE '%xuber.ca%'
    OR html_en LIKE '%WOPT%'
-   OR html_en LIKE '%Xuber%'
-   OR html_en LIKE '%xuber.ca%'
    OR COALESCE(html_ar, '') LIKE '%WOPT%'
-   OR COALESCE(html_ar, '') LIKE '%Xuber%'
-   OR COALESCE(html_ar, '') LIKE '%xuber.ca%'
    OR COALESCE(text_en, '') LIKE '%WOPT%'
-   OR COALESCE(text_en, '') LIKE '%Xuber%'
-   OR COALESCE(text_en, '') LIKE '%xuber.ca%'
-   OR COALESCE(text_ar, '') LIKE '%WOPT%'
-   OR COALESCE(text_ar, '') LIKE '%Xuber%'
-   OR COALESCE(text_ar, '') LIKE '%xuber.ca%';
+   OR COALESCE(text_ar, '') LIKE '%WOPT%';
