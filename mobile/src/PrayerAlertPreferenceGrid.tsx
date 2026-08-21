@@ -49,7 +49,7 @@ export default function PrayerAlertPreferenceGrid({ locale, value, onChange, dis
     </Pressable>
   );
 
-  const timingChip = (prayer: PrayerKey, key: keyof PrayerAlertTiming, label: string) => {
+  const timingChip = (prayer: PrayerKey, key: keyof PrayerAlertTiming, label: string, helper: string) => {
     const active = value[prayer][key];
     return (
       <Pressable
@@ -59,31 +59,21 @@ export default function PrayerAlertPreferenceGrid({ locale, value, onChange, dis
         style={({ pressed }) => [styles.timingChip, active && styles.timingChipActive, pressed && !disabled && styles.pressed, disabled && styles.disabled]}
       >
         <Text style={[styles.timingText, active && styles.timingTextActive]}>{label}</Text>
+        <Text style={[styles.timingHelper, active && styles.timingHelperActive]}>{helper}</Text>
       </Pressable>
     );
   };
 
   return (
     <View>
-      <View style={styles.presetHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.kicker}>{t("QUICK SETUP", "إعداد سريع")}</Text>
-          <Text style={styles.quickTitle}>{t("Choose a preset or customize each prayer", "اختر إعداداً سريعاً أو خصص كل صلاة")}</Text>
-        </View>
-      </View>
+      <Text style={styles.kicker}>{t("QUICK SETUP", "إعداد سريع")}</Text>
+      <Text style={styles.quickTitle}>{t("Start with a preset, then fine-tune each prayer", "ابدأ بإعداد سريع ثم خصص كل صلاة")}</Text>
       <View style={styles.presetWrap}>
-        {preset("all", t("All", "الكل"))}
-        {preset("twenty", t("20 min only", "٢٠ دقيقة فقط"))}
-        {preset("ten", t("10 min only", "١٠ دقائق فقط"))}
-        {preset("athan", t("Adhan only", "الأذان فقط"))}
-        {preset("none", t("Stop all", "إيقاف الكل"))}
-      </View>
-
-      <View style={styles.gridHeader}>
-        <Text style={styles.gridHeaderPrayer}>{t("PRAYER", "الصلاة")}</Text>
-        <Text style={styles.gridHeaderTiming}>20m</Text>
-        <Text style={styles.gridHeaderTiming}>10m</Text>
-        <Text style={styles.gridHeaderTiming}>{t("Adhan", "الأذان")}</Text>
+        {preset("all", t("All alerts", "كل التنبيهات"))}
+        {preset("twenty", t("20 min", "٢٠ دقيقة"))}
+        {preset("ten", t("10 min", "١٠ دقائق"))}
+        {preset("athan", t("Adhan", "الأذان"))}
+        {preset("none", t("Off", "إيقاف"))}
       </View>
 
       <View style={styles.list}>
@@ -91,23 +81,29 @@ export default function PrayerAlertPreferenceGrid({ locale, value, onChange, dis
           const enabled = prayerEnabled(value, prayer);
           return (
             <View key={prayer} style={[styles.row, index === PRAYER_KEYS.length - 1 && styles.rowLast, !enabled && styles.rowOff]}>
-              <View style={styles.prayerMark}><Text style={styles.prayerMarkText}>{PRAYER_MARKS[prayer]}</Text></View>
-              <View style={styles.prayerCopy}>
-                <Text style={styles.prayerName}>{NAMES[prayer][locale]}</Text>
-                <Text style={styles.prayerOther}>{NAMES[prayer][ar ? "en" : "ar"]}</Text>
+              <View style={styles.rowTop}>
+                <View style={[styles.prayerMark, enabled && styles.prayerMarkActive]}><Text style={styles.prayerMarkText}>{PRAYER_MARKS[prayer]}</Text></View>
+                <View style={styles.prayerCopy}>
+                  <Text style={styles.prayerName}>{NAMES[prayer][locale]}</Text>
+                  <Text style={styles.prayerOther}>{NAMES[prayer][ar ? "en" : "ar"]}</Text>
+                </View>
+                <View style={styles.enableCopy}>
+                  <Text style={[styles.enableLabel, enabled && styles.enableLabelActive]}>{enabled ? t("On", "مفعّل") : t("Off", "متوقف")}</Text>
+                  <Switch
+                    value={enabled}
+                    onValueChange={(next) => onChange(setPrayerEnabled(value, prayer, next))}
+                    disabled={disabled}
+                    trackColor={{ false: "#d9d6ce", true: "#93c7b6" }}
+                    thumbColor={enabled ? "#0b654f" : "#ffffff"}
+                  />
+                </View>
               </View>
+
               <View style={styles.timingGroup}>
-                {timingChip(prayer, "twenty", "20")}
-                {timingChip(prayer, "ten", "10")}
-                {timingChip(prayer, "athan", "◖")}
+                {timingChip(prayer, "twenty", t("20 min", "٢٠ د"), t("Before", "قبل"))}
+                {timingChip(prayer, "ten", t("10 min", "١٠ د"), t("Before", "قبل"))}
+                {timingChip(prayer, "athan", t("Adhan", "الأذان"), t("At prayer", "وقت الصلاة"))}
               </View>
-              <Switch
-                value={enabled}
-                onValueChange={(next) => onChange(setPrayerEnabled(value, prayer, next))}
-                disabled={disabled}
-                trackColor={{ false: "#d9d6ce", true: "#98c7b8" }}
-                thumbColor={enabled ? "#0b654f" : "#ffffff"}
-              />
             </View>
           );
         })}
@@ -115,7 +111,7 @@ export default function PrayerAlertPreferenceGrid({ locale, value, onChange, dis
 
       {showSummary ? (
         <View style={styles.summary}>
-          <Text style={styles.summaryDot}>●</Text>
+          <View style={styles.summaryDot} />
           <Text style={styles.summaryText}>{summarizePrayerAlertPreferences(value, locale)}</Text>
         </View>
       ) : null}
@@ -124,34 +120,37 @@ export default function PrayerAlertPreferenceGrid({ locale, value, onChange, dis
 }
 
 const styles = StyleSheet.create({
-  presetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  kicker: { color: "#9b7a39", fontSize: 7, fontWeight: "900", letterSpacing: 1.1 },
-  quickTitle: { color: "#254c42", fontSize: 12, fontWeight: "900", marginTop: 3 },
-  presetWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 13 },
-  preset: { minHeight: 34, borderRadius: 99, paddingHorizontal: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#eef5f1", borderWidth: 1, borderColor: "#d5e4dd" },
-  presetDanger: { backgroundColor: "#fff1ee", borderColor: "#efcbc4" },
-  presetText: { color: "#28584b", fontSize: 8, fontWeight: "900" },
+  kicker: { color: "#9b7a39", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  quickTitle: { color: "#254c42", fontSize: 14, lineHeight: 19, fontWeight: "900", marginTop: 4 },
+  presetWrap: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 11, marginBottom: 14 },
+  preset: { minHeight: 39, borderRadius: 13, paddingHorizontal: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#eef5f1", borderWidth: 1, borderColor: "#d5e4dd" },
+  presetDanger: { backgroundColor: "#fff3ef", borderColor: "#efd5cf" },
+  presetText: { color: "#28584b", fontSize: 10, fontWeight: "900" },
   presetDangerText: { color: "#a34c40" },
-  gridHeader: { minHeight: 28, flexDirection: "row", alignItems: "center", paddingHorizontal: 10 },
-  gridHeaderPrayer: { flex: 1, color: "#8b8377", fontSize: 7, fontWeight: "900", letterSpacing: .8 },
-  gridHeaderTiming: { width: 42, textAlign: "center", color: "#8b8377", fontSize: 7, fontWeight: "900" },
-  list: { borderWidth: 1, borderColor: "#e2ddd4", borderRadius: 19, backgroundColor: "#fff", overflow: "hidden" },
-  row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: "#efede8" },
-  rowLast: { borderBottomWidth: 0 },
+  list: { gap: 9 },
+  row: { borderWidth: 1, borderColor: "#e1ded6", borderRadius: 18, backgroundColor: "#fff", padding: 12 },
+  rowLast: { marginBottom: 0 },
   rowOff: { backgroundColor: "#faf8f3" },
-  prayerMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center" },
-  prayerMarkText: { color: "#0b654f", fontSize: 16, fontWeight: "900" },
-  prayerCopy: { flex: 1, minWidth: 75 },
-  prayerName: { color: "#244d42", fontSize: 12, fontWeight: "900" },
-  prayerOther: { color: "#8a918c", fontSize: 8, marginTop: 2 },
-  timingGroup: { flexDirection: "row", gap: 4 },
-  timingChip: { width: 34, height: 31, borderRadius: 10, backgroundColor: "#f1eee7", borderWidth: 1, borderColor: "#e6e0d4", alignItems: "center", justifyContent: "center" },
+  rowTop: { flexDirection: "row", alignItems: "center" },
+  prayerMark: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#f0f1ed", alignItems: "center", justifyContent: "center", marginRight: 11 },
+  prayerMarkActive: { backgroundColor: "#e2f1ea" },
+  prayerMarkText: { color: "#0b654f", fontSize: 19, fontWeight: "900" },
+  prayerCopy: { flex: 1 },
+  prayerName: { color: "#244d42", fontSize: 15, fontWeight: "900" },
+  prayerOther: { color: "#8a918c", fontSize: 11, marginTop: 2 },
+  enableCopy: { alignItems: "flex-end", gap: 3 },
+  enableLabel: { color: "#8c918d", fontSize: 9, fontWeight: "800" },
+  enableLabelActive: { color: "#0b654f" },
+  timingGroup: { flexDirection: "row", gap: 8, marginTop: 11 },
+  timingChip: { flex: 1, minHeight: 52, borderRadius: 14, backgroundColor: "#f5f2eb", borderWidth: 1, borderColor: "#e6e0d4", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
   timingChipActive: { backgroundColor: "#0b654f", borderColor: "#0b654f" },
-  timingText: { color: "#7d827e", fontSize: 7, fontWeight: "900" },
+  timingText: { color: "#53645e", fontSize: 11, fontWeight: "900" },
   timingTextActive: { color: "#fff" },
-  summary: { marginTop: 9, minHeight: 38, borderRadius: 13, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 11 },
-  summaryDot: { color: "#1d9a6c", fontSize: 8 },
-  summaryText: { flex: 1, color: "#4f6d64", fontSize: 8.5, fontWeight: "800" },
+  timingHelper: { color: "#959c98", fontSize: 8.5, fontWeight: "700", marginTop: 2 },
+  timingHelperActive: { color: "#c7e0d8" },
+  summary: { marginTop: 12, minHeight: 48, borderRadius: 15, backgroundColor: "#edf5f1", flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13, paddingVertical: 9 },
+  summaryDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#1d9a6c" },
+  summaryText: { flex: 1, color: "#4f6d64", fontSize: 10.5, lineHeight: 15, fontWeight: "800" },
   pressed: { opacity: .72 },
   disabled: { opacity: .45 }
 });
