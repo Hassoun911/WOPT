@@ -11,7 +11,9 @@ const PUBLIC_SETTING_KEYS = [
   "email_enabled",
   "community_content_enabled",
   "system_banner",
-  "scrolling_ticker"
+  "scrolling_ticker",
+  "about_sadaqah",
+  "feature_guide"
 ] as const;
 
 function json(data: unknown, status = 200) {
