@@ -1,0 +1,125 @@
+name: Finalize Hassoun fixes
+
+on:
+  push:
+    branches:
+      - work/store-crm-2026-08-19
+    paths:
+      - ".github/workflows/finalize-hassoun.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/store-crm-2026-08-19
+      - name: Apply final Hassoun fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, required=True):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  if required:
+                      raise SystemExit(f"Expected text not found in {path}: {old[:100]}")
+                  return False
+              p.write_text(text.replace(old, new))
+              return True
+
+          # Public branding/domain: all user-facing runtime URLs use hassoun.app.
+          for root in [Path('push-server'), Path('pwa/app'), Path('mobile/src')]:
+              for p in root.rglob('*'):
+                  if not p.is_file() or p.suffix.lower() not in {'.ts', '.tsx', '.js', '.jsx', '.json', '.jsonc', '.md'}:
+                      continue
+                  try:
+                      text = p.read_text()
+                  except UnicodeDecodeError:
+                      continue
+                  updated = (text
+                      .replace('notifications@xuber.ca', 'notifications@hassoun.app')
+                      .replace('https://hassoun911.github.io/WOPT/assets/hassoun-logo.png', 'https://hassoun.app/assets/hassoun-logo.png')
+                      .replace('https://hassoun911.github.io/WOPT/', 'https://hassoun.app/')
+                      .replace('https://hassoun911.github.io/WOPT', 'https://hassoun.app'))
+                  if updated != text:
+                      p.write_text(updated)
+
+          # Worker runtime config and CORS for the public app + admin CRM.
+          wrangler = Path('push-server/wrangler.jsonc')
+          text = wrangler.read_text()
+          text = text.replace('"ALLOWED_WEB_ORIGIN": "https://hassoun911.github.io"', '"ALLOWED_WEB_ORIGIN": "https://hassoun.app,https://admin.hassoun.app"')
+          text = text.replace('"PUBLIC_APP_URL": "https://hassoun.app/"', '"PUBLIC_APP_URL": "https://hassoun.app/"')
+          text = text.replace('"EMAIL_FROM": "Prayer Times <notifications@hassoun.app>"', '"EMAIL_FROM": "Hassoun <notifications@hassoun.app>"')
+          text = text.replace('"VAPID_SUBJECT": "https://hassoun.app/"', '"VAPID_SUBJECT": "https://hassoun.app/"')
+          wrangler.write_text(text)
+
+          replace(
+              'push-server/src/index.ts',
+              '  const origin = request.headers.get("Origin");\n  const allowed = origin && origin === env.ALLOWED_WEB_ORIGIN ? origin : "null";',
+              '  const origin = request.headers.get("Origin");\n  const allowedOrigins = new Set((env.ALLOWED_WEB_ORIGIN || "https://hassoun.app,https://admin.hassoun.app").split(",").map((value) => value.trim()).filter(Boolean));\n  const allowed = origin && allowedOrigins.has(origin) ? origin : "null";'
+          )
+
+          # Only the new email:<subscriber>:<date>:<prayer>:<kind> prayer pipeline may send prayer mail.
+          replace(
+              'push-server/src/emailDelivery.ts',
+              '  for (const row of results) {\n    if (!(await claimOutbox(env, row.id))) continue;',
+              '  for (const row of results) {\n    if (row.kind === "prayer" && (!row.idempotency_key || !row.idempotency_key.startsWith("email:"))) {\n      await env.DB.prepare(`UPDATE email_outbox SET status = \'cancelled\', last_error = \'Legacy prayer-email pipeline retired\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'pending\'`).bind(row.id).run();\n      continue;\n    }\n    if (!(await claimOutbox(env, row.id))) continue;'
+          )
+
+          # Admin-only test email must use an outbox kind allowed by the existing D1 CHECK constraint.
+          replace(
+              'push-server/src/adminEmail.ts',
+              "VALUES (NULL, NULL, ?, ?, 'system', ?, '{}', ?)",
+              "VALUES (NULL, NULL, ?, ?, 'announcement', ?, '{}', ?)"
+          )
+
+          # Standalone Email Campaign page gets the same backend-enforced admin-only test button.
+          replace(
+              'pwa/app/admin/email/page.tsx',
+              'type Admin = { username: string; display_name?: string | null; role: string };',
+              'type Admin = { username: string; email: string; display_name?: string | null; role: string };'
+          )
+          replace(
+              'pwa/app/admin/email/page.tsx',
+              '  const schedule = async (event: FormEvent) => {',
+              '''  const sendTest = async () => {\n    if (!token) return;\n    setBusy(true);\n    setError("");\n    setResult("");\n    try {\n      const payload = await api<{ recipient: string }>("/admin/email/test", {\n        method: "POST",\n        body: JSON.stringify({\n          subjectEn: subjectEn || "Hassoun admin test email",\n          htmlEn: `<div style="font-family:Arial,sans-serif;line-height:1.65;color:#173f35"><p>${(messageEn || "This is a Hassoun admin email test.").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\\n/g, "<br>")}</p></div>`,\n          subjectAr: subjectAr || undefined,\n          htmlAr: messageAr ? `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8;color:#173f35"><p>${messageAr.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\\n/g, "<br>")}</p></div>` : undefined,\n          locale: locale === "ar" ? "ar" : "en"\n        })\n      }, token);\n      setResult(`Test email sent only to admin: ${payload.recipient}`);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "Unable to send admin test email");\n    } finally {\n      setBusy(false);\n    }\n  };\n\n  const schedule = async (event: FormEvent) => {'''
+          )
+          replace(
+              'pwa/app/admin/email/page.tsx',
+              '<button disabled={busy || !subjectEn || !messageEn} style={s.primary}>{busy ? "Saving…" : scheduledLocal ? "Schedule email" : "Send email now"}</button>',
+              '<button type="button" onClick={() => void sendTest()} disabled={busy} style={s.secondaryButton}>Send test to admin only{admin.email ? ` (${admin.email})` : ""}</button><button disabled={busy || !subjectEn || !messageEn} style={s.primary}>{busy ? "Saving…" : scheduledLocal ? "Schedule email" : "Send email now"}</button>'
+          )
+
+          # iOS validation must compile the CocoaPods-integrated workspace, not the internal xcodeproj workspace.
+          replace(
+              '.github/workflows/store-validation.yml',
+              "WORKSPACE=$(find . -maxdepth 2 -name '*.xcworkspace' -print -quit)",
+              "WORKSPACE=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          )
+
+          # Database cleanup: stop stale prayer rows and rename old WOPT template labels.
+          migration = Path('push-server/migrations/0009_hassoun_email_consolidation.sql')
+          migration.write_text('''PRAGMA foreign_keys = ON;\n\n-- Retire stale prayer-email jobs from any pre-Hassoun pipeline.\nUPDATE email_outbox\nSET status = 'cancelled',\n    last_error = 'Legacy prayer-email pipeline retired',\n    updated_at = CURRENT_TIMESTAMP\nWHERE kind = 'prayer'\n  AND status IN ('pending', 'sending')\n  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'email:%');\n\nUPDATE email_deliveries\nSET status = 'failed',\n    error_code = 'legacy_pipeline_retired',\n    error_message = 'Legacy prayer-email pipeline retired'\nWHERE status = 'pending'\n  AND notification_kind IN ('twenty', 'ten', 'athan')\n  AND (event_id IS NULL OR event_id NOT LIKE 'email:%');\n\n-- Keep legacy template records for history, but make every visible label Hassoun.\nUPDATE email_templates\nSET name = REPLACE(name, 'WOPT', 'Hassoun'),\n    subject_en = REPLACE(subject_en, 'WOPT', 'Hassoun'),\n    subject_ar = CASE WHEN subject_ar IS NULL THEN NULL ELSE REPLACE(subject_ar, 'WOPT', 'Hassoun') END,\n    html_en = REPLACE(html_en, 'WOPT', 'Hassoun'),\n    html_ar = CASE WHEN html_ar IS NULL THEN NULL ELSE REPLACE(html_ar, 'WOPT', 'Hassoun') END,\n    text_en = CASE WHEN text_en IS NULL THEN NULL ELSE REPLACE(text_en, 'WOPT', 'Hassoun') END,\n    text_ar = CASE WHEN text_ar IS NULL THEN NULL ELSE REPLACE(text_ar, 'WOPT', 'Hassoun') END,\n    updated_at = CURRENT_TIMESTAMP\nWHERE name LIKE '%WOPT%'\n   OR subject_en LIKE '%WOPT%'\n   OR COALESCE(subject_ar, '') LIKE '%WOPT%'\n   OR html_en LIKE '%WOPT%'\n   OR COALESCE(html_ar, '') LIKE '%WOPT%'\n   OR COALESCE(text_en, '') LIKE '%WOPT%'\n   OR COALESCE(text_ar, '') LIKE '%WOPT%';\n''')
+          PY
+      - name: Verify no public Xuber references remain
+        run: |
+          if grep -Rni --exclude-dir=node_modules --exclude-dir=.git 'xuber\.ca' push-server pwa/app mobile/src; then
+            echo "xuber.ca reference remains"
+            exit 1
+          fi
+      - name: Commit fixes
+        run: |
+          git config user.name "Hassoun Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add push-server pwa/app mobile/src .github/workflows/store-validation.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: consolidate Hassoun email domain and iOS validation"
+          git push origin HEAD:work/store-crm-2026-08-19
