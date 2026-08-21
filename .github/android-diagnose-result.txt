@@ -1,10 +1,10 @@
-exit_code=1
-source_commit=cb3c70ba725a99de054dc55f4cf8d3b1cb65e086
-verified_at=2026-08-21T05:24:23Z
+exit_code=0
+source_commit=af7c43719821312fa898348e264b775e4e3d70de
+verified_at=2026-08-21T05:25:39Z
 
 npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 489 packages in 8s
+added 489 packages in 9s
 
 > windsor-prayer-times-mobile@1.0.1 pretypecheck
 > npm run quran:data
@@ -18,5 +18,3 @@ WOPT Quran data ready: 6236 ayahs, 114 surahs, 604 pages.
 > windsor-prayer-times-mobile@1.0.1 typecheck
 > tsc --noEmit
 
-src/prayerAudio.ts(19,11): error TS18047: 'PrayerAudio' is possibly 'null'.
-src/prayerAudio.ts(28,21): error TS18047: 'PrayerAudio' is possibly 'null'.
