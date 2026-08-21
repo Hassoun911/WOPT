@@ -1,0 +1,4 @@
+Command line invocation:
+    /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild -resolvePackageDependencies -workspace Hassoun.xcworkspace -scheme Hassoun
+
+resolved source packages: 

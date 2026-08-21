@@ -5,5 +5,5 @@ mobile_typescript=success
 ios_prebuild_pods=success
 ios_compile=failure
 ios_workspace=Hassoun.xcworkspace
-source_commit=8e6873dd95a1bd72bbdc395e4724dda0bd48c185
-checked_at=2026-08-21T16:37:05Z
+source_commit=3e956ff45f7168a54f9e3d684843c4ea97db1507
+checked_at=2026-08-21T16:40:45Z
