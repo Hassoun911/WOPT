@@ -205,12 +205,6 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
 
   const { appearance, setAppearance, reset: resetAppearance } = useQuranAppearance();
 
-  useEffect(() => {
-    if (screen === "reader" && appearance.browseMode !== "vertical") {
-      setAppearance((current) => ({ ...current, browseMode: "vertical" }));
-    }
-  }, [screen, appearance.browseMode]);
-
   const surahs = allSurahs();
   const pages = allPages();
   const pageNumbers = useMemo(() => Array.from({ length: 604 }, (_item, index) => index + 1), []);
@@ -381,11 +375,11 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
         }
 
         if (appearance.browseMode !== "vertical") return false;
-        if (vertical < 20 || vertical <= horizontal * 1.15) return false;
+        if (vertical < 12 || vertical <= horizontal * 1.05) return false;
 
         const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
         if (gestureState.dy < 0) return readerAtBottom.current || contentFits;
-        if (gestureState.dy > 0) return readerAtTop.current || contentFits;
+        if (gestureState.dy > 0) return readerAtTop.current || readerLastScrollY.current <= 8 || contentFits;
         return false;
       },
       onPanResponderRelease: (_event, gestureState) => {
@@ -395,11 +389,11 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
           return;
         }
 
-        if (appearance.browseMode !== "vertical" || Math.abs(gestureState.dy) < 32) return;
+        if (appearance.browseMode !== "vertical" || Math.abs(gestureState.dy) < 26) return;
         const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
         if (gestureState.dy < 0 && (readerAtBottom.current || contentFits)) {
           turnReaderPage(1);
-        } else if (gestureState.dy > 0 && (readerAtTop.current || contentFits)) {
+        } else if (gestureState.dy > 0 && (readerAtTop.current || readerLastScrollY.current <= 8 || contentFits)) {
           turnReaderPage(-1);
         }
       },
@@ -976,7 +970,12 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
     <View style={styles.flex}>
       {topBar(ar ? readerSurah.nameArabic : readerSurah.nameTransliterated, tr(`Page ${currentPage} • Juz ${currentJuz}`, `الصفحة ${num(currentPage)} • الجزء ${num(currentJuz)}`))}
       {audioPrefs.readerMode === "mushaf" ? (
-        <View style={styles.readerBody} onTouchStart={handleReaderSurfaceTouchStart} onTouchEnd={handleReaderSurfaceTouchEnd} {...readerPanResponder.panHandlers}>
+        <View
+          style={styles.readerBody}
+          onTouchStart={(event) => { handleReaderSurfaceTouchStart(event); handleVerticalTouchStart(event); }}
+          onTouchEnd={(event) => { handleReaderSurfaceTouchEnd(event); handleVerticalTouchEnd(event); }}
+          {...readerPanResponder.panHandlers}
+        >
           <ScrollView
             key={`mushaf-${currentPage}-${appearance.browseMode}`}
             style={styles.flex}
@@ -992,8 +991,6 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
               readerContentHeight.current = height;
               readerAtBottom.current = height <= readerViewportHeight.current + 12;
             }}
-            onTouchStart={handleVerticalTouchStart}
-            onTouchEnd={handleVerticalTouchEnd}
             onScroll={({ nativeEvent }) => {
               readerViewportHeight.current = nativeEvent.layoutMeasurement.height;
               readerContentHeight.current = nativeEvent.contentSize.height;
