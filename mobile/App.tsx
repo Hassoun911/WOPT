@@ -31,6 +31,7 @@ import {
   type PrayerAlertPreferences
 } from "./src/alertPreferences";
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
+import { reportHassounActivity } from "./src/activity";
 import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
 import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";
@@ -121,6 +122,15 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const islamicTimeline = useMemo(() => islamicEventTimeline(todayKey), [todayKey]);
   const upcomingIslamicEvent = islamicTimeline.next;
   const upcomingIslamicDays = islamicTimeline.daysUntilNext;
+
+  useEffect(() => {
+    void reportHassounActivity("app_open");
+  }, []);
+
+  useEffect(() => {
+    const tracked = activeTab === "quiz" ? "games" : activeTab;
+    void reportHassounActivity(tracked);
+  }, [activeTab]);
 
   useEffect(() => {
     if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);
