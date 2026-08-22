@@ -74,10 +74,10 @@ jobs:
               canvas.alpha_composite(art, (x, y))
               return canvas
 
-          # Keep the complete Hassoun mark inside Android launcher safe areas.
-          padded(1024, 820).save('assets/icon.png', format='PNG', optimize=True)
-          padded(1024, 650).save('assets/adaptive-icon.png', format='PNG', optimize=True)
-          padded(1024, 760).save('assets/splash-logo.png', format='PNG', optimize=True)
+          # Issue 2: make the approved Hassoun logo much larger in the launcher icon.
+          padded(1024, 980).save('assets/icon.png', format='PNG', optimize=True)
+          padded(1024, 900).save('assets/adaptive-icon.png', format='PNG', optimize=True)
+          padded(1024, 820).save('assets/splash-logo.png', format='PNG', optimize=True)
 
           notification = Path('assets/notification-icon.png')
           if notification.exists() and notification.stat().st_size:
@@ -99,13 +99,15 @@ jobs:
       - name: Typecheck mobile app
         run: npm run typecheck
 
-      - name: Verify clean Home and animated startup
+      - name: Verify clean Home, bottom navigation, and animated startup
         run: |
           grep -q 'v106Hero' App.tsx
           grep -q 'Explore Hassoun' App.tsx
           grep -q 'activeTab === "sheikh"' App.tsx
           grep -q 'StartupSplash' AppRoot.tsx
           grep -q 'hassoun-logo.png' AppRoot.tsx
+          ! grep -q 'styles.fab' AppExperience.tsx
+          ! grep -q 'Qur’an + Hadith' AppExperience.tsx
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
