@@ -60,6 +60,12 @@ export default function AdminEmailPage() {
     void api<{ admin: Admin }>("/admin/me", {}, saved).then(async (res) => { setAdmin(res.admin); await load(saved); }).catch(() => { window.localStorage.removeItem(TOKEN_KEY); setToken(null); setAdmin(null); });
   }, [load]);
 
+  useEffect(() => {
+    if (!error && !notice) return;
+    const timer = window.setTimeout(() => { setError(""); setNotice(""); }, 6500);
+    return () => window.clearTimeout(timer);
+  }, [error, notice]);
+
   async function signIn(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
