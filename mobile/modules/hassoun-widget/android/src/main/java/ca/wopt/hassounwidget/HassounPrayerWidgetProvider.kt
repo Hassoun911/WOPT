@@ -166,6 +166,12 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       views.setViewVisibility(R.id.widget_logo, if (showLogo) View.VISIBLE else View.GONE)
       views.setTextViewText(R.id.widget_header, "HASSOUN")
       views.setTextViewText(R.id.widget_brand_subtitle, if (locale == "ar") "وندسور • كندا" else "WINDSOR • CANADA")
+      if (!isLockScreen && layout == "full") {
+        views.setTextViewTextSize(R.id.widget_header, TypedValue.COMPLEX_UNIT_SP, 23f)
+        views.setTextViewTextSize(R.id.widget_brand_subtitle, TypedValue.COMPLEX_UNIT_SP, 10f)
+        views.setTextViewTextSize(R.id.widget_hijri, TypedValue.COMPLEX_UNIT_SP, 13f)
+        views.setTextViewTextSize(R.id.widget_date, TypedValue.COMPLEX_UNIT_SP, 10f)
+      }
 
       if (next == null) {
         views.setTextViewText(R.id.widget_next_label, if (locale == "ar") "مواقيت الصلاة" else "PRAYER TIMES")
@@ -192,13 +198,13 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
           "vertical" -> when (timeSize) { "small" -> 25f; "medium" -> 28f; "xlarge" -> 34f; else -> 31f }
           "square" -> when (timeSize) { "small" -> 21f; "medium" -> 24f; "xlarge" -> 30f; else -> 27f }
           "slim", "compact", "next" -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 22f; else -> 20f }
-          else -> when (timeSize) { "small" -> 28f; "medium" -> 31f; "xlarge" -> 38f; else -> 34f }
+          else -> when (timeSize) { "small" -> 34f; "medium" -> 38f; "xlarge" -> 46f; else -> 42f }
         }
         val prayerNameSp = when (layout) {
           "vertical" -> when (timeSize) { "small" -> 27f; "medium" -> 30f; "xlarge" -> 36f; else -> 33f }
           "square" -> when (timeSize) { "small" -> 23f; "medium" -> 26f; "xlarge" -> 32f; else -> 29f }
           "slim", "compact", "next" -> when (timeSize) { "small" -> 13f; "medium" -> 15f; "xlarge" -> 19f; else -> 17f }
-          else -> when (timeSize) { "small" -> 30f; "medium" -> 33f; "xlarge" -> 40f; else -> 36f }
+          else -> when (timeSize) { "small" -> 36f; "medium" -> 40f; "xlarge" -> 48f; else -> 44f }
         }
         views.setTextViewTextSize(R.id.widget_next_time, TypedValue.COMPLEX_UNIT_SP, timeSp)
         views.setTextViewTextSize(R.id.widget_next_name, TypedValue.COMPLEX_UNIT_SP, prayerNameSp)
@@ -232,9 +238,11 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
             layout == "slim" || layout == "compact" -> 9f
             layout == "square" -> 11f
             layout == "vertical" -> 12f
-            else -> 13f
+            else -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 24f; else -> 20f }
           }
           views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)
+          val countdownTextColor = if (theme == "ivory") Color.rgb(181, 126, 42) else Color.rgb(242, 201, 111)
+          views.setTextColor(R.id.widget_countdown, countdownTextColor)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             views.setChronometerCountDown(R.id.widget_countdown, true)
           }
@@ -243,7 +251,25 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
 
         val supportsPrayerStrip = isLockScreen || layout in setOf("full", "vertical", "square", "slim", "compact", "next")
-        if (supportsPrayerStrip && (showAllPrayers || isLockScreen)) {
+        if (!isLockScreen && layout == "full") {
+          val following = schedule?.let { findFollowingPrayer(it, next, locale) }
+          if (following != null) {
+            views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
+            views.setImageViewResource(R.id.widget_following_icon, prayerIcons[following.key] ?: R.drawable.ic_widget_asr)
+            val followingName = "${englishNames[following.key] ?: following.key} • ${arabicNames[following.key] ?: following.key}"
+            views.setTextViewText(R.id.widget_following_name, followingName)
+            views.setTextViewText(R.id.widget_following_time, "${formatClockMain(following.timeText)} ${formatClockSuffix(following.timeText)}")
+            val followingDelay = (following.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+            views.setChronometer(R.id.widget_following_countdown, SystemClock.elapsedRealtime() + followingDelay, if (locale == "ar") "بعد %s" else "in %s", true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) views.setChronometerCountDown(R.id.widget_following_countdown, true)
+            val followingColor = if (theme == "ivory") Color.rgb(13, 83, 66) else Color.rgb(239, 207, 132)
+            views.setTextColor(R.id.widget_following_name, followingColor)
+            views.setTextColor(R.id.widget_following_time, followingColor)
+            views.setTextColor(R.id.widget_following_countdown, countdownTextColor)
+          } else {
+            views.setViewVisibility(R.id.widget_prayer_strip, View.GONE)
+          }
+        } else if (supportsPrayerStrip && (showAllPrayers || isLockScreen)) {
           views.setViewVisibility(R.id.widget_prayer_strip, View.VISIBLE)
           bindPrayerStrip(views, next.day, locale, next.key, isLockScreen, theme, showArabicNames, highlightNext, timeSize, layout)
         } else {
@@ -270,6 +296,35 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(R.id.widget_location, if (locale == "ar") "وندسور، كندا" else "Windsor, Canada")
 
       manager.updateAppWidget(appWidgetId, views)
+    }
+
+    private fun findFollowingPrayer(schedule: JSONObject, current: PrayerMoment, locale: String): PrayerMoment? {
+      val currentIndex = prayerKeys.indexOf(current.key)
+      if (currentIndex < 0) return null
+
+      var nextDateKey = current.dateKey
+      var nextDay = current.day
+      var nextKey = prayerKeys.getOrNull(currentIndex + 1)
+
+      if (nextKey == null) {
+        val dateParser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = toronto }
+        val currentDate = dateParser.parse(current.dateKey) ?: return null
+        val calendar = Calendar.getInstance(toronto).apply { time = currentDate; add(Calendar.DAY_OF_YEAR, 1) }
+        nextDateKey = dateParser.format(calendar.time)
+        val prayerRoot = schedule.optJSONObject("prayer_times") ?: schedule
+        nextDay = prayerRoot.optJSONObject(nextDateKey) ?: return null
+        nextKey = "fajr"
+      }
+
+      val rawTime = nextDay.optString(nextKey, "")
+      val match = Regex("^(\\d{1,2}):(\\d{2})").find(rawTime) ?: return null
+      val normalizedTime = "${match.groupValues[1].padStart(2, '0')}:${match.groupValues[2]}"
+      val dateTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply {
+        timeZone = toronto
+        isLenient = false
+      }.parse("$nextDateKey $normalizedTime") ?: return null
+      val displayName = if (locale == "ar") arabicNames[nextKey] ?: nextKey else englishNames[nextKey] ?: nextKey
+      return PrayerMoment(nextKey, displayName, rawTime, dateTime.time, nextDateKey, nextDay)
     }
 
     private fun bindPrayerStrip(
