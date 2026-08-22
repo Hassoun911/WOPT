@@ -1,0 +1,132 @@
+name: Fix widget countdown scope and build APK
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - '.github/scripts/fix-widget-countdown-scope-v109.py'
+      - '.github/workflows/fix-widget-countdown-scope-v109.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+
+jobs:
+  fix-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Fix widget Kotlin countdown scope
+        run: python .github/scripts/fix-widget-countdown-scope-v109.py
+
+      - name: Validate fixed source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt').read_text()
+          assert p.count('val countdownTextColor =') == 1
+          assert p.index('val countdownTextColor =') < p.index('if (showCountdown) {')
+          assert 'views.setTextColor(R.id.widget_following_countdown, countdownTextColor)' in p
+          print('Widget countdown scope validated.')
+          PY
+
+      - name: Persist corrected widget sources
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          git add .github/scripts/apply-widget-large-info-v108.py
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix widget countdown color scope'
+            git push origin HEAD:work/hassoun-1.0-store-admin
+          fi
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply current mobile release patches
+        working-directory: mobile
+        run: |
+          node scripts/apply-v106-clean-home.mjs
+          node scripts/fix-memorize-entry.mjs
+          node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Build Hassoun icon assets
+        working-directory: mobile
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          logo_path = Path('assets/hassoun-logo.png')
+          if not logo_path.exists() or logo_path.stat().st_size == 0:
+              raise SystemExit('Missing assets/hassoun-logo.png')
+          logo = Image.open(logo_path).convert('RGBA')
+          logo.save(logo_path, format='PNG', optimize=True)
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
+          splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
+          art = logo.copy(); art.thumbnail((820, 820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+          notification = Path('assets/notification-icon.png')
+          if notification.exists() and notification.stat().st_size:
+              Image.open(notification).convert('RGBA').save(notification, format='PNG', optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Typecheck mobile app
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build standalone release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        working-directory: mobile
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-v1.0.8-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+          if-no-files-found: error
+          retention-days: 14
