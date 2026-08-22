@@ -1,0 +1,9 @@
+deployed_at=2026-08-22T04:41:44Z
+source_branch=work/hassoun-1.0-store-admin
+source_commit=f3932c770f8aa56e359eba14887e87bf4b0f2725
+worker_typecheck=passed
+worker_tests=passed
+d1_migrations=passed
+cloudflare_worker=deployed
+admin_crm_build=passed
+worker_smoke_test=passed
