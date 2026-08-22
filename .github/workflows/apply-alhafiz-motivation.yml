@@ -5,6 +5,7 @@ on:
     branches: [work/hassoun-1.0-store-admin]
     paths:
       - "mobile/scripts/apply-alhafiz-motivation.mjs"
+      - "mobile/scripts/fix-memorize-entry.mjs"
       - ".github/workflows/apply-alhafiz-motivation.yml"
   workflow_dispatch:
 
@@ -25,20 +26,33 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Open Al-Hafiz directly from Memorize
+        working-directory: mobile
+        run: node scripts/fix-memorize-entry.mjs
+
       - name: Apply motivation and AI coach upgrade
         working-directory: mobile
         run: node scripts/apply-alhafiz-motivation.mjs
 
       - name: Typecheck mobile app
         working-directory: mobile
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
+        run: npm run typecheck
 
-      - name: Commit upgraded classroom
+      - name: Verify classroom is wired correctly
+        working-directory: mobile
+        run: |
+          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
+          grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
+          grep -q 'KEEP LEARNING' src/quran/AlHafizClassroom.tsx
+
+      - name: Commit upgraded classroom and entry
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/src/quran/AlHafizClassroom.tsx
-          git commit -m "Motivate Al-Hafiz learners with badges and AI tips" || exit 0
+          git add mobile/src/quran/AlHafizClassroom.tsx mobile/src/quran/QuranV3.tsx
+          git commit -m "Open Al-Hafiz classroom and motivate learners" || exit 0
           git push origin HEAD:work/hassoun-1.0-store-admin
