@@ -1,0 +1,44 @@
+name: Apply Al-Hafiz Motivation Upgrade
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - "mobile/scripts/apply-alhafiz-motivation.mjs"
+      - ".github/workflows/apply-alhafiz-motivation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply motivation and AI coach upgrade
+        working-directory: mobile
+        run: node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Typecheck mobile app
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+
+      - name: Commit upgraded classroom
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/src/quran/AlHafizClassroom.tsx
+          git commit -m "Motivate Al-Hafiz learners with badges and AI tips" || exit 0
+          git push origin HEAD:work/hassoun-1.0-store-admin
