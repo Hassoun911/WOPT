@@ -1,0 +1,48 @@
+name: Fix Ask the Sheikh relevance and source links
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - '.github/scripts/fix-ask-sheikh-relevance-links.mjs'
+      - '.github/workflows/fix-ask-sheikh-relevance-links.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply relevance and source link fix
+        run: node .github/scripts/fix-ask-sheikh-relevance-links.mjs
+      - name: Typecheck mobile app
+        working-directory: mobile
+        run: |
+          npm ci
+          npx tsc --noEmit
+      - name: Typecheck push server
+        working-directory: push-server
+        run: |
+          npm ci
+          npx tsc --noEmit
+      - name: Commit fixes
+        run: |
+          if git diff --quiet -- mobile/src/AskSheikh.tsx push-server/src/askSheikh.ts; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/src/AskSheikh.tsx push-server/src/askSheikh.ts
+          git commit -m 'Fix Ask the Sheikh relevance and source validation links'
+          git push origin HEAD:work/hassoun-1.0-store-admin
