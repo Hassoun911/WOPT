@@ -1,0 +1,10 @@
+owner_smart_crm=deployed
+validated_at=2026-08-22T02:20:40Z
+source_commit=e2d8ceeb5f6222e42112185291eed52292769c53
+worker_validation=passed
+owner_crm_build=passed
+worker_deploy=passed
+crm_active=3
+crm_unsubscribed=2
+profiles=9
+content_items=3
