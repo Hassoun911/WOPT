@@ -1,3 +1,4 @@
+# rerun: 2026-08-21T22:20-04:00
 name: Fix All Hassoun CRM And Email Production Issues
 
 on:
@@ -40,19 +41,16 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # 1) Cloudflare config: Hassoun domain only and no duplicate EMAIL_FROM var.
           p = Path('push-server/wrangler.jsonc')
           s = p.read_text()
           s = s.replace('    "EMAIL_FROM": "Hassoun <notifications@hassoun.app>",\n', '')
           s = s.replace('"https://hassoun911.github.io/WOPT/"', '"https://hassoun.app/"')
           p.write_text(s)
 
-          # 2) Subscriber links: never fall back to GitHub Pages.
           p = Path('push-server/src/subscribers.ts')
           s = p.read_text().replace('https://hassoun911.github.io/WOPT/', 'https://hassoun.app/')
           p.write_text(s)
 
-          # 3) One-time legacy Resend import using Worker-bound secrets; idempotent v2 marker.
           p = Path('push-server/src/entry.ts')
           s = p.read_text()
           if 'importLegacyResendUsersOnce' not in s:
@@ -60,95 +58,85 @@ jobs:
           s = s.replace('const BACKEND_VERSION = "gps-prayer-email-audit-2026-08-21-1";', 'const BACKEND_VERSION = "owner-crm-smart-email-2026-08-21-2";')
           old = '  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {\n    return worker.scheduled(controller, env, ctx);\n  }'
           new = '  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {\n    ctx.waitUntil(importLegacyResendUsersOnce(env));\n    return worker.scheduled(controller, env, ctx);\n  }'
-          if old in s:
-              s = s.replace(old, new)
+          if old in s: s = s.replace(old, new)
           p.write_text(s)
 
-          # 4) Prayer emails: emoji-rich subjects/body, Hassoun-hosted logo, and no GitHub asset URL.
           p = Path('push-server/src/prayerEmailTemplate.ts')
           s = p.read_text()
-          s = s.replace('const ICONS: Record<PrayerKey, string> = { fajr: "☀", dhuhr: "◉", asr: "☼", maghrib: "◐", isha: "☾" };', 'const ICONS: Record<PrayerKey, string> = { fajr: "🌅", dhuhr: "☀️", asr: "🌤️", maghrib: "🌇", isha: "🌙" };')
-          s = s.replace('`بقي ٢٠ دقيقة على صلاة ${prayer}`', '`🕌⏳ بقي ٢٠ دقيقة على صلاة ${prayer} 🤲🌙`')
-          s = s.replace('`بقي ١٠ دقائق على صلاة ${prayer}`', '`🕌⏰ بقي ١٠ دقائق على صلاة ${prayer} 🤲✨`')
-          s = s.replace('`حان وقت صلاة ${prayer}`', '`🕌🔔 حان وقت صلاة ${prayer} 🤲🌙`')
-          s = s.replace('`${prayer} in 20 minutes`', '`🕌⏳ ${prayer} in 20 minutes 🤲🌙`')
-          s = s.replace('`${prayer} in 10 minutes`', '`🕌⏰ ${prayer} in 10 minutes 🤲✨`')
-          s = s.replace('`It is time for ${prayer}`', '`🕌🔔 It is time for ${prayer} 🤲🌙`')
-          s = s.replace('"متبقي ٢٠ دقيقة"', '"🕌 ⏳ متبقي ٢٠ دقيقة 🌙"')
-          s = s.replace('"متبقي ١٠ دقائق"', '"🕌 ⏰ متبقي ١٠ دقائق ✨"')
-          s = s.replace('"حان وقت الصلاة"', '"🕌 🔔 حان وقت الصلاة 🤲"')
-          s = s.replace('"20 MINUTES TO PRAYER"', '"🕌 ⏳ 20 MINUTES TO PRAYER 🌙"')
-          s = s.replace('"10 MINUTES TO PRAYER"', '"🕌 ⏰ 10 MINUTES TO PRAYER ✨"')
-          s = s.replace('"IT\'S PRAYER TIME"', '"🕌 🔔 IT\'S PRAYER TIME 🤲"')
-          s = s.replace('UPCOMING ISLAMIC EVENT', '🌙 ✨ UPCOMING ISLAMIC EVENT ✨ 🌙')
-          s = s.replace('المناسبة الإسلامية القادمة', '🌙 ✨ المناسبة الإسلامية القادمة ✨ 🌙')
-          s = s.replace('Manage prayer alerts', '⚙️ Manage prayer alerts 🔔')
-          s = s.replace('إدارة تنبيهات الصلاة', '⚙️ إدارة تنبيهات الصلاة 🔔')
-          s = s.replace('Prayer • Qur’an • Knowledge', '🕌 Prayer • 📖 Qur’an • 🤲 Knowledge ✨')
-          s = s.replace('الصلاة • القرآن • المعرفة', '🕌 الصلاة • 📖 القرآن • 🤲 المعرفة ✨')
-          s = s.replace('Today’s prayer schedule', '🕋 Today’s prayer schedule 🕌')
-          s = s.replace('جدول صلوات اليوم', '🕋 جدول صلوات اليوم 🕌')
-          s = s.replace('DAILY REMINDER', '📖✨ DAILY ISLAMIC REMINDER 🤲')
-          s = s.replace('تذكير اليوم', '📖✨ تذكير اليوم 🤲')
-          s = s.replace('Hearts find comfort in the remembrance of Allah.', '🤲💚 Hearts find comfort in the remembrance of Allah. 🌙✨')
-          s = s.replace('ألا بذكر الله تطمئن القلوب.', '🤲💚 ألا بذكر الله تطمئن القلوب. 🌙✨')
-          s = s.replace('Stay connected to prayer', '🕌 Stay connected to prayer • 🤲 Sadaqah Jariyah 🌙✨')
-          s = s.replace('ابقَ متصلاً بالصلاة', '🕌 ابقَ متصلاً بالصلاة • 🤲 صدقة جارية 🌙✨')
-          s = s.replace('https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png', 'https://hassoun.app/assets/hassoun-logo.png')
+          replacements = {
+            'const ICONS: Record<PrayerKey, string> = { fajr: "☀", dhuhr: "◉", asr: "☼", maghrib: "◐", isha: "☾" };':'const ICONS: Record<PrayerKey, string> = { fajr: "🌅", dhuhr: "☀️", asr: "🌤️", maghrib: "🌇", isha: "🌙" };',
+            '`بقي ٢٠ دقيقة على صلاة ${prayer}`':'`🕌⏳ بقي ٢٠ دقيقة على صلاة ${prayer} 🤲🌙`',
+            '`بقي ١٠ دقائق على صلاة ${prayer}`':'`🕌⏰ بقي ١٠ دقائق على صلاة ${prayer} 🤲✨`',
+            '`حان وقت صلاة ${prayer}`':'`🕌🔔 حان وقت صلاة ${prayer} 🤲🌙`',
+            '`${prayer} in 20 minutes`':'`🕌⏳ ${prayer} in 20 minutes 🤲🌙`',
+            '`${prayer} in 10 minutes`':'`🕌⏰ ${prayer} in 10 minutes 🤲✨`',
+            '`It is time for ${prayer}`':'`🕌🔔 It is time for ${prayer} 🤲🌙`',
+            '"متبقي ٢٠ دقيقة"':'"🕌 ⏳ متبقي ٢٠ دقيقة 🌙"',
+            '"متبقي ١٠ دقائق"':'"🕌 ⏰ متبقي ١٠ دقائق ✨"',
+            '"حان وقت الصلاة"':'"🕌 🔔 حان وقت الصلاة 🤲"',
+            '"20 MINUTES TO PRAYER"':'"🕌 ⏳ 20 MINUTES TO PRAYER 🌙"',
+            '"10 MINUTES TO PRAYER"':'"🕌 ⏰ 10 MINUTES TO PRAYER ✨"',
+            '"IT\'S PRAYER TIME"':'"🕌 🔔 IT\'S PRAYER TIME 🤲"',
+            'UPCOMING ISLAMIC EVENT':'🌙 ✨ UPCOMING ISLAMIC EVENT ✨ 🌙',
+            'المناسبة الإسلامية القادمة':'🌙 ✨ المناسبة الإسلامية القادمة ✨ 🌙',
+            'Manage prayer alerts':'⚙️ Manage prayer alerts 🔔',
+            'إدارة تنبيهات الصلاة':'⚙️ إدارة تنبيهات الصلاة 🔔',
+            'Prayer • Qur’an • Knowledge':'🕌 Prayer • 📖 Qur’an • 🤲 Knowledge ✨',
+            'الصلاة • القرآن • المعرفة':'🕌 الصلاة • 📖 القرآن • 🤲 المعرفة ✨',
+            'Today’s prayer schedule':'🕋 Today’s prayer schedule 🕌',
+            'جدول صلوات اليوم':'🕋 جدول صلوات اليوم 🕌',
+            'DAILY REMINDER':'📖✨ DAILY ISLAMIC REMINDER 🤲',
+            'تذكير اليوم':'📖✨ تذكير اليوم 🤲',
+            'Hearts find comfort in the remembrance of Allah.':'🤲💚 Hearts find comfort in the remembrance of Allah. 🌙✨',
+            'ألا بذكر الله تطمئن القلوب.':'🤲💚 ألا بذكر الله تطمئن القلوب. 🌙✨',
+            'Stay connected to prayer':'🕌 Stay connected to prayer • 🤲 Sadaqah Jariyah 🌙✨',
+            'ابقَ متصلاً بالصلاة':'🕌 ابقَ متصلاً بالصلاة • 🤲 صدقة جارية 🌙✨',
+            'https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png':'https://hassoun.app/assets/hassoun-logo.png'
+          }
+          for a,b in replacements.items(): s=s.replace(a,b)
           p.write_text(s)
 
-          # 5) Every email type: emoji-rich branding and subjects, logo from hassoun.app,
-          #    retain Sadaqah Jariyah + sponsor sections and allow upcoming event in prayer emails.
           p = Path('push-server/src/emailDelivery.ts')
           s = p.read_text()
-          s = s.replace('https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png', 'https://hassoun.app/assets/hassoun-logo.png')
-          s = s.replace('Prayer • Qur’an • Knowledge', '🕌 Prayer • 📖 Qur’an • 🤲 Knowledge ✨')
-          s = s.replace('>HASSOUN</div>', '>🕌 HASSOUN 🌙</div>')
-          s = s.replace('>Hassoun</div>', '>🕌 Hassoun • 🤲 Sadaqah Jariyah 🌙✨</div>')
-          s = s.replace('"تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your Hassoun prayer email alerts"', '"🕌📧 تأكيد تنبيهات الصلاة عبر البريد 🤲✨" : "🕌📧 Confirm your Hassoun prayer email alerts 🤲✨"')
-          s = s.replace('"إدارة تنبيهات Hassoun" : "Manage your Hassoun email alerts"', '"🕌⚙️ إدارة تنبيهات Hassoun 🔔🌙" : "🕌⚙️ Manage your Hassoun email alerts 🔔🌙"')
-          s = s.replace('"إعادة تعيين كلمة مرور إدارة Hassoun" : "Reset your Hassoun admin password"', '"🔐🕌 إعادة تعيين كلمة مرور إدارة Hassoun ✨" : "🔐🕌 Reset your Hassoun admin password ✨"')
-          s = s.replace('"تنبيه من Hassoun" : "Hassoun notification"', '"🕌🌙 تنبيه من Hassoun 🤲✨" : "🕌🌙 Hassoun notification 🤲✨"')
-          s = s.replace('"خطوة أخيرة" : "ONE LAST STEP"', '"🕌✨ خطوة أخيرة 🤲" : "🕌✨ ONE LAST STEP 🤲"')
-          s = s.replace('"إعدادات التنبيهات" : "ALERT SETTINGS"', '"⚙️🕌 إعدادات التنبيهات 🔔" : "⚙️🕌 ALERT SETTINGS 🔔"')
-          s = s.replace('"UPCOMING ISLAMIC OCCASION"', '"🌙✨ UPCOMING ISLAMIC OCCASION ✨🌙"')
-          s = s.replace('"المناسبة الإسلامية القادمة"', '"🌙✨ المناسبة الإسلامية القادمة ✨🌙"')
-          s = s.replace('`${days} days remaining`', '`🌙 ${days} days remaining ✨`')
-          s = s.replace('`متبقي ${days} يوم`', '`🌙 متبقي ${days} يوم ✨`')
-          s = s.replace('Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.', '🤲🌙 Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. 🕌✨')
-          s = s.replace('Support this Sadaqah Jariyah and help keep Hassoun available and growing.', '🤝🌙 Support this Sadaqah Jariyah and help keep Hassoun available and growing. 🤲✨')
-          s = s.replace('  if (row.kind === "prayer" && profile) data.upcomingEvent = null;\n', '')
-          # Decorate campaign/custom subjects too, once, at the final rendering boundary.
+          s=s.replace('https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png','https://hassoun.app/assets/hassoun-logo.png')
+          s=s.replace('Prayer • Qur’an • Knowledge','🕌 Prayer • 📖 Qur’an • 🤲 Knowledge ✨')
+          s=s.replace('>HASSOUN</div>','>🕌 HASSOUN 🌙</div>')
+          s=s.replace('>Hassoun</div>','>🕌 Hassoun • 🤲 Sadaqah Jariyah 🌙✨</div>')
+          s=s.replace('"تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your Hassoun prayer email alerts"','"🕌📧 تأكيد تنبيهات الصلاة عبر البريد 🤲✨" : "🕌📧 Confirm your Hassoun prayer email alerts 🤲✨"')
+          s=s.replace('"إدارة تنبيهات Hassoun" : "Manage your Hassoun email alerts"','"🕌⚙️ إدارة تنبيهات Hassoun 🔔🌙" : "🕌⚙️ Manage your Hassoun email alerts 🔔🌙"')
+          s=s.replace('"إعادة تعيين كلمة مرور إدارة Hassoun" : "Reset your Hassoun admin password"','"🔐🕌 إعادة تعيين كلمة مرور إدارة Hassoun ✨" : "🔐🕌 Reset your Hassoun admin password ✨"')
+          s=s.replace('"تنبيه من Hassoun" : "Hassoun notification"','"🕌🌙 تنبيه من Hassoun 🤲✨" : "🕌🌙 Hassoun notification 🤲✨"')
+          s=s.replace('"UPCOMING ISLAMIC OCCASION"','"🌙✨ UPCOMING ISLAMIC OCCASION ✨🌙"')
+          s=s.replace('"المناسبة الإسلامية القادمة"','"🌙✨ المناسبة الإسلامية القادمة ✨🌙"')
+          s=s.replace('Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.','🤲🌙 Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. 🕌✨')
+          s=s.replace('Support this Sadaqah Jariyah and help keep Hassoun available and growing.','🤝🌙 Support this Sadaqah Jariyah and help keep Hassoun available and growing. 🤲✨')
+          s=s.replace('  if (row.kind === "prayer" && profile) data.upcomingEvent = null;\n','')
           if 'function decorateSubject(' not in s:
-              marker = 'function templateValues(rendered: RenderedEmail, data: Record<string, unknown>)'
-              helper = '''function decorateSubject(subject: string) {\n  return /[🕌🌙🤲📖✨🔔⏰⏳]/u.test(subject) ? subject : `🕌🌙 ${subject} 🤲✨`;\n}\n\n'''
-              s = s.replace(marker, helper + marker)
-          s = s.replace('  if (!profile || profile.enabled !== 1) return builtIn;\n  const extra = enhancementHtml(profile, content, rawData, row.locale);\n  return appendEnhancements(builtIn, extra, profile, content, row.locale);', '  if (!profile || profile.enabled !== 1) return { ...builtIn, subject: decorateSubject(builtIn.subject) };\n  const extra = enhancementHtml(profile, content, rawData, row.locale);\n  const enhanced = appendEnhancements(builtIn, extra, profile, content, row.locale);\n  return { ...enhanced, subject: decorateSubject(enhanced.subject) };')
+              marker='function templateValues(rendered: RenderedEmail, data: Record<string, unknown>)'
+              s=s.replace(marker,'function decorateSubject(subject: string) {\n  return /[🕌🌙🤲📖✨🔔⏰⏳]/u.test(subject) ? subject : `🕌🌙 ${subject} 🤲✨`;\n}\n\n'+marker)
+          old='  if (!profile || profile.enabled !== 1) return builtIn;\n  const extra = enhancementHtml(profile, content, rawData, row.locale);\n  return appendEnhancements(builtIn, extra, profile, content, row.locale);'
+          new='  if (!profile || profile.enabled !== 1) return { ...builtIn, subject: decorateSubject(builtIn.subject) };\n  const extra = enhancementHtml(profile, content, rawData, row.locale);\n  const enhanced = appendEnhancements(builtIn, extra, profile, content, row.locale);\n  return { ...enhanced, subject: decorateSubject(enhanced.subject) };'
+          s=s.replace(old,new)
           p.write_text(s)
 
-          # 6) CRM status bars: stay in normal document flow, clear automatically, never cover controls.
-          p = Path('pwa/app/admin/CrmDashboard.tsx')
-          s = p.read_text()
-          hook = '''\n  useEffect(() => {\n    if (!error && !notice) return;\n    const timer = window.setTimeout(() => { setError(\"\"); setNotice(\"\"); }, 6500);\n    return () => window.clearTimeout(timer);\n  }, [error, notice]);\n'''
-          anchor = '  const signIn = async (event: FormEvent) => {'
-          if hook.strip() not in s:
-              s = s.replace(anchor, hook + '\n' + anchor)
-          s = s.replace('errorBanner:{maxWidth:1250,margin:"14px auto 0",padding:"12px 16px",background:"#fdecec",color:"#9c2626",borderRadius:12}', 'errorBanner:{position:"relative",zIndex:1,maxWidth:1218,boxSizing:"border-box",margin:"16px auto 0",padding:"12px 16px",background:"#fff3f1",color:"#9c2626",border:"1px solid #f3c9c4",borderRadius:12,boxShadow:"0 4px 14px rgba(80,20,20,.05)"}')
-          s = s.replace('successBanner:{maxWidth:1250,margin:"14px auto 0",padding:"12px 16px",background:"#e9f7ef",color:"#17633d",borderRadius:12}', 'successBanner:{position:"relative",zIndex:1,maxWidth:1218,boxSizing:"border-box",margin:"16px auto 0",padding:"12px 16px",background:"#e9f7ef",color:"#17633d",border:"1px solid #c9e8d5",borderRadius:12,boxShadow:"0 4px 14px rgba(20,80,50,.05)"}')
+          p=Path('pwa/app/admin/CrmDashboard.tsx')
+          s=p.read_text()
+          hook='''\n  useEffect(() => {\n    if (!error && !notice) return;\n    const timer = window.setTimeout(() => { setError(\"\"); setNotice(\"\"); }, 6500);\n    return () => window.clearTimeout(timer);\n  }, [error, notice]);\n'''
+          anchor='  const signIn = async (event: FormEvent) => {'
+          if hook.strip() not in s: s=s.replace(anchor,hook+'\n'+anchor)
+          s=s.replace('errorBanner:{maxWidth:1250,margin:"14px auto 0",padding:"12px 16px",background:"#fdecec",color:"#9c2626",borderRadius:12}','errorBanner:{position:"relative",zIndex:1,maxWidth:1218,boxSizing:"border-box",margin:"16px auto 0",padding:"12px 16px",background:"#fff3f1",color:"#9c2626",border:"1px solid #f3c9c4",borderRadius:12,boxShadow:"0 4px 14px rgba(80,20,20,.05)"}')
+          s=s.replace('successBanner:{maxWidth:1250,margin:"14px auto 0",padding:"12px 16px",background:"#e9f7ef",color:"#17633d",borderRadius:12}','successBanner:{position:"relative",zIndex:1,maxWidth:1218,boxSizing:"border-box",margin:"16px auto 0",padding:"12px 16px",background:"#e9f7ef",color:"#17633d",border:"1px solid #c9e8d5",borderRadius:12,boxShadow:"0 4px 14px rgba(20,80,50,.05)"}')
           p.write_text(s)
 
-          # 7) Email Center notices also auto-dismiss and use the production Worker directly.
-          p = Path('pwa/app/admin/email/page.tsx')
-          s = p.read_text()
+          p=Path('pwa/app/admin/email/page.tsx')
+          s=p.read_text()
           if 'setTimeout(() => { setError(""); setNotice(""); }, 6500)' not in s:
-              anchor = '  async function signIn(event: FormEvent) {'
-              hook = '''  useEffect(() => {\n    if (!error && !notice) return;\n    const timer = window.setTimeout(() => { setError(\"\"); setNotice(\"\"); }, 6500);\n    return () => window.clearTimeout(timer);\n  }, [error, notice]);\n\n'''
-              s = s.replace(anchor, hook + anchor)
+              anchor='  async function signIn(event: FormEvent) {'
+              hook='''  useEffect(() => {\n    if (!error && !notice) return;\n    const timer = window.setTimeout(() => { setError(\"\"); setNotice(\"\"); }, 6500);\n    return () => window.clearTimeout(timer);\n  }, [error, notice]);\n\n'''
+              s=s.replace(anchor,hook+anchor)
           p.write_text(s)
           PY
-
           git diff --check
-          git status --short
 
       - name: Commit repaired source branch
         run: |
@@ -179,35 +167,32 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build
 
-      - name: Wait for one-time legacy import
+      - name: Wait for legacy import marker
         run: sleep 80
 
-      - name: Verify live Worker and CRM database
+      - name: Verify live Worker and database
         working-directory: push-server
         run: |
           set -euo pipefail
-          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health | tee /tmp/health.json
+          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health > /tmp/health.json
           npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, COUNT(*) AS n FROM email_subscribers GROUP BY status ORDER BY status;" > /tmp/subscribers.json
           npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS profiles FROM email_template_profiles; SELECT COUNT(*) AS content_items FROM email_content_library;" > /tmp/templates.json
-          cat /tmp/subscribers.json
-          cat /tmp/templates.json
           python - <<'PY'
           import json
           from pathlib import Path
           health=json.loads(Path('/tmp/health.json').read_text())
           subs=json.loads(Path('/tmp/subscribers.json').read_text())
           templates=json.loads(Path('/tmp/templates.json').read_text())
-          rows=subs[0].get('results',[]) if subs else []
-          out=['all_crm_email_fix=passed',f"backend_version={health.get('backendVersion','unknown')}"]
-          for row in rows: out.append(f"subscribers_{row['status']}={row['n']}")
+          lines=['all_crm_email_fix=passed',f"backend_version={health.get('backendVersion','unknown')}"]
+          for row in subs[0].get('results',[]): lines.append(f"subscribers_{row['status']}={row['n']}")
           for block in templates:
               for row in block.get('results',[]):
-                  for k,v in row.items(): out.append(f"{k}={v}")
-          Path('/tmp/final-status.txt').write_text('\n'.join(out)+'\n')
+                  for k,v in row.items(): lines.append(f"{k}={v}")
+          Path('/tmp/final-status.txt').write_text('\n'.join(lines)+'\n')
           print(Path('/tmp/final-status.txt').read_text())
           PY
 
-      - name: Save final repair status to source branch
+      - name: Save final repair status
         run: |
           cp /tmp/final-status.txt .github/all-crm-email-fix-status.txt
           git add .github/all-crm-email-fix-status.txt
