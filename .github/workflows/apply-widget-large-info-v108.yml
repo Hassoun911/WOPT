@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   apply:
@@ -44,20 +45,25 @@ jobs:
              [ -z "$(git status --porcelain --ignored=matching -- "$TARGET_XML" "$TARGET_KT" | grep -v '^!!' || true)" ] && \
              ! git check-ignore -q "$TARGET_XML" "$TARGET_KT"; then
             echo 'No widget changes to commit.'
-            exit 0
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+            # The native Android module is intentionally covered by a repository ignore rule.
+            # These two generated source files are release inputs, so stage them explicitly.
+            git add -f -- "$TARGET_XML" "$TARGET_KT"
+
+            if ! git diff --cached --quiet; then
+              git commit -m 'Apply large bilingual prayer widget layout'
+              git push origin HEAD:work/hassoun-1.0-store-admin
+            else
+              echo 'No staged widget changes to commit.'
+            fi
           fi
 
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          # The native Android module is intentionally covered by a repository ignore rule.
-          # These two generated source files are release inputs, so stage them explicitly.
-          git add -f -- "$TARGET_XML" "$TARGET_KT"
-
-          if git diff --cached --quiet; then
-            echo 'No staged widget changes to commit.'
-            exit 0
-          fi
-
-          git commit -m 'Apply large bilingual prayer widget layout'
-          git push origin HEAD:work/hassoun-1.0-store-admin
+      - name: Start fresh Android APK build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run android-debug.yml --ref work/hassoun-1.0-store-admin
+          echo 'Android APK build dispatched.'
