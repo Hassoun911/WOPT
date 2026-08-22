@@ -1,3 +1,4 @@
+# Rerun after making the premium widget apply workflow idempotent.
 name: Fix widget countdown scope and build APK
 
 on:
