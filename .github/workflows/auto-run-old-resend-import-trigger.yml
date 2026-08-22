@@ -1,0 +1,17 @@
+name: Trigger Legacy Resend CRM Import
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/auto-run-old-resend-import-trigger.yml"
+permissions:
+  actions: write
+  contents: read
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch import workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sync-old-resend-users-once.yml --repo Hassoun911/WOPT --ref work/hassoun-1.0-store-admin
