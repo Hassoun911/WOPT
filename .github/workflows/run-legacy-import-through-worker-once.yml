@@ -1,0 +1,91 @@
+name: Run Legacy User Import Through Worker Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/run-legacy-import-through-worker-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WORKER_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - name: Install
+        working-directory: push-server
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Add temporary one-time route
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('push-server/src/index.ts')
+          s=p.read_text()
+          imp='import { importLegacyResendUsersOnce } from "./legacyResendImport";\n'
+          if imp not in s:
+              s=imp+s
+          marker='if (request.method === "GET" && url.pathname === "/health") {'
+          replacement='if (request.method === "POST" && url.pathname === "/internal/import-legacy-resend-users-v1") {\n        response = json(await importLegacyResendUsersOnce(env));\n      } else if (request.method === "GET" && url.pathname === "/health") {'
+          if marker not in s:
+              raise SystemExit('health route marker not found')
+          s=s.replace(marker,replacement,1)
+          p.write_text(s)
+          PY
+          cd push-server
+          npm run typecheck
+          npm test
+      - name: Deploy temporary route and import
+        id: import
+        working-directory: push-server
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy
+          ok=false
+          for attempt in $(seq 1 15); do
+            code=$(curl -sS -o /tmp/import.json -w '%{http_code}' -X POST "${WORKER_URL}/internal/import-legacy-resend-users-v1" || true)
+            if [ "$code" = "200" ] && jq -e 'type=="object"' /tmp/import.json >/dev/null 2>&1; then ok=true; break; fi
+            sleep 2
+          done
+          test "$ok" = true
+          jq 'del(.summary)' /tmp/import.json
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status,COUNT(*) AS n FROM email_subscribers GROUP BY status ORDER BY status;" > /tmp/counts.json
+      - name: Restore normal production Worker
+        if: always()
+        shell: bash
+        run: |
+          git checkout -- push-server/src/index.ts
+          cd push-server
+          npm run typecheck
+          npx wrangler deploy
+      - name: Save count-only import result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "legacy_worker_import_checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if [ -f /tmp/import.json ]; then
+              jq -r 'if .skipped==false then "import_status=completed\ndiscovered="+(.discovered|tostring)+"\ninserted="+(.inserted|tostring)+"\nblocked="+(.blocked|tostring) else "import_status=skipped\nreason="+(.reason//"already_completed") end' /tmp/import.json
+            else
+              echo "import_status=failed_before_response"
+            fi
+            if [ -f /tmp/counts.json ]; then jq -r '.[0].results[] | "crm_"+.status+"="+(.n|tostring)' /tmp/counts.json; fi
+          } > .github/legacy-worker-import-result.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/legacy-worker-import-result.txt
+          git commit -m "Record Hassoun legacy Worker import result" || true
+          git push origin HEAD:main || true
