@@ -1,0 +1,79 @@
+name: Diagnose Owner Smart CRM Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-owner-smart-crm-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run all checks without stopping
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/status.txt
+          cd push-server
+          npm ci --ignore-scripts --no-audit --no-fund >/tmp/worker-install.log 2>&1
+          echo "worker_install=$?" >> /tmp/status.txt
+          npm run typecheck >/tmp/worker-typecheck.log 2>&1
+          echo "worker_typecheck=$?" >> /tmp/status.txt
+          npm test >/tmp/worker-test.log 2>&1
+          echo "worker_test=$?" >> /tmp/status.txt
+          npx wrangler d1 migrations apply wopt-prayer-push --remote >/tmp/migration.log 2>&1
+          echo "d1_migration=$?" >> /tmp/status.txt
+          cd ..
+          node .github/scripts/import-legacy-resend-users.mjs >/tmp/resend-discovery.log 2>&1
+          echo "resend_discovery=$?" >> /tmp/status.txt
+          cd push-server
+          if [ -s /tmp/hassoun-legacy-users.sql ]; then
+            npx wrangler d1 execute wopt-prayer-push --remote --file /tmp/hassoun-legacy-users.sql >/tmp/import.log 2>&1
+            echo "d1_user_import=$?" >> /tmp/status.txt
+          else
+            echo "d1_user_import=0" >> /tmp/status.txt
+          fi
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status,COUNT(*) AS n FROM email_subscribers GROUP BY status ORDER BY status;" >/tmp/counts.json 2>/tmp/count-error.log
+          echo "d1_count=$?" >> /tmp/status.txt
+          cd ../pwa
+          npm ci --ignore-scripts --no-audit --no-fund >/tmp/pwa-install.log 2>&1
+          echo "pwa_install=$?" >> /tmp/status.txt
+          npm run build >/tmp/pwa-build.log 2>&1
+          echo "pwa_build=$?" >> /tmp/status.txt
+          cd ..
+          {
+            echo "owner_smart_crm_diagnostic"
+            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            cat /tmp/status.txt
+            if [ -f /tmp/hassoun-legacy-discovery.json ]; then jq -r '"resend_discovered="+(.discovered|tostring),"resend_active_candidates="+(.active|tostring),"resend_blocked_candidates="+(.blocked|tostring)' /tmp/hassoun-legacy-discovery.json; fi
+            if jq -e '.[0].results' /tmp/counts.json >/dev/null 2>&1; then jq -r '.[0].results[] | "crm_"+.status+"="+(.n|tostring)' /tmp/counts.json; fi
+            echo "-- typecheck tail --"
+            tail -n 12 /tmp/worker-typecheck.log | sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email]/g'
+            echo "-- pwa build tail --"
+            tail -n 12 /tmp/pwa-build.log | sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email]/g'
+            echo "-- resend tail --"
+            tail -n 8 /tmp/resend-discovery.log | sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email]/g'
+          } > .github/owner-smart-crm-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/owner-smart-crm-diagnostic.txt
+          git commit -m "Record Owner smart CRM diagnostic" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin || true
