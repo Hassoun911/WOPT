@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   audit:
@@ -18,6 +19,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
@@ -29,8 +31,7 @@ jobs:
       - name: Audit tables and counts without private data
         shell: bash
         run: |
-          set -euo pipefail
-          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name FROM sqlite_master WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscr%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%contact%') ORDER BY name;" > /tmp/tables.json
+          set +e
           out="$GITHUB_WORKSPACE/.github/email-crm-audit.txt"
           {
             echo "Hassoun email CRM live D1 audit"
@@ -38,12 +39,19 @@ jobs:
             echo "source_commit=$(git rev-parse HEAD)"
             echo
           } > "$out"
-          for table in $(jq -r '.[0].results[].name' /tmp/tables.json); do
-            count=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS n FROM \"$table\";" | jq -r '.[0].results[0].n')
-            cols=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "PRAGMA table_info(\"$table\");" | jq -r '.[0].results | map(.name) | join(", ")')
-            echo "$table|rows=$count|columns=$cols" >> "$out"
-          done
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name FROM sqlite_master WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscr%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%contact%') ORDER BY name;" > /tmp/tables.json 2>/tmp/audit.err
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "audit_error=$(tr '\n' ' ' < /tmp/audit.err | sed 's/|/ /g')" >> "$out"
+          else
+            for table in $(jq -r '.[0].results[].name' /tmp/tables.json); do
+              count=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS n FROM \"$table\";" 2>/dev/null | jq -r '.[0].results[0].n // "?"')
+              cols=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "PRAGMA table_info(\"$table\");" 2>/dev/null | jq -r '.[0].results | map(.name) | join(", ")' 2>/dev/null)
+              echo "$table|rows=$count|columns=$cols" >> "$out"
+            done
+          fi
           cat "$out" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
       - name: Save audit result
         working-directory: .
         run: |
@@ -52,3 +60,10 @@ jobs:
           git add .github/email-crm-audit.txt
           git commit -m "Record Hassoun email CRM live audit" || true
           git push origin HEAD:main || true
+      - name: Report audit in issue
+        working-directory: .
+        run: |
+          body=$(cat .github/email-crm-audit.txt)
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Hassoun email CRM live audit $(date -u +%Y-%m-%dT%H:%M:%SZ)" --body "\`\`\`text
+          ${body}
+          \`\`\`"
