@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
 
+# Triggered again after adding per-template test email actions.
 jobs:
   deploy:
     runs-on: ubuntu-latest
