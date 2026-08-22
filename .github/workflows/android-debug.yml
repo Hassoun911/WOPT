@@ -46,10 +46,16 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Apply Hassoun v1.0.6 clean Home layout
+      - name: Apply clean Home layout
         run: node scripts/apply-v106-clean-home.mjs
 
-      - name: Repair Hassoun branding assets
+      - name: Open Al-Hafiz from Memorize tile
+        run: node scripts/fix-memorize-entry.mjs
+
+      - name: Apply Al-Hafiz motivation and AI coach
+        run: node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Build full-size Hassoun launcher icon
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
@@ -65,19 +71,18 @@ jobs:
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
 
-          def padded(size, art_size, background=(0, 0, 0, 0)):
-              canvas = Image.new('RGBA', (size, size), background)
-              art = logo.copy()
-              art.thumbnail((art_size, art_size), Image.Resampling.LANCZOS)
-              x = (size - art.width) // 2
-              y = (size - art.height) // 2
-              canvas.alpha_composite(art, (x, y))
-              return canvas
+          # Use the complete approved Hassoun artwork as the Android icon.
+          # Do not wrap the full square logo inside Android's adaptive foreground layer,
+          # because launchers inset that foreground and make the artwork look tiny.
+          full_icon = logo.resize((1024, 1024), Image.Resampling.LANCZOS)
+          full_icon.save('assets/icon.png', format='PNG', optimize=True)
 
-          # Issue 2: make the approved Hassoun logo much larger in the launcher icon.
-          padded(1024, 980).save('assets/icon.png', format='PNG', optimize=True)
-          padded(1024, 900).save('assets/adaptive-icon.png', format='PNG', optimize=True)
-          padded(1024, 820).save('assets/splash-logo.png', format='PNG', optimize=True)
+          # Keep a clean source for the in-app fade splash.
+          splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
+          art = logo.copy()
+          art.thumbnail((820, 820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
 
           notification = Path('assets/notification-icon.png')
           if notification.exists() and notification.stat().st_size:
@@ -85,7 +90,6 @@ jobs:
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
-          pngcheck -q assets/adaptive-icon.png
           pngcheck -q assets/splash-logo.png
           pngcheck -q assets/notification-icon.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
@@ -99,13 +103,18 @@ jobs:
       - name: Typecheck mobile app
         run: npm run typecheck
 
-      - name: Verify clean Home, bottom navigation, and animated startup
+      - name: Verify Home, Al-Hafiz, icon, and startup fixes
         run: |
           grep -q 'v106Hero' App.tsx
           grep -q 'Explore Hassoun' App.tsx
           grep -q 'activeTab === "sheikh"' App.tsx
+          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
+          grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
+          grep -q 'KEEP LEARNING' src/quran/AlHafizClassroom.tsx
           grep -q 'StartupSplash' AppRoot.tsx
           grep -q 'hassoun-logo.png' AppRoot.tsx
+          grep -q 'icon: "./assets/icon.png"' app.config.ts
+          ! grep -q 'adaptiveIcon' app.config.ts
           ! grep -q 'styles.fab' AppExperience.tsx
           ! grep -q 'Qur’an + Hadith' AppExperience.tsx
 
@@ -119,12 +128,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.6.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.7.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v1.0.6-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.6.apk
+          name: hassoun-v1.0.7-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.7.apk
           if-no-files-found: error
           retention-days: 14
