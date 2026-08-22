@@ -15,6 +15,7 @@ object WatchDataStore {
             .edit()
             .putFloat(KEY_CALORIES, calories.toFloat())
             .apply()
+        ComplicationRefresh.calories(context)
     }
 
     fun calories(context: Context): Double? {
@@ -29,6 +30,7 @@ object WatchDataStore {
             .putString(KEY_LAT, location.latitude.toString())
             .putString(KEY_LON, location.longitude.toString())
             .apply()
+        ComplicationRefresh.qibla(context)
     }
 
     fun location(context: Context): Pair<Double, Double>? {

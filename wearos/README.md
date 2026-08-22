@@ -1,34 +1,49 @@
 # Hassoun Wear OS
 
-This folder contains the real Wear OS implementation for the Hassoun watch experience.
+Native Hassoun watch-face implementation for Wear OS.
 
-It is intentionally split into two installable modules:
+## Structure
 
-- `watchface`: resource-only Watch Face Format (WFF) face. This is the actual Hassoun face shown by Wear OS.
-- `datasource`: native Wear OS helper app that supplies Hassoun-specific complication data for calories and Qibla.
+The project is intentionally split into two installable Android modules:
 
-The split is required because current Watch Face Format bundles cannot contain application code.
+- `watchface` — resource-only Watch Face Format (WFF) face.
+- `datasource` — the small Hassoun Watch Data app that supplies the values WFF cannot calculate by itself.
 
-## What is live on the face
+Current Wear OS requires Watch Face Format faces to be resource-only, so the face and the code-backed data provider cannot live in the same bundle.
 
-- **Steps**: rendered directly by Watch Face Format using the platform `STEP_COUNT` data source.
-- **Calories**: supplied by the Hassoun Watch Data app from Wear OS Health Services `CALORIES_DAILY`.
-- **Qibla**: calculated from the watch location to the Kaaba (21.422487, 39.826206) and displayed as a true-north bearing in degrees.
-- **Time**: rendered natively by Watch Face Format.
+## Live data on the Hassoun face
 
-Qibla on the face is a bearing (for example `102°`). It is not a continuously rotating compass needle. Tap/open the Hassoun Watch Data app to refresh location when needed.
+- **Steps** — native WFF `STEP_COUNT`, read directly from Wear OS.
+- **Calories** — Wear OS Health Services `CALORIES_DAILY`, including activity + BMR, supplied through `Hassoun Calories`.
+- **Qibla** — true-north bearing from the watch location to the Kaaba (21.422487, 39.826206), supplied through `Hassoun Qibla`.
+- **Gregorian date** — native WFF date sources.
+- **Battery** — native WFF `BATTERY_PERCENT`.
+- **Time** — native WFF digital clock, respecting the watch's 12/24-hour preference.
 
-## Install / test order
+When Hassoun receives new calories or location data it explicitly asks Wear OS to refresh the matching complication, while the normal 5-minute provider polling remains as a fallback.
 
-1. Open `wearos` as an Android Studio project (Android Studio Quail 3 or newer recommended).
-2. Install the `datasource` module on the Wear OS watch.
-3. Open **Hassoun Watch Data** on the watch and grant Activity Recognition and Location permissions.
-4. Install the `watchface` module.
-5. From the watch face picker, choose **Hassoun**.
-6. If Calories or Qibla did not auto-select, edit the Hassoun face and select **Hassoun Calories** / **Hassoun Qibla** for those slots.
+## Qibla behavior
 
-## Build
+The face displays the Qibla **bearing from true north** (for example `102°`). This is stable and useful at a glance. It is not pretending to be a continuously rotating compass needle, because complication updates are not a suitable real-time compass transport.
 
-AGP 9.3 requires Gradle 9.5 or newer. Android Studio can sync/build the project directly.
+## Install / test
 
-The watch face targets Watch Face Format version 2 so it works with Wear OS 5-class devices while remaining compatible with newer Wear OS releases.
+1. Open the `wearos` folder in Android Studio Quail 3 (2026.1.3) or newer.
+2. Install/run the `datasource` module on the watch.
+3. Open **Hassoun Watch Data** once and tap **Enable live data**.
+4. Grant **Physical activity** and **Location** when Wear OS asks.
+5. Install/run the `watchface` module.
+6. Choose **Hassoun** from the watch face picker.
+7. If the two Hassoun providers were not selected automatically, edit the face and choose:
+   - `Hassoun Calories` for Calories
+   - `Hassoun Qibla` for Qibla
+
+## Build requirements
+
+- Android Gradle Plugin 9.3.0
+- Gradle 9.5+
+- JDK 17
+- compileSdk 36
+- Watch Face Format v2 / minSdk 34 (Wear OS 5+)
+
+Android Studio's WFF-aware editor/validator should be used before store submission, and the Wear OS WFF memory validator should be run for production publishing.

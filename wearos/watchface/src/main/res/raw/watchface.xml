@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WatchFace width="450" height="450">
     <Scene>
-        <!-- Hassoun green/gold base -->
+        <!-- Hassoun green/gold base; hidden in ambient so AOD stays low-power. -->
         <PartDraw x="0" y="0" width="450" height="450">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Ellipse x="0" y="0" width="450" height="450">
                 <Fill color="#003D33" />
             </Ellipse>
@@ -14,20 +15,22 @@
             </Ellipse>
         </PartDraw>
 
-        <!-- Brand -->
         <PartText x="75" y="34" width="300" height="48">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="32" weight="BOLD" color="#F6C54F"><![CDATA[HASSOUN]]></Font>
             </Text>
         </PartText>
 
-        <!-- Native live steps: no phone bridge and no Samsung-face dependency -->
+        <!-- Native live steps. WFF reads this directly on the watch. -->
         <PartText x="55" y="96" width="155" height="30">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="#F6C54F"><![CDATA[STEPS]]></Font>
             </Text>
         </PartText>
         <PartText x="55" y="124" width="155" height="48">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="#FFFFFF">
                     <Template><![CDATA[%d]]><Parameter expression="[STEP_COUNT]" /></Template>
@@ -35,29 +38,43 @@
             </Text>
         </PartText>
 
-        <!-- Calories label -->
         <PartText x="240" y="96" width="155" height="30">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="#F6C54F"><![CDATA[CALORIES]]></Font>
             </Text>
         </PartText>
 
-        <!-- Main time -->
+        <!-- Main clock remains visible in ambient mode. -->
         <DigitalClock x="75" y="181" width="300" height="82">
-            <TimeText x="0" y="0" width="300" height="82" format="h:mm" hourFormat="SYNC_TO_DEVICE">
+            <TimeText x="0" y="0" width="300" height="82" format="h:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER" verticalAlign="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="70" weight="BOLD" color="#FFF0A3" />
             </TimeText>
         </DigitalClock>
 
-        <!-- Qibla label -->
-        <PartText x="55" y="299" width="155" height="30">
+        <!-- Native Gregorian date. -->
+        <PartText x="110" y="267" width="230" height="32">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <Text align="CENTER">
+                <Font family="SYNC_TO_DEVICE" size="20" weight="NORMAL" color="#FFFFFF">
+                    <Template><![CDATA[%s, %s %d]]>
+                        <Parameter expression="[DAY_OF_WEEK_S]" />
+                        <Parameter expression="[MONTH_S]" />
+                        <Parameter expression="[DAY]" />
+                    </Template>
+                </Font>
+            </Text>
+        </PartText>
+
+        <PartText x="55" y="304" width="155" height="30">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="#F6C54F"><![CDATA[QIBLA]]></Font>
             </Text>
         </PartText>
 
-        <!-- Small center ornament -->
-        <PartDraw x="205" y="286" width="40" height="40">
+        <PartDraw x="205" y="304" width="40" height="40">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Ellipse x="4" y="4" width="32" height="32">
                 <Stroke color="#F6C54F" thickness="3" />
             </Ellipse>
@@ -66,23 +83,29 @@
             </Arc>
         </PartDraw>
 
-        <PartText x="240" y="299" width="155" height="30">
+        <!-- Native battery avoids another provider dependency. -->
+        <PartText x="240" y="304" width="155" height="30">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="#F6C54F"><![CDATA[HASSOUN]]></Font>
+                <Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="#F6C54F"><![CDATA[BATTERY]]></Font>
             </Text>
         </PartText>
-        <PartText x="240" y="329" width="155" height="42">
+        <PartText x="240" y="334" width="155" height="48">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="17" color="#FFFFFF"><![CDATA[WEAR OS]]></Font>
+                <Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="#FFFFFF">
+                    <Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+                </Font>
             </Text>
         </PartText>
 
-        <!-- Hassoun Calories complication. Falls back to empty until data helper is installed. -->
+        <!-- Hassoun Calories complication. -->
         <ComplicationSlot
             slotId="101"
             displayName="calories_slot"
             supportedTypes="SHORT_TEXT EMPTY"
             x="240" y="124" width="155" height="48">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <BoundingOval x="0" y="0" width="155" height="48" />
             <DefaultProviderPolicy
                 primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.CaloriesComplicationService"
@@ -98,14 +121,16 @@
                     </Text>
                 </PartText>
             </Complication>
+            <Complication type="EMPTY" />
         </ComplicationSlot>
 
-        <!-- Hassoun Qibla bearing complication -->
+        <!-- Hassoun Qibla bearing complication. -->
         <ComplicationSlot
             slotId="102"
             displayName="qibla_slot"
             supportedTypes="SHORT_TEXT EMPTY"
-            x="55" y="329" width="155" height="48">
+            x="55" y="334" width="155" height="48">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
             <BoundingOval x="0" y="0" width="155" height="48" />
             <DefaultProviderPolicy
                 primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.QiblaComplicationService"
@@ -121,11 +146,7 @@
                     </Text>
                 </PartText>
             </Complication>
+            <Complication type="EMPTY" />
         </ComplicationSlot>
-
-        <!-- Preserve a low-pixel ambient face -->
-        <PartDraw x="0" y="0" width="450" height="450">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-        </PartDraw>
     </Scene>
 </WatchFace>

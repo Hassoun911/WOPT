@@ -3,14 +3,13 @@ package ca.hassoun.wear.data
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.PassiveListenerConfig
 
 object HealthRegistration {
     fun register(context: Context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+        if (context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
             return
         }
 
