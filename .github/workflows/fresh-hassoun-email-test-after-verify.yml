@@ -1,0 +1,54 @@
+name: Fresh Hassoun Email Test After Verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fresh-hassoun-email-test-after-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Reset only the one-time test row
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --command "UPDATE email_outbox SET status='pending', attempts=0, last_error=NULL, sent_at=NULL, scheduled_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE idempotency_key='production-test-20260821-windsor-hassoun-v1';"
+      - name: Wait for one fresh Worker attempt
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            sleep 45
+            npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, attempts, last_error, sent_at FROM email_outbox WHERE idempotency_key='production-test-20260821-windsor-hassoun-v1' LIMIT 1;" > /tmp/result.json
+            cat /tmp/result.json
+            status="$(jq -r '.[0].results[0].status // empty' /tmp/result.json)"
+            if [ "$status" = "sent" ]; then
+              echo "Hassoun production test sent successfully"
+              exit 0
+            fi
+            attempts="$(jq -r '.[0].results[0].attempts // 0' /tmp/result.json)"
+            if [ "$attempts" -ge 1 ]; then
+              echo "A fresh provider attempt occurred but did not send."
+              jq -r '.[0].results[0].last_error // "Unknown error"' /tmp/result.json
+              exit 1
+            fi
+          done
+          echo "Worker did not process the test row in time"
+          exit 1
