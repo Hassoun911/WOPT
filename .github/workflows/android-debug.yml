@@ -1,9 +1,10 @@
-# Build Hassoun v0.5.5 widget studio + Samsung LockStar release
 name: Build Hassoun Android APK
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - work/hassoun-1.0-store-admin
     paths:
       - "mobile/**"
       - ".github/workflows/android-debug.yml"
@@ -39,28 +40,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Regenerate Expo and widget image assets
+      - name: Verify approved Hassoun branding assets
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y librsvg2-bin pngcrush
-          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/icon.png
-          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/adaptive-icon.png
-          rsvg-convert -w 512 -h 512 assets/hassoun-notification.svg -o /tmp/notification-icon.png
-          rsvg-convert -w 512 -h 512 assets/hassoun-brand.svg -o /tmp/hassoun-logo.png
-          rsvg-convert -w 512 -h 512 assets/hassoun-brand.svg -o /tmp/splash-logo.png
-          pngcrush -q -ow /tmp/icon.png
-          pngcrush -q -ow /tmp/adaptive-icon.png
-          pngcrush -q -ow /tmp/notification-icon.png
-          pngcrush -q -ow /tmp/hassoun-logo.png
-          pngcrush -q -ow /tmp/splash-logo.png
-          cp /tmp/icon.png assets/icon.png
-          cp /tmp/adaptive-icon.png assets/adaptive-icon.png
-          cp /tmp/notification-icon.png assets/notification-icon.png
-          cp /tmp/hassoun-logo.png assets/hassoun-logo.png
-          cp /tmp/splash-logo.png assets/splash-logo.png
+          test -s assets/hassoun-logo.png
+          test -s assets/icon.png
+          test -s assets/adaptive-icon.png
+          test -s assets/splash-logo.png
+          test -s assets/notification-icon.png
+          sha256sum assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
-          cp /tmp/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-          file modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          echo "Using committed approved PNG branding. No legacy SVG regeneration is allowed."
 
       - name: Check Expo push configuration
         run: |
@@ -78,12 +68,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.5.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.4.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.5-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.5.apk
+          name: hassoun-v1.0.4-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.4.apk
           if-no-files-found: error
           retention-days: 14
