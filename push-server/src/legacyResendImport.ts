@@ -1,7 +1,18 @@
 import type { Env } from "./types";
 
-const IMPORT_KEY = "resend_prayer_users_v1";
+const IMPORT_KEY = "resend_prayer_users_v2";
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
+
+// These addresses are the legacy Windsor prayer recipients visible in the
+// owner's Resend delivery screen. Suppressed recipients are retained in the
+// CRM for history but are never re-enabled for email delivery.
+const VERIFIED_LEGACY_RECIPIENTS: Person[] = [
+  { email: "solutionsleb@gmail.com", blocked: false },
+  { email: "toufic@propertycousins.ca", blocked: true },
+  { email: "reemhassoun@gmail.com", blocked: true },
+  { email: "ramahassoun740@gmail.com", blocked: false },
+  { email: "windsor.hassoun@gmail.com", blocked: false }
+];
 
 type ResendEmail = { id?: string; to?: string[] | string; subject?: string; last_event?: string };
 type ResendContact = { id?: string; email?: string; unsubscribed?: boolean };
@@ -66,8 +77,6 @@ async function historicalPrayerRecipients(env: Env) {
     after = last.id;
   }
 
-  // Contacts are used only to preserve unsubscribe state for addresses already
-  // discovered in Hassoun prayer-email history. Unrelated Resend contacts are ignored.
   try {
     after = "";
     for (let page = 0; page < 50; page += 1) {
@@ -149,8 +158,20 @@ export async function importLegacyResendUsersOnce(env: Env) {
   if (done) return { skipped: true, summary: done.summary_json };
   if (!env.RESEND_API_KEY) return { skipped: true, reason: "resend_not_configured" };
 
-  const people = await historicalPrayerRecipients(env);
-  if (!people.length) return { skipped: true, reason: "no_historical_prayer_recipients" };
+  let discovered: Person[] = [];
+  try {
+    discovered = await historicalPrayerRecipients(env);
+  } catch (error) {
+    console.warn("Historical Resend prayer scan failed; using verified legacy set", error);
+  }
+
+  const merged = new Map<string, Person>();
+  for (const person of discovered) merged.set(person.email, { ...person });
+  for (const person of VERIFIED_LEGACY_RECIPIENTS) {
+    const current = merged.get(person.email);
+    merged.set(person.email, { email: person.email, blocked: Boolean(person.blocked || current?.blocked) });
+  }
+  const people = [...merged.values()];
 
   let inserted = 0;
   let blocked = 0;
