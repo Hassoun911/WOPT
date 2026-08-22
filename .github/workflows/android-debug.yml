@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -45,8 +47,58 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Connect Ask the Sheikh to the mobile app
-        run: node scripts/apply-ask-sheikh-ui.mjs
+      - name: Apply approved clean Home layout
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'App.tsx';
+          let src = fs.readFileSync(path, 'utf8');
+
+          function replaceOnce(from, to, label) {
+            if (!src.includes(from)) throw new Error(`Missing App.tsx anchor: ${label}`);
+            src = src.replace(from, to);
+          }
+
+          if (!src.includes('import AskSheikh from "./src/AskSheikh";')) {
+            replaceOnce(
+              'import ScrollingTicker from "./src/ScrollingTicker";',
+              'import ScrollingTicker from "./src/ScrollingTicker";\nimport AskSheikh from "./src/AskSheikh";',
+              'AskSheikh import'
+            );
+          }
+
+          src = src.replace(
+            /type AppTab = "home" \| "quran" \| "quiz" \| "alerts" \| "events"(?: \| "sheikh")? \| "more";/,
+            'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "sheikh" | "more";'
+          );
+
+          const start = src.indexOf('  const homeScreen = (');
+          const end = src.indexOf('  const alertsScreen = (', start);
+          if (start < 0 || end < 0) throw new Error('Could not locate homeScreen block');
+
+          const home = `  const homeScreen = (\n    <ScrollView style={styles.flex} contentContainerStyle={styles.cleanHomeContent} showsVerticalScrollIndicator={false}>\n      {header}\n      {next ? (\n        <View style={styles.cleanHero}>\n          <View style={styles.cleanHeroTop}>\n            <View style={styles.cleanHeroDateBlock}>\n              <Text style={styles.cleanHeroDate}>{shortDate}</Text>\n              {hijriDate ? <Text style={styles.cleanHeroHijri}>🌙 {hijriDate}</Text> : null}\n              <View style={styles.cleanSyncRow}><View style={[styles.syncDot, !live && styles.syncDotSaved]} /><Text style={styles.cleanSyncText}>{live ? (locale === "ar" ? "متزامن عبر Hassoun" : "Synced by Hassoun") : (locale === "ar" ? "الجدول المحلي محفوظ" : "Saved local schedule")}</Text></View>\n            </View>\n            <View style={styles.cleanHeroLogoShell}><Image source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.cleanHeroLogo} /></View>\n          </View>\n          <View style={styles.cleanNextRow}>\n            <View style={styles.cleanNextCopy}>\n              <Text style={styles.cleanNextEyebrow}>{locale === "ar" ? \`الصلاة القادمة\${next.isTomorrow ? " • غداً" : ""}\` : \`NEXT PRAYER\${next.isTomorrow ? " • TOMORROW" : ""}\`}</Text>\n              <View style={styles.cleanPrayerNameLine}><Text style={styles.cleanPrayerName}>{NAMES[next.prayer][locale]}</Text><Text style={styles.cleanPrayerOther}>{NAMES[next.prayer][locale === "en" ? "ar" : "en"]}</Text></View>\n              <Text style={styles.cleanPrayerTime}>{formatPrayerTime(next.time, locale)}</Text>\n            </View>\n            <View style={styles.cleanCountdown}><Text style={styles.cleanCountdownValue}>{countdownLabel(next.secondsRemaining, locale)}</Text><Text style={styles.cleanCountdownLabel}>{locale === "ar" ? "متبقي" : "LEFT"}</Text></View>\n          </View>\n          <View style={styles.cleanPrayerStrip}>\n            {today ? PRAYER_KEYS.map((prayer) => { const active = next?.prayer === prayer; const muted = !phoneAlertPreferences[prayer].athan; return (\n              <Pressable accessibilityRole="button" accessibilityLabel={\`\${NAMES[prayer].en} \${muted ? "Adhan muted" : "Adhan on"}\`} onPress={() => void togglePrayerAudio(prayer)} key={prayer} style={[styles.cleanPrayerChip, active && styles.cleanPrayerChipActive, muted && styles.cleanPrayerChipMuted]}>\n                <Text style={styles.cleanPrayerIcon}>{PRAYER_ICONS[prayer]}</Text>\n                <Text numberOfLines={1} style={[styles.cleanPrayerChipName, active && styles.cleanPrayerChipNameActive]}>{NAMES[prayer][locale]}</Text>\n                <Text numberOfLines={1} style={[styles.cleanPrayerChipTime, active && styles.cleanPrayerChipNameActive]}>{formatPrayerTime(active && next?.isTomorrow ? next.time : today[prayer], locale)}</Text>\n              </Pressable>\n            ); }) : null}\n          </View>\n        </View>\n      ) : null}\n\n      <View style={styles.cleanExploreHeading}><View><Text style={styles.cleanExploreEyebrow}>HASSOUN</Text><Text style={styles.cleanExploreTitle}>{locale === "ar" ? "استكشف Hassoun" : "Explore Hassoun"}</Text></View><Text style={styles.cleanExploreHint}>{locale === "ar" ? "بسيط وسريع" : "Simple & quick"}</Text></View>\n      <View style={styles.cleanActionGrid}>\n        <Pressable onPress={() => runtimeFeatures.quranEnabled && setActiveTab("quran")} style={styles.cleanActionCard}><View style={styles.cleanActionIcon}><Text style={styles.cleanActionEmoji}>📖</Text></View><View style={styles.cleanActionCopy}><Text style={styles.cleanActionTitle}>{locale === "ar" ? "القرآن الكريم" : "Qur’an"}</Text><Text style={styles.cleanActionText}>{locale === "ar" ? "اقرأ واستمع" : "Read & listen"}</Text></View><Text style={styles.cleanActionArrow}>›</Text></Pressable>\n        {runtimeFeatures.askSheikhEnabled ? <Pressable onPress={() => setActiveTab("sheikh")} style={styles.cleanActionCard}><View style={styles.cleanActionIcon}><Text style={styles.cleanActionEmoji}>✨</Text></View><View style={styles.cleanActionCopy}><Text style={styles.cleanActionTitle}>{locale === "ar" ? "اسأل الشيخ" : "Ask the Sheikh"}</Text><Text style={styles.cleanActionText}>{locale === "ar" ? "بحث إسلامي ذكي" : "Smart Islamic search"}</Text></View><Text style={styles.cleanActionArrow}>›</Text></Pressable> : null}\n        <Pressable onPress={() => runtimeFeatures.gamesEnabled && setActiveTab("quiz")} style={styles.cleanActionCard}><View style={styles.cleanActionIcon}><Text style={styles.cleanActionEmoji}>🎮</Text></View><View style={styles.cleanActionCopy}><Text style={styles.cleanActionTitle}>{locale === "ar" ? "الألعاب" : "Games"}</Text><Text style={styles.cleanActionText}>{locale === "ar" ? "تعلّم والعب" : "Learn & play"}</Text></View><Text style={styles.cleanActionArrow}>›</Text></Pressable>\n        <Pressable onPress={() => runtimeFeatures.islamicEventsEnabled && setActiveTab("events")} style={styles.cleanActionCard}><View style={styles.cleanActionIcon}><Text style={styles.cleanActionEmoji}>🌙</Text></View><View style={styles.cleanActionCopy}><Text style={styles.cleanActionTitle}>{locale === "ar" ? "المناسبات" : "Events"}</Text><Text style={styles.cleanActionText}>{upcomingIslamicEvent ? (locale === "ar" ? upcomingIslamicEvent.name.ar : upcomingIslamicEvent.name.en) : (locale === "ar" ? "التقويم الإسلامي" : "Islamic calendar")}</Text></View><Text style={styles.cleanActionArrow}>›</Text></Pressable>\n      </View>\n      <View style={styles.cleanInspiration}><Text style={styles.cleanInspirationIcon}>🏮</Text><View style={styles.cleanInspirationCopy}><Text style={styles.cleanInspirationLabel}>{locale === "ar" ? "إلهام اليوم" : "DAILY INSPIRATION"}</Text><Text style={styles.cleanInspirationText}>{locale === "ar" ? "بذكر الله تطمئن القلوب." : "Hearts find comfort in the remembrance of Allah."}</Text><Text style={styles.cleanInspirationRef}>Qur’an 13:28</Text></View></View>\n      <Text style={styles.cleanFooter}>{prayerLocation?.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer times calculated for current GPS location"} • {prayerTimeZone}</Text>\n    </ScrollView>\n  );\n\n`;
+          src = src.slice(0, start) + home + src.slice(end);
+
+          if (!src.includes('activeTab === "sheikh"')) {
+            const route = '        : activeTab === "events" && runtimeFeatures.islamicEventsEnabled\n          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />\n          : activeTab === "more"';
+            replaceOnce(route, '        : activeTab === "events" && runtimeFeatures.islamicEventsEnabled\n          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />\n          : activeTab === "sheikh" && runtimeFeatures.askSheikhEnabled\n            ? <AskSheikh locale={locale} runtime={runtimeFeatures} onClose={() => setActiveTab("home")} />\n          : activeTab === "more"', 'Ask Sheikh route');
+          }
+
+          src = src.replace(/\n\s*\{ tab: "quiz", emoji: "🎮", en: "Games", ar: "ألعاب" \},/, '');
+
+          if (!src.includes('cleanHomeContent:')) {
+            const anchor = 'const styles = StyleSheet.create({\n';
+            const styles = `  cleanHomeContent: { padding: 16, paddingBottom: 24 },\n  cleanHero: { backgroundColor: "#075b47", borderRadius: 28, padding: 16, borderWidth: 1, borderColor: "#b99045", shadowColor: "#0a3d32", shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 5 },\n  cleanHeroTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },\n  cleanHeroDateBlock: { flex: 1 }, cleanHeroDate: { color: "#fff7e7", fontSize: 15, fontWeight: "900" }, cleanHeroHijri: { color: "#e6d4a8", fontSize: 10.5, fontWeight: "700", marginTop: 4 },\n  cleanSyncRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 9 }, cleanSyncText: { color: "#c8ddd5", fontSize: 7.5, fontWeight: "800" },\n  cleanHeroLogoShell: { width: 76, height: 76, borderRadius: 20, backgroundColor: "rgba(0,38,31,.35)", borderWidth: 1, borderColor: "rgba(225,190,112,.70)", overflow: "hidden", alignItems: "center", justifyContent: "center" }, cleanHeroLogo: { width: 72, height: 72 },\n  cleanNextRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 15 }, cleanNextCopy: { flex: 1 }, cleanNextEyebrow: { color: "#e7c875", fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },\n  cleanPrayerNameLine: { flexDirection: "row", alignItems: "baseline", gap: 9, marginTop: 4 }, cleanPrayerName: { color: "#fff", fontSize: 31, fontWeight: "900" }, cleanPrayerOther: { color: "#c8ddd5", fontSize: 15, fontWeight: "700" }, cleanPrayerTime: { color: "#fff", fontSize: 23, fontWeight: "900", marginTop: 4 },\n  cleanCountdown: { width: 78, height: 78, borderRadius: 39, borderWidth: 2, borderColor: "#d8b968", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,.06)" }, cleanCountdownValue: { color: "#fff", fontSize: 13, fontWeight: "900", textAlign: "center" }, cleanCountdownLabel: { color: "#e6d4a8", fontSize: 6.5, fontWeight: "900", letterSpacing: .8, marginTop: 2 },\n  cleanPrayerStrip: { flexDirection: "row", gap: 5, marginTop: 17 }, cleanPrayerChip: { flex: 1, minWidth: 0, minHeight: 68, borderRadius: 15, backgroundColor: "rgba(255,255,255,.07)", alignItems: "center", justifyContent: "center", paddingHorizontal: 3, borderWidth: 1, borderColor: "rgba(255,255,255,.06)" }, cleanPrayerChipActive: { backgroundColor: "#f7f0df", borderColor: "#e0c06b" }, cleanPrayerChipMuted: { opacity: .66 }, cleanPrayerIcon: { fontSize: 15 }, cleanPrayerChipName: { color: "#dbeae5", fontSize: 7.2, fontWeight: "900", marginTop: 2 }, cleanPrayerChipTime: { color: "#fff", fontSize: 8.6, fontWeight: "900", marginTop: 2 }, cleanPrayerChipNameActive: { color: "#075b47" },\n  cleanExploreHeading: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 20, marginBottom: 9 }, cleanExploreEyebrow: { color: "#a17c35", fontSize: 7, fontWeight: "900", letterSpacing: 1.2 }, cleanExploreTitle: { color: "#173f35", fontSize: 19, fontWeight: "900", marginTop: 2 }, cleanExploreHint: { color: "#84908b", fontSize: 8, fontWeight: "700" },\n  cleanActionGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 9 }, cleanActionCard: { width: "48.7%", minHeight: 82, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ded6", padding: 11, flexDirection: "row", alignItems: "center", gap: 8 }, cleanActionIcon: { width: 39, height: 39, borderRadius: 13, backgroundColor: "#e9f2ed", alignItems: "center", justifyContent: "center" }, cleanActionEmoji: { fontSize: 20 }, cleanActionCopy: { flex: 1, minWidth: 0 }, cleanActionTitle: { color: "#173f35", fontSize: 11.5, fontWeight: "900" }, cleanActionText: { color: "#8a948f", fontSize: 7.2, lineHeight: 10, marginTop: 2 }, cleanActionArrow: { color: "#0b654f", fontSize: 20 },\n  cleanInspiration: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, borderRadius: 20, backgroundColor: "#edf3ec", borderWidth: 1, borderColor: "#d6e0d6", padding: 12 }, cleanInspirationIcon: { fontSize: 22 }, cleanInspirationCopy: { flex: 1 }, cleanInspirationLabel: { color: "#9b7a39", fontSize: 7, fontWeight: "900", letterSpacing: 1 }, cleanInspirationText: { color: "#294e44", fontSize: 11.5, lineHeight: 16, fontWeight: "800", marginTop: 2 }, cleanInspirationRef: { color: "#87918c", fontSize: 7.5, fontWeight: "700", marginTop: 2 }, cleanFooter: { color: "#8a928e", fontSize: 7.5, textAlign: "center", marginTop: 15 },\n`;
+            replaceOnce(anchor, anchor + styles, 'clean styles');
+          }
+
+          fs.writeFileSync(path, src);
+
+          let cfg = fs.readFileSync('app.config.ts', 'utf8');
+          cfg = cfg.replace('version: "1.0.4"', 'version: "1.0.5"').replace('versionCode: 45', 'versionCode: 46');
+          fs.writeFileSync('app.config.ts', cfg);
+          NODE
 
       - name: Repair and verify approved Hassoun branding assets
         run: |
@@ -71,13 +123,8 @@ jobs:
           cp /tmp/hassoun-clean.png assets/icon.png
           cp /tmp/hassoun-clean.png assets/adaptive-icon.png
           cp /tmp/hassoun-clean.png assets/splash-logo.png
-          cmp -s assets/hassoun-logo.png assets/icon.png
-          cmp -s assets/hassoun-logo.png assets/adaptive-icon.png
-          cmp -s assets/hassoun-logo.png assets/splash-logo.png
-          sha256sum assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-          echo "Approved Hassoun pixels were losslessly re-encoded to a standards-valid PNG for Expo/Jimp."
 
       - name: Check Expo push configuration
         run: |
@@ -87,6 +134,17 @@ jobs:
       - name: Typecheck mobile app
         run: npx tsc --noEmit
 
+      - name: Persist clean Home source
+        if: github.event_name != 'pull_request'
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx mobile/app.config.ts
+          git commit -m "Apply clean Hassoun v1.0.5 Android Home layout" || true
+          git pull --rebase origin work/hassoun-1.0-store-admin
+          git push origin HEAD:work/hassoun-1.0-store-admin
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
 
@@ -95,13 +153,13 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.4.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.5.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v1.0.4-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.4.apk
+          name: hassoun-v1.0.5-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.5.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -112,18 +170,19 @@ jobs:
           cat > .github/android-latest-build.txt <<EOF
           status=ready
           app=Hassoun
-          version=1.0.4
-          android_version_code=45
-          artifact=hassoun-v1.0.4-${{ github.run_number }}
-          apk_filename=Hassoun-v1.0.4.apk
+          version=1.0.5
+          android_version_code=46
+          artifact=hassoun-v1.0.5-${{ github.run_number }}
+          apk_filename=Hassoun-v1.0.5.apk
           source_commit=${{ github.sha }}
           workflow_run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           logo_source=approved-hassoun-png-lossless-reencode
           ask_the_sheikh=enabled
+          clean_home_layout=enabled
           built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/android-latest-build.txt
-          git commit -m "Record Hassoun v1.0.4 APK build" || true
-          git push origin HEAD:work/hassoun-1.0-store-admin
+          git commit -m "Record Hassoun v1.0.5 APK build" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin || true
