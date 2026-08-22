@@ -1,0 +1,49 @@
+name: Validate Hassoun Smart CRM Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-hassoun-smart-crm-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            pwa/package-lock.json
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Validate CRM / PWA
+        working-directory: pwa
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Record validation success
+        run: |
+          cat > .github/smart-crm-validation.txt <<EOF
+          smart_crm_validation=passed
+          validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          source_commit=$(git rev-parse HEAD)
+          worker=typecheck+tests passed
+          crm=pwa production build passed
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/smart-crm-validation.txt
+          git commit -m "Record Hassoun smart CRM validation" || true
+          git push origin HEAD:main || true
