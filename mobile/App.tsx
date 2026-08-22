@@ -41,6 +41,7 @@ import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
 import { addDateDays, formatPrayerTime, windsorDateKey, windsorLocalToDate } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
+import { DEFAULT_RUNTIME_CONFIG, loadHassounRuntimeConfig, type HassounRuntimeConfig } from "./src/remoteConfig";
 
 type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";
 
@@ -116,6 +117,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);
   const [islamicEventAlertsEnabled, setIslamicEventAlertsEnabled] = useState(true);
   const [islamicEventAlertsBusy, setIslamicEventAlertsBusy] = useState(false);
+  const [runtimeFeatures, setRuntimeFeatures] = useState<HassounRuntimeConfig>(DEFAULT_RUNTIME_CONFIG);
 
   const prayerTimeZone = prayerLocation?.timezone || WINDSOR_TIME_ZONE;
   const prayerLocationLabel = prayerLocation?.label || CITY_LABEL;
@@ -130,6 +132,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
   useEffect(() => {
     void reportHassounActivity("app_open");
+    void loadHassounRuntimeConfig().then(setRuntimeFeatures).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -340,7 +343,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <View style={styles.dateHero}><View style={styles.dateCopy}><Text style={styles.datePrimary}>{shortDate}</Text>{hijriDate ? <Text style={styles.dateHijri}>🌙 {hijriDate}</Text> : null}<View style={styles.syncRow}><View style={[styles.syncDot, !live && styles.syncDotSaved]} /><Text style={styles.syncText}>{live ? (locale === "ar" ? "متزامن عبر Hassoun" : "Synced by Hassoun") : (locale === "ar" ? "الجدول الرسمي محفوظ" : "Saved local schedule")}</Text></View></View><View style={styles.heroLogoShell}><Image source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.heroLogo} /></View></View>
 
       {upcomingIslamicEvent && upcomingIslamicDays !== null && upcomingIslamicDays <= 15 ? (
-        <Pressable onPress={() => setActiveTab("events")} style={styles.eventCountdownCard}>
+        <Pressable onPress={() => runtimeFeatures.islamicEventsEnabled && setActiveTab("events")} style={styles.eventCountdownCard}>
           <View style={styles.eventCountdownIcon}><Text style={styles.eventCountdownEmoji}>{upcomingIslamicEvent.emoji}</Text></View>
           <View style={styles.eventCountdownCopy}><Text style={styles.eventCountdownEyebrow}>{locale === "ar" ? "المناسبة الإسلامية القادمة" : "UPCOMING ISLAMIC EVENT"}</Text><Text style={styles.eventCountdownTitle}>{upcomingIslamicEvent.name[locale]}</Text><Text style={styles.eventCountdownText}>{locale === "ar" ? `متبقي ${islamicEventCountdown(upcomingIslamicDays, locale)}` : `${islamicEventCountdown(upcomingIslamicDays, locale)} remaining`} • {upcomingIslamicEvent.description[locale]}</Text></View>
           <Text style={styles.eventCountdownArrow}>›</Text>
@@ -352,11 +355,11 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       <View style={styles.sectionHeadingRow}><View><Text style={styles.sectionTitle}>{locale === "ar" ? "جدول اليوم" : "Today’s Schedule"}</Text><Text style={styles.sectionHint}>{locale === "ar" ? "اضغط على أي صلاة لكتم أو تشغيل صوت الأذان" : "Tap any prayer to mute or unmute its Adhan audio"}</Text></View><Text style={styles.sectionMeta}>{locale === "ar" ? "٥ صلوات" : "5 prayers"}</Text></View>
       <View style={styles.prayerList}>{today ? PRAYER_KEYS.map((prayer) => { const active = next?.prayer === prayer; const muted = !phoneAlertPreferences[prayer].athan; return <Pressable accessibilityRole="button" accessibilityLabel={`${NAMES[prayer].en} ${muted ? "Adhan muted" : "Adhan on"}`} onPress={() => void togglePrayerAudio(prayer)} key={prayer} style={({ pressed }) => [styles.prayerRow, active && styles.prayerRowActive, muted && styles.prayerRowMuted, pressed && styles.prayerRowPressed]}><View style={[styles.prayerIconWrap, active && styles.prayerIconWrapActive]}><Text style={styles.prayerIcon}>{PRAYER_ICONS[prayer]}</Text></View><View style={styles.prayerNameBlock}><Text style={[styles.prayerName, active && styles.prayerActiveText]}>{NAMES[prayer][locale]}</Text><View style={styles.prayerSubRow}><Text style={[styles.prayerOtherName, active && styles.prayerActiveMuted]}>{NAMES[prayer][locale === "en" ? "ar" : "en"]}</Text>{active && next?.isTomorrow ? <Text style={styles.tomorrowTag}>{locale === "ar" ? "غداً" : "Tomorrow"}</Text> : null}</View></View><View style={styles.prayerRight}><View style={[styles.audioPill, muted && styles.audioPillMuted]}><Text style={[styles.audioPillText, muted && styles.audioPillTextMuted]}>{muted ? (locale === "ar" ? "مكتوم" : "MUTED") : (locale === "ar" ? "الأذان يعمل" : "ADHAN ON")}</Text></View><Text style={[styles.prayerTime, active && styles.prayerActiveText]}>{formatPrayerTime(active && next?.isTomorrow ? next.time : today[prayer], locale)}</Text></View></Pressable>; }) : <Text style={styles.emptyText}>No prayer schedule is available for {todayKey}.</Text>}</View>
 
-      <Pressable onPress={() => setActiveTab("quiz")} style={styles.quizCard}><View style={styles.quizTopRow}><View style={styles.quizIconWrap}><Text style={styles.quizIcon}>🧠</Text></View><View style={styles.quizCopy}><Text style={styles.quizEyebrow}>{locale === "ar" ? "تعلّم كل يوم" : "LEARN EVERY DAY"}</Text><Text style={styles.quizTitle}>{locale === "ar" ? "المسابقة والألعاب الجماعية" : "Quiz & Multiplayer Games"}</Text><Text style={styles.quizDescription}>{locale === "ar" ? "مسابقة يومية + Trivia وImposter وألعاب إسلامية ورياضية جماعية." : "Daily quiz + live Trivia, Imposter and Islamic/sports multiplayer games."}</Text></View><Text style={styles.quizArrow}>›</Text></View><View style={styles.quizStats}><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>{badge.emoji}</Text><Text style={styles.quizStatValue}>{badge.name[locale]}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "الشارة" : "Badge"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🔥</Text><Text style={styles.quizStatValue}>{quizStats.streak}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "سلسلة" : "Streak"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🏆</Text><Text style={styles.quizStatValue}>{quizStats.totalWins}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "انتصارات" : "Wins"}</Text></View></View>{upcomingBadge ? <Text style={styles.quizNextBadge}>{upcomingBadge.emoji} {locale === "ar" ? "الشارة القادمة" : "Next badge"}: {upcomingBadge.name[locale]} • {Math.max(0, upcomingBadge.minWins - quizStats.totalWins)} {locale === "ar" ? "انتصارات" : "wins"}</Text> : null}</Pressable>
+      <Pressable onPress={() => runtimeFeatures.gamesEnabled && setActiveTab("quiz")} style={styles.quizCard}><View style={styles.quizTopRow}><View style={styles.quizIconWrap}><Text style={styles.quizIcon}>🧠</Text></View><View style={styles.quizCopy}><Text style={styles.quizEyebrow}>{locale === "ar" ? "تعلّم كل يوم" : "LEARN EVERY DAY"}</Text><Text style={styles.quizTitle}>{locale === "ar" ? "المسابقة والألعاب الجماعية" : "Quiz & Multiplayer Games"}</Text><Text style={styles.quizDescription}>{locale === "ar" ? "مسابقة يومية + Trivia وImposter وألعاب إسلامية ورياضية جماعية." : "Daily quiz + live Trivia, Imposter and Islamic/sports multiplayer games."}</Text></View><Text style={styles.quizArrow}>›</Text></View><View style={styles.quizStats}><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>{badge.emoji}</Text><Text style={styles.quizStatValue}>{badge.name[locale]}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "الشارة" : "Badge"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🔥</Text><Text style={styles.quizStatValue}>{quizStats.streak}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "سلسلة" : "Streak"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🏆</Text><Text style={styles.quizStatValue}>{quizStats.totalWins}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "انتصارات" : "Wins"}</Text></View></View>{upcomingBadge ? <Text style={styles.quizNextBadge}>{upcomingBadge.emoji} {locale === "ar" ? "الشارة القادمة" : "Next badge"}: {upcomingBadge.name[locale]} • {Math.max(0, upcomingBadge.minWins - quizStats.totalWins)} {locale === "ar" ? "انتصارات" : "wins"}</Text> : null}</Pressable>
 
-      <View style={styles.smartGrid}><Pressable onPress={() => setActiveTab("quran")} style={styles.smartCard}><Text style={styles.smartEmoji}>📖</Text><Text style={styles.smartTitle}>{locale === "ar" ? "القرآن" : "Qur’an"}</Text><Text style={styles.smartText}>{locale === "ar" ? "قارئ أندرويد أصلي" : "Native Android reader"}</Text></Pressable><Pressable onPress={() => setActiveTab("alerts")} style={styles.smartCard}><Text style={styles.smartEmoji}>🔔</Text><Text style={styles.smartTitle}>{locale === "ar" ? "التنبيهات" : "Alerts"}</Text><Text style={styles.smartText}>{alertsEnabled ? (locale === "ar" ? "مفعّلة" : "Enabled") : (locale === "ar" ? "اضبط التذكيرات" : "Set reminders")}</Text></Pressable></View>
+      <View style={styles.smartGrid}><Pressable onPress={() => runtimeFeatures.quranEnabled && setActiveTab("quran")} style={styles.smartCard}><Text style={styles.smartEmoji}>📖</Text><Text style={styles.smartTitle}>{locale === "ar" ? "القرآن" : "Qur’an"}</Text><Text style={styles.smartText}>{locale === "ar" ? "قارئ أندرويد أصلي" : "Native Android reader"}</Text></Pressable><Pressable onPress={() => runtimeFeatures.alertsEnabled && setActiveTab("alerts")} style={styles.smartCard}><Text style={styles.smartEmoji}>🔔</Text><Text style={styles.smartTitle}>{locale === "ar" ? "التنبيهات" : "Alerts"}</Text><Text style={styles.smartText}>{alertsEnabled ? (locale === "ar" ? "مفعّلة" : "Enabled") : (locale === "ar" ? "اضبط التذكيرات" : "Set reminders")}</Text></Pressable></View>
 
-      <Pressable onPress={() => setActiveTab("events")} style={styles.eventsEntryCard}><View style={styles.eventsEntryIcon}><Text style={styles.eventsEntryEmoji}>🌙</Text></View><View style={styles.eventsEntryCopy}><Text style={styles.eventsEntryEyebrow}>{locale === "ar" ? "التقويم الإسلامي" : "ISLAMIC CALENDAR"}</Text><Text style={styles.eventsEntryTitle}>{locale === "ar" ? "المناسبات الإسلامية" : "Islamic Events"}</Text><Text style={styles.eventsEntryText}>{upcomingIslamicEvent ? `${locale === "ar" ? "القادمة" : "Next"}: ${upcomingIslamicEvent.name[locale]} • ${islamicEventCountdown(upcomingIslamicDays ?? 0, locale)}` : (locale === "ar" ? "شاهد مناسبات السنة" : "View the full year")}</Text></View><Text style={styles.eventsEntryArrow}>›</Text></Pressable>
+      <Pressable onPress={() => runtimeFeatures.islamicEventsEnabled && setActiveTab("events")} style={styles.eventsEntryCard}><View style={styles.eventsEntryIcon}><Text style={styles.eventsEntryEmoji}>🌙</Text></View><View style={styles.eventsEntryCopy}><Text style={styles.eventsEntryEyebrow}>{locale === "ar" ? "التقويم الإسلامي" : "ISLAMIC CALENDAR"}</Text><Text style={styles.eventsEntryTitle}>{locale === "ar" ? "المناسبات الإسلامية" : "Islamic Events"}</Text><Text style={styles.eventsEntryText}>{upcomingIslamicEvent ? `${locale === "ar" ? "القادمة" : "Next"}: ${upcomingIslamicEvent.name[locale]} • ${islamicEventCountdown(upcomingIslamicDays ?? 0, locale)}` : (locale === "ar" ? "شاهد مناسبات السنة" : "View the full year")}</Text></View><Text style={styles.eventsEntryArrow}>›</Text></Pressable>
 
       <View style={styles.inspirationCard}><View style={styles.inspirationIcon}><Text style={styles.inspirationEmoji}>🏮</Text></View><View style={styles.inspirationCopy}><Text style={styles.inspirationEyebrow}>{locale === "ar" ? "إلهام اليوم" : "DAILY INSPIRATION"}</Text><Text style={styles.inspirationText}>{locale === "ar" ? "بذكر الله تطمئن القلوب." : "Hearts find comfort in the remembrance of Allah."}</Text><Text style={styles.inspirationRef}>Qur’an 13:28</Text></View></View>
       <Text style={styles.footer}>{prayerLocation?.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : "Prayer times calculated for current GPS location"} • {prayerTimeZone}</Text>
@@ -405,7 +408,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
       <View style={styles.emailCard}>
         <View style={styles.emailIcon}><Text style={styles.emailEmoji}>🌙</Text></View>
-        <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "ينبهك Hassoun قبل ١٥ يوماً من المناسبة القادمة. هذا إعداد مستقل عن صفحة المناسبات." : "Hassoun can remind you 15 days before the next Islamic event. This is a real alert setting, separate from the Events page."}</Text><Pressable onPress={() => setActiveTab("events")}><Text style={styles.eventSettingsLink}>{locale === "ar" ? "عرض كل المناسبات ←" : "View all Islamic events →"}</Text></Pressable></View>
+        <View style={styles.settingCopy}><Text style={styles.settingTitle}>{locale === "ar" ? "تنبيهات المناسبات الإسلامية" : "Islamic event reminders"}</Text><Text style={styles.settingText}>{locale === "ar" ? "ينبهك Hassoun قبل ١٥ يوماً من المناسبة القادمة. هذا إعداد مستقل عن صفحة المناسبات." : "Hassoun can remind you 15 days before the next Islamic event. This is a real alert setting, separate from the Events page."}</Text><Pressable onPress={() => runtimeFeatures.islamicEventsEnabled && setActiveTab("events")}><Text style={styles.eventSettingsLink}>{locale === "ar" ? "عرض كل المناسبات ←" : "View all Islamic events →"}</Text></Pressable></View>
         <Switch value={islamicEventAlertsEnabled} onValueChange={(value) => void toggleIslamicEventAlerts(value)} disabled={islamicEventAlertsBusy} trackColor={{ false: "#d9ddd9", true: "#95c3b4" }} thumbColor={islamicEventAlertsEnabled ? "#0b5b47" : "#f8faf8"} />
       </View>
 
@@ -415,13 +418,13 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
   const moreScreen = <SettingsHub locale={locale} onToggleLocale={toggleLocale} onOpenAlerts={() => setActiveTab("alerts")} onOpenEmailAlerts={onOpenEmailAlerts} />;
 
-  const body = activeTab === "quran"
+  const body = activeTab === "quran" && runtimeFeatures.quranEnabled
     ? <Quran locale={locale} onBackHome={() => { setQuranAppNavVisible(true); setQuranOwnsAudioSurface(false); setActiveTab("home"); }} onAppNavVisibilityChange={setQuranAppNavVisible} onLocalAudioSurfaceChange={setQuranOwnsAudioSurface} />
-    : activeTab === "quiz"
+    : activeTab === "quiz" && runtimeFeatures.gamesEnabled
       ? <QuizGamesHub locale={locale} dateKey={todayKey} stats={quizStats} onStatsChange={setQuizStats} onBackHome={() => setActiveTab("home")} />
-      : activeTab === "alerts"
+      : activeTab === "alerts" && runtimeFeatures.alertsEnabled
         ? alertsScreen
-        : activeTab === "events"
+        : activeTab === "events" && runtimeFeatures.islamicEventsEnabled
           ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
           : activeTab === "more"
             ? moreScreen
@@ -429,9 +432,9 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
 
   const navItems: Array<{ tab: AppTab; emoji: string; en: string; ar: string }> = [
     { tab: "home", emoji: "🏠", en: "Home", ar: "الرئيسية" },
-    { tab: "quran", emoji: "📖", en: "Qur’an", ar: "القرآن" },
-    { tab: "quiz", emoji: "🎮", en: "Games", ar: "ألعاب" },
-    { tab: "alerts", emoji: "🔔", en: "Alerts", ar: "تنبيهات" },
+    ...(runtimeFeatures.quranEnabled ? [{ tab: "quran" as AppTab, emoji: "📖", en: "Qur’an", ar: "القرآن" }] : []),
+    ...(runtimeFeatures.gamesEnabled ? [{ tab: "quiz" as AppTab, emoji: "🎮", en: "Games", ar: "ألعاب" }] : []),
+    ...(runtimeFeatures.alertsEnabled ? [{ tab: "alerts" as AppTab, emoji: "🔔", en: "Alerts", ar: "تنبيهات" }] : []),
     { tab: "more", emoji: "•••", en: "More", ar: "المزيد" }
   ];
 
