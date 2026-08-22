@@ -1,0 +1,97 @@
+name: Fix Email Logo And Send Full Prayer Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-email-logo-and-send-full-prayer-test.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+
+      - name: Install Worker dependencies
+        working-directory: push-server
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Fix logo URL in every Worker email template
+        run: |
+          set -euo pipefail
+          old='https://hassoun911.github.io/WOPT/assets/hassoun-logo.png'
+          new='https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png'
+          python - <<'PY'
+          from pathlib import Path
+          old = 'https://hassoun911.github.io/WOPT/assets/hassoun-logo.png'
+          new = 'https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png'
+          paths = [Path('push-server/src/emailDelivery.ts'), Path('push-server/src/prayerEmailTemplate.ts')]
+          for path in paths:
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'Old logo URL not found in {path}')
+              path.write_text(text.replace(old, new))
+              print(f'Updated {path}')
+          PY
+          git diff --check
+
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Deploy corrected Worker
+        working-directory: push-server
+        run: npm run deploy
+
+      - name: Commit permanent logo fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add push-server/src/emailDelivery.ts push-server/src/prayerEmailTemplate.ts
+          git commit -m "Fix Hassoun logo in all email templates" || true
+          git push origin HEAD:main
+
+      - name: Queue full Isha prayer email test
+        working-directory: push-server
+        run: |
+          set -euo pipefail
+          KEY='full-prayer-test-20260821-windsor-v1'
+          npx wrangler d1 execute wopt-prayer-push --remote --command "DELETE FROM email_outbox WHERE idempotency_key='${KEY}';"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT INTO email_outbox (recipient_email, locale, kind, template_key, template_data_json, idempotency_key, status, attempts, scheduled_at) VALUES ('windsor.hassoun@gmail.com','en','prayer',NULL,'{\"prayer\":\"isha\",\"kind\":\"athan\",\"prayerDate\":\"2026-08-21\",\"prayerTime\":\"21:48\",\"locationLabel\":\"Windsor, Ontario\",\"prayerTimes\":{\"fajr\":\"05:12\",\"dhuhr\":\"13:35\",\"asr\":\"17:23\",\"maghrib\":\"20:26\",\"isha\":\"21:48\"},\"manageUrl\":\"https://hassoun911.github.io/WOPT/email/manage\"}','${KEY}','pending',0,CURRENT_TIMESTAMP);"
+
+      - name: Confirm full prayer email delivery
+        working-directory: push-server
+        run: |
+          set -euo pipefail
+          KEY='full-prayer-test-20260821-windsor-v1'
+          for attempt in 1 2 3 4 5; do
+            sleep 45
+            npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, attempts, last_error, sent_at FROM email_outbox WHERE idempotency_key='${KEY}' LIMIT 1;" > /tmp/prayer-email.json
+            cat /tmp/prayer-email.json
+            status="$(jq -r '.[0].results[0].status // empty' /tmp/prayer-email.json)"
+            if [ "$status" = "sent" ]; then
+              echo "Full Hassoun Isha prayer email sent successfully to windsor.hassoun@gmail.com"
+              exit 0
+            fi
+            if [ "$status" = "failed" ]; then
+              jq -r '.[0].results[0].last_error // "Unknown provider error"' /tmp/prayer-email.json
+              exit 1
+            fi
+          done
+          echo "Full prayer email did not reach sent status in time"
+          exit 1
