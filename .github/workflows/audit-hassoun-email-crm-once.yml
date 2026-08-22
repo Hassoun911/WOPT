@@ -7,7 +7,7 @@ on:
       - ".github/workflows/audit-hassoun-email-crm-once.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
@@ -30,12 +30,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name, sql FROM sqlite_master WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscr%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%contact%') ORDER BY name;" > /tmp/tables.json
-          echo '### Email / subscriber table audit' >> "$GITHUB_STEP_SUMMARY"
-          jq -r '.[0].results[] | "- `" + .name + "`"' /tmp/tables.json >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name FROM sqlite_master WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscr%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%contact%') ORDER BY name;" > /tmp/tables.json
+          out="$GITHUB_WORKSPACE/.github/email-crm-audit.txt"
+          {
+            echo "Hassoun email CRM live D1 audit"
+            echo "generated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo
+          } > "$out"
           for table in $(jq -r '.[0].results[].name' /tmp/tables.json); do
             count=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS n FROM \"$table\";" | jq -r '.[0].results[0].n')
             cols=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "PRAGMA table_info(\"$table\");" | jq -r '.[0].results | map(.name) | join(", ")')
-            echo "- **$table** — $count rows — columns: $cols" >> "$GITHUB_STEP_SUMMARY"
+            echo "$table|rows=$count|columns=$cols" >> "$out"
           done
+          cat "$out" >> "$GITHUB_STEP_SUMMARY"
+      - name: Save audit result
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/email-crm-audit.txt
+          git commit -m "Record Hassoun email CRM live audit" || true
+          git push origin HEAD:main || true
