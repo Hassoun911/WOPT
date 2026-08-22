@@ -2,6 +2,7 @@ import worker from "./index";
 import { recordSubscriberActivity } from "./activity";
 import { auditEmailSystemsOnce, sendOwnerAdminEmailTestOnce } from "./emailAuditOnce";
 import { sendAdminTemplateTest } from "./adminEmailTest";
+import { listAskSheikhQuestions, recordAskSheikhQuestion } from "./askSheikh";
 import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import { importLegacyResendUsersOnce } from "./legacyResendImport";
@@ -18,7 +19,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "owner-crm-smart-email-2026-08-22-4";
+const BACKEND_VERSION = "owner-crm-ai-sheikh-2026-08-22-1";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -46,12 +47,12 @@ function withCors(request: Request, response: Response, env: Env) {
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS" && ["/prayer-times", "/activity"].includes(url.pathname)) {
+    if (request.method === "OPTIONS") {
       const origin = allowedOrigin(request, env);
       return new Response(null, { status: 204, headers: origin ? {
         "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Bootstrap-Key",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
         Vary: "Origin"
       } : {} });
     }
@@ -62,18 +63,20 @@ export default {
       const templateKey = decodeURIComponent(url.pathname.split("/").pop() || "");
       return getSponsorLogo(env, templateKey);
     }
+    if (request.method === "GET" && url.pathname === "/ask-sheikh/questions") {
+      return withCors(request, await listAskSheikhQuestions(url, env), env);
+    }
+    if (request.method === "POST" && url.pathname === "/ask-sheikh/questions") {
+      return withCors(request, await recordAskSheikhQuestion(request, env), env);
+    }
     if (request.method === "POST" && url.pathname === "/admin/email/campaigns") {
       const body = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
       if (body.action === "send_template_test") {
         return withCors(request, await sendAdminTemplateTest(request, env), env);
       }
     }
-    if (request.method === "GET" && url.pathname === "/internal/email-audit-once-20260821") {
-      return auditEmailSystemsOnce(env);
-    }
-    if (request.method === "POST" && url.pathname === "/internal/email-test-owner-once-20260821") {
-      return sendOwnerAdminEmailTestOnce(env);
-    }
+    if (request.method === "GET" && url.pathname === "/internal/email-audit-once-20260821") return auditEmailSystemsOnce(env);
+    if (request.method === "POST" && url.pathname === "/internal/email-test-owner-once-20260821") return sendOwnerAdminEmailTestOnce(env);
     if (request.method === "GET" && url.pathname === "/prayer-times") {
       try {
         return withCors(request, await getLocationPrayerTimes(url, env), env);
