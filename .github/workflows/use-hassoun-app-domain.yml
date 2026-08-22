@@ -1,0 +1,75 @@
+name: Use hassoun.app as primary site
+
+on:
+  push:
+    paths:
+      - ".github/workflows/use-hassoun-app-domain.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-domain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace old public site links
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          roots = [Path("mobile"), Path("pwa"), Path("push-server"), Path("README.md"), Path(".github/scripts")]
+          text_suffixes = {".ts", ".tsx", ".js", ".mjs", ".py", ".json", ".jsonc", ".md", ".html", ".webmanifest", ".yml", ".yaml", ".kt", ".xml"}
+
+          def process(path: Path):
+              if not path.is_file():
+                  return
+              if path.suffix not in text_suffixes and path.name not in {"README.md"}:
+                  return
+              if "node_modules" in path.parts or "build" in path.parts or ".vinext" in path.parts:
+                  return
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  return
+              old = text
+              text = text.replace("https://hassoun911.github.io/WOPT/", "https://hassoun.app/")
+              text = text.replace("https://hassoun911.github.io/WOPT", "https://hassoun.app")
+              text = text.replace("https://hassoun911.github.io", "https://hassoun.app")
+              if text != old:
+                  path.write_text(text, encoding="utf-8")
+
+          for root in roots:
+              if root.is_file():
+                  process(root)
+              elif root.exists():
+                  for p in root.rglob("*"):
+                      process(p)
+
+          deploy = Path(".github/workflows/deploy-pages.yml")
+          text = deploy.read_text(encoding="utf-8")
+          text = text.replace('NEXT_PUBLIC_BASE_PATH: "/WOPT"', 'NEXT_PUBLIC_BASE_PATH: ""')
+          deploy.write_text(text, encoding="utf-8")
+
+          Path("pwa/public/CNAME").write_text("hassoun.app\n", encoding="utf-8")
+          PY
+
+      - name: Verify primary domain
+        run: |
+          grep -R "hassoun911.github.io/WOPT" mobile pwa push-server README.md .github/scripts --exclude-dir=node_modules --exclude-dir=build --exclude-dir=.vinext && exit 1 || true
+          grep -q 'NEXT_PUBLIC_BASE_PATH: ""' .github/workflows/deploy-pages.yml
+          test "$(cat pwa/public/CNAME)" = "hassoun.app"
+
+      - name: Commit domain update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile pwa push-server README.md .github/scripts .github/workflows/deploy-pages.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Use hassoun.app as primary public site"
+          git push origin HEAD:main
