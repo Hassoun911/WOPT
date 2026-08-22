@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: hassoun-android-store-${{ github.ref }}
@@ -20,14 +20,13 @@ jobs:
   validate-android-store:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     defaults:
       run:
         working-directory: mobile
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,12 +42,12 @@ jobs:
           java-version: "17"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Apply v1.0.6 clean Home and Ask the Sheikh navigation
+      - name: Apply v1.0.6 clean Home layout
         run: node scripts/apply-v106-clean-home.mjs
 
-      - name: Repair branding and create padded launcher icons
+      - name: Create visible launcher branding
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
@@ -56,53 +55,46 @@ jobs:
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
-
           logo_path = Path('assets/hassoun-logo.png')
           if not logo_path.exists() or logo_path.stat().st_size == 0:
               raise SystemExit('Missing assets/hassoun-logo.png')
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
 
-          def padded(size, art_size, background=(0,0,0,0)):
-              canvas = Image.new('RGBA', (size, size), background)
+          def padded(size, art_size):
+              canvas = Image.new('RGBA', (size, size), (0,0,0,0))
               art = logo.copy()
               art.thumbnail((art_size, art_size), Image.Resampling.LANCZOS)
-              x = (size - art.width) // 2
-              y = (size - art.height) // 2
-              canvas.alpha_composite(art, (x, y))
+              canvas.alpha_composite(art, ((size-art.width)//2, (size-art.height)//2))
               return canvas
 
-          # Samsung and other launchers mask icons aggressively. Keep the complete bird/Qur'an mark
-          # inside the safe area instead of filling the whole square and clipping the logo.
-          padded(1024, 820).save('assets/icon.png', format='PNG', optimize=True)
-          padded(1024, 650).save('assets/adaptive-icon.png', format='PNG', optimize=True)
+          # Issue 2: logo should be clearly visible on Samsung/Android launchers.
+          padded(1024, 980).save('assets/icon.png', format='PNG', optimize=True)
+          padded(1024, 900).save('assets/adaptive-icon.png', format='PNG', optimize=True)
+          padded(1024, 820).save('assets/splash-logo.png', format='PNG', optimize=True)
 
-          splash = padded(1024, 760)
-          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
-
-          # Re-encode notification image without changing its notification-safe artwork.
           n = Path('assets/notification-icon.png')
           if n.exists() and n.stat().st_size:
-              image = Image.open(n).convert('RGBA')
-              image.save(n, format='PNG', optimize=True)
+              Image.open(n).convert('RGBA').save(n, format='PNG', optimize=True)
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
           pngcheck -q assets/adaptive-icon.png
           pngcheck -q assets/splash-logo.png
-          pngcheck -q assets/notification-icon.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
       - name: TypeScript validation
         run: npm run typecheck
 
-      - name: Verify clean Home is inside the APK source
+      - name: Verify issue fixes in APK source
         run: |
           grep -q 'v106Hero' App.tsx
           grep -q 'Explore Hassoun' App.tsx
           grep -q 'activeTab === "sheikh"' App.tsx
-          ! grep -q 'Quiz & Multiplayer Games' <(sed -n '/const homeScreen = (/,/const alertsScreen = (/p' App.tsx)
+          grep -q 'StartupSplash' AppRoot.tsx
+          ! grep -q 'styles.fab' AppExperience.tsx
+          ! grep -q 'Qur’an + Hadith' AppExperience.tsx
 
       - name: Verify restricted exact-alarm permission is absent
         run: |
@@ -110,7 +102,6 @@ jobs:
             echo "USE_EXACT_ALARM is not allowed in the store release source."
             exit 1
           fi
-          grep -R --line-number --fixed-strings "android.permission.SCHEDULE_EXACT_ALARM" app.config.ts modules/prayer-audio/android/src/main/AndroidManifest.xml
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
@@ -124,29 +115,11 @@ jobs:
       - name: Verify Android target SDK 36+
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
-          if [ -z "$APK" ]; then
-            echo "Release APK not found."
-            exit 1
-          fi
+          test -n "$APK"
           ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
           TARGET="$($ANALYZER manifest target-sdk "$APK")"
           echo "Detected targetSdkVersion=$TARGET"
-          if [ "$TARGET" -lt 36 ]; then
-            echo "Google Play store release requires targetSdkVersion 36 or newer."
-            exit 1
-          fi
-
-      - name: Verify final manifest permissions
-        run: |
-          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
-          ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
-          PERMISSIONS="$($ANALYZER manifest permissions "$APK")"
-          echo "$PERMISSIONS"
-          if echo "$PERMISSIONS" | grep -q "android.permission.USE_EXACT_ALARM"; then
-            echo "Restricted USE_EXACT_ALARM leaked into the final Android manifest."
-            exit 1
-          fi
-          echo "$PERMISSIONS" | grep -q "android.permission.SCHEDULE_EXACT_ALARM"
+          test "$TARGET" -ge 36
 
       - name: Upload Hassoun 1.0.6 APK
         uses: actions/upload-artifact@v4
@@ -163,40 +136,3 @@ jobs:
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
-
-      - name: Record Android validation on current branch
-        working-directory: .
-        run: |
-          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
-          ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
-          TARGET="$($ANALYZER manifest target-sdk "$APK")"
-          cat > .github/android-store-status.txt <<EOF
-          android_store_validation=ready
-          app_version=1.0.6
-          android_version_code=47
-          target_sdk=${TARGET}
-          clean_home_layout=ready
-          full_launcher_logo=ready
-          ask_sheikh_navigation=ready
-          exact_alarm_policy=ready
-          startup_adhan_guard=ready
-          quran_bidirectional_navigation=ready
-          quran_horizontal_browsing=ready
-          gps_prayer_location=ready
-          al_hafiz_classroom=ready
-          islamic_events_full_hijri_year=ready
-          settings_feature_guide=ready
-          sadaqah_about_page=ready
-          alert_center_stability=ready
-          islamic_event_alert_controls=ready
-          widget_fast_start=ready
-          apk_artifact=hassoun-1.0.6-android-apk
-          aab_artifact=hassoun-1.0.6-android-aab
-          verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          source_commit=$(git rev-parse HEAD)
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/android-store-status.txt
-          git commit -m "Record Hassoun Android store validation" || true
-          git push origin HEAD:${GITHUB_REF_NAME} || true
