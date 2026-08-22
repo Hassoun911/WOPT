@@ -1,0 +1,50 @@
+name: Deploy Owner Email V2
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/deploy-owner-email-v2.yml"
+      - "push-server/**"
+      - "admin-crm/**"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            admin-crm/package-lock.json
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Apply D1 migrations
+        working-directory: push-server
+        run: npx wrangler d1 migrations apply wopt-prayer-push --remote
+      - name: Deploy Worker
+        working-directory: push-server
+        run: npx wrangler deploy
+      - name: Validate Admin CRM
+        working-directory: admin-crm
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Smoke test Worker
+        run: |
+          sleep 8
+          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health
