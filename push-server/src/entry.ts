@@ -1,6 +1,7 @@
 import worker from "./index";
 import { recordSubscriberActivity } from "./activity";
 import { auditEmailSystemsOnce, sendOwnerAdminEmailTestOnce } from "./emailAuditOnce";
+import { sendAdminTemplateTest } from "./adminEmailTest";
 import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import { importLegacyResendUsersOnce } from "./legacyResendImport";
@@ -17,7 +18,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "owner-crm-smart-email-2026-08-22-3";
+const BACKEND_VERSION = "owner-crm-smart-email-2026-08-22-4";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -60,6 +61,12 @@ export default {
     if (request.method === "GET" && /^\/email\/assets\/sponsor-logo\/[A-Za-z0-9_-]{1,120}$/.test(url.pathname)) {
       const templateKey = decodeURIComponent(url.pathname.split("/").pop() || "");
       return getSponsorLogo(env, templateKey);
+    }
+    if (request.method === "POST" && url.pathname === "/admin/email/campaigns") {
+      const body = await request.clone().json().catch(() => ({})) as Record<string, unknown>;
+      if (body.action === "send_template_test") {
+        return withCors(request, await sendAdminTemplateTest(request, env), env);
+      }
     }
     if (request.method === "GET" && url.pathname === "/internal/email-audit-once-20260821") {
       return auditEmailSystemsOnce(env);
