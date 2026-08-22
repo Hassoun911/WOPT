@@ -45,7 +45,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Repair and verify Hassoun PNG assets
+      - name: Apply v1.0.6 clean Home and Ask the Sheikh navigation
+        run: node scripts/apply-v106-clean-home.mjs
+
+      - name: Repair branding and create padded launcher icons
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
@@ -53,21 +56,35 @@ jobs:
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
-          assets = [
-              Path('assets/hassoun-logo.png'),
-              Path('assets/icon.png'),
-              Path('assets/adaptive-icon.png'),
-              Path('assets/splash-logo.png'),
-              Path('assets/notification-icon.png'),
-          ]
-          for path in assets:
-              if not path.exists() or path.stat().st_size == 0:
-                  raise SystemExit(f'Missing required Hassoun image: {path}')
-              image = Image.open(path).convert('RGBA')
-              tmp = path.with_suffix('.repaired.png')
-              image.save(tmp, format='PNG', optimize=True)
-              tmp.replace(path)
-              print(f'Repaired {path}')
+
+          logo_path = Path('assets/hassoun-logo.png')
+          if not logo_path.exists() or logo_path.stat().st_size == 0:
+              raise SystemExit('Missing assets/hassoun-logo.png')
+          logo = Image.open(logo_path).convert('RGBA')
+          logo.save(logo_path, format='PNG', optimize=True)
+
+          def padded(size, art_size, background=(0,0,0,0)):
+              canvas = Image.new('RGBA', (size, size), background)
+              art = logo.copy()
+              art.thumbnail((art_size, art_size), Image.Resampling.LANCZOS)
+              x = (size - art.width) // 2
+              y = (size - art.height) // 2
+              canvas.alpha_composite(art, (x, y))
+              return canvas
+
+          # Samsung and other launchers mask icons aggressively. Keep the complete bird/Qur'an mark
+          # inside the safe area instead of filling the whole square and clipping the logo.
+          padded(1024, 820).save('assets/icon.png', format='PNG', optimize=True)
+          padded(1024, 650).save('assets/adaptive-icon.png', format='PNG', optimize=True)
+
+          splash = padded(1024, 760)
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+
+          # Re-encode notification image without changing its notification-safe artwork.
+          n = Path('assets/notification-icon.png')
+          if n.exists() and n.stat().st_size:
+              image = Image.open(n).convert('RGBA')
+              image.save(n, format='PNG', optimize=True)
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
@@ -79,6 +96,13 @@ jobs:
 
       - name: TypeScript validation
         run: npm run typecheck
+
+      - name: Verify clean Home is inside the APK source
+        run: |
+          grep -q 'v106Hero' App.tsx
+          grep -q 'Explore Hassoun' App.tsx
+          grep -q 'activeTab === "sheikh"' App.tsx
+          ! grep -q 'Quiz & Multiplayer Games' <(sed -n '/const homeScreen = (/,/const alertsScreen = (/p' App.tsx)
 
       - name: Verify restricted exact-alarm permission is absent
         run: |
@@ -124,18 +148,18 @@ jobs:
           fi
           echo "$PERMISSIONS" | grep -q "android.permission.SCHEDULE_EXACT_ALARM"
 
-      - name: Upload Hassoun 1.0.5 APK
+      - name: Upload Hassoun 1.0.6 APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.5-android-apk
+          name: hassoun-1.0.6-android-apk
           path: mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Hassoun 1.0.5 AAB
+      - name: Upload Hassoun 1.0.6 AAB
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.5-android-aab
+          name: hassoun-1.0.6-android-aab
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
@@ -148,9 +172,12 @@ jobs:
           TARGET="$($ANALYZER manifest target-sdk "$APK")"
           cat > .github/android-store-status.txt <<EOF
           android_store_validation=ready
-          app_version=1.0.5
-          android_version_code=46
+          app_version=1.0.6
+          android_version_code=47
           target_sdk=${TARGET}
+          clean_home_layout=ready
+          full_launcher_logo=ready
+          ask_sheikh_navigation=ready
           exact_alarm_policy=ready
           startup_adhan_guard=ready
           quran_bidirectional_navigation=ready
@@ -163,8 +190,8 @@ jobs:
           alert_center_stability=ready
           islamic_event_alert_controls=ready
           widget_fast_start=ready
-          apk_artifact=hassoun-1.0.5-android-apk
-          aab_artifact=hassoun-1.0.5-android-aab
+          apk_artifact=hassoun-1.0.6-android-apk
+          aab_artifact=hassoun-1.0.6-android-aab
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           source_commit=$(git rev-parse HEAD)
           EOF
