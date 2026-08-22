@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watch_face_name">Hassoun</string>
+    <string name="calories_slot">Hassoun Calories</string>
+    <string name="qibla_slot">Hassoun Qibla</string>
+</resources>

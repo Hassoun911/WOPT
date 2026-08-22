@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hassoun Watch Data</string>
+    <string name="calories_label">Hassoun Calories</string>
+    <string name="qibla_label">Hassoun Qibla</string>
+</resources>
