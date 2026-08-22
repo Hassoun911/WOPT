@@ -1,10 +1,10 @@
 exit_code=1
-source_commit=28dec72880a828dab8e7d11ae1e7e0bb7a2ba43b
-verified_at=2026-08-22T07:13:53Z
+source_commit=080b4a54870de536617662a26f505d44503e52fc
+verified_at=2026-08-22T07:14:01Z
 
 npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 
-added 489 packages in 9s
+added 489 packages in 6s
 
 > windsor-prayer-times-mobile@1.0.3 pretypecheck
 > npm run quran:data
@@ -19,3 +19,4 @@ WOPT Quran data ready: 6236 ayahs, 114 surahs, 604 pages.
 > tsc --noEmit
 
 AppRoot.tsx(104,19): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app.config.ts(12,3): error TS2353: Object literal may only specify known properties, and 'splash' does not exist in type 'ExpoConfig'.
