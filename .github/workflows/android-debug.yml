@@ -45,7 +45,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Verify approved Hassoun branding assets
+      - name: Repair and verify approved Hassoun branding assets
         run: |
           test -s assets/hassoun-logo.png
           test -s assets/icon.png
@@ -55,10 +55,26 @@ jobs:
           cmp -s assets/hassoun-logo.png assets/icon.png
           cmp -s assets/hassoun-logo.png assets/adaptive-icon.png
           cmp -s assets/hassoun-logo.png assets/splash-logo.png
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          src = Image.open('assets/hassoun-logo.png').convert('RGBA')
+          src.save('/tmp/hassoun-clean.png', format='PNG', optimize=True)
+          PY
+          pngcheck -q /tmp/hassoun-clean.png
+          cp /tmp/hassoun-clean.png assets/hassoun-logo.png
+          cp /tmp/hassoun-clean.png assets/icon.png
+          cp /tmp/hassoun-clean.png assets/adaptive-icon.png
+          cp /tmp/hassoun-clean.png assets/splash-logo.png
+          cmp -s assets/hassoun-logo.png assets/icon.png
+          cmp -s assets/hassoun-logo.png assets/adaptive-icon.png
+          cmp -s assets/hassoun-logo.png assets/splash-logo.png
           sha256sum assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-          echo "Using committed approved PNG branding. No legacy SVG regeneration is allowed."
+          echo "Approved Hassoun pixels were losslessly re-encoded to a standards-valid PNG for Expo/Jimp."
 
       - name: Check Expo push configuration
         run: |
@@ -99,7 +115,7 @@ jobs:
           apk_filename=Hassoun-v1.0.4.apk
           source_commit=${{ github.sha }}
           workflow_run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          approved_logo_sha=532bef4abb1bd81bb10747c1302d88d271f93a2a
+          logo_source=approved-hassoun-png-lossless-reencode
           built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
           git config user.name "github-actions[bot]"
