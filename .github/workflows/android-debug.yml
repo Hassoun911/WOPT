@@ -10,7 +10,7 @@ on:
       - ".github/workflows/android-debug.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -47,6 +47,9 @@ jobs:
           test -s assets/adaptive-icon.png
           test -s assets/splash-logo.png
           test -s assets/notification-icon.png
+          cmp -s assets/hassoun-logo.png assets/icon.png
+          cmp -s assets/hassoun-logo.png assets/adaptive-icon.png
+          cmp -s assets/hassoun-logo.png assets/splash-logo.png
           sha256sum assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
@@ -77,3 +80,24 @@ jobs:
           path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.4.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record successful APK build
+        working-directory: .
+        run: |
+          cat > .github/android-latest-build.txt <<EOF
+          status=ready
+          app=Hassoun
+          version=1.0.4
+          android_version_code=45
+          artifact=hassoun-v1.0.4-${{ github.run_number }}
+          apk_filename=Hassoun-v1.0.4.apk
+          source_commit=${{ github.sha }}
+          workflow_run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          approved_logo_sha=532bef4abb1bd81bb10747c1302d88d271f93a2a
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/android-latest-build.txt
+          git commit -m "Record Hassoun v1.0.4 APK build" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
