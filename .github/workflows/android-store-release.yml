@@ -44,10 +44,16 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Apply v1.0.6 clean Home layout
+      - name: Apply clean Home layout
         run: node scripts/apply-v106-clean-home.mjs
 
-      - name: Create visible launcher branding
+      - name: Open Al-Hafiz from Memorize tile
+        run: node scripts/fix-memorize-entry.mjs
+
+      - name: Apply Al-Hafiz motivation and AI coach
+        run: node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Create full-size launcher branding
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
@@ -61,17 +67,15 @@ jobs:
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
 
-          def padded(size, art_size):
-              canvas = Image.new('RGBA', (size, size), (0,0,0,0))
-              art = logo.copy()
-              art.thumbnail((art_size, art_size), Image.Resampling.LANCZOS)
-              canvas.alpha_composite(art, ((size-art.width)//2, (size-art.height)//2))
-              return canvas
+          # Keep the approved square Hassoun logo full-size instead of putting it
+          # inside the adaptive foreground safe zone, which made it tiny on Samsung.
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
 
-          # Issue 2: logo should be clearly visible on Samsung/Android launchers.
-          padded(1024, 980).save('assets/icon.png', format='PNG', optimize=True)
-          padded(1024, 900).save('assets/adaptive-icon.png', format='PNG', optimize=True)
-          padded(1024, 820).save('assets/splash-logo.png', format='PNG', optimize=True)
+          splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          art = logo.copy()
+          art.thumbnail((820, 820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
 
           n = Path('assets/notification-icon.png')
           if n.exists() and n.stat().st_size:
@@ -79,7 +83,6 @@ jobs:
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
-          pngcheck -q assets/adaptive-icon.png
           pngcheck -q assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
@@ -92,7 +95,12 @@ jobs:
           grep -q 'v106Hero' App.tsx
           grep -q 'Explore Hassoun' App.tsx
           grep -q 'activeTab === "sheikh"' App.tsx
+          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
+          grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
+          grep -q 'KEEP LEARNING' src/quran/AlHafizClassroom.tsx
           grep -q 'StartupSplash' AppRoot.tsx
+          grep -q 'icon: "./assets/icon.png"' app.config.ts
+          ! grep -q 'adaptiveIcon' app.config.ts
           ! grep -q 'styles.fab' AppExperience.tsx
           ! grep -q 'Qur’an + Hadith' AppExperience.tsx
 
@@ -121,18 +129,18 @@ jobs:
           echo "Detected targetSdkVersion=$TARGET"
           test "$TARGET" -ge 36
 
-      - name: Upload Hassoun 1.0.6 APK
+      - name: Upload Hassoun 1.0.7 APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.6-android-apk
+          name: hassoun-1.0.7-android-apk
           path: mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Hassoun 1.0.6 AAB
+      - name: Upload Hassoun 1.0.7 AAB
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-1.0.6-android-aab
+          name: hassoun-1.0.7-android-aab
           path: mobile/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
