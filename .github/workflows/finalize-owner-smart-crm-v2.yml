@@ -1,0 +1,68 @@
+name: Finalize Owner Smart CRM V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/finalize-owner-smart-crm-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            pwa/package-lock.json
+      - name: Validate and migrate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npx wrangler d1 migrations apply wopt-prayer-push --remote
+      - name: Discover legacy Resend users
+        run: node .github/scripts/import-legacy-resend-users.mjs
+      - name: Import into D1
+        working-directory: push-server
+        run: |
+          if [ -s /tmp/hassoun-legacy-users.sql ]; then npx wrangler d1 execute wopt-prayer-push --remote --file /tmp/hassoun-legacy-users.sql; fi
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, COUNT(*) AS n FROM email_subscribers GROUP BY status ORDER BY status;" > /tmp/hassoun-crm-counts.json
+      - name: Build Owner CRM
+        working-directory: pwa
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Save result
+        run: |
+          {
+            echo "owner_smart_crm=ready"
+            echo "validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "worker_validation=passed"
+            echo "owner_crm_build=passed"
+            jq -r '"resend_discovered="+(.discovered|tostring),"resend_active_candidates="+(.active|tostring),"resend_blocked_candidates="+(.blocked|tostring)' /tmp/hassoun-legacy-discovery.json
+            jq -r '.[0].results[] | "crm_"+.status+"="+(.n|tostring)' /tmp/hassoun-crm-counts.json
+          } > .github/owner-smart-crm-final-result.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/owner-smart-crm-final-result.txt
+          git commit -m "Record Owner smart CRM finalization" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
