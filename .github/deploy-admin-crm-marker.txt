@@ -1,0 +1,3 @@
+Deploy repaired Owner CRM frontend to admin.hassoun.app
+Triggered: 2026-08-21 22:29 America/Toronto
+Branch: work/hassoun-1.0-store-admin
