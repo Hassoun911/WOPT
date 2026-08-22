@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
-import AppWithEmail from "./AppWithEmail";
+import AppExperience from "./AppExperience";
 
 export default function AppRoot() {
   const [locationEpoch, setLocationEpoch] = useState(0);
@@ -18,5 +18,5 @@ export default function AppRoot() {
     return () => subscription.remove();
   }, []);
 
-  return <AppWithEmail key={locationEpoch} />;
+  return <AppExperience key={locationEpoch} />;
 }
