@@ -19,6 +19,16 @@ export type HassounRuntimeConfig = {
   gamesEnabled: boolean;
   emailEnabled: boolean;
   communityContentEnabled: boolean;
+  prayerTimesEnabled: boolean;
+  alertsEnabled: boolean;
+  islamicEventsEnabled: boolean;
+  sadaqahSectionEnabled: boolean;
+  donationEnabled: boolean;
+  askSheikhEnabled: boolean;
+  askSheikhShareEnabled: boolean;
+  askSheikhMaxResults: number;
+  askSheikhDisclaimerEn: string;
+  askSheikhDisclaimerAr: string;
   systemBanner: { enabled: boolean; title: string; message: string };
   featuredContent: FeaturedRuntimeContent[];
 };
@@ -31,11 +41,21 @@ export const DEFAULT_RUNTIME_CONFIG: HassounRuntimeConfig = {
   gamesEnabled: true,
   emailEnabled: true,
   communityContentEnabled: true,
+  prayerTimesEnabled: true,
+  alertsEnabled: true,
+  islamicEventsEnabled: true,
+  sadaqahSectionEnabled: true,
+  donationEnabled: false,
+  askSheikhEnabled: true,
+  askSheikhShareEnabled: true,
+  askSheikhMaxResults: 8,
+  askSheikhDisclaimerEn: "Hassoun finds relevant Qur’an verses and verified Hadith content. For personal religious rulings, consult a qualified local scholar.",
+  askSheikhDisclaimerAr: "يعرض Hassoun آيات قرآنية ومحتوى حديث موثق ذا صلة. للأحكام والفتاوى الشخصية راجع عالماً مؤهلاً تثق به.",
   systemBanner: { enabled: false, title: "", message: "" },
   featuredContent: []
 };
 
-function apiUrl() {
+export function hassounApiUrl() {
   const configured = Constants.expoConfig?.extra?.pushApiUrl;
   return typeof configured === "string" && configured.startsWith("https://")
     ? configured.replace(/\/$/, "")
@@ -50,11 +70,16 @@ function asString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function asNumber(value: unknown, fallback: number, min: number, max: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.round(parsed))) : fallback;
+}
+
 export async function loadHassounRuntimeConfig(): Promise<HassounRuntimeConfig> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(`${apiUrl()}/app/runtime`, {
+    const response = await fetch(`${hassounApiUrl()}/app/runtime`, {
       signal: controller.signal,
       headers: { Accept: "application/json" }
     });
@@ -77,6 +102,16 @@ export async function loadHassounRuntimeConfig(): Promise<HassounRuntimeConfig> 
       gamesEnabled: asBool(settings.games_enabled, true),
       emailEnabled: asBool(settings.email_enabled, true),
       communityContentEnabled: asBool(settings.community_content_enabled, true),
+      prayerTimesEnabled: asBool(settings.prayer_times_enabled, true),
+      alertsEnabled: asBool(settings.alerts_enabled, true),
+      islamicEventsEnabled: asBool(settings.islamic_events_enabled, true),
+      sadaqahSectionEnabled: asBool(settings.sadaqah_section_enabled, true),
+      donationEnabled: asBool(settings.donation_enabled, false),
+      askSheikhEnabled: asBool(settings.ask_sheikh_enabled, true),
+      askSheikhShareEnabled: asBool(settings.ask_sheikh_share_enabled, true),
+      askSheikhMaxResults: asNumber(settings.ask_sheikh_max_results, 8, 3, 20),
+      askSheikhDisclaimerEn: asString(settings.ask_sheikh_disclaimer_en, DEFAULT_RUNTIME_CONFIG.askSheikhDisclaimerEn),
+      askSheikhDisclaimerAr: asString(settings.ask_sheikh_disclaimer_ar, DEFAULT_RUNTIME_CONFIG.askSheikhDisclaimerAr),
       systemBanner: {
         enabled: asBool(banner.enabled, false),
         title: asString(banner.title, ""),
