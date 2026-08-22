@@ -1,0 +1,41 @@
+name: Audit Hassoun Email CRM Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/audit-hassoun-email-crm-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit tables and counts without private data
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT name, sql FROM sqlite_master WHERE type='table' AND (lower(name) LIKE '%email%' OR lower(name) LIKE '%subscr%' OR lower(name) LIKE '%user%' OR lower(name) LIKE '%contact%') ORDER BY name;" > /tmp/tables.json
+          echo '### Email / subscriber table audit' >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[0].results[] | "- `" + .name + "`"' /tmp/tables.json >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          for table in $(jq -r '.[0].results[].name' /tmp/tables.json); do
+            count=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT COUNT(*) AS n FROM \"$table\";" | jq -r '.[0].results[0].n')
+            cols=$(npx wrangler d1 execute wopt-prayer-push --remote --json --command "PRAGMA table_info(\"$table\");" | jq -r '.[0].results | map(.name) | join(", ")')
+            echo "- **$table** — $count rows — columns: $cols" >> "$GITHUB_STEP_SUMMARY"
+          done
