@@ -8,6 +8,11 @@ on:
     paths:
       - "mobile/**"
       - ".github/workflows/android-debug.yml"
+  pull_request:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - ".github/android-verify.trigger"
 
 permissions:
   contents: write
@@ -82,6 +87,7 @@ jobs:
           retention-days: 14
 
       - name: Record successful APK build
+        if: github.event_name != 'pull_request'
         working-directory: .
         run: |
           cat > .github/android-latest-build.txt <<EOF
