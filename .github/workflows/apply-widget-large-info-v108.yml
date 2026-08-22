@@ -37,12 +37,27 @@ jobs:
           PY
       - name: Commit widget changes
         run: |
-          if git diff --quiet -- mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt; then
+          TARGET_XML='mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml'
+          TARGET_KT='mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt'
+
+          if git diff --quiet -- "$TARGET_XML" "$TARGET_KT" && \
+             [ -z "$(git status --porcelain --ignored=matching -- "$TARGET_XML" "$TARGET_KT" | grep -v '^!!' || true)" ] && \
+             ! git check-ignore -q "$TARGET_XML" "$TARGET_KT"; then
             echo 'No widget changes to commit.'
             exit 0
           fi
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+
+          # The native Android module is intentionally covered by a repository ignore rule.
+          # These two generated source files are release inputs, so stage them explicitly.
+          git add -f -- "$TARGET_XML" "$TARGET_KT"
+
+          if git diff --cached --quiet; then
+            echo 'No staged widget changes to commit.'
+            exit 0
+          fi
+
           git commit -m 'Apply large bilingual prayer widget layout'
           git push origin HEAD:work/hassoun-1.0-store-admin
