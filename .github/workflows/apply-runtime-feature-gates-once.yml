@@ -1,0 +1,33 @@
+name: Apply Hassoun Runtime Feature Gates Once
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - "mobile/scripts/apply-runtime-feature-gates.mjs"
+      - ".github/workflows/apply-runtime-feature-gates-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply runtime feature gates
+        run: node mobile/scripts/apply-runtime-feature-gates.mjs
+      - name: Commit gated app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/App.tsx
+          git commit -m "Enforce CRM feature switches in mobile navigation" || exit 0
+          git push origin HEAD:work/hassoun-1.0-store-admin
