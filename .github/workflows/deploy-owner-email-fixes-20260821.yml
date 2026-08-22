@@ -7,9 +7,8 @@ on:
       - ".github/workflows/deploy-owner-email-fixes-20260821.yml"
 
 permissions:
-  contents: read
+  contents: write
 
-# Triggered again after adding per-template test email actions.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -55,4 +54,16 @@ jobs:
       - name: Smoke test Worker
         run: |
           sleep 8
-          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health
+          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health | tee /tmp/health.json
+
+      - name: Record verified backend deployment on main
+        run: |
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main:main
+          git checkout main
+          printf 'deployed_at=%s\nsource_branch=work/hassoun-1.0-store-admin\nsource_commit=%s\nworker_typecheck=passed\nworker_tests=passed\nd1_migrations=passed\ncloudflare_worker=deployed\nadmin_crm_build=passed\nworker_smoke_test=passed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SOURCE_SHA" > .github/final-email-backend-result.txt
+          git add .github/final-email-backend-result.txt
+          git commit -m "Record verified owner email backend deployment"
+          git push origin main
