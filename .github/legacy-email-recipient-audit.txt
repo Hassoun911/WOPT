@@ -1,0 +1,15 @@
+Hassoun legacy email recipient audit
+generated_at=2026-08-22T01:45:20Z
+source_commit=6460bd06d484007ddfc493ec452f55e2a6fd6517
+
+email_deliveries by notification_kind:
+athan|rows=27|distinct_recipients=1|blocked_rows=0
+
+email_outbox by kind:
+prayer|rows=28|distinct_recipients=1
+admin_password_reset|rows=9|distinct_recipients=1
+verification|rows=2|distinct_recipients=1
+announcement|rows=1|distinct_recipients=1
+
+historical prayer-like recipient count:
+eligible_distinct_recipients=1
