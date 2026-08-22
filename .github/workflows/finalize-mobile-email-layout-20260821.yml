@@ -1,0 +1,99 @@
+name: Finalize Mobile Email Layout 2026-08-21
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/finalize-mobile-email-layout-20260821.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            admin-crm/package-lock.json
+
+      - name: Align real email with mobile preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          for name in ['push-server/src/prayerEmailTemplate.ts','push-server/src/emailDelivery.ts']:
+              p=Path(name); s=p.read_text()
+              s=s.replace('https://hassoun.app/assets/hassoun-logo.png','https://admin.hassoun.app/hassoun-logo.png')
+              s=s.replace('https://hassoun.app/hassoun-logo.png','https://admin.hassoun.app/hassoun-logo.png')
+              p.write_text(s)
+
+          p=Path('push-server/src/emailDelivery.ts'); s=p.read_text()
+          start=s.index('function appendEnhancements(')
+          end=s.index('\nasync function renderEmail', start)
+          replacement=r'''function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow, content: Map<string, ContentRow>, locale: Locale) {
+            if (!extraHtml) return rendered;
+            const textParts: string[] = [];
+            if (profile.include_daily_hadith === 1 && content.get("hadith")) textParts.push(`${content.get("hadith")!.title_en}: ${content.get("hadith")!.body_en}${content.get("hadith")!.source_ref ? ` (${content.get("hadith")!.source_ref})` : ""}`);
+            if (profile.include_daily_surah === 1 && content.get("surah")) textParts.push(`${content.get("surah")!.title_en}: ${content.get("surah")!.body_en}${content.get("surah")!.source_ref ? ` (${content.get("surah")!.source_ref})` : ""}`);
+            if (profile.include_motivation === 1 && content.get("motivation")) textParts.push(`${content.get("motivation")!.title_en}: ${content.get("motivation")!.body_en}`);
+            if (profile.include_sadaqah_jariyah === 1) textParts.push("Hassoun is a continuing Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.");
+            if (profile.include_sponsor === 1) textParts.push(`${profile.sponsor_name || "Sponsor"}: ${profile.sponsor_message_en || "Supporting Hassoun and its community benefit."}${profile.sponsor_url ? ` ${profile.sponsor_url}` : ""}`);
+
+            let html = rendered.html;
+            const footerNeedle = '<tr><td style="background:#0a3028';
+            const insideEmail = `<tr><td style="padding:4px 0 2px">${extraHtml}</td></tr>`;
+            if (html.includes(footerNeedle)) html = html.replace(footerNeedle, `${insideEmail}${footerNeedle}`);
+            else if (html.includes('</body>')) html = html.replace('</body>', `${extraHtml}</body>`);
+            else html += extraHtml;
+            return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}` };
+          }
+'''
+          s=s[:start]+replacement+s[end:]
+          p.write_text(s)
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add push-server/src/prayerEmailTemplate.ts push-server/src/emailDelivery.ts
+          git commit -m "Match delivered email to mobile approval preview" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
+
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Deploy Worker
+        working-directory: push-server
+        run: |
+          npx wrangler d1 migrations apply wopt-prayer-push --remote
+          npx wrangler deploy
+
+      - name: Validate real Admin CRM
+        working-directory: admin-crm
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+
+      - name: Smoke test
+        run: |
+          sleep 8
+          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health
