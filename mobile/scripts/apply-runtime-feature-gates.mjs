@@ -81,3 +81,4 @@ replaceOnce(
 
 fs.writeFileSync(path, src);
 console.log('Applied Hassoun runtime feature gates to mobile/App.tsx');
+// Triggered after the one-time workflow was installed so the source patch is applied and committed.
