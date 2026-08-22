@@ -82,8 +82,6 @@ export default function AppRoot() {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
       const now = Date.now();
-      // Refresh location-dependent prayer data after a long background period,
-      // but never replay the startup splash just because the app resumed.
       if (now - lastActiveAt > 30_000) setLocationEpoch((value) => value + 1);
       lastActiveAt = now;
     });
@@ -101,7 +99,11 @@ export default function AppRoot() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   splash: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     zIndex: 9999,
     elevation: 9999,
     backgroundColor: "#042d27",
