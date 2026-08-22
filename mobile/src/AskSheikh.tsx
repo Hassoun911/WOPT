@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { getAyah, getSurah, searchQuran, type QuranAyah, type QuranSurah } from "./quran/quranData";
 import { hassounApiUrl, type HassounRuntimeConfig } from "./remoteConfig";
 
-type HadithMatch = { public_id: string; title_en?: string; title_ar?: string; body_en?: string; body_ar?: string; source_text?: string };
+type HadithMatch = { public_id: string; title_en?: string; title_ar?: string; body_en?: string; body_ar?: string; source_text?: string; source_url?: string };
 type QuranMatch = { surah: QuranSurah; ayah: QuranAyah; reason?: string };
 type Props = { locale: "en" | "ar"; runtime: HassounRuntimeConfig; onClose: () => void };
 
 const CONCEPTS: Array<{ terms: string[]; refs: Array<[number, number, string]>; keywords: string[] }> = [
+  { terms: ["dog","dogs","puppy","canine","كلب","كلاب","الكلب","الكلاب"], refs: [[5,4,"Trained hunting animals"],[18,18,"The Companions of the Cave and their dog"],[18,22,"The dog of the Companions of the Cave"]], keywords:["كلبهم","بالوصيد"] },
   { terms: ["parents","mother","father","والدين","والد","أم","اب"], refs: [[17,23,"Kindness to parents"],[31,14,"Gratitude to Allah and parents"]], keywords:["بالوالدين إحسانا"] },
   { terms: ["fasting","ramadan","صيام","رمضان"], refs: [[2,183,"Fasting is prescribed"],[2,185,"Ramadan and the Qur’an"]], keywords:["كتب عليكم الصيام"] },
   { terms: ["prayer","salah","salat","صلاة","اذان"], refs: [[29,45,"Prayer restrains from wrongdoing"],[4,103,"Prayer at appointed times"]], keywords:["أقم الصلاة"] },
@@ -23,6 +24,16 @@ const CONCEPTS: Array<{ terms: string[]; refs: Array<[number, number, string]>; 
   { terms: ["forgive","forgiveness","mercy","توبة","مغفرة","رحمة"], refs: [[39,53,"Do not despair of Allah’s mercy"],[3,134,"Those who pardon people"]], keywords:["لا تقنطوا من رحمة الله"] }
 ];
 
+function hadithSourceUrl(item: HadithMatch) {
+  if (item.source_url && /^https:\/\//i.test(item.source_url)) return item.source_url;
+  const ref = item.source_text || "";
+  const bukhari = ref.match(/Sahih\s+(?:al-)?Bukhari\s+([0-9]+[a-z]?)/i);
+  if (bukhari) return `https://sunnah.com/bukhari:${bukhari[1]}`;
+  const muslim = ref.match(/Sahih\s+Muslim\s+([0-9]+[a-z]?)/i);
+  if (muslim) return `https://sunnah.com/muslim:${muslim[1]}`;
+  return "";
+}
+
 function unique(items: QuranMatch[]) {
   const seen = new Set<string>();
   return items.filter((x) => { const k = `${x.ayah.surah}:${x.ayah.ayah}`; if (seen.has(k)) return false; seen.add(k); return true; });
@@ -31,6 +42,7 @@ function unique(items: QuranMatch[]) {
 function smartQuranSearch(question: string, limit: number) {
   const q = question.toLocaleLowerCase("en");
   const out: QuranMatch[] = [];
+  let conceptMatched = false;
   const exact = q.match(/\b(\d{1,3})\s*[:/]\s*(\d{1,3})\b/);
   if (exact) {
     const ayah = getAyah(Number(exact[1]), Number(exact[2]));
@@ -39,11 +51,18 @@ function smartQuranSearch(question: string, limit: number) {
   }
   for (const c of CONCEPTS) {
     if (!c.terms.some((t) => q.includes(t.toLocaleLowerCase("en")))) continue;
+    conceptMatched = true;
     for (const [s,a,reason] of c.refs) { const ayah=getAyah(s,a); const surah=getSurah(s); if (ayah&&surah) out.push({surah,ayah,reason}); }
     for (const keyword of c.keywords) for (const m of searchQuran(keyword, 4)) if (m.ayah) out.push({ surah:m.surah, ayah:m.ayah, reason:"Related wording" });
   }
-  for (const word of q.replace(/what does islam say about|what does islam say|islamic ruling on|tell me about/gi, " ").split(/\s+/).filter((x)=>x.length>4).slice(0,4)) {
-    for (const m of searchQuran(word, 3)) if (m.ayah) out.push({ surah:m.surah, ayah:m.ayah, reason:"Topic match" });
+  if (!conceptMatched && out.length === 0) {
+    const cleaned = q
+      .replace(/what does islam say about|what does islam say|islamic ruling on|tell me about/gi, " ")
+      .replace(/ماذا يقول (?:الإسلام|الاسلام|الدين) عن|ماذا يقول الدين|ما حكم|حكم الشرع في/gi, " ");
+    const generic = new Set(["religion","islam","ruling","about","الدين","الاسلام","الإسلام","يقول","حكم","الشرع","ماذا","عن"]);
+    for (const word of cleaned.split(/\s+/).filter((x)=>x.length>3 && !generic.has(x)).slice(0,3)) {
+      for (const m of searchQuran(word, 3)) if (m.ayah) out.push({ surah:m.surah, ayah:m.ayah, reason:"Topic match" });
+    }
   }
   return unique(out).slice(0, Math.max(4, limit));
 }
@@ -104,7 +123,7 @@ export default function AskSheikh({ locale, runtime, onClose }: Props) {
       {openVerse?<View style={styles.inlineReader}><View style={styles.inlineTop}><Text style={styles.inlineTitle}>📖 {openVerse.surah.nameTransliterated} • {openVerse.ayah.surah}:{openVerse.ayah.ayah}</Text><Pressable onPress={()=>setOpenVerse(null)}><Text style={styles.inlineClose}>✕</Text></Pressable></View><Text style={styles.inlineArabic}>{openVerse.ayah.text}</Text><Text style={styles.inlineMeta}>{openVerse.surah.nameEnglish} • {openVerse.surah.revelationType}</Text><Text style={styles.inlineHint}>{ar?"بقي مربع البحث والنتائج مفتوحين في نفس الصفحة.":"Your search and results stay open on this same page."}</Text></View>:null}
 
       {hadith.length?<Text style={styles.hadithHeading}>📜 {ar?"أحاديث ذات صلة":"Related Hadith"}</Text>:null}
-      {hadith.map((item)=><View key={item.public_id} style={styles.hadithCard}><Text style={styles.hadithTitle}>{ar?(item.title_ar||item.title_en||"حديث"):(item.title_en||item.title_ar||"Hadith")}</Text><Text style={styles.hadithBody}>{ar?(item.body_ar||item.body_en):(item.body_en||item.body_ar)}</Text>{item.source_text?<View style={styles.referencePill}><Text style={styles.referenceText}>✓ {item.source_text}</Text></View>:<Text style={styles.noRef}>{ar?"لا يُعرض الحديث كمرجع حتى تتوفر بيانات المصدر.":"A hadith is not treated as a reference until its source information is available."}</Text>}</View>)}
+      {hadith.map((item)=>{const sourceUrl=hadithSourceUrl(item);return <View key={item.public_id} style={styles.hadithCard}><Text style={styles.hadithTitle}>{ar?(item.title_ar||item.title_en||"حديث"):(item.title_en||item.title_ar||"Hadith")}</Text><Text style={styles.hadithBody}>{ar?(item.body_ar||item.body_en):(item.body_en||item.body_ar)}</Text>{item.source_text?(sourceUrl?<Pressable accessibilityRole="link" onPress={()=>void Linking.openURL(sourceUrl)} style={styles.referencePill}><Text style={styles.referenceText}>✓ {item.source_text} ↗</Text><Text style={styles.verifyText}>{ar?"اضغط للتحقق من المصدر":"Tap to verify source"}</Text></Pressable>:<View style={styles.referencePill}><Text style={styles.referenceText}>✓ {item.source_text}</Text></View>):<Text style={styles.noRef}>{ar?"لا يُعرض الحديث كمرجع حتى تتوفر بيانات المصدر.":"A hadith is not treated as a reference until its source information is available."}</Text>}</View>})}
 
       <View style={styles.footer}><Text style={styles.footerText}>{ar?"Hassoun أداة بحث وليست بديلاً عن فتوى من عالم مؤهل، خصوصاً في المسائل الشخصية أو المعقدة.":"Hassoun is a research tool, not a replacement for a qualified scholar’s fatwa, especially for personal or complex rulings."}</Text></View>
     </ScrollView>
@@ -117,5 +136,5 @@ const styles=StyleSheet.create({
   answerCard:{marginTop:12,borderRadius:20,backgroundColor:"#e9f3ee",borderWidth:1,borderColor:"#c8ded4",padding:14},answerLabel:{color:"#a17c35",fontSize:7.5,fontWeight:"900",letterSpacing:1},answerText:{color:"#23483e",fontSize:12.5,lineHeight:19,fontWeight:"700",marginTop:5},resultsHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginTop:17,marginBottom:8},sectionTitle:{color:"#173f35",fontSize:17,fontWeight:"900"},share:{paddingHorizontal:10,paddingVertical:6,borderRadius:12,backgroundColor:"#e8f2ed"},shareText:{color:"#075b47",fontSize:9,fontWeight:"900"},
   quranCard:{backgroundColor:"#075b47",borderRadius:20,padding:14,marginBottom:9},sourceTag:{color:"#e7c875",fontSize:7.5,fontWeight:"900",letterSpacing:.8},arabic:{color:"#fff",fontSize:20,lineHeight:34,textAlign:"right",marginTop:8},reason:{color:"#c9ddd5",fontSize:9,lineHeight:14,marginTop:7},openLink:{color:"#f4d987",fontSize:9,fontWeight:"900",marginTop:9},
   inlineReader:{borderRadius:20,backgroundColor:"#fffaf0",borderWidth:1,borderColor:"#d9bf78",padding:14,marginBottom:12},inlineTop:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},inlineTitle:{color:"#173f35",fontSize:12,fontWeight:"900"},inlineClose:{color:"#8b6b2c",fontSize:14,fontWeight:"900"},inlineArabic:{color:"#153f35",fontSize:23,lineHeight:38,textAlign:"right",marginTop:12},inlineMeta:{color:"#718078",fontSize:9,fontWeight:"700",marginTop:8},inlineHint:{color:"#9b7a39",fontSize:8.5,fontWeight:"800",marginTop:8},
-  hadithHeading:{color:"#173f35",fontSize:17,fontWeight:"900",marginTop:8,marginBottom:8},hadithCard:{backgroundColor:"#fff",borderRadius:20,padding:14,borderWidth:1,borderColor:"#dfddd5",marginBottom:9},hadithTitle:{color:"#173f35",fontSize:13,fontWeight:"900"},hadithBody:{color:"#4e625b",fontSize:11,lineHeight:18,marginTop:6},referencePill:{alignSelf:"flex-start",backgroundColor:"#e7f2ec",borderRadius:99,paddingHorizontal:9,paddingVertical:5,marginTop:9},referenceText:{color:"#075b47",fontSize:8.5,fontWeight:"900"},noRef:{color:"#9c7761",fontSize:8.5,lineHeight:13,marginTop:8},footer:{marginTop:12,borderRadius:17,backgroundColor:"#eee9dc",padding:12},footerText:{color:"#78817b",fontSize:8.5,lineHeight:13,textAlign:"center"}
+  hadithHeading:{color:"#173f35",fontSize:17,fontWeight:"900",marginTop:8,marginBottom:8},hadithCard:{backgroundColor:"#fff",borderRadius:20,padding:14,borderWidth:1,borderColor:"#dfddd5",marginBottom:9},hadithTitle:{color:"#173f35",fontSize:13,fontWeight:"900"},hadithBody:{color:"#4e625b",fontSize:11,lineHeight:18,marginTop:6},referencePill:{alignSelf:"flex-start",backgroundColor:"#e7f2ec",borderRadius:99,paddingHorizontal:9,paddingVertical:5,marginTop:9},referenceText:{color:"#075b47",fontSize:8.5,fontWeight:"900"},verifyText:{color:"#547269",fontSize:7.5,fontWeight:"800",marginTop:2},noRef:{color:"#9c7761",fontSize:8.5,lineHeight:13,marginTop:8},footer:{marginTop:12,borderRadius:17,backgroundColor:"#eee9dc",padding:12},footerText:{color:"#78817b",fontSize:8.5,lineHeight:13,textAlign:"center"}
 });

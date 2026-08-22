@@ -14,7 +14,7 @@ function normalize(value: string) {
     .replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
-const STOP = new Set(["what","does","islam","say","about","this","that","the","a","an","and","or","to","of","in","on","for","with","can","i","we","you","my","our","it","is","are","was","were","do","does","did","how","why","when","where","who","هل","ما","ماذا","عن","في","من","على","الى","إلى","هو","هي","هذا","هذه","الإسلام","اسلام"]);
+const STOP = new Set(["what","does","islam","say","about","this","that","the","a","an","and","or","to","of","in","on","for","with","can","i","we","you","my","our","it","is","are","was","were","do","does","did","how","why","when","where","who","هل","ما","ماذا","عن","في","من","على","الى","إلى","هو","هي","هذا","هذه","الإسلام","اسلام","الدين","يقول","يقولون","حكم","الشرع","religion","ruling"]);
 
 const SYNONYMS: Record<string, string[]> = {
   dogs: ["dog","dogs","puppy","canine","كلب","كلاب","جرو"],
