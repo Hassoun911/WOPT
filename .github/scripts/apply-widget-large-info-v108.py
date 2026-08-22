@@ -297,7 +297,7 @@ provider = provider.replace(
 )
 provider = provider.replace(
     'else -> 13f\n          }\n          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)',
-    'else -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 24f; else -> 20f }\n          }\n          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)\n          val countdownTextColor = if (theme == "ivory") Color.rgb(181, 126, 42) else Color.rgb(242, 201, 111)\n          views.setTextColor(R.id.widget_countdown, countdownTextColor)'
+    'else -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 24f; else -> 20f }\n          }\n          views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)\n          views.setTextColor(R.id.widget_countdown, countdownTextColor)'
 )
 
 # Make the bilingual header/date hierarchy larger in the full layout.
@@ -312,6 +312,14 @@ insert = needle + '''      if (!isLockScreen && layout == "full") {
 if needle not in provider:
     raise SystemExit('Header insertion point not found')
 provider = provider.replace(needle, insert, 1)
+
+# Keep the contrasting countdown color in the outer prayer scope because the
+# following-prayer row uses the same accent even when the primary countdown is hidden.
+provider = provider.replace(
+    '        val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)\n        if (showCountdown) {',
+    '        val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)\n        val countdownTextColor = if (theme == "ivory") Color.rgb(181, 126, 42) else Color.rgb(242, 201, 111)\n        if (showCountdown) {',
+    1
+)
 
 # Full widget uses one clean following-prayer strip instead of five tiny prayer boxes.
 old_strip = '''        val supportsPrayerStrip = isLockScreen || layout in setOf("full", "vertical", "square", "slim", "compact", "next")

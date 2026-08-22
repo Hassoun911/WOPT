@@ -219,6 +219,7 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
         }
 
         val delay = (next.targetMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        val countdownTextColor = if (theme == "ivory") Color.rgb(181, 126, 42) else Color.rgb(242, 201, 111)
         if (showCountdown) {
           views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
           val countFormat = when (countdownStyle) {
@@ -241,7 +242,6 @@ class HassounPrayerWidgetProvider : AppWidgetProvider() {
             else -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 24f; else -> 20f }
           }
           views.setTextViewTextSize(R.id.widget_countdown, TypedValue.COMPLEX_UNIT_SP, countdownSp)
-          val countdownTextColor = if (theme == "ivory") Color.rgb(181, 126, 42) else Color.rgb(242, 201, 111)
           views.setTextColor(R.id.widget_countdown, countdownTextColor)
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             views.setChronometerCountDown(R.id.widget_countdown, true)
