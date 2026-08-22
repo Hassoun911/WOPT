@@ -9,7 +9,7 @@ on:
       - "admin-crm/**"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -47,4 +47,12 @@ jobs:
       - name: Smoke test Worker
         run: |
           sleep 8
-          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health
+          curl -fsS https://wopt-prayer-push.wopt-windsor.workers.dev/health | tee /tmp/health.json
+      - name: Record successful deploy
+        run: |
+          printf 'deployed_at=%s\nsource_commit=%s\nworker=passed\nd1_migrations=passed\nadmin_crm_build=passed\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(git rev-parse HEAD)" > .github/deploy-owner-email-v2-result.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/deploy-owner-email-v2-result.txt
+          git commit -m "Record owner email v2 production deploy"
+          git push origin HEAD:work/hassoun-1.0-store-admin
