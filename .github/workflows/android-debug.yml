@@ -1,4 +1,5 @@
 name: Build Hassoun Android APK
+# Widget layout refresh: trigger a fresh APK artifact after the native widget update.
 
 on:
   workflow_dispatch:
