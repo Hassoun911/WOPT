@@ -1,0 +1,48 @@
+name: Apply premium large widget layout
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - '.github/scripts/apply-widget-large-info-v108.py'
+      - '.github/workflows/apply-widget-large-info-v108.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply large bilingual widget layout
+        run: python .github/scripts/apply-widget-large-info-v108.py
+      - name: Validate XML and Kotlin source markers
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse('mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml')
+          p=open('mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt', encoding='utf-8').read()
+          assert 'widget_following_countdown' in p
+          assert 'countdownTextColor' in p
+          print('Widget layout XML and provider markers validated.')
+          PY
+      - name: Commit widget changes
+        run: |
+          if git diff --quiet -- mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt; then
+            echo 'No widget changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
+          git commit -m 'Apply large bilingual prayer widget layout'
+          git push origin HEAD:work/hassoun-1.0-store-admin
