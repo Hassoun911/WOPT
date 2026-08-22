@@ -3,6 +3,7 @@ import { recordSubscriberActivity } from "./activity";
 import { auditEmailSystemsOnce, sendOwnerAdminEmailTestOnce } from "./emailAuditOnce";
 import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
+import { importLegacyResendUsersOnce } from "./legacyResendImport";
 import type { Env } from "./types";
 
 const ADMIN_ORIGINS = new Set([
@@ -15,7 +16,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "gps-prayer-email-audit-2026-08-21-1";
+const BACKEND_VERSION = "owner-crm-smart-email-2026-08-21-2";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -88,6 +89,7 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(importLegacyResendUsersOnce(env));
     return worker.scheduled(controller, env, ctx);
   }
 } satisfies ExportedHandler<Env>;

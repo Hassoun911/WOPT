@@ -22,7 +22,7 @@ const NAMES: Record<PrayerKey, { en: string; ar: string }> = {
   isha: { en: "Isha", ar: "العشاء" }
 };
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
-const ICONS: Record<PrayerKey, string> = { fajr: "☀", dhuhr: "◉", asr: "☼", maghrib: "◐", isha: "☾" };
+const ICONS: Record<PrayerKey, string> = { fajr: "🌅", dhuhr: "☀️", asr: "🌤️", maghrib: "🌇", isha: "🌙" };
 
 function esc(value: unknown) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -64,11 +64,11 @@ export function prayerDashboardEmail(data: Record<string, unknown>, locale: Loca
   const event = (data.upcomingEvent && typeof data.upcomingEvent === "object" ? data.upcomingEvent : null) as UpcomingEvent | null;
 
   const subject = ar
-    ? kind === "twenty" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : kind === "ten" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `حان وقت صلاة ${prayer}`
-    : kind === "twenty" ? `${prayer} in 20 minutes` : kind === "ten" ? `${prayer} in 10 minutes` : `It is time for ${prayer}`;
+    ? kind === "twenty" ? `🕌⏳ بقي ٢٠ دقيقة على صلاة ${prayer} 🤲🌙` : kind === "ten" ? `🕌⏰ بقي ١٠ دقائق على صلاة ${prayer} 🤲✨` : `🕌🔔 حان وقت صلاة ${prayer} 🤲🌙`
+    : kind === "twenty" ? `🕌⏳ ${prayer} in 20 minutes 🤲🌙` : kind === "ten" ? `🕌⏰ ${prayer} in 10 minutes 🤲✨` : `🕌🔔 It is time for ${prayer} 🤲🌙`;
   const heroKicker = ar
-    ? kind === "twenty" ? "متبقي ٢٠ دقيقة" : kind === "ten" ? "متبقي ١٠ دقائق" : "حان وقت الصلاة"
-    : kind === "twenty" ? "20 MINUTES TO PRAYER" : kind === "ten" ? "10 MINUTES TO PRAYER" : "IT'S PRAYER TIME";
+    ? kind === "twenty" ? "🕌 ⏳ متبقي ٢٠ دقيقة 🌙" : kind === "ten" ? "🕌 ⏰ متبقي ١٠ دقائق ✨" : "🕌 🔔 حان وقت الصلاة 🤲"
+    : kind === "twenty" ? "🕌 ⏳ 20 MINUTES TO PRAYER 🌙" : kind === "ten" ? "🕌 ⏰ 10 MINUTES TO PRAYER ✨" : "🕌 🔔 IT'S PRAYER TIME 🤲";
 
   const prayerRows = PRAYERS.map((key) => {
     const active = key === prayerKey;
@@ -79,27 +79,27 @@ export function prayerDashboardEmail(data: Record<string, unknown>, locale: Loca
   }).join("");
 
   const eventBlock = event && typeof event.daysLeft === "number" && event.daysLeft <= 15
-    ? `<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff4cf;border:1px solid #e2c56b;border-radius:18px"><tr><td style="padding:15px"><div style="font-size:10px;letter-spacing:1.2px;color:#98752e;font-weight:900">${esc(t("UPCOMING ISLAMIC EVENT", "المناسبة الإسلامية القادمة"))}</div><div style="font-size:20px;font-weight:900;color:#173f35;margin-top:5px">${esc(event.emoji || "🌙")} ${esc(ar ? event.nameAr : event.nameEn)}</div><div style="font-size:13px;color:#5f6f69;margin-top:5px;line-height:1.5">${esc(ar ? event.descriptionAr : event.descriptionEn)}</div><div style="display:inline-block;margin-top:10px;background:#0b654f;color:#fff;border-radius:99px;padding:7px 11px;font-size:11px;font-weight:900">${esc(ar ? `متبقي ${event.daysLeft} يوم` : `${event.daysLeft} days remaining`)}</div></td></tr></table></td></tr>`
+    ? `<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff4cf;border:1px solid #e2c56b;border-radius:18px"><tr><td style="padding:15px"><div style="font-size:10px;letter-spacing:1.2px;color:#98752e;font-weight:900">${esc(t("🌙 ✨ UPCOMING ISLAMIC EVENT ✨ 🌙", "🌙 ✨ المناسبة الإسلامية القادمة ✨ 🌙"))}</div><div style="font-size:20px;font-weight:900;color:#173f35;margin-top:5px">${esc(event.emoji || "🌙")} ${esc(ar ? event.nameAr : event.nameEn)}</div><div style="font-size:13px;color:#5f6f69;margin-top:5px;line-height:1.5">${esc(ar ? event.descriptionAr : event.descriptionEn)}</div><div style="display:inline-block;margin-top:10px;background:#0b654f;color:#fff;border-radius:99px;padding:7px 11px;font-size:11px;font-weight:900">${esc(ar ? `متبقي ${event.daysLeft} يوم` : `${event.daysLeft} days remaining`)}</div></td></tr></table></td></tr>`
     : "";
 
   const action = manageUrl
-    ? `<tr><td align="center" style="padding:0 22px 22px"><a href="${esc(manageUrl)}" style="display:block;background:#0b654f;color:#fff;text-decoration:none;border-radius:14px;padding:14px 18px;font-size:13px;font-weight:900">${esc(t("Manage prayer alerts", "إدارة تنبيهات الصلاة"))}</a></td></tr>`
+    ? `<tr><td align="center" style="padding:0 22px 22px"><a href="${esc(manageUrl)}" style="display:block;background:#0b654f;color:#fff;text-decoration:none;border-radius:14px;padding:14px 18px;font-size:13px;font-weight:900">${esc(t("⚙️ Manage prayer alerts 🔔", "⚙️ إدارة تنبيهات الصلاة 🔔"))}</a></td></tr>`
     : "";
 
   const direction = ar ? "rtl" : "ltr";
   const align = ar ? "right" : "left";
-  const logo = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png";
+  const logo = "https://hassoun.app/assets/hassoun-logo.png";
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f2ede3;font-family:Arial,Helvetica,sans-serif;color:#173f35"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f2ede3;padding:20px 10px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fffdf8;border:1px solid #ded5c5;border-radius:26px;overflow:hidden;box-shadow:0 8px 30px rgba(40,56,48,.08)" dir="${direction}">
-  <tr><td style="padding:18px 22px;background:#fffdf8"><table role="presentation" width="100%"><tr><td width="58"><img src="${logo}" width="52" height="52" alt="Hassoun" style="display:block;border-radius:15px;background:#003d33"></td><td style="padding-${ar ? "right" : "left"}:11px;text-align:${align}"><div style="font-size:12px;font-weight:900;letter-spacing:2px;color:#a0782c">HASSOUN</div><div style="font-size:12px;color:#65756f;margin-top:2px">${esc(t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة"))}</div></td><td style="text-align:${ar ? "left" : "right"};font-size:10px;color:#8e9189">${esc(location)}</td></tr></table></td></tr>
+  <tr><td style="padding:18px 22px;background:#fffdf8"><table role="presentation" width="100%"><tr><td width="58"><img src="${logo}" width="52" height="52" alt="Hassoun" style="display:block;border-radius:15px;background:#003d33"></td><td style="padding-${ar ? "right" : "left"}:11px;text-align:${align}"><div style="font-size:12px;font-weight:900;letter-spacing:2px;color:#a0782c">HASSOUN</div><div style="font-size:12px;color:#65756f;margin-top:2px">${esc(t("🕌 Prayer • 📖 Qur’an • 🤲 Knowledge ✨", "🕌 الصلاة • 📖 القرآن • 🤲 المعرفة ✨"))}</div></td><td style="text-align:${ar ? "left" : "right"};font-size:10px;color:#8e9189">${esc(location)}</td></tr></table></td></tr>
   <tr><td style="background:#075b48;padding:23px 22px;text-align:${align}"><div style="font-size:10px;letter-spacing:1.5px;color:#eed27d;font-weight:900">${esc(heroKicker)}</div><table role="presentation" width="100%"><tr><td><div style="font-size:31px;line-height:1.1;color:#fff;font-weight:900;margin-top:7px">${esc(prayer)}</div><div style="font-size:13px;color:#c8ded7;margin-top:4px">${esc(NAMES[prayerKey][ar ? "en" : "ar"])}</div></td><td style="text-align:${ar ? "left" : "right"};vertical-align:bottom"><div style="font-size:28px;color:#fff;font-weight:900">${esc(prayerTime)}</div></td></tr></table><div style="height:1px;background:rgba(255,255,255,.16);margin:17px 0 10px"></div><div style="font-size:12px;color:#d7e7e1">${esc(gregorianLabel(prayerDate, locale))} • ${esc(hijriLabel(prayerDate, locale))}</div></td></tr>
-  <tr><td style="padding:19px 18px 8px"><div style="font-size:12px;font-weight:900;color:#173f35;padding:0 4px 8px">${esc(t("Today’s prayer schedule", "جدول صلوات اليوم"))}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${prayerRows}</tr></table></td></tr>
-  <tr><td style="padding:10px 22px 18px"><table role="presentation" width="100%" style="background:#edf5f1;border-radius:18px"><tr><td style="padding:15px;text-align:${align}"><div style="font-size:10px;color:#9a7a39;font-weight:900;letter-spacing:1px">${esc(t("DAILY REMINDER", "تذكير اليوم"))}</div><div style="font-size:17px;line-height:1.6;color:#244d42;font-weight:800;margin-top:5px">${esc(t("Hearts find comfort in the remembrance of Allah.", "ألا بذكر الله تطمئن القلوب."))}</div><div style="font-size:10px;color:#73837d;margin-top:4px">Qur’an 13:28</div></td></tr></table></td></tr>
+  <tr><td style="padding:19px 18px 8px"><div style="font-size:12px;font-weight:900;color:#173f35;padding:0 4px 8px">${esc(t("🕋 Today’s prayer schedule 🕌", "🕋 جدول صلوات اليوم 🕌"))}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${prayerRows}</tr></table></td></tr>
+  <tr><td style="padding:10px 22px 18px"><table role="presentation" width="100%" style="background:#edf5f1;border-radius:18px"><tr><td style="padding:15px;text-align:${align}"><div style="font-size:10px;color:#9a7a39;font-weight:900;letter-spacing:1px">${esc(t("📖✨ DAILY ISLAMIC REMINDER 🤲", "📖✨ تذكير اليوم 🤲"))}</div><div style="font-size:17px;line-height:1.6;color:#244d42;font-weight:800;margin-top:5px">${esc(t("🤲💚 Hearts find comfort in the remembrance of Allah. 🌙✨", "🤲💚 ألا بذكر الله تطمئن القلوب. 🌙✨"))}</div><div style="font-size:10px;color:#73837d;margin-top:4px">Qur’an 13:28</div></td></tr></table></td></tr>
   ${eventBlock}${action}
   <tr><td style="padding:0 22px 22px;text-align:center;color:#97958d;font-size:10px;line-height:1.5">${esc(t("Prayer times are based on your selected location and time zone. Islamic-event dates may vary by local moon sighting.", "مواقيت الصلاة حسب موقعك ومنطقتك الزمنية، وقد تختلف تواريخ المناسبات بحسب رؤية الهلال المحلية."))}</td></tr>
-</table><div style="max-width:600px;margin:12px auto 0;text-align:center;color:#9b988f;font-size:10px">Hassoun • ${esc(t("Stay connected to prayer", "ابقَ متصلاً بالصلاة"))}</div></td></tr></table></body></html>`;
+</table><div style="max-width:600px;margin:12px auto 0;text-align:center;color:#9b988f;font-size:10px">Hassoun • ${esc(t("🕌 Stay connected to prayer • 🤲 Sadaqah Jariyah 🌙✨", "🕌 ابقَ متصلاً بالصلاة • 🤲 صدقة جارية 🌙✨"))}</div></td></tr></table></body></html>`;
 
   const scheduleText = PRAYERS.map((key) => `${NAMES[key][locale]} ${time12(prayerTimes[key])}`).join(" • ");
-  const eventText = event && typeof event.daysLeft === "number" && event.daysLeft <= 15 ? `\n${t("Upcoming Islamic event", "المناسبة الإسلامية القادمة")}: ${ar ? event.nameAr : event.nameEn} — ${event.daysLeft} ${t("days", "يوم")}` : "";
+  const eventText = event && typeof event.daysLeft === "number" && event.daysLeft <= 15 ? `\n${t("Upcoming Islamic event", "🌙 ✨ المناسبة الإسلامية القادمة ✨ 🌙")}: ${ar ? event.nameAr : event.nameEn} — ${event.daysLeft} ${t("days", "يوم")}` : "";
   const text = `${subject}\n${prayerTime} • ${location}\n${gregorianLabel(prayerDate, locale)} • ${hijriLabel(prayerDate, locale)}\n${scheduleText}${eventText}\nQur’an 13:28${manageUrl ? `\n${manageUrl}` : ""}`;
   return { subject, html, text };
 }
