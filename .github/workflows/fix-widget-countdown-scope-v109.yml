@@ -1,4 +1,4 @@
-# Rerun after making the premium widget apply workflow idempotent.
+# Rerun after fixing Pillow installation for setup-python.
 name: Fix widget countdown scope and build APK
 
 on:
@@ -81,8 +81,9 @@ jobs:
         working-directory: mobile
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y python3-pil pngcheck
-          python3 - <<'PY'
+          sudo apt-get install -y pngcheck
+          python -m pip install --upgrade pip pillow
+          python - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
