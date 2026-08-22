@@ -15,12 +15,13 @@ type OutboxRow = {
 };
 type TemplateRow = { subject_en: string; subject_ar: string | null; html_en: string; html_ar: string | null; text_en: string | null; text_ar: string | null };
 type RenderedEmail = { subject: string; html: string; text: string };
-
-const SPONSOR_LOGO = "https://hassoun.app/property-cousins-sponsor.jpg";
-const SPONSOR_SITE = "https://thepropertycousins.net/";
-const SPONSOR_ADDRESS = "2055 Sandwich W Pkwy Unit 1200, Windsor, ON N9H 2M8";
-const SPONSOR_PHONE = "(519) 970-0202";
-const SPONSOR_MARKER = "data-hassoun-sadaqah-jariyah";
+type ProfileRow = {
+  template_key: string; enabled: number; include_islamic_occasion: number; include_daily_hadith: number;
+  include_daily_surah: number; include_occasion_countdown: number; include_motivation: number;
+  include_sadaqah_jariyah: number; include_sponsor: number; sponsor_name: string | null; sponsor_url: string | null;
+  sponsor_message_en: string | null; sponsor_message_ar: string | null;
+};
+type ContentRow = { content_type: "hadith" | "surah" | "motivation"; title_en: string; title_ar: string | null; body_en: string; body_ar: string | null; source_ref: string | null };
 
 function configured(env: Env) { return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM); }
 export function emailDeliveryConfigured(env: Env) { return configured(env); }
@@ -33,44 +34,29 @@ function dataObject(value: string | null) {
   try { const parsed = JSON.parse(value) as unknown; return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}; } catch { return {}; }
 }
 
-function sponsorHtml(locale: Locale) {
-  const ar = locale === "ar";
-  return `<table ${SPONSOR_MARKER}="1" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:16px auto 0;background:#f8f1e4;border:1px solid #eadfc9;border-radius:20px"><tr><td style="padding:18px 20px;text-align:center"><div style="font-size:11px;letter-spacing:1.2px;color:#806a42;font-weight:900">${escapeHtml(ar ? "هذا المشروع صدقة جارية" : "THIS PROJECT IS SADAQAH JARIYAH")}</div><p style="margin:7px auto 13px;max-width:490px;color:#5e675f;font-size:12px;line-height:1.55">${escapeHtml(ar ? "Hassoun مشروع مستمر لمساعدة المسلمين على الصلاة والقرآن والعلم النافع. نسألكم الدعاء لكل من يساهم في دعمه." : "Hassoun is an ongoing charity built to help Muslims stay connected to Salah, Qur’an and beneficial Islamic knowledge. Please make dua for everyone who supports it.")}</p><div style="font-size:10px;color:#8c806c;font-weight:800;margin-bottom:8px">${escapeHtml(ar ? "برعاية" : "Proudly sponsored by")}</div><a href="${SPONSOR_SITE}" style="text-decoration:none"><img src="${SPONSOR_LOGO}" alt="The Property Cousins Realty Inc." width="190" style="display:block;max-width:190px;width:100%;height:auto;margin:0 auto 9px;border:0"><div style="font-size:12px;color:#173f35;font-weight:900">THE PROPERTY COUSINS REALTY INC.</div></a><div style="font-size:10px;color:#756d60;line-height:1.55;margin-top:5px">${SPONSOR_ADDRESS}<br>${SPONSOR_PHONE}</div></td></tr></table>`;
-}
-
-function ensureSponsored(email: RenderedEmail, locale: Locale): RenderedEmail {
-  if (email.html.includes(SPONSOR_MARKER) || email.html.includes("THIS PROJECT IS SADAQAH JARIYAH") || email.html.includes("هذا المشروع صدقة جارية")) return email;
-  const sponsor = sponsorHtml(locale);
-  const html = /<\/body>/i.test(email.html) ? email.html.replace(/<\/body>/i, `${sponsor}</body>`) : `${email.html}${sponsor}`;
-  const sponsorText = locale === "ar"
-    ? `\n\nهذا المشروع صدقة جارية — برعاية The Property Cousins Realty Inc.\n${SPONSOR_ADDRESS} • ${SPONSOR_PHONE}`
-    : `\n\nThis project is Sadaqah Jariyah — sponsored by The Property Cousins Realty Inc.\n${SPONSOR_ADDRESS} • ${SPONSOR_PHONE}`;
-  return { ...email, html, text: `${email.text}${sponsorText}` };
-}
-
 function brandedEmail(options: { locale: Locale; eyebrow: string; title: string; intro: string; details?: Array<{ label: string; value: string }>; buttonLabel?: string; buttonUrl?: string; note?: string }) {
   const direction = options.locale === "ar" ? "rtl" : "ltr";
   const textAlign = options.locale === "ar" ? "right" : "left";
   const details = (options.details ?? []).filter((item) => item.value).map((item) => `<tr><td style="padding:8px 0;color:#8a806f;font-size:12px;font-weight:700;vertical-align:top;width:120px">${escapeHtml(item.label)}</td><td style="padding:8px 0;color:#214d42;font-size:13px;font-weight:700;vertical-align:top">${escapeHtml(item.value)}</td></tr>`).join("");
   const action = options.buttonUrl && options.buttonLabel ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:22px"><tr><td align="center"><a href="${escapeHtml(options.buttonUrl)}" style="display:block;background:#0b5b47;color:#fff;text-decoration:none;font-size:15px;font-weight:800;text-align:center;padding:15px 20px;border-radius:14px">${escapeHtml(options.buttonLabel)}</a></td></tr></table>` : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f6f0e5;font-family:Arial,Helvetica,sans-serif;color:#173f35"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f0e5;padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:24px;overflow:hidden"><tr><td style="padding:24px 24px 18px;text-align:${textAlign}" dir="${direction}"><table role="presentation" width="100%"><tr><td width="58"><img src="https://hassoun.app/icon-192.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33"></td><td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px"><div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div></td></tr></table></td></tr><tr><td style="padding:0 24px 26px;text-align:${textAlign}" dir="${direction}"><div style="font-size:11px;letter-spacing:1.6px;color:#9a8a70;font-weight:800">${escapeHtml(options.eyebrow)}</div><h1 style="margin:9px 0 10px;font-size:28px;line-height:1.18;color:#153f35">${escapeHtml(options.title)}</h1><p style="margin:0;color:#6f746c;font-size:15px;line-height:1.65">${escapeHtml(options.intro)}</p>${details ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;background:#f8f3e9;border:1px solid #e6dccb;border-radius:16px;padding:10px 14px">${details}</table>` : ""}${action}${options.note ? `<p style="margin:18px 0 0;color:#8a8377;font-size:12px;line-height:1.6">${escapeHtml(options.note)}</p>` : ""}</td></tr></table><div style="max-width:520px;margin:14px auto 0;color:#9a9488;font-size:11px;text-align:center">Hassoun</div></td></tr></table></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f6f0e5;font-family:Arial,Helvetica,sans-serif;color:#173f35"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f0e5;padding:24px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:24px;overflow:hidden"><tr><td style="padding:24px 24px 18px;text-align:${textAlign}" dir="${direction}"><table role="presentation" width="100%"><tr><td width="58"><img src="https://raw.githubusercontent.com/Hassoun911/WOPT/main/pwa/public/assets/hassoun-logo.png" width="54" height="54" alt="Hassoun" style="display:block;border:0;border-radius:15px;background:#003d33"></td><td style="vertical-align:middle;padding-${options.locale === "ar" ? "right" : "left"}:12px"><div style="font-size:11px;letter-spacing:2px;color:#a17825;font-weight:900">HASSOUN</div><div style="font-size:14px;color:#355c52;font-weight:800">Prayer • Qur’an • Knowledge</div></td></tr></table></td></tr><tr><td style="padding:0 24px 26px;text-align:${textAlign}" dir="${direction}"><div style="font-size:11px;letter-spacing:1.6px;color:#9a8a70;font-weight:800">${escapeHtml(options.eyebrow)}</div><h1 style="margin:9px 0 10px;font-size:28px;line-height:1.18;color:#153f35">${escapeHtml(options.title)}</h1><p style="margin:0;color:#6f746c;font-size:15px;line-height:1.65">${escapeHtml(options.intro)}</p>${details ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;background:#f8f3e9;border:1px solid #e6dccb;border-radius:16px;padding:10px 14px">${details}</table>` : ""}${action}${options.note ? `<p style="margin:18px 0 0;color:#8a8377;font-size:12px;line-height:1.6">${escapeHtml(options.note)}</p>` : ""}</td></tr></table><div style="max-width:520px;margin:14px auto 0;color:#9a9488;font-size:11px;text-align:center">Hassoun</div></td></tr></table></body></html>`;
 }
 
 function builtInSystemEmail(kind: string, data: Record<string, unknown>, locale: Locale): RenderedEmail {
   if (kind === "verification") {
     const verificationUrl = String(data.verificationUrl ?? ""); const location = String(data.locationLabel ?? ""); const timezone = String(data.timezone ?? "");
-    const subject = locale === "ar" ? "✅ تأكيد تنبيهات الصلاة عبر Hassoun" : "✅ Confirm your Hassoun prayer email alerts";
+    const subject = locale === "ar" ? "تأكيد تنبيهات الصلاة عبر البريد" : "Confirm your Hassoun prayer email alerts";
     return { subject, text: locale === "ar" ? `أكد تنبيهات الصلاة. الموقع: ${location}. ${verificationUrl}` : `Confirm your prayer email alerts. Location: ${location}. ${verificationUrl}`, html: brandedEmail({ locale, eyebrow: locale === "ar" ? "خطوة أخيرة" : "ONE LAST STEP", title: locale === "ar" ? "أكد تنبيهات الصلاة" : "Confirm your prayer email alerts", intro: locale === "ar" ? "أكد بريدك لتفعيل التنبيهات حسب موقعك ومواقيت الصلاة المحلية." : "Confirm your email to activate local prayer alerts.", details: [{ label: locale === "ar" ? "الموقع" : "Prayer location", value: location }, { label: locale === "ar" ? "المنطقة الزمنية" : "Time zone", value: timezone }], buttonLabel: locale === "ar" ? "تأكيد التنبيهات" : "Confirm email alerts", buttonUrl: verificationUrl, note: locale === "ar" ? "تنتهي صلاحية الرابط خلال 24 ساعة." : "This confirmation link expires in 24 hours." }) };
   }
   if (kind === "manage") {
-    const manageUrl = String(data.manageUrl ?? ""); const subject = locale === "ar" ? "⚙️ إدارة تنبيهات Hassoun" : "⚙️ Manage your Hassoun email alerts";
+    const manageUrl = String(data.manageUrl ?? ""); const subject = locale === "ar" ? "إدارة تنبيهات Hassoun" : "Manage your Hassoun email alerts";
     return { subject, text: `${subject}: ${manageUrl}`, html: brandedEmail({ locale, eyebrow: locale === "ar" ? "إعدادات التنبيهات" : "ALERT SETTINGS", title: locale === "ar" ? "إدارة تنبيهات الصلاة" : "Manage your prayer alerts", intro: locale === "ar" ? "عدّل التنبيهات أو موقع الصلاة أو ألغِ الاشتراك." : "Change reminder timing, prayer location, or unsubscribe.", buttonLabel: locale === "ar" ? "فتح الإعدادات" : "Open alert settings", buttonUrl: manageUrl }) };
   }
   if (kind === "admin_password_reset") {
-    const resetUrl = String(data.resetUrl ?? ""); const subject = locale === "ar" ? "🔐 إعادة تعيين كلمة مرور إدارة Hassoun" : "🔐 Reset your Hassoun admin password";
+    const resetUrl = String(data.resetUrl ?? ""); const subject = locale === "ar" ? "إعادة تعيين كلمة مرور إدارة Hassoun" : "Reset your Hassoun admin password";
     return { subject, text: `${subject}: ${resetUrl}`, html: brandedEmail({ locale, eyebrow: "HASSOUN ADMIN", title: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset your admin password", intro: locale === "ar" ? "استخدم الرابط الآمن لإنشاء كلمة مرور جديدة." : "Use this secure link to create a new admin password.", buttonLabel: locale === "ar" ? "إعادة تعيين كلمة المرور" : "Reset password", buttonUrl: resetUrl, note: locale === "ar" ? "تنتهي صلاحية الرابط خلال ساعة." : "This link expires in one hour." }) };
   }
-  const subject = locale === "ar" ? "🌙 تنبيه جديد من Hassoun" : "🌙 New Hassoun notification";
+  const subject = locale === "ar" ? "تنبيه من Hassoun" : "Hassoun notification";
   return { subject, text: String(data.message ?? subject), html: brandedEmail({ locale, eyebrow: "HASSOUN", title: locale === "ar" ? "تنبيه جديد" : "New notification", intro: String(data.message ?? subject) }) };
 }
 
@@ -79,24 +65,97 @@ function applyTemplate(template: string, values: Record<string, unknown>, html: 
   return template.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (_match, key: string) => { const value = values[key] ?? ""; return html && key !== "emailHtml" ? escapeHtml(value) : String(value); });
 }
 
+function profileKey(row: OutboxRow) {
+  if (row.kind === "prayer") return "prayer_alert";
+  if (["verification", "manage", "admin_password_reset", "religious_occasion", "daily_content", "announcement", "community_event", "marketing"].includes(row.kind)) return row.kind;
+  return "announcement";
+}
+
+async function loadProfile(env: Env, row: OutboxRow) {
+  return env.DB.prepare(
+    `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
+            include_daily_surah, include_occasion_countdown, include_motivation,
+            include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
+            sponsor_message_en, sponsor_message_ar
+     FROM email_template_profiles WHERE template_key = ? LIMIT 1`
+  ).bind(profileKey(row)).first<ProfileRow>();
+}
+
+async function loadContent(env: Env) {
+  const { results } = await env.DB.prepare(
+    `SELECT content_type, title_en, title_ar, body_en, body_ar, source_ref
+     FROM email_content_library WHERE enabled = 1 ORDER BY sort_order, id`
+  ).all<ContentRow>();
+  const map = new Map<string, ContentRow>();
+  for (const item of results) if (!map.has(item.content_type)) map.set(item.content_type, item);
+  return map;
+}
+
+function contentCard(item: ContentRow, locale: Locale, accent: string) {
+  const ar = locale === "ar"; const title = ar ? (item.title_ar || item.title_en) : item.title_en; const body = ar ? (item.body_ar || item.body_en) : item.body_en;
+  return `<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#fffdf8;border:1px solid #e4ddcf;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:${accent};font-weight:900">${escapeHtml(title)}</div><div style="font-size:14px;line-height:1.65;color:#31564c;font-weight:700;margin-top:5px">${escapeHtml(body)}</div>${item.source_ref ? `<div style="font-size:10px;color:#89938f;margin-top:6px">${escapeHtml(item.source_ref)}</div>` : ""}</td></tr></table></td></tr>`;
+}
+
+function enhancementHtml(profile: ProfileRow, content: Map<string, ContentRow>, data: Record<string, unknown>, locale: Locale) {
+  const ar = locale === "ar"; const blocks: string[] = [];
+  const event = data.upcomingEvent && typeof data.upcomingEvent === "object" ? data.upcomingEvent as Record<string, unknown> : null;
+  if (event && (profile.include_islamic_occasion === 1 || profile.include_occasion_countdown === 1)) {
+    const name = String(ar ? event.nameAr ?? event.nameEn ?? "" : event.nameEn ?? event.nameAr ?? "");
+    const description = String(ar ? event.descriptionAr ?? event.descriptionEn ?? "" : event.descriptionEn ?? event.descriptionAr ?? "");
+    const days = Number(event.daysLeft ?? 0);
+    const countdown = profile.include_occasion_countdown === 1 ? `<div style="display:inline-block;margin-top:9px;background:#0b654f;color:white;border-radius:99px;padding:6px 10px;font-size:11px;font-weight:900">${escapeHtml(ar ? `متبقي ${days} يوم` : `${days} days remaining`)}</div>` : "";
+    const details = profile.include_islamic_occasion === 1 ? `<div style="font-size:19px;font-weight:900;color:#173f35">${escapeHtml(event.emoji || "🌙")} ${escapeHtml(name)}</div><div style="font-size:13px;line-height:1.5;color:#60716b;margin-top:5px">${escapeHtml(description)}</div>` : "";
+    blocks.push(`<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#fff3cc;border:1px solid #e1c56f;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(ar ? "المناسبة الإسلامية القادمة" : "UPCOMING ISLAMIC OCCASION")}</div>${details}${countdown}</td></tr></table></td></tr>`);
+  }
+  if (profile.include_daily_hadith === 1 && content.get("hadith")) blocks.push(contentCard(content.get("hadith")!, locale, "#9a772c"));
+  if (profile.include_daily_surah === 1 && content.get("surah")) blocks.push(contentCard(content.get("surah")!, locale, "#08735a"));
+  if (profile.include_motivation === 1 && content.get("motivation")) blocks.push(contentCard(content.get("motivation")!, locale, "#5b6d9a"));
+  if (profile.include_sadaqah_jariyah === 1) {
+    blocks.push(`<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#edf6f2;border:1px solid #cfe3db;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#08735a;font-weight:900">${escapeHtml(ar ? "صدقة جارية" : "SADAQAH JARIYAH")}</div><div style="font-size:14px;line-height:1.6;color:#31564c;font-weight:800;margin-top:5px">${escapeHtml(ar ? "هذا المشروع صدقة جارية عن عبد الجليل حسون وسلمى حسون. نسأل الله أن يتقبله وينفع به." : "Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. May Allah accept it and let its benefit continue.")}</div></td></tr></table></td></tr>`);
+  }
+  if (profile.include_sponsor === 1) {
+    const sponsorName = profile.sponsor_name || (ar ? "قسم الرعاية والدعم" : "Sponsor & Support");
+    const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
+    const link = profile.sponsor_url ? `<a href="${escapeHtml(profile.sponsor_url)}" style="display:inline-block;margin-top:9px;background:#173f35;color:white;text-decoration:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900">${escapeHtml(ar ? "زيارة الراعي" : "Sponsor / Support")}</a>` : "";
+    blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
+  }
+  if (!blocks.length) return "";
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:14px auto 0">${blocks.join("")}</table>`;
+}
+
+function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow, content: Map<string, ContentRow>, locale: Locale) {
+  if (!extraHtml) return rendered;
+  const textParts: string[] = [];
+  if (profile.include_daily_hadith === 1 && content.get("hadith")) textParts.push(`${content.get("hadith")!.title_en}: ${content.get("hadith")!.body_en}${content.get("hadith")!.source_ref ? ` (${content.get("hadith")!.source_ref})` : ""}`);
+  if (profile.include_daily_surah === 1 && content.get("surah")) textParts.push(`${content.get("surah")!.title_en}: ${content.get("surah")!.body_en}${content.get("surah")!.source_ref ? ` (${content.get("surah")!.source_ref})` : ""}`);
+  if (profile.include_motivation === 1 && content.get("motivation")) textParts.push(`${content.get("motivation")!.title_en}: ${content.get("motivation")!.body_en}`);
+  if (profile.include_sadaqah_jariyah === 1) textParts.push("Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.");
+  if (profile.include_sponsor === 1) textParts.push(profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
+  const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${extraHtml}</body>`) : `${rendered.html}${extraHtml}`;
+  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}` };
+}
+
 async function renderEmail(env: Env, row: OutboxRow) {
-  const data = dataObject(row.template_data_json);
-  const builtIn = row.kind === "prayer" ? prayerDashboardEmail(data, row.locale) : builtInSystemEmail(row.kind, data, row.locale);
-  let rendered: RenderedEmail;
-  if (["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind) || !row.template_key) {
-    rendered = builtIn;
-  } else {
+  const rawData = dataObject(row.template_data_json);
+  const [profile, content] = await Promise.all([loadProfile(env, row), loadContent(env)]);
+  const data = { ...rawData };
+  if (row.kind === "prayer" && profile) data.upcomingEvent = null;
+  let builtIn = row.kind === "prayer" ? prayerDashboardEmail(data, row.locale) : builtInSystemEmail(row.kind, data, row.locale);
+
+  if (!["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind) && row.template_key) {
     const template = await env.DB.prepare(`SELECT subject_en, subject_ar, html_en, html_ar, text_en, text_ar FROM email_templates WHERE template_key = ? AND enabled = 1 LIMIT 1`).bind(row.template_key).first<TemplateRow>();
-    if (!template) rendered = builtIn;
-    else {
-      const values = templateValues(builtIn, data);
+    if (template) {
+      const values = templateValues(builtIn, rawData);
       const subjectSource = row.locale === "ar" ? (template.subject_ar || template.subject_en) : template.subject_en;
       const htmlSource = row.locale === "ar" ? (template.html_ar || template.html_en) : template.html_en;
       const textSource = row.locale === "ar" ? (template.text_ar || template.text_en || builtIn.text) : (template.text_en || builtIn.text);
-      rendered = { subject: applyTemplate(subjectSource, values, false), html: applyTemplate(htmlSource, values, true), text: applyTemplate(textSource, values, false) };
+      builtIn = { subject: applyTemplate(subjectSource, values, false), html: applyTemplate(htmlSource, values, true), text: applyTemplate(textSource, values, false) };
     }
   }
-  return ensureSponsored(rendered, row.locale);
+
+  if (!profile || profile.enabled !== 1) return builtIn;
+  const extra = enhancementHtml(profile, content, rawData, row.locale);
+  return appendEnhancements(builtIn, extra, profile, content, row.locale);
 }
 
 async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
