@@ -54,4 +54,6 @@ export interface Env {
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
   EXPO_ACCESS_TOKEN?: string;
+  OPENAI_API_KEY?: string;
+  SUNNAH_API_KEY?: string;
 }
