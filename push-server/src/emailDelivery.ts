@@ -15,6 +15,13 @@ type OutboxRow = {
 };
 type TemplateRow = { subject_en: string; subject_ar: string | null; html_en: string; html_ar: string | null; text_en: string | null; text_ar: string | null };
 type RenderedEmail = { subject: string; html: string; text: string };
+type ProfileRow = {
+  template_key: string; enabled: number; include_islamic_occasion: number; include_daily_hadith: number;
+  include_daily_surah: number; include_occasion_countdown: number; include_motivation: number;
+  include_sadaqah_jariyah: number; include_sponsor: number; sponsor_name: string | null; sponsor_url: string | null;
+  sponsor_message_en: string | null; sponsor_message_ar: string | null;
+};
+type ContentRow = { content_type: "hadith" | "surah" | "motivation"; title_en: string; title_ar: string | null; body_en: string; body_ar: string | null; source_ref: string | null };
 
 function configured(env: Env) { return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM); }
 export function emailDeliveryConfigured(env: Env) { return configured(env); }
@@ -58,19 +65,97 @@ function applyTemplate(template: string, values: Record<string, unknown>, html: 
   return template.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (_match, key: string) => { const value = values[key] ?? ""; return html && key !== "emailHtml" ? escapeHtml(value) : String(value); });
 }
 
+function profileKey(row: OutboxRow) {
+  if (row.kind === "prayer") return "prayer_alert";
+  if (["verification", "manage", "admin_password_reset", "religious_occasion", "daily_content", "announcement", "community_event", "marketing"].includes(row.kind)) return row.kind;
+  return "announcement";
+}
+
+async function loadProfile(env: Env, row: OutboxRow) {
+  return env.DB.prepare(
+    `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
+            include_daily_surah, include_occasion_countdown, include_motivation,
+            include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
+            sponsor_message_en, sponsor_message_ar
+     FROM email_template_profiles WHERE template_key = ? LIMIT 1`
+  ).bind(profileKey(row)).first<ProfileRow>();
+}
+
+async function loadContent(env: Env) {
+  const { results } = await env.DB.prepare(
+    `SELECT content_type, title_en, title_ar, body_en, body_ar, source_ref
+     FROM email_content_library WHERE enabled = 1 ORDER BY sort_order, id`
+  ).all<ContentRow>();
+  const map = new Map<string, ContentRow>();
+  for (const item of results) if (!map.has(item.content_type)) map.set(item.content_type, item);
+  return map;
+}
+
+function contentCard(item: ContentRow, locale: Locale, accent: string) {
+  const ar = locale === "ar"; const title = ar ? (item.title_ar || item.title_en) : item.title_en; const body = ar ? (item.body_ar || item.body_en) : item.body_en;
+  return `<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#fffdf8;border:1px solid #e4ddcf;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:${accent};font-weight:900">${escapeHtml(title)}</div><div style="font-size:14px;line-height:1.65;color:#31564c;font-weight:700;margin-top:5px">${escapeHtml(body)}</div>${item.source_ref ? `<div style="font-size:10px;color:#89938f;margin-top:6px">${escapeHtml(item.source_ref)}</div>` : ""}</td></tr></table></td></tr>`;
+}
+
+function enhancementHtml(profile: ProfileRow, content: Map<string, ContentRow>, data: Record<string, unknown>, locale: Locale) {
+  const ar = locale === "ar"; const blocks: string[] = [];
+  const event = data.upcomingEvent && typeof data.upcomingEvent === "object" ? data.upcomingEvent as Record<string, unknown> : null;
+  if (event && (profile.include_islamic_occasion === 1 || profile.include_occasion_countdown === 1)) {
+    const name = String(ar ? event.nameAr ?? event.nameEn ?? "" : event.nameEn ?? event.nameAr ?? "");
+    const description = String(ar ? event.descriptionAr ?? event.descriptionEn ?? "" : event.descriptionEn ?? event.descriptionAr ?? "");
+    const days = Number(event.daysLeft ?? 0);
+    const countdown = profile.include_occasion_countdown === 1 ? `<div style="display:inline-block;margin-top:9px;background:#0b654f;color:white;border-radius:99px;padding:6px 10px;font-size:11px;font-weight:900">${escapeHtml(ar ? `متبقي ${days} يوم` : `${days} days remaining`)}</div>` : "";
+    const details = profile.include_islamic_occasion === 1 ? `<div style="font-size:19px;font-weight:900;color:#173f35">${escapeHtml(event.emoji || "🌙")} ${escapeHtml(name)}</div><div style="font-size:13px;line-height:1.5;color:#60716b;margin-top:5px">${escapeHtml(description)}</div>` : "";
+    blocks.push(`<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#fff3cc;border:1px solid #e1c56f;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(ar ? "المناسبة الإسلامية القادمة" : "UPCOMING ISLAMIC OCCASION")}</div>${details}${countdown}</td></tr></table></td></tr>`);
+  }
+  if (profile.include_daily_hadith === 1 && content.get("hadith")) blocks.push(contentCard(content.get("hadith")!, locale, "#9a772c"));
+  if (profile.include_daily_surah === 1 && content.get("surah")) blocks.push(contentCard(content.get("surah")!, locale, "#08735a"));
+  if (profile.include_motivation === 1 && content.get("motivation")) blocks.push(contentCard(content.get("motivation")!, locale, "#5b6d9a"));
+  if (profile.include_sadaqah_jariyah === 1) {
+    blocks.push(`<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#edf6f2;border:1px solid #cfe3db;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#08735a;font-weight:900">${escapeHtml(ar ? "صدقة جارية" : "SADAQAH JARIYAH")}</div><div style="font-size:14px;line-height:1.6;color:#31564c;font-weight:800;margin-top:5px">${escapeHtml(ar ? "هذا المشروع صدقة جارية عن عبد الجليل حسون وسلمى حسون. نسأل الله أن يتقبله وينفع به." : "Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun. May Allah accept it and let its benefit continue.")}</div></td></tr></table></td></tr>`);
+  }
+  if (profile.include_sponsor === 1) {
+    const sponsorName = profile.sponsor_name || (ar ? "قسم الرعاية والدعم" : "Sponsor & Support");
+    const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
+    const link = profile.sponsor_url ? `<a href="${escapeHtml(profile.sponsor_url)}" style="display:inline-block;margin-top:9px;background:#173f35;color:white;text-decoration:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900">${escapeHtml(ar ? "زيارة الراعي" : "Sponsor / Support")}</a>` : "";
+    blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
+  }
+  if (!blocks.length) return "";
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:14px auto 0">${blocks.join("")}</table>`;
+}
+
+function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow, content: Map<string, ContentRow>, locale: Locale) {
+  if (!extraHtml) return rendered;
+  const textParts: string[] = [];
+  if (profile.include_daily_hadith === 1 && content.get("hadith")) textParts.push(`${content.get("hadith")!.title_en}: ${content.get("hadith")!.body_en}${content.get("hadith")!.source_ref ? ` (${content.get("hadith")!.source_ref})` : ""}`);
+  if (profile.include_daily_surah === 1 && content.get("surah")) textParts.push(`${content.get("surah")!.title_en}: ${content.get("surah")!.body_en}${content.get("surah")!.source_ref ? ` (${content.get("surah")!.source_ref})` : ""}`);
+  if (profile.include_motivation === 1 && content.get("motivation")) textParts.push(`${content.get("motivation")!.title_en}: ${content.get("motivation")!.body_en}`);
+  if (profile.include_sadaqah_jariyah === 1) textParts.push("Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.");
+  if (profile.include_sponsor === 1) textParts.push(profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
+  const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${extraHtml}</body>`) : `${rendered.html}${extraHtml}`;
+  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}` };
+}
+
 async function renderEmail(env: Env, row: OutboxRow) {
-  const data = dataObject(row.template_data_json);
-  const builtIn = row.kind === "prayer" ? prayerDashboardEmail(data, row.locale) : builtInSystemEmail(row.kind, data, row.locale);
-  // Core Hassoun emails use the current responsive code templates so stale D1 templates cannot downgrade their design.
-  if (["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind)) return builtIn;
-  if (!row.template_key) return builtIn;
-  const template = await env.DB.prepare(`SELECT subject_en, subject_ar, html_en, html_ar, text_en, text_ar FROM email_templates WHERE template_key = ? AND enabled = 1 LIMIT 1`).bind(row.template_key).first<TemplateRow>();
-  if (!template) return builtIn;
-  const values = templateValues(builtIn, data);
-  const subjectSource = row.locale === "ar" ? (template.subject_ar || template.subject_en) : template.subject_en;
-  const htmlSource = row.locale === "ar" ? (template.html_ar || template.html_en) : template.html_en;
-  const textSource = row.locale === "ar" ? (template.text_ar || template.text_en || builtIn.text) : (template.text_en || builtIn.text);
-  return { subject: applyTemplate(subjectSource, values, false), html: applyTemplate(htmlSource, values, true), text: applyTemplate(textSource, values, false) };
+  const rawData = dataObject(row.template_data_json);
+  const [profile, content] = await Promise.all([loadProfile(env, row), loadContent(env)]);
+  const data = { ...rawData };
+  if (row.kind === "prayer" && profile) data.upcomingEvent = null;
+  let builtIn = row.kind === "prayer" ? prayerDashboardEmail(data, row.locale) : builtInSystemEmail(row.kind, data, row.locale);
+
+  if (!["verification", "manage", "admin_password_reset", "prayer"].includes(row.kind) && row.template_key) {
+    const template = await env.DB.prepare(`SELECT subject_en, subject_ar, html_en, html_ar, text_en, text_ar FROM email_templates WHERE template_key = ? AND enabled = 1 LIMIT 1`).bind(row.template_key).first<TemplateRow>();
+    if (template) {
+      const values = templateValues(builtIn, rawData);
+      const subjectSource = row.locale === "ar" ? (template.subject_ar || template.subject_en) : template.subject_en;
+      const htmlSource = row.locale === "ar" ? (template.html_ar || template.html_en) : template.html_en;
+      const textSource = row.locale === "ar" ? (template.text_ar || template.text_en || builtIn.text) : (template.text_en || builtIn.text);
+      builtIn = { subject: applyTemplate(subjectSource, values, false), html: applyTemplate(htmlSource, values, true), text: applyTemplate(textSource, values, false) };
+    }
+  }
+
+  if (!profile || profile.enabled !== 1) return builtIn;
+  const extra = enhancementHtml(profile, content, rawData, row.locale);
+  return appendEnhancements(builtIn, extra, profile, content, row.locale);
 }
 
 async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
