@@ -4,6 +4,7 @@ import { auditEmailSystemsOnce, sendOwnerAdminEmailTestOnce } from "./emailAudit
 import { finishGameSession } from "./gameHistory";
 import { getLocationPrayerTimes } from "./locationPrayer";
 import { importLegacyResendUsersOnce } from "./legacyResendImport";
+import { getSponsorLogo } from "./sponsorAsset";
 import type { Env } from "./types";
 
 const ADMIN_ORIGINS = new Set([
@@ -16,7 +17,7 @@ const PUBLIC_ORIGINS = new Set([
   "https://hassoun911.github.io"
 ]);
 
-const BACKEND_VERSION = "owner-crm-smart-email-2026-08-21-2";
+const BACKEND_VERSION = "owner-crm-smart-email-2026-08-22-3";
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin");
@@ -55,6 +56,10 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/health") {
       return withCors(request, Response.json({ ok: true, service: "wopt-prayer-push", backendVersion: BACKEND_VERSION }), env);
+    }
+    if (request.method === "GET" && /^\/email\/assets\/sponsor-logo\/[A-Za-z0-9_-]{1,120}$/.test(url.pathname)) {
+      const templateKey = decodeURIComponent(url.pathname.split("/").pop() || "");
+      return getSponsorLogo(env, templateKey);
     }
     if (request.method === "GET" && url.pathname === "/internal/email-audit-once-20260821") {
       return auditEmailSystemsOnce(env);
