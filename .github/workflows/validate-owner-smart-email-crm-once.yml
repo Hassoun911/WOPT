@@ -1,0 +1,51 @@
+name: Validate Owner Smart Email CRM Once
+
+on:
+  push:
+    branches: [work/hassoun-1.0-store-admin]
+    paths:
+      - ".github/workflows/validate-owner-smart-email-crm-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/hassoun-1.0-store-admin
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            pwa/package-lock.json
+      - name: Validate Worker
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Validate Owner CRM
+        working-directory: pwa
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Save validation result
+        run: |
+          cat > .github/owner-smart-email-validation.txt <<EOF
+          owner_smart_email_validation=passed
+          validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          source_commit=$(git rev-parse HEAD)
+          worker=passed
+          owner_crm=passed
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/owner-smart-email-validation.txt
+          git commit -m "Record Owner smart email CRM validation" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin || true
