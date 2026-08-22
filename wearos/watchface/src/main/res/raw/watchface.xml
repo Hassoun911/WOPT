@@ -47,7 +47,7 @@
 
         <!-- Main clock remains visible in ambient mode. -->
         <DigitalClock x="75" y="181" width="300" height="82">
-            <TimeText x="0" y="0" width="300" height="82" format="h:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER" verticalAlign="CENTER">
+            <TimeText x="0" y="0" width="300" height="82" format="h:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER">
                 <Font family="SYNC_TO_DEVICE" size="70" weight="BOLD" color="#FFF0A3" />
             </TimeText>
         </DigitalClock>
@@ -102,7 +102,7 @@
         <!-- Hassoun Calories complication. -->
         <ComplicationSlot
             slotId="101"
-            displayName="calories_slot"
+            displayName="@string/calories_slot"
             supportedTypes="SHORT_TEXT EMPTY"
             x="240" y="124" width="155" height="48">
             <Variant mode="AMBIENT" target="alpha" value="0" />
@@ -127,7 +127,7 @@
         <!-- Hassoun Qibla bearing complication. -->
         <ComplicationSlot
             slotId="102"
-            displayName="qibla_slot"
+            displayName="@string/qibla_slot"
             supportedTypes="SHORT_TEXT EMPTY"
             x="55" y="334" width="155" height="48">
             <Variant mode="AMBIENT" target="alpha" value="0" />
