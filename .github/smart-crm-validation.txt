@@ -1,0 +1,5 @@
+smart_crm_validation=passed
+validated_at=2026-08-22T01:39:55Z
+source_commit=cf6ea1057a6aa6f2be187d3bc8919fd4dbf8b641
+worker=typecheck+tests passed
+crm=pwa production build passed
