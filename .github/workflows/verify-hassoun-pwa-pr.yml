@@ -1,0 +1,41 @@
+name: Verify Hassoun Public PWA
+
+on:
+  pull_request:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - ".github/pwa-verify.trigger"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pwa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build public Hassoun site
+        run: npx next build
+        env:
+          WOPT_STATIC_EXPORT: "1"
+          NEXT_PUBLIC_BASE_PATH: ""
+          NEXT_PUBLIC_PUSH_API_URL: "https://wopt-prayer-push.wopt-windsor.workers.dev"
+      - name: Verify root custom-domain build
+        run: |
+          test -f out/index.html
+          test -f out/quran/index.html
+          test -f out/CNAME
+          grep -qx 'hassoun.app' out/CNAME
+          test -f out/hassoun-logo.png
+          echo "Public Hassoun PWA build and custom-domain artifact are valid."
