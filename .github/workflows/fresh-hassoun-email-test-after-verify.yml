@@ -52,3 +52,5 @@ jobs:
           done
           echo "Worker did not process the test row in time"
           exit 1
+
+# rerun after rotating RESEND_API_KEY on 2026-08-21
