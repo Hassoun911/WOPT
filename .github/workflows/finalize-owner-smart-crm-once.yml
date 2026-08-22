@@ -1,0 +1,87 @@
+name: Finalize Owner Smart CRM Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/finalize-owner-smart-crm-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            push-server/package-lock.json
+            pwa/package-lock.json
+      - name: Validate Worker and apply D1 migration
+        working-directory: push-server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npx wrangler d1 migrations apply wopt-prayer-push --remote
+      - name: Import legacy Resend prayer users safely
+        working-directory: push-server
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RESEND_API_KEY"
+          cat > /tmp/import.mjs <<'NODE'
+          import crypto from 'node:crypto';
+          import fs from 'node:fs';
+          const key=process.env.RESEND_API_KEY;
+          const secret=process.env.EMAIL_LINK_SECRET||process.env.VAPID_PRIVATE_KEY;
+          if(!secret) throw new Error('Missing email link secret');
+          const headers={Authorization:`Bearer ${key}`,Accept:'application/json'};
+          async function get(path){const r=await fetch(`https://api.resend.com${path}`,{headers});if(!r.ok)throw new Error(`${path}: ${r.status} ${await r.text()}`);return r.json();}
+          const people=new Map();
+          function add(email,blocked=false){if(typeof email!=='string')return;email=email.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return;const old=people.get(email);people.set(email,{email,blocked:Boolean(blocked||old?.blocked)});}
+          try{let after='';for(let page=0;page<50;page++){const q=new URLSearchParams({limit:'100'});if(after)q.set('after',after);const p=await get(`/emails?${q}`);const rows=p.data||[];if(!rows.length)break;for(const row of rows){if(!/(fajr|dhuhr|zuhr|asr|maghrib|isha|prayer time|athan|adhan|وقت الصلاة|الفجر|الظهر|العصر|المغرب|العشاء)/i.test(String(row.subject||'')))continue;for(const e of(Array.isArray(row.to)?row.to:[row.to]))add(e,row.last_event==='suppressed');}if(rows.length<100||!rows.at(-1)?.id)break;after=rows.at(-1).id;}}catch(e){console.warn('history',e.message)}
+          try{let after='';for(let page=0;page<50;page++){const q=new URLSearchParams({limit:'100'});if(after)q.set('after',after);const p=await get(`/contacts?${q}`);const rows=p.data||[];if(!rows.length)break;for(const c of rows)add(c.email,c.unsubscribed===true);if(rows.length<100||!rows.at(-1)?.id)break;after=rows.at(-1).id;}}catch(e){console.warn('contacts',e.message)}
+          const esc=v=>`'${String(v).replaceAll("'","''")}'`;const sql=[];let active=0,blocked=0;
+          for(const p of people.values()){const status=p.blocked?'unsubscribed':'active';status==='active'?active++:blocked++;const id=crypto.randomUUID();const t=crypto.createHmac('sha256',secret).update(`manage|${id}|${p.email}`).digest('base64url');const h=crypto.createHash('sha256').update(t).digest('hex');sql.push(`INSERT INTO email_subscribers (public_id,email,locale,latitude,longitude,timezone,country_code,country_name,region,city,calculation_method,madhab,status,manage_token_hash,verified_at,unsubscribed_at) SELECT ${esc(id)},${esc(p.email)},'en',42.3149,-83.0364,'America/Toronto','CA','Canada','Ontario','Windsor',3,'standard',${esc(status)},${esc(h)},${status==='active'?'CURRENT_TIMESTAMP':'NULL'},${status==='active'?'NULL':'CURRENT_TIMESTAMP'} WHERE NOT EXISTS (SELECT 1 FROM email_subscribers WHERE email=${esc(p.email)} COLLATE NOCASE);`);sql.push(`INSERT OR IGNORE INTO subscriber_email_preferences (subscriber_id,prayer_alerts,daily_prayer_schedule,religious_occasions,daily_content,announcements,community_events,marketing) SELECT id,${status==='active'?1:0},0,1,0,1,1,0 FROM email_subscribers WHERE email=${esc(p.email)} COLLATE NOCASE;`);for(const prayer of['fajr','dhuhr','asr','maghrib','isha'])sql.push(`INSERT OR IGNORE INTO subscriber_prayer_preferences (subscriber_id,prayer,email_twenty,email_ten,email_athan) SELECT id,${esc(prayer)},0,0,${status==='active'?1:0} FROM email_subscribers WHERE email=${esc(p.email)} COLLATE NOCASE;`);}
+          fs.writeFileSync('/tmp/import.sql',sql.join('\n'));fs.writeFileSync('/tmp/discovery.json',JSON.stringify({discovered:people.size,active,blocked}));
+          NODE
+          node /tmp/import.mjs
+          if [ -s /tmp/import.sql ]; then npx wrangler d1 execute wopt-prayer-push --remote --file /tmp/import.sql; fi
+          npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status,COUNT(*) AS n FROM email_subscribers GROUP BY status ORDER BY status;" > /tmp/counts.json
+      - name: Validate Owner CRM production build
+        working-directory: pwa
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Record final result on Owner branch
+        run: |
+          out=.github/owner-smart-crm-final-result.txt
+          {
+            echo "owner_smart_crm=ready"
+            echo "validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "worker_validation=passed"
+            echo "owner_crm_build=passed"
+            jq -r '"resend_discovered="+(.discovered|tostring),"resend_active_candidates="+(.active|tostring),"resend_blocked_candidates="+(.blocked|tostring)' /tmp/discovery.json
+            jq -r '.[0].results[]|"crm_"+.status+"="+(.n|tostring)' /tmp/counts.json
+          } > "$out"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$out"
+          git commit -m "Record Owner smart CRM finalization" || true
+          git push origin HEAD:work/hassoun-1.0-store-admin
