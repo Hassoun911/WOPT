@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
 
+# Final trigger: sponsor logo compression + exact template test delivery.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,9 +27,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            push-server/package-lock.json
-            admin-crm/package-lock.json
+          cache-dependency-path: push-server/package-lock.json
 
       - name: Validate Worker
         working-directory: push-server
@@ -48,7 +47,7 @@ jobs:
       - name: Validate production Admin CRM
         working-directory: admin-crm
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --ignore-scripts --no-audit --no-fund
           npm run build
 
       - name: Smoke test Worker
