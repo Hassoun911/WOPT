@@ -1,0 +1,63 @@
+name: Send Hassoun Production Email Test Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/send-hassoun-email-test-once.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  send-test-email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Queue production email test
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT OR IGNORE INTO email_templates (template_key, name, category, subject_en, html_en, text_en, enabled) VALUES ('production_email_test', 'Hassoun production email test', 'system', 'Hassoun production email test', '{{emailHtml}}', '{{emailText}}', 1);"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT OR IGNORE INTO email_outbox (recipient_email, locale, kind, template_key, template_data_json, idempotency_key) VALUES ('windsor.hassoun@gmail.com', 'en', 'announcement', 'production_email_test', '{\"message\":\"This is a live production test from the unified Hassoun email system. If this email arrives from notifications@hassoun.app, the final email pipeline is working correctly.\"}', 'production-test-20260821-windsor-hassoun-v1');"
+
+      - name: Wait for Worker cron and confirm delivery
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            sleep 45
+            npx wrangler d1 execute wopt-prayer-push --remote --json --command "SELECT status, attempts, last_error, sent_at FROM email_outbox WHERE idempotency_key = 'production-test-20260821-windsor-hassoun-v1' LIMIT 1;" > /tmp/email-test.json
+            cat /tmp/email-test.json
+            status="$(jq -r '.[0].results[0].status // empty' /tmp/email-test.json)"
+            if [ "$status" = "sent" ]; then
+              echo "Hassoun production test email sent successfully to windsor.hassoun@gmail.com"
+              exit 0
+            fi
+            if [ "$status" = "failed" ]; then
+              echo "Hassoun production test email failed"
+              jq -r '.[0].results[0].last_error // "Unknown provider error"' /tmp/email-test.json
+              exit 1
+            fi
+            echo "Email status is ${status:-unknown}; waiting for the next Worker cron cycle (${attempt}/4)."
+          done
+          echo "Email did not reach sent status within the verification window."
+          exit 1
