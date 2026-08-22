@@ -1,0 +1,49 @@
+name: Deploy Ask the Sheikh Smart Backend
+
+on:
+  push:
+    branches:
+      - work/hassoun-1.0-store-admin
+    paths:
+      - "push-server/src/askSheikh.ts"
+      - "push-server/src/types.ts"
+      - ".github/workflows/deploy-ask-sheikh-ai.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SUNNAH_API_KEY: ${{ secrets.SUNNAH_API_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - name: Install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate Ask the Sheikh backend
+        run: |
+          npm run typecheck
+          npm test
+      - name: Install optional AI and Sunnah API secrets
+        run: |
+          if [ -n "${OPENAI_API_KEY:-}" ]; then printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY; else echo "OPENAI_API_KEY is not configured; verified source-search fallback remains active."; fi
+          if [ -n "${SUNNAH_API_KEY:-}" ]; then printf '%s' "$SUNNAH_API_KEY" | npx wrangler secret put SUNNAH_API_KEY; else echo "SUNNAH_API_KEY is not configured; local verified hadith database remains active."; fi
+      - name: Deploy Worker
+        run: npx wrangler deploy
+      - name: Verify Ask the Sheikh endpoint
+        run: |
+          curl -fsS -X POST 'https://wopt-prayer-push.wopt-windsor.workers.dev/ask-sheikh/questions' \
+            -H 'Content-Type: application/json' \
+            --data '{"question":"What does Islam say about riba?","locale":"en","quranRefs":["2:275","2:278"]}' \
+            -o /tmp/ask.json
+          jq -e '.ok == true and (.category | type == "string") and (.hadith | type == "array")' /tmp/ask.json >/dev/null
