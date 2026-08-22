@@ -1,0 +1,1 @@
+Brand asset placeholder marker; binary logo is stored as hassoun-logo.png in the next branding commit.
