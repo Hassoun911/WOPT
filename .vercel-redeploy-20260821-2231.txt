@@ -1,0 +1,2 @@
+Trigger production redeploy after Vercel Git reconnection.
+No application behavior change.
