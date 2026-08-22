@@ -1,0 +1,39 @@
+owner_smart_crm_diagnostic
+checked_at=2026-08-22T01:59:48Z
+worker_install=0
+worker_typecheck=0
+worker_test=0
+d1_migration=0
+resend_discovery=1
+d1_user_import=0
+d1_count=0
+pwa_install=0
+pwa_build=0
+crm_active=1
+-- typecheck tail --
+
+> wopt-prayer-push-server@0.1.0 typecheck
+> tsc --noEmit
+
+-- pwa build tail --
+  ├ ? /support        
+  └ ? /terms          
+
+  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+
+Validated Sites artifact: ESM Worker default.fetch and hosting manifest are present.
+-- resend tail --
+
+Error: Missing RESEND_API_KEY
+    at file:///home/runner/work/WOPT/WOPT/.github/scripts/import-legacy-resend-users.mjs:6:20
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.23.2
