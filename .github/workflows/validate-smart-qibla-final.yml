@@ -3,6 +3,9 @@ name: Validate Smart Qibla Final
 on:
   push:
     paths:
+      - 'mobile/src/QiblaDirectionScreen.tsx'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
       - '.github/workflows/validate-smart-qibla-final.yml'
   workflow_dispatch:
 
@@ -34,7 +37,10 @@ jobs:
       - name: Typecheck
         id: typecheck
         continue-on-error: true
-        run: npx tsc --noEmit 2>&1 | tee /tmp/smart-qibla.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsc --noEmit 2>&1 | tee /tmp/smart-qibla.log
 
       - name: Save exact validation result
         if: always()
