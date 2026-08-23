@@ -18,6 +18,8 @@ import QuizGamesHub from "./src/QuizGamesHub";
 import IslamicEventsPage from "./src/IslamicEventsPage";
 import { islamicEventCountdown, islamicEventTimeline } from "./src/islamicEvents";
 import SettingsHub from "./src/SettingsHub";
+import HomePrayerPanel from "./src/HomePrayerPanel";
+import QiblaDirectionScreen from "./src/QiblaDirectionScreen";
 import HassounWidget from "./modules/hassoun-widget";
 import QuranAudio, { type QuranAudioStatus } from "./modules/quran-audio";
 import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
@@ -40,7 +42,7 @@ import Quran from "./src/quran/Quran";
 import { addDateDays, formatPrayerTime, windsorDateKey, windsorLocalToDate } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
-type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";
+type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";
 
 type AppProps = {
   onOpenEmailAlerts?: () => void;
@@ -295,10 +297,14 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         </Pressable>
       ) : null}
 
-      {next ? <View style={styles.nextCard}><View style={styles.nextTopRow}><View><Text style={styles.nextEyebrow}>{locale === "ar" ? `الصلاة القادمة${next.isTomorrow ? " • غداً" : ""}` : `NEXT PRAYER${next.isTomorrow ? " • TOMORROW" : ""}`}</Text><Text style={styles.nextName}>{NAMES[next.prayer][locale]}</Text><Text style={styles.nextArabic}>{NAMES[next.prayer][locale === "en" ? "ar" : "en"]}</Text></View><View style={styles.nextIconBubble}><Text style={styles.nextIcon}>{PRAYER_ICONS[next.prayer]}</Text></View></View><View style={styles.nextBottomRow}><Text style={styles.nextTime}>{formatPrayerTime(next.time, locale)}</Text><View style={styles.countdownPill}><Text style={styles.countdownText}>⏳ {countdownLabel(next.secondsRemaining, locale)} {locale === "ar" ? "متبقي" : "left"}</Text></View></View><View style={styles.progressTrack}><View style={styles.progressFill} /></View></View> : null}
-
-      <View style={styles.sectionHeadingRow}><View><Text style={styles.sectionTitle}>{locale === "ar" ? "جدول اليوم" : "Today’s Schedule"}</Text><Text style={styles.sectionHint}>{locale === "ar" ? "اضغط على أي صلاة لكتم أو تشغيل صوت الأذان" : "Tap any prayer to mute or unmute its Adhan audio"}</Text></View><Text style={styles.sectionMeta}>{locale === "ar" ? "٥ صلوات" : "5 prayers"}</Text></View>
-      <View style={styles.prayerList}>{today ? PRAYER_KEYS.map((prayer) => { const active = next?.prayer === prayer; const muted = !phoneAlertPreferences[prayer].athan; return <Pressable accessibilityRole="button" accessibilityLabel={`${NAMES[prayer].en} ${muted ? "Adhan muted" : "Adhan on"}`} onPress={() => void togglePrayerAudio(prayer)} key={prayer} style={({ pressed }) => [styles.prayerRow, active && styles.prayerRowActive, muted && styles.prayerRowMuted, pressed && styles.prayerRowPressed]}><View style={[styles.prayerIconWrap, active && styles.prayerIconWrapActive]}><Text style={styles.prayerIcon}>{PRAYER_ICONS[prayer]}</Text></View><View style={styles.prayerNameBlock}><Text style={[styles.prayerName, active && styles.prayerActiveText]}>{NAMES[prayer][locale]}</Text><View style={styles.prayerSubRow}><Text style={[styles.prayerOtherName, active && styles.prayerActiveMuted]}>{NAMES[prayer][locale === "en" ? "ar" : "en"]}</Text>{active && next?.isTomorrow ? <Text style={styles.tomorrowTag}>{locale === "ar" ? "غداً" : "Tomorrow"}</Text> : null}</View></View><View style={styles.prayerRight}><View style={[styles.audioPill, muted && styles.audioPillMuted]}><Text style={[styles.audioPillText, muted && styles.audioPillTextMuted]}>{muted ? (locale === "ar" ? "مكتوم" : "MUTED") : (locale === "ar" ? "الأذان يعمل" : "ADHAN ON")}</Text></View><Text style={[styles.prayerTime, active && styles.prayerActiveText]}>{formatPrayerTime(active && next?.isTomorrow ? next.time : today[prayer], locale)}</Text></View></Pressable>; }) : <Text style={styles.emptyText}>No prayer schedule is available for {todayKey}.</Text>}</View>
+      <HomePrayerPanel
+        locale={locale}
+        today={today}
+        next={next}
+        preferences={phoneAlertPreferences}
+        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
+        onOpenQibla={() => setActiveTab("qibla")}
+      />
 
       <Pressable onPress={() => setActiveTab("quiz")} style={styles.quizCard}><View style={styles.quizTopRow}><View style={styles.quizIconWrap}><Text style={styles.quizIcon}>🧠</Text></View><View style={styles.quizCopy}><Text style={styles.quizEyebrow}>{locale === "ar" ? "تعلّم كل يوم" : "LEARN EVERY DAY"}</Text><Text style={styles.quizTitle}>{locale === "ar" ? "المسابقة والألعاب الجماعية" : "Quiz & Multiplayer Games"}</Text><Text style={styles.quizDescription}>{locale === "ar" ? "مسابقة يومية + Trivia وImposter وألعاب إسلامية ورياضية جماعية." : "Daily quiz + live Trivia, Imposter and Islamic/sports multiplayer games."}</Text></View><Text style={styles.quizArrow}>›</Text></View><View style={styles.quizStats}><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>{badge.emoji}</Text><Text style={styles.quizStatValue}>{badge.name[locale]}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "الشارة" : "Badge"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🔥</Text><Text style={styles.quizStatValue}>{quizStats.streak}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "سلسلة" : "Streak"}</Text></View><View style={styles.quizStat}><Text style={styles.quizStatEmoji}>🏆</Text><Text style={styles.quizStatValue}>{quizStats.totalWins}</Text><Text style={styles.quizStatLabel}>{locale === "ar" ? "انتصارات" : "Wins"}</Text></View></View>{upcomingBadge ? <Text style={styles.quizNextBadge}>{upcomingBadge.emoji} {locale === "ar" ? "الشارة القادمة" : "Next badge"}: {upcomingBadge.name[locale]} • {Math.max(0, upcomingBadge.minWins - quizStats.totalWins)} {locale === "ar" ? "انتصارات" : "wins"}</Text> : null}</Pressable>
 
@@ -369,9 +375,11 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         ? alertsScreen
         : activeTab === "events"
           ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
-          : activeTab === "more"
-            ? moreScreen
-            : homeScreen;
+          : activeTab === "qibla"
+            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
+            : activeTab === "more"
+              ? moreScreen
+              : homeScreen;
 
   const navItems: Array<{ tab: AppTab; emoji: string; en: string; ar: string }> = [
     { tab: "home", emoji: "🏠", en: "Home", ar: "الرئيسية" },
@@ -385,7 +393,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="dark" /><View style={styles.flex}>{body}</View>
       {(activeTab !== "quran" || !quranOwnsAudioSurface) && globalQuranAudio.state !== "idle" && globalQuranAudio.state !== "error" ? <View style={styles.globalAudioBar}><View style={styles.globalAudioCopy}><Text style={styles.globalAudioEyebrow}>{locale === "ar" ? "تشغيل القرآن" : "QUR’AN AUDIO"}</Text><Text numberOfLines={1} style={styles.globalAudioTitle}>{globalQuranAudio.title || (locale === "ar" ? "القرآن الكريم" : "Qur’an playback")}</Text>{globalQuranAudio.subtitle ? <Text numberOfLines={1} style={styles.globalAudioMeta}>{globalQuranAudio.subtitle}</Text> : null}</View><Pressable onPress={() => QuranAudio?.previous()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>‹</Text></Pressable><Pressable onPress={() => globalQuranAudio.state === "playing" ? QuranAudio?.pause() : QuranAudio?.resume()} style={styles.globalAudioMain}><Text style={styles.globalAudioMainText}>{globalQuranAudio.state === "playing" ? "Ⅱ" : "▶"}</Text></Pressable><Pressable onPress={() => QuranAudio?.next()} style={styles.globalAudioButton}><Text style={styles.globalAudioButtonText}>›</Text></Pressable><Pressable onPress={() => QuranAudio?.stop()} style={styles.globalAudioStop}><Text style={styles.globalAudioStopText}>■</Text></Pressable></View> : null}
-      {(activeTab !== "quran" || quranAppNavVisible) ? <View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.tab; return <Pressable key={item.tab} onPress={() => setActiveTab(item.tab)} style={[styles.navItem, active && styles.navItemActive]}><Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text><Text style={[styles.navLabel, active && styles.navLabelActive]}>{locale === "ar" ? item.ar : item.en}</Text></Pressable>; })}</View> : null}
+      {activeTab !== "qibla" && (activeTab !== "quran" || quranAppNavVisible) ? <View style={styles.bottomNav}>{navItems.map((item) => { const active = activeTab === item.tab; return <Pressable key={item.tab} onPress={() => setActiveTab(item.tab)} style={[styles.navItem, active && styles.navItemActive]}><Text style={[styles.navEmoji, active && styles.navEmojiActive]}>{item.emoji}</Text><Text style={[styles.navLabel, active && styles.navLabelActive]}>{locale === "ar" ? item.ar : item.en}</Text></Pressable>; })}</View> : null}
     </SafeAreaView>
   );
 }
