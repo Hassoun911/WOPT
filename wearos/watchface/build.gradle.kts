@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
 }
 
+// Hassoun Watch Face v1.1.1
 android {
     namespace = "ca.hassoun.watchface"
     compileSdk = 36
