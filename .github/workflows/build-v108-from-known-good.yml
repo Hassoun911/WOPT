@@ -1,0 +1,137 @@
+name: Build Hassoun v1.0.8 from last good APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/v108-from-known-good
+    paths:
+      - '.github/workflows/build-v108-from-known-good.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v108-known-good
+  cancel-in-progress: true
+
+env:
+  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout known-good baseline plus approved fixes
+        uses: actions/checkout@v4
+        with:
+          ref: build/v108-from-known-good
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Preserve known-good logo and generate launcher assets
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          logo_path = Path('assets/hassoun-logo.png')
+          if not logo_path.exists() or logo_path.stat().st_size == 0:
+              raise SystemExit('Missing known-good Hassoun logo')
+          logo = Image.open(logo_path).convert('RGBA')
+          logo.save(logo_path, format='PNG', optimize=True)
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
+          splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          art = logo.copy()
+          art.thumbnail((820,820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Verify only approved v1.0.8 fixes
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.8"' app.config.ts
+          grep -q 'versionCode: 49' app.config.ts
+          grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'QiblaDirectionScreen' App.tsx
+          grep -q 'onTogglePrayer' src/HomePrayerPanel.tsx
+          grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
+          npx tsc --noEmit
+
+      - name: Generate Android project
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build standalone RELEASE APK with embedded JS bundle
+        working-directory: mobile/android
+        env:
+          NODE_ENV: production
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify JavaScript bundle is inside APK
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/apk-files.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-files.txt
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.8-fixed
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish direct-install prerelease
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk'
+          TAG='v1.0.8-known-good-fixed'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --target build/v108-from-known-good --title 'Hassoun v1.0.8 Fixed' --notes 'Built directly from the last known-good Hassoun APK baseline. Preserves the working logo and app foundation, adds only the approved prayer-home and Qibla updates, and verifies the JavaScript bundle is embedded for standalone installation.' --prerelease
+          fi

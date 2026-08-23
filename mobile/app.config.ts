@@ -5,14 +5,14 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "1.0.7",
+  version: "1.0.8",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
-    buildNumber: "2",
+    buildNumber: "3",
     infoPlist: {
       UIBackgroundModes: ["remote-notification", "audio"],
       NSLocationWhenInUseUsageDescription: "Hassoun uses your location to support location-aware features and prayer-time settings when you choose to use them.",
@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 48,
+    versionCode: 49,
     icon: "./assets/icon.png",
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
