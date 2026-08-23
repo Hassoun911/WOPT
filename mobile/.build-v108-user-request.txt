@@ -1,0 +1,3 @@
+Build requested by owner on 2026-08-23 from work/forward-from-latest-good.
+Target: Hassoun v1.0.8 / Android versionCode 49.
+Preserve Smart Memorize/Tahfiz and all v1.0.7 baseline functionality.

@@ -1,0 +1,5 @@
+Hassoun v1.0.8 forward-only build trigger
+Baseline: v1.0.7 / Android code 48
+Target: v1.0.8 / Android code 49
+Trackable PR build runner: db9f1aa35e58d7ba2bca87e0f3b62d17f2866281
+PR synchronize trigger: 2026-08-23T18:37Z
