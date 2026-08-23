@@ -1,4 +1,5 @@
 # Build Hassoun Android release APK from verified forward-only source
+# diagnostic trigger for exact v1.0.8 build log
 name: Build Hassoun Android APK
 
 on:
