@@ -1,18 +1,19 @@
-name: Build Hassoun v1.0.8 from last good APK
+name: Build Hassoun v1.0.8 good APK with new prayer layout
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - build/v108-from-known-good
+      - build/v108-good-apk-layout-only
     paths:
       - '.github/workflows/build-v108-from-known-good.yml'
+      - 'mobile/src/HomePrayerPanel.tsx'
 
 permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v108-known-good
+  group: hassoun-v108-good-layout-only
   cancel-in-progress: true
 
 env:
@@ -27,10 +28,10 @@ jobs:
         working-directory: mobile
 
     steps:
-      - name: Checkout known-good baseline plus approved fixes
+      - name: Checkout exact known-good APK base plus layout-only change
         uses: actions/checkout@v4
         with:
-          ref: build/v108-from-known-good
+          ref: build/v108-good-apk-layout-only
           fetch-depth: 0
 
       - name: Setup Node 22
@@ -52,7 +53,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Preserve known-good logo and generate launcher assets
+      - name: Preserve known-good logo and launcher assets
         run: |
           set -euo pipefail
           sudo apt-get update -y
@@ -79,14 +80,13 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Verify only approved v1.0.8 fixes
+      - name: Verify app and layout
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
           grep -q 'versionCode: 49' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
-          grep -q 'QiblaDirectionScreen' App.tsx
-          grep -q 'onTogglePrayer' src/HomePrayerPanel.tsx
+          grep -q 'All five daily prayers at a glance' src/HomePrayerPanel.tsx
           grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
           npx tsc --noEmit
 
@@ -111,14 +111,14 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > /tmp/apk-files.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-files.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-new-prayer-layout.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-new-prayer-layout.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-fixed
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk
+          name: Hassoun-v1.0.8-new-prayer-layout
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-new-prayer-layout.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -128,10 +128,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-fixed.apk'
-          TAG='v1.0.8-known-good-fixed'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-new-prayer-layout.apk'
+          TAG='v1.0.8-good-apk-new-layout'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-from-known-good --title 'Hassoun v1.0.8 Fixed' --notes 'Built directly from the last known-good Hassoun APK baseline. Preserves the working logo and app foundation, adds only the approved prayer-home and Qibla updates, and verifies the JavaScript bundle is embedded for standalone installation.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Good APK + New Prayer Layout' --notes 'Same known-good v1.0.8 APK foundation. Only the Home prayer-times layout was changed to show all five prayers vertically.' --prerelease
           fi
