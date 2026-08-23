@@ -1,7 +1,9 @@
 package ca.hassoun.wear.data
 
 import android.Manifest
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
@@ -24,25 +26,22 @@ class QiblaComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         if (request.complicationType != ComplicationType.SHORT_TEXT) return null
 
+        val saved = WatchDataStore.location(this)
+        if (saved != null) {
+            return buildData("${qiblaBearing(saved.first, saved.second).roundToInt()}°", true)
+        }
+
         if (!hasLocationPermission()) {
-            return buildData("SETUP")
+            return buildData("SETUP", true)
         }
 
-        val position = currentLocation()
-            ?: bestLastKnownLocation()
-            ?: WatchDataStore.location(this)
-
-        val value = if (position == null) {
-            "WAIT"
-        } else {
-            "${qiblaBearing(position.first, position.second).roundToInt()}°"
-        }
-
-        return buildData(value)
+        val position = currentLocation() ?: bestLastKnownLocation()
+        val value = if (position == null) "WAIT" else "${qiblaBearing(position.first, position.second).roundToInt()}°"
+        return buildData(value, true)
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
-        return if (type == ComplicationType.SHORT_TEXT) buildData("102°") else null
+        return if (type == ComplicationType.SHORT_TEXT) buildData("52°", false) else null
     }
 
     private fun hasLocationPermission(): Boolean {
@@ -53,46 +52,35 @@ class QiblaComplicationService : SuspendingComplicationDataSourceService() {
     private suspend fun currentLocation(): Pair<Double, Double>? {
         val manager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
         val candidates = buildList {
             add(LocationManager.FUSED_PROVIDER)
             add(LocationManager.NETWORK_PROVIDER)
             if (fine) add(LocationManager.GPS_PROVIDER)
-            manager.getProviders(true).forEach { provider ->
-                if (!contains(provider)) add(provider)
-            }
-        }.filter { provider ->
-            runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false)
-        }
+            manager.getProviders(true).forEach { provider -> if (!contains(provider)) add(provider) }
+        }.filter { provider -> runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false) }
 
         for (provider in candidates) {
-            val location = withTimeoutOrNull(6_000L) {
-                requestCurrentLocation(manager, provider)
-            }
+            val location = withTimeoutOrNull(6_000L) { requestCurrentLocation(manager, provider) }
             if (location != null) {
                 WatchDataStore.saveLocation(this, location)
                 return location.latitude to location.longitude
             }
         }
-
         return null
     }
 
-    private suspend fun requestCurrentLocation(
-        manager: LocationManager,
-        provider: String
-    ): Location? = suspendCancellableCoroutine { continuation ->
-        val cancellationSignal = CancellationSignal()
-        continuation.invokeOnCancellation { cancellationSignal.cancel() }
-
-        runCatching {
-            manager.getCurrentLocation(provider, cancellationSignal, mainExecutor) { location ->
-                if (continuation.isActive) continuation.resume(location)
+    private suspend fun requestCurrentLocation(manager: LocationManager, provider: String): Location? =
+        suspendCancellableCoroutine { continuation ->
+            val cancellationSignal = CancellationSignal()
+            continuation.invokeOnCancellation { cancellationSignal.cancel() }
+            runCatching {
+                manager.getCurrentLocation(provider, cancellationSignal, mainExecutor) { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+            }.onFailure {
+                if (continuation.isActive) continuation.resume(null)
             }
-        }.onFailure {
-            if (continuation.isActive) continuation.resume(null)
         }
-    }
 
     private fun bestLastKnownLocation(): Pair<Double, Double>? {
         val manager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -101,7 +89,6 @@ class QiblaComplicationService : SuspendingComplicationDataSourceService() {
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
             .maxByOrNull { it.time }
             ?: return null
-
         WatchDataStore.saveLocation(this, location)
         return location.latitude to location.longitude
     }
@@ -112,17 +99,28 @@ class QiblaComplicationService : SuspendingComplicationDataSourceService() {
         val userLat = Math.toRadians(latitude)
         val userLon = Math.toRadians(longitude)
         val deltaLon = kaabaLon - userLon
-
         val y = sin(deltaLon) * cos(kaabaLat)
         val x = cos(userLat) * sin(kaabaLat) - sin(userLat) * cos(kaabaLat) * cos(deltaLon)
-        val degrees = Math.toDegrees(atan2(y, x))
-        return (degrees + 360.0) % 360.0
+        return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 
-    private fun buildData(value: String): ComplicationData {
-        return ShortTextComplicationData.Builder(
+    private fun buildData(value: String, tappable: Boolean): ComplicationData {
+        val builder = ShortTextComplicationData.Builder(
             text = PlainComplicationText.Builder(value).build(),
-            contentDescription = PlainComplicationText.Builder("Qibla bearing $value from true north").build()
-        ).build()
+            contentDescription = PlainComplicationText.Builder("Qibla bearing $value. Tap for live compass.").build()
+        )
+        if (tappable) builder.setTapAction(compassTapAction())
+        return builder.build()
+    }
+
+    private fun compassTapAction(): PendingIntent {
+        val intent = Intent(this, QiblaCompassActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        return PendingIntent.getActivity(
+            this,
+            520,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }
