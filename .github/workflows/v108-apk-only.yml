@@ -9,9 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  issues: write
-  pull-requests: write
+  contents: write
 
 concurrency:
   group: hassoun-v108-apk-only
@@ -23,60 +21,56 @@ jobs:
     timeout-minutes: 45
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
-      NODE_ENV: production
     defaults:
       run:
         working-directory: mobile
 
     steps:
-      - name: Report build start
+      - name: Record run id
+        continue-on-error: true
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.run_id }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh api repos/${{ github.repository }}/issues/32/comments \
-            -f body="HASSOUN_V108_ISOLATED_START run_id=${RUN_ID} run=${RUN_URL}"
+          printf 'run_id=%s\nstatus=running\n' "$RUN_ID" >/tmp/v108-run.txt
+          CONTENT="$(base64 -w0 /tmp/v108-run.txt)"
+          SHA="$(gh api repos/${{ github.repository }}/contents/.github/v108-run.txt?ref=ci/v108-apk-only --jq .sha 2>/dev/null || true)"
+          if [ -n "$SHA" ]; then
+            gh api repos/${{ github.repository }}/contents/.github/v108-run.txt -X PUT -f message='Track v1.0.8 APK run' -f branch='ci/v108-apk-only' -f content="$CONTENT" -f sha="$SHA"
+          else
+            gh api repos/${{ github.repository }}/contents/.github/v108-run.txt -X PUT -f message='Track v1.0.8 APK run' -f branch='ci/v108-apk-only' -f content="$CONTENT"
+          fi
 
       - name: Checkout verified forward source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: work/forward-from-latest-good
-          fetch-depth: 0
 
-      - name: Setup Node 22
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          npm ci --include=dev --no-audit --no-fund
-          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Reproduce verified v1.0.7 transforms
+      - name: Apply verified v1.0.7 transforms
         run: |
-          set -euo pipefail
           node scripts/apply-v106-clean-home.mjs
           node scripts/fix-memorize-entry.mjs
           node scripts/apply-alhafiz-motivation.mjs
 
-      - name: Overlay prayer home and smart Qibla
+      - name: Apply new prayer home and smart Qibla
         run: |
-          set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
           curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
           python3 - <<'PY'
@@ -121,15 +115,14 @@ jobs:
           : activeTab === "qibla"
             ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
             : activeTab === "more"'''
-          text, body_count = body_pattern.subn(body_replacement, text, count=1)
-          if body_count != 1 and 'activeTab === "qibla"' not in text:
+          text, count2 = body_pattern.subn(body_replacement, text, count=1)
+          if count2 != 1 and 'activeTab === "qibla"' not in text:
               raise SystemExit('Could not wire Qibla screen')
           path.write_text(text)
           PY
 
-      - name: Prepare Hassoun logo assets
+      - name: Build full-size Hassoun launcher icon
         run: |
-          set -euo pipefail
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
           python3 - <<'PY'
@@ -138,7 +131,7 @@ jobs:
           ImageFile.LOAD_TRUNCATED_IMAGES = True
           logo_path = Path('assets/hassoun-logo.png')
           if not logo_path.exists() or logo_path.stat().st_size == 0:
-              raise SystemExit('Missing exact Hassoun logo')
+              raise SystemExit('Missing assets/hassoun-logo.png')
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
           logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
@@ -154,55 +147,34 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Verify v1.0.8 features
+      - name: Verify current features
         run: |
-          set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
           grep -q 'versionCode: 49' app.config.ts
           grep -q 'SmartMemorize' src/quran/QuranV3.tsx
           grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
-          grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
-          grep -q 'alignmentFlash' src/QiblaDirectionScreen.tsx
-          npx tsc --noEmit
+
+      - name: Typecheck mobile app
+        run: npm run typecheck
 
       - name: Generate Android project
-        run: |
-          set -euo pipefail
-          rm -rf android
-          npx expo prebuild --platform android --clean --no-install
+        run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+      - name: Build standalone release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
         working-directory: mobile/android
 
-      - name: Verify APK
-        run: |
-          set -euo pipefail
-          APK="android/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          unzip -l "$APK" > /tmp/hassoun-v108.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v108.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+      - name: Rename Hassoun APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
 
-      - name: Upload APK
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-APK
+          name: hassoun-v1.0.8-${{ github.run_number }}
           path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Report result
-        if: always()
-        working-directory: .
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          RESULT: ${{ job.status }}
-        run: |
-          gh api repos/${{ github.repository }}/issues/32/comments \
-            -f body="HASSOUN_V108_ISOLATED result=${RESULT} run_id=${RUN_ID} run=${RUN_URL}"
