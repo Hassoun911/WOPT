@@ -7,6 +7,12 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/build-forward-latest-apk.yml'
+  pull_request:
+    branches:
+      - latest-good
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-forward-latest-apk.yml'
   workflow_dispatch:
 
 permissions:
