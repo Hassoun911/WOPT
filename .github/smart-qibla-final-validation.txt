@@ -1,0 +1,4 @@
+success
+validated_commit=1e3e996bf54be23a05b1ba89241b4b8b24fa57d9
+src/QiblaDirectionScreen.tsx(323,35): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/QiblaDirectionScreen.tsx(324,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
