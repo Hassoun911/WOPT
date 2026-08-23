@@ -7,6 +7,12 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/build-hassoun-current-apk.yml'
+  pull_request:
+    branches:
+      - latest-good
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-hassoun-current-apk.yml'
   workflow_dispatch:
 
 permissions:
