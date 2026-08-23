@@ -200,3 +200,30 @@ jobs:
               --notes 'Android v1.0.8 / code 49. Built from the verified v1.0.7 baseline with redesigned prayer home, per-prayer Adhan controls, smart Qibla, and Smart Memorize/Tahfiz preserved.' \
               --prerelease
           fi
+
+      - name: Write build success marker
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v1.0.8-forward-final/Hassoun-v1.0.8.apk"
+          printf 'status=success\nversion=1.0.8\nversionCode=49\nrun_id=%s\nrun=%s\ndownload=%s\n' "$RUN_ID" "$RUN_URL" "$DOWNLOAD_URL" > /tmp/v108-release-result.txt
+          CONTENT="$(base64 -w0 /tmp/v108-release-result.txt)"
+          EXISTING_SHA="$(gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt?ref=ci/v108-apk-only --jq .sha 2>/dev/null || true)"
+          if [ -n "$EXISTING_SHA" ]; then
+            gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt \
+              -X PUT \
+              -f message='Record successful Hassoun v1.0.8 APK build' \
+              -f branch='ci/v108-apk-only' \
+              -f content="$CONTENT" \
+              -f sha="$EXISTING_SHA"
+          else
+            gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt \
+              -X PUT \
+              -f message='Record successful Hassoun v1.0.8 APK build' \
+              -f branch='ci/v108-apk-only' \
+              -f content="$CONTENT"
+          fi
