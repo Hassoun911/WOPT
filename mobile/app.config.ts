@@ -5,30 +5,33 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "0.6.17",
+  version: "1.0.8",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
+    buildNumber: "3",
     infoPlist: {
       UIBackgroundModes: ["remote-notification", "audio"],
-      NSLocationWhenInUseUsageDescription: "Hassoun uses your location to automatically select the correct local prayer times and email alert time zone.",
-      NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation."
+      NSLocationWhenInUseUsageDescription: "Hassoun uses your location to support location-aware features and prayer-time settings when you choose to use them.",
+      NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation.",
+      NSSpeechRecognitionUsageDescription: "Hassoun uses speech recognition only when you choose Qur’an recitation practice so your recitation can be compared on your device."
     }
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 40,
+    versionCode: 49,
+    icon: "./assets/icon.png",
     adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#003d33"
+      foregroundImage: "./assets/icon.png",
+      backgroundColor: "#0b2f29"
     },
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
       "android.permission.RECEIVE_BOOT_COMPLETED",
-      "android.permission.USE_EXACT_ALARM",
+      "android.permission.SCHEDULE_EXACT_ALARM",
       "android.permission.FOREGROUND_SERVICE",
       "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
       "android.permission.VIBRATE",
