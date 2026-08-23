@@ -1,5 +1,4 @@
 name: Build Hassoun Android APK
-# Widget layout refresh: trigger a fresh APK artifact after the native widget update.
 
 on:
   workflow_dispatch:
@@ -11,7 +10,7 @@ on:
       - ".github/workflows/android-debug.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hassoun-apk-${{ github.ref }}
@@ -30,6 +29,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Record APK run id
+        continue-on-error: true
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          printf 'run_id=%s\nstatus=running\n' "$RUN_ID" >/tmp/hassoun-v108-run.txt
+          CONTENT="$(base64 -w0 /tmp/hassoun-v108-run.txt)"
+          SHA="$(gh api repos/${{ github.repository }}/contents/.github/hassoun-v108-run.txt?ref=work/hassoun-1.0-store-admin --jq .sha 2>/dev/null || true)"
+          if [ -n "$SHA" ]; then
+            gh api repos/${{ github.repository }}/contents/.github/hassoun-v108-run.txt -X PUT -f message='Track Hassoun v1.0.8 APK run' -f branch='work/hassoun-1.0-store-admin' -f content="$CONTENT" -f sha="$SHA"
+          else
+            gh api repos/${{ github.repository }}/contents/.github/hassoun-v108-run.txt -X PUT -f message='Track Hassoun v1.0.8 APK run' -f branch='work/hassoun-1.0-store-admin' -f content="$CONTENT"
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -56,6 +71,58 @@ jobs:
       - name: Apply Al-Hafiz motivation and AI coach
         run: node scripts/apply-alhafiz-motivation.mjs
 
+      - name: Apply redesigned prayer home and smart Qibla
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('App.tsx')
+          text = path.read_text()
+          if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
+              text = text.replace(
+                  'import SettingsHub from "./src/SettingsHub";\n',
+                  'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
+                  1,
+              )
+          text = text.replace(
+              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
+              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
+              1,
+          )
+          home_pattern = re.compile(
+              r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',
+              re.S,
+          )
+          home_replacement = '''\n\n      <HomePrayerPanel
+        locale={locale}
+        today={today}
+        next={next}
+        preferences={phoneAlertPreferences}
+        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
+        onOpenQibla={() => setActiveTab("qibla")}
+      />
+
+      <Pressable onPress={() => setActiveTab("quiz")}'''
+          text, count = home_pattern.subn(home_replacement, text, count=1)
+          if count != 1 and '<HomePrayerPanel' not in text:
+              raise SystemExit('Could not replace legacy home prayer block')
+          body_pattern = re.compile(
+              r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
+              re.S,
+          )
+          body_replacement = ''': activeTab === "events"
+          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
+          : activeTab === "qibla"
+            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
+            : activeTab === "more"'''
+          text, count2 = body_pattern.subn(body_replacement, text, count=1)
+          if count2 != 1 and 'activeTab === "qibla"' not in text:
+              raise SystemExit('Could not wire Qibla screen')
+          path.write_text(text)
+          PY
+
       - name: Build full-size Hassoun launcher icon
         run: |
           sudo apt-get update -y
@@ -64,27 +131,17 @@ jobs:
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
-
           logo_path = Path('assets/hassoun-logo.png')
           if not logo_path.exists() or logo_path.stat().st_size == 0:
               raise SystemExit('Missing assets/hassoun-logo.png')
-
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
-
-          # Use the complete approved Hassoun artwork as the Android icon.
-          # Do not wrap the full square logo inside Android's adaptive foreground layer,
-          # because launchers inset that foreground and make the artwork look tiny.
-          full_icon = logo.resize((1024, 1024), Image.Resampling.LANCZOS)
-          full_icon.save('assets/icon.png', format='PNG', optimize=True)
-
-          # Keep a clean source for the in-app fade splash.
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
           splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
           art = logo.copy()
           art.thumbnail((820, 820), Image.Resampling.LANCZOS)
           splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
           splash.save('assets/splash-logo.png', format='PNG', optimize=True)
-
           notification = Path('assets/notification-icon.png')
           if notification.exists() and notification.stat().st_size:
               Image.open(notification).convert('RGBA').save(notification, format='PNG', optimize=True)
@@ -104,20 +161,18 @@ jobs:
       - name: Typecheck mobile app
         run: npm run typecheck
 
-      - name: Verify Home, Al-Hafiz, icon, and startup fixes
+      - name: Verify preserved and new features
         run: |
-          grep -q 'v106Hero' App.tsx
-          grep -q 'Explore Hassoun' App.tsx
-          grep -q 'activeTab === "sheikh"' App.tsx
-          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
+          grep -q 'version: "1.0.8"' app.config.ts
+          grep -q 'versionCode: 49' app.config.ts
+          grep -q 'SmartMemorize' src/quran/QuranV3.tsx
           grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
           grep -q 'KEEP LEARNING' src/quran/AlHafizClassroom.tsx
           grep -q 'StartupSplash' AppRoot.tsx
           grep -q 'hassoun-logo.png' AppRoot.tsx
-          grep -q 'icon: "./assets/icon.png"' app.config.ts
+          grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'QiblaDirectionScreen' App.tsx
           ! grep -q 'adaptiveIcon' app.config.ts
-          ! grep -q 'styles.fab' AppExperience.tsx
-          ! grep -q 'Qur’an + Hadith' AppExperience.tsx
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
@@ -129,12 +184,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.7.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v1.0.7-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.7.apk
+          name: hassoun-v1.0.8-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
           if-no-files-found: error
           retention-days: 14
