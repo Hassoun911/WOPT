@@ -12,6 +12,10 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: hassoun-v108-apk-main
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -24,6 +28,16 @@ jobs:
         working-directory: mobile
 
     steps:
+      - name: Report build start on PR 32
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/32/comments \
+            -f body="HASSOUN_V108_APK_START run_id=${RUN_ID} run=${RUN_URL}"
+
       - name: Checkout verified forward source
         uses: actions/checkout@v4
         with:
@@ -118,6 +132,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
           python3 - <<'PY'
+          from pathlib import import_module
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
