@@ -3,8 +3,15 @@ name: Build Hassoun current APK stable
 on:
   push:
     branches:
-      - work/hassoun-1.0-store-admin
+      - work/forward-from-latest-good
     paths:
+      - 'mobile/**'
+      - '.github/workflows/build-hassoun-current-apk.yml'
+  pull_request:
+    branches:
+      - latest-good
+    paths:
+      - 'mobile/**'
       - '.github/workflows/build-hassoun-current-apk.yml'
   workflow_dispatch:
 
@@ -27,10 +34,10 @@ jobs:
         working-directory: mobile
 
     steps:
-      - name: Checkout current Android branch
+      - name: Checkout forward-only Android branch
         uses: actions/checkout@v6
         with:
-          ref: work/hassoun-1.0-store-admin
+          ref: work/forward-from-latest-good
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -48,13 +55,71 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Apply current committed release transforms
+      - name: Reproduce verified v1.0.7 baseline transforms
         run: |
           node scripts/apply-v106-clean-home.mjs
           node scripts/fix-memorize-entry.mjs
           node scripts/apply-alhafiz-motivation.mjs
 
-      - name: Prepare launcher and widget logo with system Python
+      - name: Overlay redesigned prayer home and smart Qibla
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('App.tsx')
+          text = path.read_text()
+
+          if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
+              text = text.replace(
+                  'import SettingsHub from "./src/SettingsHub";\n',
+                  'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
+                  1,
+              )
+
+          text = text.replace(
+              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
+              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
+              1,
+          )
+
+          home_pattern = re.compile(
+              r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',
+              re.S,
+          )
+          home_replacement = '''\n\n      <HomePrayerPanel
+        locale={locale}
+        today={today}
+        next={next}
+        preferences={phoneAlertPreferences}
+        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
+        onOpenQibla={() => setActiveTab("qibla")}
+      />
+
+      <Pressable onPress={() => setActiveTab("quiz")}'''
+          text, home_count = home_pattern.subn(home_replacement, text, count=1)
+          if home_count != 1 and '<HomePrayerPanel' not in text:
+              raise SystemExit('Could not replace legacy home prayer block')
+
+          body_pattern = re.compile(
+              r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
+              re.S,
+          )
+          body_replacement = ''': activeTab === "events"
+          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
+          : activeTab === "qibla"
+            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
+            : activeTab === "more"'''
+          text, body_count = body_pattern.subn(body_replacement, text, count=1)
+          if body_count != 1 and 'activeTab === "qibla"' not in text:
+              raise SystemExit('Could not wire Qibla screen')
+
+          path.write_text(text)
+          PY
+
+      - name: Prepare exact Hassoun logo assets
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
@@ -68,14 +133,11 @@ jobs:
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
           logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
-          splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
           art = logo.copy()
           art.thumbnail((820, 820), Image.Resampling.LANCZOS)
           splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
           splash.save('assets/splash-logo.png', format='PNG', optimize=True)
-          n = Path('assets/notification-icon.png')
-          if n.exists() and n.stat().st_size:
-              Image.open(n).convert('RGBA').save(n, format='PNG', optimize=True)
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
@@ -83,14 +145,17 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Validate current fixes
+      - name: Validate forward-only release
         run: |
-          npm run typecheck
+          grep -q 'version: "1.0.8"' app.config.ts
+          grep -q 'versionCode: 49' app.config.ts
+          grep -q 'SmartMemorize' src/quran/QuranV3.tsx
           grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
-          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
-          grep -q 'widget_following_countdown' modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          grep -q 'val countdownTextColor =' modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt
-          grep -q 'widget_following_icon' modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml
+          grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'QiblaDirectionScreen' App.tsx
+          grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
+          grep -q 'alignmentFlash' src/QiblaDirectionScreen.tsx
+          npm run typecheck
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
@@ -105,13 +170,13 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-current.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-current.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
 
       - name: Upload Hassoun APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-current-android-apk
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-current.apk
+          name: hassoun-v1.0.8-forward-apk
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
           if-no-files-found: error
           retention-days: 14
