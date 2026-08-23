@@ -132,7 +132,6 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
           python3 - <<'PY'
-          from pathlib import import_module
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
