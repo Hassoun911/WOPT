@@ -2,10 +2,10 @@ plugins {
     id("com.android.application")
 }
 
-val generatedPrayerAssets = layout.buildDirectory.dir("generated/prayer-assets")
+val generatedPrayerAssetsDir = file("$buildDir/generated/prayer-assets")
 val copyPrayerTimes = tasks.register<Copy>("copyPrayerTimes") {
     from(rootProject.projectDir.resolve("../windsor_islamic_association_2026_prayer_times.json"))
-    into(generatedPrayerAssets)
+    into(generatedPrayerAssetsDir)
 }
 
 android {
@@ -20,7 +20,7 @@ android {
         versionName = "1.1.0"
     }
 
-    sourceSets.getByName("main").assets.srcDir(generatedPrayerAssets)
+    sourceSets.getByName("main").assets.srcDir(generatedPrayerAssetsDir)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
