@@ -1,0 +1,64 @@
+name: Hassoun Mobile Forward-Only Guard
+
+on:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/LATEST_GOOD.md"
+      - ".github/workflows/mobile-forward-only-guard.yml"
+  push:
+    branches:
+      - main
+      - latest-good
+      - "work/**"
+    paths:
+      - "mobile/**"
+      - ".github/LATEST_GOOD.md"
+      - ".github/workflows/mobile-forward-only-guard.yml"
+
+jobs:
+  prevent-mobile-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify latest-good minimums
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const configPath = 'mobile/app.config.ts';
+          const quranPath = 'mobile/src/quran/QuranV3.tsx';
+          const config = fs.readFileSync(configPath, 'utf8');
+          const quran = fs.readFileSync(quranPath, 'utf8');
+
+          const version = config.match(/\bversion:\s*"([^"]+)"/)?.[1];
+          const versionCode = Number(config.match(/\bversionCode:\s*(\d+)/)?.[1] || 0);
+
+          const parse = (value) => String(value || '0.0.0').split('.').map((part) => Number(part) || 0);
+          const compare = (a, b) => {
+            const aa = parse(a);
+            const bb = parse(b);
+            for (let i = 0; i < Math.max(aa.length, bb.length); i += 1) {
+              const diff = (aa[i] || 0) - (bb[i] || 0);
+              if (diff) return diff;
+            }
+            return 0;
+          };
+
+          const failures = [];
+          if (!version || compare(version, '1.0.7') < 0) failures.push(`App version regressed: ${version || 'missing'} < 1.0.7`);
+          if (versionCode < 48) failures.push(`Android versionCode regressed: ${versionCode} < 48`);
+          if (!quran.includes('SmartMemorize')) failures.push('Smart Memorize / Tahfiz integration is missing from QuranV3.tsx');
+          if (!config.includes('android.permission.SCHEDULE_EXACT_ALARM')) failures.push('Expected current exact-alarm permission is missing');
+          if (!config.includes('supportsTablet: false')) failures.push('Expected current iOS phone-only configuration is missing');
+
+          if (failures.length) {
+            console.error('\nHASSOUN FORWARD-ONLY GUARD FAILED\n');
+            for (const failure of failures) console.error(`- ${failure}`);
+            console.error('\nStart from the latest-good branch instead of an older mobile source.');
+            process.exit(1);
+          }
+
+          console.log(`Forward-only baseline OK: Hassoun ${version}, Android code ${versionCode}, Smart Memorize present.`);
+          NODE
