@@ -1,0 +1,119 @@
+name: Build installable Hassoun v1.0.8 APK now
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-v108-installable-now.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout verified v1.0.8 source
+        uses: actions/checkout@v4
+        with:
+          ref: work/forward-from-latest-good
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+
+      - name: Apply verified app transforms
+        run: |
+          set -euo pipefail
+          node scripts/apply-v106-clean-home.mjs
+          node scripts/fix-memorize-entry.mjs
+          node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Add redesigned prayer home and smart Qibla
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
+          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('App.tsx')
+          t=p.read_text()
+          if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in t:
+              t=t.replace('import SettingsHub from "./src/SettingsHub";\n','import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',1)
+          t=t.replace('type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";','type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',1)
+          hp=re.compile(r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',re.S)
+          hr='''\n\n      <HomePrayerPanel\n        locale={locale}\n        today={today}\n        next={next}\n        preferences={phoneAlertPreferences}\n        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}\n        onOpenQibla={() => setActiveTab("qibla")}\n      />\n\n      <Pressable onPress={() => setActiveTab("quiz")}'''
+          t,c=hp.subn(hr,t,count=1)
+          if c != 1 and '<HomePrayerPanel' not in t: raise SystemExit('home overlay failed')
+          bp=re.compile(r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',re.S)
+          br=''': activeTab === "events"\n          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />\n          : activeTab === "qibla"\n            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />\n            : activeTab === "more"'''
+          t,c2=bp.subn(br,t,count=1)
+          if c2 != 1 and 'activeTab === "qibla"' not in t: raise SystemExit('qibla overlay failed')
+          p.write_text(t)
+          PY
+
+      - name: Verify TypeScript
+        run: npx tsc --noEmit
+
+      - name: Generate Android project
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build installable debug APK
+        run: ./gradlew assembleDebug --no-daemon --max-workers=2 --stacktrace
+        working-directory: mobile/android
+
+      - name: Rename APK
+        run: |
+          set -euo pipefail
+          APK='android/app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$APK"
+          cp "$APK" android/app/build/outputs/apk/debug/Hassoun-v1.0.8-installable.apk
+          ls -lh android/app/build/outputs/apk/debug/Hassoun-v1.0.8-installable.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.8-installable
+          path: mobile/android/app/build/outputs/apk/debug/Hassoun-v1.0.8-installable.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish APK release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/debug/Hassoun-v1.0.8-installable.apk'
+          TAG='v1.0.8-installable'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --target work/forward-from-latest-good --title 'Hassoun v1.0.8 Installable APK' --notes 'Signed debug APK for direct Android installation and testing.' --prerelease
+          fi
