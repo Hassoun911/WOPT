@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
 import android.view.Gravity
@@ -139,30 +140,86 @@ class SetupActivity : Activity() {
         if (healthResult.isFailure || locationResult.isFailure) {
             startingData = false
             enableButton.isEnabled = true
-            status.text = "Permissions are enabled, but live data could not start. Tap Enable live data to retry."
+            status.text = "Live data could not start. Tap Enable live data to retry."
             return
         }
 
-        status.text = "Live data enabled. Steps come from Wear OS. Calories and Qibla are now connected to Hassoun."
+        if (WatchDataStore.location(this) != null) {
+            status.text = "Live data enabled. Qibla location connected."
+        } else {
+            status.text = "Live data enabled. Finding Qibla location…"
+        }
     }
 
     private fun refreshLocation() {
         if (!hasLocationPermission()) return
 
         val manager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .firstOrNull { candidate ->
-                runCatching { manager.isProviderEnabled(candidate) }.getOrDefault(false)
-            }
-            ?: manager.getProviders(true).firstOrNull()
-            ?: return
+        val enabledProviders = manager.getProviders(true)
 
-        manager.getCurrentLocation(provider, null, mainExecutor) { location ->
-            if (location != null) {
-                WatchDataStore.saveLocation(this, location)
-                status.text = "Live data enabled. Qibla location connected."
+        // Wear OS/Google Maps often already has a usable fused or network fix.
+        // Save the newest cached fix immediately instead of waiting for GPS.
+        newestLastKnownLocation(manager, enabledProviders)?.let { location ->
+            saveQiblaLocation(location)
+        }
+
+        val candidates = buildList {
+            add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+            enabledProviders.forEach { provider -> if (!contains(provider)) add(provider) }
+        }.filter { provider ->
+            runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false)
+        }
+
+        if (candidates.isEmpty()) {
+            if (WatchDataStore.location(this) == null) {
+                locationFailed("Turn on Location on the watch, then tap Enable live data again.")
+            }
+            return
+        }
+
+        var completed = 0
+        candidates.forEach { provider ->
+            runCatching {
+                manager.getCurrentLocation(provider, null, mainExecutor) { location ->
+                    completed += 1
+                    if (location != null) {
+                        saveQiblaLocation(location)
+                    } else if (completed == candidates.size && WatchDataStore.location(this) == null) {
+                        locationFailed("Could not get a watch location. Open Maps until your blue dot appears, then tap Enable live data again.")
+                    }
+                }
+            }.onFailure {
+                completed += 1
+                if (completed == candidates.size && WatchDataStore.location(this) == null) {
+                    locationFailed("Could not get a watch location. Tap Enable live data to retry.")
+                }
             }
         }
+    }
+
+    private fun newestLastKnownLocation(
+        manager: LocationManager,
+        providers: List<String>
+    ): Location? {
+        return providers
+            .asSequence()
+            .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time }
+    }
+
+    private fun saveQiblaLocation(location: Location) {
+        WatchDataStore.saveLocation(this, location)
+        startingData = false
+        enableButton.isEnabled = true
+        status.text = "Live data enabled. Qibla location connected."
+    }
+
+    private fun locationFailed(message: String) {
+        startingData = false
+        enableButton.isEnabled = true
+        status.text = message
     }
 
     companion object {
