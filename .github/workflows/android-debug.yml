@@ -6,6 +6,11 @@ on:
   push:
     paths:
       - ".github/workflows/android-debug.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/.v108-apk-track"
 
 permissions:
   contents: write
@@ -13,7 +18,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: hassoun-v108-apk-main
+  group: hassoun-v108-apk-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -29,6 +34,7 @@ jobs:
 
     steps:
       - name: Report build start on PR 32
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
@@ -195,6 +201,7 @@ jobs:
           retention-days: 14
 
       - name: Publish v1.0.8 prerelease APK
+        if: github.event_name != 'pull_request'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
@@ -212,7 +219,7 @@ jobs:
           fi
 
       - name: Report result on PR 32
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
