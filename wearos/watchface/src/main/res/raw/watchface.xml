@@ -11,24 +11,24 @@
     </UserConfigurations>
 
     <Scene>
-        <!-- Deep black face with a customizable full-circle accent. -->
+        <!-- Minimal black face with a clean customizable perimeter. -->
         <PartDraw x="0" y="0" width="450" height="450">
             <Ellipse x="0" y="0" width="450" height="450">
                 <Fill color="#020706" />
             </Ellipse>
-            <Ellipse x="10" y="10" width="430" height="430">
-                <Stroke color="[CONFIGURATION.themeColor]" thickness="8" />
+            <Ellipse x="13" y="13" width="424" height="424">
+                <Stroke color="[CONFIGURATION.themeColor]" thickness="5" />
             </Ellipse>
             <Ellipse x="24" y="24" width="402" height="402">
-                <Stroke color="[CONFIGURATION.themeColor]" thickness="2" />
+                <Stroke color="[CONFIGURATION.themeColor]" thickness="1" />
             </Ellipse>
         </PartDraw>
 
-        <!-- Curved edge information. -->
+        <!-- Only useful edge information: steps on the left, battery on the right. -->
         <PartText x="0" y="0" width="450" height="450">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <TextCircular centerX="225" centerY="225" width="410" height="410" startAngle="292" endAngle="338" align="CENTER" direction="CLOCKWISE">
-                <Font family="SYNC_TO_DEVICE" size="19" weight="BOLD" color="[CONFIGURATION.themeColor]">
+            <TextCircular centerX="225" centerY="225" width="406" height="406" startAngle="300" endAngle="338" align="CENTER" direction="CLOCKWISE">
+                <Font family="SYNC_TO_DEVICE" size="14" weight="BOLD" color="[CONFIGURATION.themeColor]">
                     <Template><![CDATA[STEPS %d]]><Parameter expression="[STEP_COUNT]" /></Template>
                 </Font>
             </TextCircular>
@@ -36,32 +36,18 @@
 
         <PartText x="0" y="0" width="450" height="450">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <TextCircular centerX="225" centerY="225" width="410" height="410" startAngle="22" endAngle="66" align="CENTER" direction="CLOCKWISE">
-                <Font family="SYNC_TO_DEVICE" size="19" weight="BOLD" color="[CONFIGURATION.themeColor]">
-                    <Template><![CDATA[BATTERY %d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+            <TextCircular centerX="225" centerY="225" width="406" height="406" startAngle="22" endAngle="60" align="CENTER" direction="CLOCKWISE">
+                <Font family="SYNC_TO_DEVICE" size="14" weight="BOLD" color="[CONFIGURATION.themeColor]">
+                    <Template><![CDATA[BAT %d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
                 </Font>
             </TextCircular>
         </PartText>
 
-        <PartText x="0" y="0" width="450" height="450">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <TextCircular centerX="225" centerY="225" width="410" height="410" startAngle="120" endAngle="158" align="CENTER" direction="CLOCKWISE">
-                <Font family="SYNC_TO_DEVICE" size="17" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[10 MIN ALERT]]></Font>
-            </TextCircular>
-        </PartText>
-
-        <PartText x="0" y="0" width="450" height="450">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <TextCircular centerX="225" centerY="225" width="410" height="410" startAngle="202" endAngle="246" align="CENTER" direction="COUNTER_CLOCKWISE">
-                <Font family="SYNC_TO_DEVICE" size="17" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[AFTER ADHAN ON]]></Font>
-            </TextCircular>
-        </PartText>
-
         <!-- Gregorian date only. -->
-        <PartText x="100" y="55" width="250" height="34">
+        <PartText x="115" y="54" width="220" height="28">
             <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="20" weight="NORMAL" color="#FFFFFF">
+                <Font family="SYNC_TO_DEVICE" size="17" weight="NORMAL" color="#FFFFFF">
                     <Template><![CDATA[%s, %s %d]]>
                         <Parameter expression="[DAY_OF_WEEK_S]" />
                         <Parameter expression="[MONTH_S]" />
@@ -71,25 +57,57 @@
             </Text>
         </PartText>
 
-        <!-- Main time stays blue regardless of selected theme. -->
-        <DigitalClock x="75" y="104" width="300" height="92">
+        <!-- Large blue time with breathing room. -->
+        <DigitalClock x="75" y="88" width="300" height="92">
             <TimeText x="0" y="0" width="300" height="92" format="h:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="76" weight="BOLD" color="#159BFF" />
+                <Font family="SYNC_TO_DEVICE" size="78" weight="BOLD" color="#159BFF" />
             </TimeText>
         </DigitalClock>
 
-        <!-- Next prayer panel: only the upcoming prayer and time remaining. -->
-        <PartDraw x="105" y="205" width="240" height="127">
+        <!-- Calories tucked into the right side without a card. -->
+        <PartText x="345" y="164" width="70" height="18">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <RoundRectangle x="0" y="0" width="240" height="127" cornerRadius="24">
-                <Stroke color="[CONFIGURATION.themeColor]" thickness="2" />
+            <Text align="CENTER">
+                <Font family="SYNC_TO_DEVICE" size="11" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[CAL]]></Font>
+            </Text>
+        </PartText>
+
+        <ComplicationSlot
+            slotId="101"
+            displayName="@string/calories_slot"
+            supportedTypes="SHORT_TEXT EMPTY"
+            x="336" y="180" width="88" height="38">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <BoundingOval x="0" y="0" width="88" height="38" />
+            <DefaultProviderPolicy
+                primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.CaloriesComplicationService"
+                primaryProviderType="SHORT_TEXT"
+                defaultSystemProvider="EMPTY"
+                defaultSystemProviderType="EMPTY" />
+            <Complication type="SHORT_TEXT">
+                <PartText x="0" y="0" width="88" height="38">
+                    <Text align="CENTER">
+                        <Font family="SYNC_TO_DEVICE" size="22" weight="BOLD" color="#FFFFFF">
+                            <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                        </Font>
+                    </Text>
+                </PartText>
+            </Complication>
+            <Complication type="EMPTY" />
+        </ComplicationSlot>
+
+        <!-- Thin separator instead of a large prayer card. -->
+        <PartDraw x="125" y="198" width="200" height="2">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <RoundRectangle x="0" y="0" width="200" height="2" cornerRadius="1">
+                <Fill color="[CONFIGURATION.themeColor]" />
             </RoundRectangle>
         </PartDraw>
 
-        <PartText x="125" y="213" width="200" height="28">
+        <PartText x="125" y="208" width="200" height="22">
             <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="17" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[NEXT PRAYER]]></Font>
+                <Font family="SYNC_TO_DEVICE" size="14" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[NEXT PRAYER]]></Font>
             </Text>
         </PartText>
 
@@ -97,18 +115,18 @@
             slotId="103"
             displayName="@string/next_prayer_slot"
             supportedTypes="SHORT_TEXT EMPTY"
-            x="135" y="239" width="180" height="42">
+            x="130" y="230" width="190" height="42">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <BoundingOval x="0" y="0" width="180" height="42" />
+            <BoundingOval x="0" y="0" width="190" height="42" />
             <DefaultProviderPolicy
                 primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.NextPrayerNameComplicationService"
                 primaryProviderType="SHORT_TEXT"
                 defaultSystemProvider="EMPTY"
                 defaultSystemProviderType="EMPTY" />
             <Complication type="SHORT_TEXT">
-                <PartText x="0" y="0" width="180" height="42">
+                <PartText x="0" y="0" width="190" height="42">
                     <Text align="CENTER">
-                        <Font family="SYNC_TO_DEVICE" size="31" weight="BOLD" color="#FFFFFF">
+                        <Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="#FFFFFF">
                             <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
                         </Font>
                     </Text>
@@ -121,18 +139,18 @@
             slotId="104"
             displayName="@string/prayer_countdown_slot"
             supportedTypes="SHORT_TEXT EMPTY"
-            x="125" y="278" width="200" height="42">
+            x="130" y="270" width="190" height="40">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <BoundingOval x="0" y="0" width="200" height="42" />
+            <BoundingOval x="0" y="0" width="190" height="40" />
             <DefaultProviderPolicy
                 primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.NextPrayerCountdownComplicationService"
                 primaryProviderType="SHORT_TEXT"
                 defaultSystemProvider="EMPTY"
                 defaultSystemProviderType="EMPTY" />
             <Complication type="SHORT_TEXT">
-                <PartText x="0" y="0" width="200" height="42">
+                <PartText x="0" y="0" width="190" height="40">
                     <Text align="CENTER">
-                        <Font family="SYNC_TO_DEVICE" size="29" weight="BOLD" color="#FFFFFF">
+                        <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="#FFFFFF">
                             <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
                         </Font>
                     </Text>
@@ -141,35 +159,49 @@
             <Complication type="EMPTY" />
         </ComplicationSlot>
 
-        <PartText x="140" y="311" width="170" height="22">
+        <PartText x="145" y="307" width="160" height="18">
             <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="14" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[TIME LEFT]]></Font>
+                <Font family="SYNC_TO_DEVICE" size="11" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[TIME LEFT]]></Font>
             </Text>
         </PartText>
 
-        <!-- Calories stays on the curved-edge side area. -->
-        <PartText x="337" y="172" width="86" height="24">
+        <PartDraw x="125" y="329" width="200" height="2">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <RoundRectangle x="0" y="0" width="200" height="2" cornerRadius="1">
+                <Fill color="[CONFIGURATION.themeColor]" />
+            </RoundRectangle>
+        </PartDraw>
+
+        <!-- Compact, obvious Qibla button. The complication tap opens live compass mode. -->
+        <PartDraw x="145" y="345" width="160" height="58">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <RoundRectangle x="0" y="0" width="160" height="58" cornerRadius="29">
+                <Stroke color="[CONFIGURATION.themeColor]" thickness="2" />
+            </RoundRectangle>
+        </PartDraw>
+
+        <PartText x="160" y="350" width="130" height="18">
             <Variant mode="AMBIENT" target="alpha" value="0" />
             <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="13" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[CAL]]></Font>
+                <Font family="SYNC_TO_DEVICE" size="11" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[QIBLA • TAP]]></Font>
             </Text>
         </PartText>
 
         <ComplicationSlot
-            slotId="101"
-            displayName="@string/calories_slot"
+            slotId="102"
+            displayName="@string/qibla_slot"
             supportedTypes="SHORT_TEXT EMPTY"
-            x="333" y="194" width="94" height="40">
+            x="150" y="364" width="150" height="34">
             <Variant mode="AMBIENT" target="alpha" value="0" />
-            <BoundingOval x="0" y="0" width="94" height="40" />
+            <BoundingOval x="0" y="0" width="150" height="34" />
             <DefaultProviderPolicy
-                primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.CaloriesComplicationService"
+                primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.QiblaComplicationService"
                 primaryProviderType="SHORT_TEXT"
                 defaultSystemProvider="EMPTY"
                 defaultSystemProviderType="EMPTY" />
             <Complication type="SHORT_TEXT">
-                <PartText x="0" y="0" width="94" height="40">
+                <PartText x="0" y="0" width="150" height="34">
                     <Text align="CENTER">
                         <Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="#FFFFFF">
                             <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -179,51 +211,5 @@
             </Complication>
             <Complication type="EMPTY" />
         </ComplicationSlot>
-
-        <!-- Tappable Qibla button. Tap launches live compass mode. -->
-        <PartDraw x="158" y="343" width="134" height="82">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <RoundRectangle x="0" y="0" width="134" height="82" cornerRadius="38">
-                <Stroke color="[CONFIGURATION.themeColor]" thickness="3" />
-            </RoundRectangle>
-        </PartDraw>
-
-        <PartText x="175" y="349" width="100" height="20">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="14" weight="BOLD" color="[CONFIGURATION.themeColor]"><![CDATA[QIBLA]]></Font>
-            </Text>
-        </PartText>
-
-        <ComplicationSlot
-            slotId="102"
-            displayName="@string/qibla_slot"
-            supportedTypes="SHORT_TEXT EMPTY"
-            x="160" y="365" width="130" height="47">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <BoundingOval x="0" y="0" width="130" height="47" />
-            <DefaultProviderPolicy
-                primaryProvider="ca.hassoun.wear.data/ca.hassoun.wear.data.QiblaComplicationService"
-                primaryProviderType="SHORT_TEXT"
-                defaultSystemProvider="EMPTY"
-                defaultSystemProviderType="EMPTY" />
-            <Complication type="SHORT_TEXT">
-                <PartText x="0" y="0" width="130" height="47">
-                    <Text align="CENTER">
-                        <Font family="SYNC_TO_DEVICE" size="29" weight="BOLD" color="#FFFFFF">
-                            <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
-                        </Font>
-                    </Text>
-                </PartText>
-            </Complication>
-            <Complication type="EMPTY" />
-        </ComplicationSlot>
-
-        <PartText x="165" y="405" width="120" height="18">
-            <Variant mode="AMBIENT" target="alpha" value="0" />
-            <Text align="CENTER">
-                <Font family="SYNC_TO_DEVICE" size="12" weight="NORMAL" color="[CONFIGURATION.themeColor]"><![CDATA[TAP FOR COMPASS]]></Font>
-            </Text>
-        </PartText>
     </Scene>
 </WatchFace>
