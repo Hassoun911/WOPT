@@ -1,9 +1,13 @@
-# Build Hassoun v0.5.5 widget studio + Samsung LockStar release
+# Build Hassoun Android release APK
 name: Build Hassoun Android APK
 
 on:
   workflow_dispatch:
   push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-debug.yml"
+  pull_request:
     paths:
       - "mobile/**"
       - ".github/workflows/android-debug.yml"
@@ -78,12 +82,12 @@ jobs:
         working-directory: mobile/android
 
       - name: Rename Hassoun APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.5.5.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/Hassoun-v0.6.18.apk
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v0.5.5-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.5.5.apk
+          name: hassoun-v0.6.18-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v0.6.18.apk
           if-no-files-found: error
           retention-days: 14
