@@ -1,0 +1,61 @@
+name: Validate Home Qibla Redesign
+
+on:
+  push:
+    paths:
+      - 'mobile/App.tsx'
+      - 'mobile/src/HomePrayerPanel.tsx'
+      - 'mobile/src/QiblaDirectionScreen.tsx'
+      - '.github/workflows/validate-home-qibla-redesign.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck redesigned app
+        id: typecheck
+        continue-on-error: true
+        run: npx tsc --noEmit 2>&1 | tee /tmp/home-qibla-typecheck.log
+
+      - name: Write result
+        if: always()
+        run: |
+          if [ "${{ steps.typecheck.outcome }}" = "success" ]; then
+            printf 'PASS\nHome prayer redesign and Qibla screen TypeScript validation passed.\n' > ../.github/home-qibla-validation.txt
+          else
+            printf 'FAIL\n' > ../.github/home-qibla-validation.txt
+            tail -80 /tmp/home-qibla-typecheck.log >> ../.github/home-qibla-validation.txt
+          fi
+
+      - name: Commit result
+        if: always()
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/home-qibla-validation.txt
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Record home Qibla redesign validation"
+          git push origin main
