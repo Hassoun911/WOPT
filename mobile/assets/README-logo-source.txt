@@ -1,0 +1,1 @@
+The Hassoun app icon/logo asset in this build is the exact bird + Quran image supplied by the app owner on 2026-08-23. The PNG assets/icon.png and assets/hassoun-logo.png are generated from that supplied image.
