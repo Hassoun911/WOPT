@@ -1,9 +1,9 @@
 name: Build Hassoun v1.0.8 forward-only APK
 
 on:
-  push:
+  pull_request:
     branches:
-      - work/forward-from-latest-good
+      - latest-good
     paths:
       - 'mobile/**'
       - '.github/workflows/build-forward-latest-apk.yml'
