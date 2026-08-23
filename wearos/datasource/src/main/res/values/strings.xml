@@ -3,4 +3,7 @@
     <string name="app_name">Hassoun Watch Data</string>
     <string name="calories_label">Hassoun Calories</string>
     <string name="qibla_label">Hassoun Qibla</string>
+    <string name="qibla_compass_label">Qibla Compass</string>
+    <string name="next_prayer_label">Next Prayer</string>
+    <string name="prayer_countdown_label">Prayer Time Left</string>
 </resources>
