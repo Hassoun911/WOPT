@@ -37,11 +37,11 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Restore stable Wear OS debug signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: hassoun-wear-debug-keystore-v1
+      - name: Restore Hassoun development signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          base64 --decode wearos/debug/hassoun-debug.keystore.b64 > "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
 
       - name: Build Hassoun Wear OS modules
         run: gradle -p wearos :watchface:assembleDebug :datasource:assembleDebug --stacktrace
