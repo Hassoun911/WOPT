@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.8 good APK with smart Hafiz picker
+name: Build Hassoun v1.0.8 good APK with popup Hafiz picker
 
 on:
   workflow_dispatch:
@@ -81,7 +81,7 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Apply smart Al-Hafiz Surah and ayah picker
+      - name: Apply popup Al-Hafiz Surah and ayah picker
         run: node scripts/apply-smart-hafiz-picker.mjs
 
       - name: Verify app and approved UI changes
@@ -91,8 +91,9 @@ jobs:
           grep -q 'versionCode: 49' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'All five daily prayers at a glance' src/HomePrayerPanel.tsx
-          grep -q 'SMART QUR’AN PICKER' src/quran/AlHafizClassroom.tsx
-          grep -q 'Search: Yasin' src/quran/AlHafizClassroom.tsx
+          grep -q 'QUR’AN LESSON PICKER' src/quran/AlHafizClassroom.tsx
+          grep -q 'Select a Surah' src/quran/AlHafizClassroom.tsx
+          grep -q 'Paste Qur’an text instead' src/quran/AlHafizClassroom.tsx
           grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
           npx tsc --noEmit
 
@@ -117,14 +118,14 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > /tmp/apk-files.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-files.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-smart-hafiz-picker.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-smart-hafiz-picker.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-popup-surah-picker.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-popup-surah-picker.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-smart-hafiz-picker
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-smart-hafiz-picker.apk
+          name: Hassoun-v1.0.8-popup-surah-picker
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-popup-surah-picker.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -134,10 +135,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-smart-hafiz-picker.apk'
-          TAG='v1.0.8-good-apk-smart-hafiz-picker'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-popup-surah-picker.apk'
+          TAG='v1.0.8-good-apk-popup-surah-picker'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Good APK + Smart Hafiz Picker' --notes 'Same last known-good v1.0.8 APK foundation and working logo. Keeps the approved five-prayer layout and improves only the Al-Hafiz lesson Surah/ayah picker with searchable Surahs, quick ranges, selected-Surah details, and exact ayah controls.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Good APK + Popup Surah Picker' --notes 'Same known-good APK foundation. Adds a real popup Surah selector with name/number search, ayah-range controls, and a direct paste-Quran-text option.' --prerelease
           fi
