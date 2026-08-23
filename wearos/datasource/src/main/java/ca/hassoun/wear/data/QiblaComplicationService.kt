@@ -3,13 +3,18 @@ package ca.hassoun.wear.data
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.location.LocationManager
+import android.os.CancellationSignal
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -18,8 +23,21 @@ import kotlin.math.sin
 class QiblaComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         if (request.complicationType != ComplicationType.SHORT_TEXT) return null
-        val position = bestLocation() ?: WatchDataStore.location(this)
-        val value = if (position == null) "SETUP" else "${qiblaBearing(position.first, position.second).roundToInt()}°"
+
+        if (!hasLocationPermission()) {
+            return buildData("SETUP")
+        }
+
+        val position = currentLocation()
+            ?: bestLastKnownLocation()
+            ?: WatchDataStore.location(this)
+
+        val value = if (position == null) {
+            "WAIT"
+        } else {
+            "${qiblaBearing(position.first, position.second).roundToInt()}°"
+        }
+
         return buildData(value)
     }
 
@@ -27,11 +45,56 @@ class QiblaComplicationService : SuspendingComplicationDataSourceService() {
         return if (type == ComplicationType.SHORT_TEXT) buildData("102°") else null
     }
 
-    private fun bestLocation(): Pair<Double, Double>? {
-        val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!fine && !coarse) return null
+    private fun hasLocationPermission(): Boolean {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
 
+    private suspend fun currentLocation(): Pair<Double, Double>? {
+        val manager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        val candidates = buildList {
+            add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+            if (fine) add(LocationManager.GPS_PROVIDER)
+            manager.getProviders(true).forEach { provider ->
+                if (!contains(provider)) add(provider)
+            }
+        }.filter { provider ->
+            runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false)
+        }
+
+        for (provider in candidates) {
+            val location = withTimeoutOrNull(6_000L) {
+                requestCurrentLocation(manager, provider)
+            }
+            if (location != null) {
+                WatchDataStore.saveLocation(this, location)
+                return location.latitude to location.longitude
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun requestCurrentLocation(
+        manager: LocationManager,
+        provider: String
+    ): Location? = suspendCancellableCoroutine { continuation ->
+        val cancellationSignal = CancellationSignal()
+        continuation.invokeOnCancellation { cancellationSignal.cancel() }
+
+        runCatching {
+            manager.getCurrentLocation(provider, cancellationSignal, mainExecutor) { location ->
+                if (continuation.isActive) continuation.resume(location)
+            }
+        }.onFailure {
+            if (continuation.isActive) continuation.resume(null)
+        }
+    }
+
+    private fun bestLastKnownLocation(): Pair<Double, Double>? {
         val manager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val location = manager.getProviders(true)
             .asSequence()
