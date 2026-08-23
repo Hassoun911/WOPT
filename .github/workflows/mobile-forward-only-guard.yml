@@ -67,6 +67,7 @@ jobs:
           NODE
 
   build-v108-apk:
+    if: github.event_name == 'pull_request' && github.head_ref == 'work/forward-from-latest-good'
     needs: prevent-mobile-regression
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -75,11 +76,13 @@ jobs:
         working-directory: mobile
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      NODE_ENV: production
     steps:
       - name: Checkout v1.0.8 forward branch
         uses: actions/checkout@v4
         with:
           ref: work/forward-from-latest-good
+          fetch-depth: 0
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -89,22 +92,30 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies like last successful Android build
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
 
       - name: Reproduce verified v1.0.7 release transforms
         run: |
+          set -euo pipefail
           node scripts/apply-v106-clean-home.mjs
           node scripts/fix-memorize-entry.mjs
           node scripts/apply-alhafiz-motivation.mjs
 
       - name: Overlay redesigned prayer home and smart Qibla
         run: |
+          set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
           curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
           python3 - <<'PY'
@@ -163,6 +174,7 @@ jobs:
 
       - name: Prepare exact Hassoun logo assets
         run: |
+          set -euo pipefail
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
           python3 - <<'PY'
@@ -187,8 +199,9 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Validate v1.0.8 features before compile
+      - name: Validate v1.0.8 features without network pretypecheck
         run: |
+          set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
           grep -q 'versionCode: 49' app.config.ts
           grep -q 'SmartMemorize' src/quran/QuranV3.tsx
@@ -197,21 +210,28 @@ jobs:
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
           grep -q 'alignmentFlash' src/QiblaDirectionScreen.tsx
-          npm run typecheck
+          npx tsc --noEmit
 
-      - name: Generate Android project
-        run: npx expo prebuild --platform android --clean --no-install
+      - name: Clean Expo Android prebuild
+        run: |
+          set -euo pipefail
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
 
       - name: Build release APK
         run: |
+          set -euo pipefail
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
 
-      - name: Package v1.0.8 APK
+      - name: Verify and package v1.0.8 APK
         run: |
-          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
-          test -n "$APK"
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/hassoun-v108.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v108.txt
           cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
           ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
 
