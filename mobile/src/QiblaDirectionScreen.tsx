@@ -234,8 +234,8 @@ export default function QiblaDirectionScreen({ locale, onBack }: Props) {
         <Text style={styles.footer}>{locale === "ar" ? "يتم تحديث الاتجاه مباشرة من بوصلة الهاتف وحساب القبلة من موقعك إلى الكعبة المشرفة" : "Live heading from your phone compass • Qibla recalculated from your current location to the Kaaba"}</Text>
       </ScrollView>
 
-      <Animated.View pointerEvents="none" style={[styles.alignmentFlash, { opacity: flashOpacity }]} />
-      {aligned ? <View pointerEvents="none" style={styles.alignedFrame} /> : null}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.alignmentFlash, { opacity: flashOpacity }]} />
+      {aligned ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.alignedFrame]} /> : null}
     </View>
   );
 }
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   infoValue: { color: "#fff", fontSize: 10, fontWeight: "900", marginTop: 4 },
   infoDivider: { width: 1, height: 31, backgroundColor: "rgba(224,189,105,.22)" },
   footer: { color: "#8fb0a5", textAlign: "center", fontSize: 8, lineHeight: 12, marginTop: 17 },
-  alignmentFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: alignedBlue },
-  alignedFrame: { ...StyleSheet.absoluteFillObject, borderWidth: 7, borderColor: alignedBlue },
+  alignmentFlash: { backgroundColor: alignedBlue },
+  alignedFrame: { borderWidth: 7, borderColor: alignedBlue },
   pressed: { opacity: .72, transform: [{ scale: .985 }] }
 });
