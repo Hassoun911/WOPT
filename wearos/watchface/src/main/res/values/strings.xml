@@ -3,4 +3,13 @@
     <string name="watch_face_name">Hassoun</string>
     <string name="calories_slot">Hassoun Calories</string>
     <string name="qibla_slot">Hassoun Qibla</string>
+    <string name="next_prayer_slot">Next Prayer</string>
+    <string name="prayer_countdown_slot">Prayer Time Left</string>
+
+    <string name="color_label">Color Theme</string>
+    <string name="color_green">Green</string>
+    <string name="color_white">White</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_teal">Teal</string>
+    <string name="color_purple">Purple</string>
 </resources>
