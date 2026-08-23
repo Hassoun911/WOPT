@@ -1,4 +1,5 @@
 # Build Hassoun Android release APK
+# v0.6.19 exact-logo verification
 name: Build Hassoun Android APK
 
 on:
