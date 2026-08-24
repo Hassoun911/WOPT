@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/build-v108-final-fix.yml'
       - 'mobile/scripts/fix-prayer-warning-build.mjs'
+      - 'mobile/scripts/apply-navigation-guide-next-prayer.mjs'
 
 permissions:
   contents: write
@@ -79,12 +80,22 @@ jobs:
       - name: Make prayer warning TypeScript-safe
         run: node scripts/fix-prayer-warning-build.mjs
 
+      - name: Apply navigation, guide and next-prayer fixes
+        run: node scripts/apply-navigation-guide-next-prayer.mjs
+
       - name: Verify latest features and TypeScript
         run: |
           set -euo pipefail
           grep -q 'LESS THAN 5 MINUTES' src/HomePrayerPanel.tsx
           grep -q 'countNumberUrgent' src/HomePrayerPanel.tsx
           grep -q 'warningOpacity' src/HomePrayerPanel.tsx
+          grep -q 'const active = next?.prayer === prayer;' src/HomePrayerPanel.tsx
+          grep -q 'TOMORROW' src/HomePrayerPanel.tsx
+          grep -q 'hardwareBackPress' App.tsx
+          grep -q 'settingsHardwareBack' src/SettingsHub.tsx
+          grep -q 'Home & next prayer' src/FeatureGuidePage.tsx
+          grep -q 'Qibla compass' src/FeatureGuidePage.tsx
+          grep -q 'More, settings & support' src/FeatureGuidePage.tsx
           grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
           grep -q 'hasBismillahPrefix' src/quran/AlHafizClassroom.tsx
           grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
@@ -133,5 +144,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, Bismillah/card polish, active-word highlight, and five-minute red prayer warning.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, improved Learn the App guide, Android in-app back navigation, next-prayer row countdown, and five-minute red prayer warning.' --prerelease
           fi
