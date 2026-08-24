@@ -11,6 +11,8 @@ on:
       - 'mobile/scripts/apply-smart-hafiz-picker.mjs'
       - 'mobile/scripts/apply-interactive-hafiz-study.mjs'
       - 'mobile/scripts/apply-fast-widget-launch.mjs'
+      - 'mobile/scripts/fix-hafiz-bismillah-ayah-numbers.mjs'
+      - 'mobile/scripts/fix-hafiz-word-highlight.mjs'
 
 permissions:
   contents: write
@@ -89,6 +91,12 @@ jobs:
       - name: Apply interactive Al-Hafiz study cards
         run: node scripts/apply-interactive-hafiz-study.mjs
 
+      - name: Remove Bismillah from cards and fix ayah brackets
+        run: node scripts/fix-hafiz-bismillah-ayah-numbers.mjs
+
+      - name: Highlight active word during playback
+        run: node scripts/fix-hafiz-word-highlight.mjs
+
       - name: Apply instant widget/cold-start loading
         run: node scripts/apply-fast-widget-launch.mjs
 
@@ -103,6 +111,10 @@ jobs:
           grep -q 'All five daily prayers at a glance' src/HomePrayerPanel.tsx
           grep -q 'QUR’AN LESSON PICKER' src/quran/AlHafizClassroom.tsx
           grep -q 'Tap any word to hear that word only' src/quran/AlHafizClassroom.tsx
+          grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
+          grep -q 'wordButtonPlaying' src/quran/AlHafizClassroom.tsx
+          grep -q 'hasBismillahPrefix' src/quran/AlHafizClassroom.tsx
+          grep -q '\\u2066﴿' src/quran/AlHafizClassroom.tsx
           grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
           grep -q 'ABC question' src/quran/AlHafizClassroom.tsx
           grep -q 'Split card' src/quran/AlHafizClassroom.tsx
@@ -131,14 +143,14 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > /tmp/apk-files.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-files.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-study-polish.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-study-polish.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-interactive-fast-launch
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
+          name: Hassoun-v1.0.8-study-polish
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-study-polish.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -148,10 +160,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk'
-          TAG='v1.0.8-good-apk-interactive-fast-launch'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-study-polish.apk'
+          TAG='v1.0.8-good-apk-study-polish'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Interactive Al-Hafiz + Fast Widget Launch' --notes 'Built from the known-good APK foundation. Keeps the approved prayer and Al-Hafiz upgrades and changes app startup so cached/bundled prayer data renders immediately while GPS/network refresh happens in the background.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Study Polish' --notes 'Known-good APK foundation with fast widget launch, interactive Al-Hafiz cards, Bismillah removed from study-card text, corrected ayah-number bracket direction, and active-word highlighting during word audio.' --prerelease
           fi
