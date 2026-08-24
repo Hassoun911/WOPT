@@ -1,34 +1,34 @@
 /* Web-only home prayer section aligned with the current native Hassoun app. */
 @media (min-width: 701px) {
   .app-shell{padding-top:0;background:radial-gradient(circle at 82% 4%,rgba(194,220,208,.34),transparent 28%),#f7f4ec}
-  .topbar{max-width:1060px;min-height:82px;border-bottom:0;padding:12px 0}
-  .brand-mark{width:48px;height:48px;border-radius:16px;background:#075f4a;box-shadow:0 8px 22px rgba(7,95,74,.16)}
-  .brand strong{font-size:20px;font-weight:850;color:#173f35}.brand small{font-size:11px;color:#7b8984}
+  .topbar{max-width:1060px;min-height:70px;border-bottom:0;padding:8px 0}
+  .brand-mark{width:44px;height:44px;border-radius:15px;background:#075f4a;box-shadow:0 8px 22px rgba(7,95,74,.16)}
+  .brand strong{font-size:19px;font-weight:850;color:#173f35}.brand small{font-size:10px;color:#7b8984}
 
-  .dashboard{max-width:960px;margin:18px auto 0;display:grid;grid-template-columns:1fr;gap:14px}
-  .date-column{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding:16px 18px;border:1px solid #dedbd2;border-radius:24px;background:#fffdf8;box-shadow:0 10px 30px rgba(22,55,45,.05)}
-  .date-column .sync-pill{grid-column:1;margin:0;width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:15px;background:#edf5f1;border:0;font-size:0}
-  .date-column .sync-pill span{width:9px;height:9px}
-  .date-column .eyebrow{grid-column:2;margin:0 0 3px;font-size:9px;letter-spacing:.14em;color:#a17c36}
-  .date-column h1{grid-column:2;margin:0;font-size:25px;line-height:1.05;letter-spacing:-.035em;font-weight:900;color:#173f35}
-  .gregorian-date{grid-column:2;margin:5px 0 0;font-size:15px;font-weight:750;color:#173f35}
-  .hijri-date{grid-column:2;margin:3px 0 0;font-size:11px;color:#7a8983}
-  .date-nav{grid-column:3;grid-row:1 / span 5;margin:0;align-self:center}.date-nav button{height:40px;background:#f7faf8;border-color:#dce5e1}.date-nav .today-button{font-size:11px;padding:0 13px}
+  .dashboard{max-width:960px;margin:8px auto 0;display:grid;grid-template-columns:1fr;gap:8px}
+  .date-column{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;row-gap:2px;padding:10px 14px;border:1px solid #dedbd2;border-radius:18px;background:#fffdf8;box-shadow:0 7px 20px rgba(22,55,45,.045)}
+  .date-column .sync-pill{grid-column:1;grid-row:1 / span 4;margin:0;width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:13px;background:#edf5f1;border:0;font-size:0}
+  .date-column .sync-pill span{width:8px;height:8px}
+  .date-column .eyebrow{grid-column:2;margin:0;font-size:8px;letter-spacing:.13em;color:#a17c36;line-height:1}
+  .date-column h1{grid-column:2;margin:1px 0 0;font-size:21px;line-height:1;letter-spacing:-.03em;font-weight:900;color:#173f35}
+  .gregorian-date{grid-column:2;margin:2px 0 0;font-size:13px;font-weight:750;color:#173f35;line-height:1.1}
+  .hijri-date{grid-column:2;margin:1px 0 0;font-size:10px;color:#7a8983;line-height:1.1}
+  .date-nav{grid-column:3;grid-row:1 / span 4;margin:0;align-self:center;display:flex;gap:5px}.date-nav button{height:34px;min-width:36px;background:#f7faf8;border-color:#dce5e1;border-radius:10px}.date-nav .today-button{font-size:10px;padding:0 10px}
 
-  .next-prayer-card{border-radius:30px;padding:24px 26px 17px;background:linear-gradient(135deg,#075f4a 0%,#086a52 72%,#0a7459 100%);border:1px solid rgba(215,180,94,.78);box-shadow:0 16px 38px rgba(7,62,52,.18)}
-  .next-prayer-card::after{width:270px;height:270px;right:-105px;bottom:-165px;border-color:rgba(215,180,94,.13);box-shadow:0 0 0 46px rgba(215,180,94,.03),0 0 0 92px rgba(255,255,255,.018)}
-  .next-card-head{align-items:center;gap:20px}.next-card-head>div:first-child{min-width:0;flex:1}.eyebrow.light{color:#e6ca78;font-size:9px;letter-spacing:.18em;margin-bottom:7px}
-  .next-card-head h2{font-size:44px;font-weight:900;letter-spacing:-.045em;line-height:1}.next-card-head h2 span{color:#f0d17c;font-size:.38em;font-weight:850;margin-left:8px}
-  .live-clock{min-width:160px;padding:11px 14px;border:1px solid rgba(225,195,113,.5);border-radius:18px;background:rgba(2,55,45,.48);display:flex;flex-direction:column;justify-content:center;text-align:center}.live-clock span{color:#e8ca77;font-size:8px;font-weight:900;letter-spacing:.12em}.live-clock strong{font-size:18px;color:#fff;margin-top:5px}
-  .countdown-row{margin-top:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px;border-top:1px solid rgba(224,194,112,.22);padding-top:14px;align-items:stretch}
+  .next-prayer-card{border-radius:28px;padding:20px 22px 14px;background:linear-gradient(135deg,#075f4a 0%,#086a52 72%,#0a7459 100%);border:1px solid rgba(215,180,94,.78);box-shadow:0 14px 34px rgba(7,62,52,.17)}
+  .next-prayer-card::after{width:250px;height:250px;right:-100px;bottom:-160px;border-color:rgba(215,180,94,.13);box-shadow:0 0 0 42px rgba(215,180,94,.03),0 0 0 84px rgba(255,255,255,.018)}
+  .next-card-head{align-items:center;gap:18px}.next-card-head>div:first-child{min-width:0;flex:1}.eyebrow.light{color:#e6ca78;font-size:8px;letter-spacing:.17em;margin-bottom:5px}
+  .next-card-head h2{font-size:40px;font-weight:900;letter-spacing:-.045em;line-height:1}.next-card-head h2 span{color:#f0d17c;font-size:.38em;font-weight:850;margin-left:8px}
+  .live-clock{min-width:150px;padding:9px 12px;border:1px solid rgba(225,195,113,.5);border-radius:16px;background:rgba(2,55,45,.48);display:flex;flex-direction:column;justify-content:center;text-align:center}.live-clock span{color:#e8ca77;font-size:8px;font-weight:900;letter-spacing:.12em}.live-clock strong{font-size:17px;color:#fff;margin-top:4px}
+  .countdown-row{margin-top:14px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px;border-top:1px solid rgba(224,194,112,.22);padding-top:11px;align-items:stretch}
   .countdown-divider{display:none!important}
-  .countdown-row>div{min-height:66px;padding:11px 14px!important;border-radius:16px;background:rgba(2,55,45,.34);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;justify-content:center}
+  .countdown-row>div{min-height:58px;padding:9px 12px!important;border-radius:14px;background:rgba(2,55,45,.34);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;justify-content:center}
   .countdown-row>div:last-child{background:linear-gradient(135deg,rgba(215,180,94,.18),rgba(215,180,94,.08));border-color:rgba(225,195,113,.38)}
   .countdown-row span{font-size:8px;color:#b9d2ca;font-weight:900;letter-spacing:.12em}.countdown-row>div:last-child span{color:#f1d689}
-  .countdown-row strong{font-size:19px;margin-top:5px;color:#fff}.countdown-row strong.countdown{color:#ffe293!important;background:transparent!important;padding:0!important;border-radius:0!important;font-size:24px!important;line-height:1!important;font-weight:950!important;font-variant-numeric:tabular-nums}
-  .source-note{margin-top:12px;padding-top:10px;font-size:9px;color:#d7e6e1}
+  .countdown-row strong{font-size:18px;margin-top:4px;color:#fff}.countdown-row strong.countdown{color:#ffe293!important;background:transparent!important;padding:0!important;border-radius:0!important;font-size:22px!important;line-height:1!important;font-weight:950!important;font-variant-numeric:tabular-nums}
+  .source-note{margin-top:9px;padding-top:8px;font-size:8px;color:#d7e6e1}
 
-  .prayer-section{max-width:960px;margin:24px auto 0}.section-heading{margin-bottom:10px;align-items:center}.section-heading h2{font-size:20px;font-weight:900;color:#173f35}.text-button{font-size:11px}
+  .prayer-section{max-width:960px;margin:20px auto 0}.section-heading{margin-bottom:10px;align-items:center}.section-heading h2{font-size:20px;font-weight:900;color:#173f35}.text-button{font-size:11px}
   .prayer-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
   .prayer-card{min-height:184px;padding:13px 12px 12px;border-radius:22px;background:#fffdf8;border-color:#ded9ce;text-align:center;display:flex;flex-direction:column;align-items:center;overflow:visible}
   .prayer-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(23,63,53,.07)}
