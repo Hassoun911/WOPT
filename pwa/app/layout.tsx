@@ -5,6 +5,7 @@ import "./mobile-nav-fix.css";
 import "./quran.css";
 import "./direction-fixes.css";
 import "./parity.css";
+import "./quran-index-fix.css";
 import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
