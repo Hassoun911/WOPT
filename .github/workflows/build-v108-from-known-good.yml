@@ -11,8 +11,7 @@ on:
       - 'mobile/scripts/apply-smart-hafiz-picker.mjs'
       - 'mobile/scripts/apply-interactive-hafiz-study.mjs'
       - 'mobile/scripts/apply-fast-widget-launch.mjs'
-      - 'mobile/scripts/fix-hafiz-bismillah-ayah-numbers.mjs'
-      - 'mobile/scripts/fix-hafiz-word-highlight.mjs'
+      - 'mobile/scripts/apply-hafiz-study-polish.mjs'
 
 permissions:
   contents: write
@@ -91,11 +90,8 @@ jobs:
       - name: Apply interactive Al-Hafiz study cards
         run: node scripts/apply-interactive-hafiz-study.mjs
 
-      - name: Remove Bismillah from cards and fix ayah brackets
-        run: node scripts/fix-hafiz-bismillah-ayah-numbers.mjs
-
-      - name: Highlight active word during playback
-        run: node scripts/fix-hafiz-word-highlight.mjs
+      - name: Apply robust Al-Hafiz study polish
+        run: node scripts/apply-hafiz-study-polish.mjs
 
       - name: Apply instant widget/cold-start loading
         run: node scripts/apply-fast-widget-launch.mjs
@@ -109,12 +105,14 @@ jobs:
           grep -q 'loadInitialPrayerTimes' App.tsx
           grep -q 'Refresh live data silently' App.tsx
           grep -q 'All five daily prayers at a glance' src/HomePrayerPanel.tsx
+          grep -q 'LESS THAN 5 MINUTES' src/HomePrayerPanel.tsx
+          grep -q 'countNumberUrgent' src/HomePrayerPanel.tsx
           grep -q 'QUR’AN LESSON PICKER' src/quran/AlHafizClassroom.tsx
           grep -q 'Tap any word to hear that word only' src/quran/AlHafizClassroom.tsx
           grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
           grep -q 'wordButtonPlaying' src/quran/AlHafizClassroom.tsx
           grep -q 'hasBismillahPrefix' src/quran/AlHafizClassroom.tsx
-          grep -q '\\u2066﴿' src/quran/AlHafizClassroom.tsx
+          grep -q 'String(ayah.ayah)' src/quran/AlHafizClassroom.tsx
           grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
           grep -q 'ABC question' src/quran/AlHafizClassroom.tsx
           grep -q 'Split card' src/quran/AlHafizClassroom.tsx
@@ -165,5 +163,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Study Polish' --notes 'Known-good APK foundation with fast widget launch, interactive Al-Hafiz cards, Bismillah removed from study-card text, corrected ayah-number bracket direction, and active-word highlighting during word audio.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Study Polish' --notes 'Known-good APK foundation with fast widget launch, interactive Al-Hafiz cards, Bismillah removed from study-card text, corrected ayah-number direction, active-word highlighting during word audio, and five-minute prayer warning.' --prerelease
           fi
