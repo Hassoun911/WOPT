@@ -51,11 +51,11 @@ export const metadata: Metadata = {
   other: { "codex-preview": "development" },
   icons: {
     icon: [
-      { url: asset("/icon-192.png"), type: "image/png", sizes: "192x192" },
-      { url: asset("/icon-512.png"), type: "image/png", sizes: "512x512" },
+      { url: asset("/favicon-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
+      { url: asset("/hassoun-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
     ],
-    shortcut: asset("/icon-192.png"),
-    apple: asset("/apple-touch-icon.png"),
+    shortcut: asset("/favicon-logo.png?v=20260824-3"),
+    apple: asset("/hassoun-logo.png?v=20260824-3"),
   },
 };
 
