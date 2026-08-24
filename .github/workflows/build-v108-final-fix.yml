@@ -1,0 +1,137 @@
+name: Build Hassoun v1.0.8 final fixed APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/v108-good-apk-layout-only
+    paths:
+      - '.github/workflows/build-v108-final-fix.yml'
+      - 'mobile/scripts/fix-prayer-warning-build.mjs'
+
+permissions:
+  contents: write
+
+env:
+  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/v108-good-apk-layout-only
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Preserve known-good logo
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          p=Path('assets/hassoun-logo.png')
+          if not p.exists() or p.stat().st_size == 0: raise SystemExit('Missing Hassoun logo')
+          logo=Image.open(p).convert('RGBA')
+          logo.save(p,format='PNG',optimize=True)
+          logo.resize((1024,1024),Image.Resampling.LANCZOS).save('assets/icon.png',format='PNG',optimize=True)
+          splash=Image.new('RGBA',(1024,1024),(0,0,0,0)); art=logo.copy(); art.thumbnail((820,820),Image.Resampling.LANCZOS)
+          splash.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2)); splash.save('assets/splash-logo.png',format='PNG',optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Apply approved Al-Hafiz upgrades
+        run: |
+          set -euo pipefail
+          node scripts/apply-smart-hafiz-picker.mjs
+          node scripts/apply-interactive-hafiz-study.mjs
+          node scripts/apply-hafiz-study-polish.mjs
+
+      - name: Apply fast widget launch
+        run: node scripts/apply-fast-widget-launch.mjs
+
+      - name: Make prayer warning TypeScript-safe
+        run: node scripts/fix-prayer-warning-build.mjs
+
+      - name: Verify latest features and TypeScript
+        run: |
+          set -euo pipefail
+          grep -q 'LESS THAN 5 MINUTES' src/HomePrayerPanel.tsx
+          grep -q 'countNumberUrgent' src/HomePrayerPanel.tsx
+          grep -q 'warningOpacity' src/HomePrayerPanel.tsx
+          grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
+          grep -q 'hasBismillahPrefix' src/quran/AlHafizClassroom.tsx
+          grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
+          grep -q 'ABC question' src/quran/AlHafizClassroom.tsx
+          grep -q 'Split card' src/quran/AlHafizClassroom.tsx
+          npx tsc --noEmit
+
+      - name: Generate Android project
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build standalone release APK
+        working-directory: mobile/android
+        env:
+          NODE_ENV: production
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify embedded JS bundle
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -s "$APK"
+          unzip -l "$APK" >/tmp/apk-list.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-list.txt
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.8-final-fixed
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish prerelease
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk'
+          TAG='v1.0.8-final-fixed'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, Bismillah/card polish, active-word highlight, and five-minute red prayer warning.' --prerelease
+          fi
