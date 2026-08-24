@@ -1,0 +1,44 @@
+name: Submit Existing Hassoun iOS 1.0.8 to TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/ios-current
+    paths:
+      - '.github/submit-existing-ios-1.0.8-trigger.txt'
+      - '.github/workflows/submit-existing-ios-1.0.8.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  submit-existing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
+
+    steps:
+      - name: Checkout current iOS release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/ios-current
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Submit existing successful EAS build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest submit \
+            --platform ios \
+            --id 889c900a-9628-48f9-95a7-69f7bb22d5f7 \
+            --profile production \
+            --non-interactive \
+            --wait
