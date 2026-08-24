@@ -15,28 +15,35 @@
   .hijri-date{grid-column:2;margin:3px 0 0;font-size:11px;color:#7a8983}
   .date-nav{grid-column:3;grid-row:1 / span 5;margin:0;align-self:center}.date-nav button{height:40px;background:#f7faf8;border-color:#dce5e1}.date-nav .today-button{font-size:11px;padding:0 13px}
 
-  .next-prayer-card{border-radius:28px;padding:22px 24px 15px;background:#075f4a;border:1px solid #b99a4f;box-shadow:0 14px 34px rgba(7,62,52,.16)}
-  .next-prayer-card::after{width:240px;height:240px;right:-100px;bottom:-150px;border-color:rgba(215,180,94,.12);box-shadow:0 0 0 42px rgba(215,180,94,.025),0 0 0 84px rgba(255,255,255,.018)}
-  .next-card-head{align-items:stretch}.next-card-head>div:first-child{min-width:0;flex:1}.eyebrow.light{color:#e3c779;font-size:9px;letter-spacing:.18em}
-  .next-card-head h2{font-size:38px;font-weight:900;letter-spacing:-.04em}.next-card-head h2 span{color:#e5c979;font-size:.43em;font-weight:800}
-  .live-clock{min-width:150px;padding:12px 15px;border:1px solid rgba(225,195,113,.55);border-radius:20px;background:rgba(2,55,45,.5);display:flex;flex-direction:column;justify-content:center;text-align:center}.live-clock span{color:#e8ca77;font-size:9px;font-weight:900}.live-clock strong{font-size:20px;color:#fff}
-  .countdown-row{margin-top:15px;gap:0;display:grid;grid-template-columns:1fr 1px 1fr;border-top:1px solid rgba(224,194,112,.25);padding-top:13px}.countdown-row>div{padding:0 10px}.countdown-row>div:first-child{padding-left:0}.countdown-row span{font-size:8px;color:#b9d2ca;font-weight:800}.countdown-row strong{font-size:18px;margin-top:4px}.countdown-row .countdown{color:#f1d689;font-variant-numeric:tabular-nums}.countdown-divider{height:32px;background:rgba(224,194,112,.25)}
-  .source-note{margin-top:12px;padding-top:11px;font-size:9px;color:#d7e6e1}
+  .next-prayer-card{border-radius:30px;padding:24px 26px 17px;background:linear-gradient(135deg,#075f4a 0%,#086a52 72%,#0a7459 100%);border:1px solid rgba(215,180,94,.78);box-shadow:0 16px 38px rgba(7,62,52,.18)}
+  .next-prayer-card::after{width:270px;height:270px;right:-105px;bottom:-165px;border-color:rgba(215,180,94,.13);box-shadow:0 0 0 46px rgba(215,180,94,.03),0 0 0 92px rgba(255,255,255,.018)}
+  .next-card-head{align-items:center;gap:20px}.next-card-head>div:first-child{min-width:0;flex:1}.eyebrow.light{color:#e6ca78;font-size:9px;letter-spacing:.18em;margin-bottom:7px}
+  .next-card-head h2{font-size:44px;font-weight:900;letter-spacing:-.045em;line-height:1}.next-card-head h2 span{color:#f0d17c;font-size:.38em;font-weight:850;margin-left:8px}
+  .live-clock{min-width:160px;padding:11px 14px;border:1px solid rgba(225,195,113,.5);border-radius:18px;background:rgba(2,55,45,.48);display:flex;flex-direction:column;justify-content:center;text-align:center}.live-clock span{color:#e8ca77;font-size:8px;font-weight:900;letter-spacing:.12em}.live-clock strong{font-size:18px;color:#fff;margin-top:5px}
+  .countdown-row{margin-top:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px;border-top:1px solid rgba(224,194,112,.22);padding-top:14px;align-items:stretch}
+  .countdown-divider{display:none!important}
+  .countdown-row>div{min-height:66px;padding:11px 14px!important;border-radius:16px;background:rgba(2,55,45,.34);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;justify-content:center}
+  .countdown-row>div:last-child{background:linear-gradient(135deg,rgba(215,180,94,.18),rgba(215,180,94,.08));border-color:rgba(225,195,113,.38)}
+  .countdown-row span{font-size:8px;color:#b9d2ca;font-weight:900;letter-spacing:.12em}.countdown-row>div:last-child span{color:#f1d689}
+  .countdown-row strong{font-size:19px;margin-top:5px;color:#fff}.countdown-row strong.countdown{color:#ffe293!important;background:transparent!important;padding:0!important;border-radius:0!important;font-size:24px!important;line-height:1!important;font-weight:950!important;font-variant-numeric:tabular-nums}
+  .source-note{margin-top:12px;padding-top:10px;font-size:9px;color:#d7e6e1}
 
   .prayer-section{max-width:960px;margin:24px auto 0}.section-heading{margin-bottom:10px;align-items:center}.section-heading h2{font-size:20px;font-weight:900;color:#173f35}.text-button{font-size:11px}
   .prayer-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
-  .prayer-card{min-height:174px;padding:13px 12px 12px;border-radius:22px;background:#fffdf8;border-color:#ded9ce;text-align:center;display:flex;flex-direction:column;align-items:center}
+  .prayer-card{min-height:184px;padding:13px 12px 12px;border-radius:22px;background:#fffdf8;border-color:#ded9ce;text-align:center;display:flex;flex-direction:column;align-items:center;overflow:visible}
   .prayer-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(23,63,53,.07)}
-  .prayer-card.active{background:#034b3d;border-color:#d7b45e;box-shadow:inset 0 0 0 .5px #d7b45e,0 10px 25px rgba(3,75,61,.13);color:white}
+  .prayer-card.active{background:#034b3d;border-color:#d7b45e;box-shadow:inset 0 0 0 .5px #d7b45e,0 10px 25px rgba(3,75,61,.13);color:white;padding-bottom:47px!important}
   .prayer-number{width:50px;height:50px;display:grid;place-items:center;border-radius:17px;background:#edf3ef;color:#a77f2d;font-size:0;margin:0 auto 4px}
   .prayer-number::before{content:'☾';font-size:26px;line-height:1;color:#a77f2d}.prayer-card:nth-child(1) .prayer-number::before{content:'◒'}.prayer-card:nth-child(2) .prayer-number::before{content:'☀︎'}.prayer-card:nth-child(3) .prayer-number::before{content:'◐'}.prayer-card:nth-child(4) .prayer-number::before{content:'◓'}.prayer-card:nth-child(5) .prayer-number::before{content:'☾'}
   .prayer-card.active .prayer-number{background:rgba(225,194,112,.13);border:1px solid rgba(225,194,112,.5)}.prayer-card.active .prayer-number::before{color:#f1d689}
   .prayer-name{margin-top:5px}.prayer-name h3{display:block;font-size:16px;font-weight:900;letter-spacing:-.02em}.prayer-name span{display:block;margin:2px 0 0;font-size:10px;color:#78857f}.prayer-card.active .prayer-name h3{color:#fff}.prayer-card.active .prayer-name span{color:#c7ddd5}
   .prayer-card time{margin-top:8px;font-size:17px;font-weight:900;color:#123e34}.prayer-card.active time{color:#fff}
   .next-label{top:8px;right:8px;padding:4px 6px;background:#d7b45e;color:#034b3d;font-size:7px;letter-spacing:.06em}
+  .prayer-card.active .wopt-card-countdown{left:12px!important;right:12px!important;bottom:10px!important;transform:none!important;width:auto!important;padding:7px 8px!important;border-radius:11px!important;background:rgba(215,180,94,.14)!important;border:1px solid rgba(225,195,113,.34)!important;color:#f7dc8b!important;font-size:10px!important;font-weight:900!important;line-height:1.1!important;text-align:center!important;letter-spacing:.02em!important;box-shadow:none!important}
   .notice-card{max-width:960px;margin:14px auto 0;padding:12px 15px;border-radius:17px;background:rgba(255,253,248,.75)}.notice-card strong{font-size:11px}.notice-card p,.verified-date{font-size:9px}
 }
 
 @media (max-width:700px){
-  .dashboard{margin-top:18px}.next-prayer-card{border-color:#b99a4f}.prayer-card.active{background:#034b3d;border-color:#d7b45e}.next-label{background:#d7b45e;color:#034b3d}
+  .dashboard{margin-top:18px}.next-prayer-card{border-color:#b99a4f}.prayer-card.active{background:#034b3d;border-color:#d7b45e;padding-bottom:44px!important}.next-label{background:#d7b45e;color:#034b3d}
+  .prayer-card.active .wopt-card-countdown{left:10px!important;right:10px!important;bottom:8px!important;transform:none!important;width:auto!important;background:rgba(215,180,94,.14)!important;border:1px solid rgba(225,195,113,.34)!important;color:#f7dc8b!important;padding:6px 7px!important;border-radius:10px!important;font-size:9px!important;text-align:center!important}
 }
