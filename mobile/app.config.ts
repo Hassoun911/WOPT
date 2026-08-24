@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
-    buildNumber: "3",
+    buildNumber: "20260823",
     infoPlist: {
       UIBackgroundModes: ["remote-notification", "audio"],
       NSLocationWhenInUseUsageDescription: "Hassoun uses your location to support location-aware features and prayer-time settings when you choose to use them.",
