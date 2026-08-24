@@ -1,0 +1,75 @@
+name: Validate iOS Quran Audio
+
+on:
+  push:
+    paths:
+      - "mobile/modules/quran-audio/**"
+      - "mobile/app.config.ts"
+      - ".github/workflows/validate-ios-quran-audio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-ios-quran-audio
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: TypeScript check
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+      - name: Clean iOS prebuild
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install --repo-update
+
+      - name: Confirm QuranAudio pod is linked
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "QuranAudio" Podfile.lock
+          grep -R -q "QuranAudioModule" Pods/Target\ Support\ Files ios 2>/dev/null || true
+          echo "QuranAudio pod linked"
+
+      - name: Build iOS simulator app
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" -print -quit)
+          test -n "$WORKSPACE"
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["workspace"]["schemes"][0])')
+          echo "Workspace: $WORKSPACE"
+          echo "Scheme: $SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
