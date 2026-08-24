@@ -8,29 +8,10 @@
   "orientation": "any",
   "background_color": "#f5f2e9",
   "theme_color": "#0b5b47",
-  "categories": [
-    "lifestyle",
-    "utilities"
-  ],
+  "categories": ["lifestyle", "utilities"],
   "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "maskable-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "favicon-logo.png?v=20260824-3", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "hassoun-logo.png?v=20260824-3", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
