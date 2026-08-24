@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.8 final fixed APK
+name: Build Hassoun Android v1.0.8 — 2026-08-23
 
 on:
   workflow_dispatch:
@@ -138,25 +138,25 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" >/tmp/apk-list.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-list.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-Android-v1.0.8-2026-08-23.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-final-fixed
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk
+          name: Hassoun-Android-v1.0.8-2026-08-23
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-Android-v1.0.8-2026-08-23.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish prerelease
+      - name: Publish dated prerelease
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-final-fixed.apk'
-          TAG='v1.0.8-final-fixed'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-Android-v1.0.8-2026-08-23.apk'
+          TAG='v1.0.8-android-2026-08-23'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, Ask the Sheikh restored, improved Learn the App guide, Android in-app back navigation, next-prayer row countdown, five-minute red prayer warning, and Islamic-event year summary with next-year labeling.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun Android v1.0.8 — 2026-08-23' --notes 'Dated Hassoun Android release candidate. Includes interactive Al-Hafiz, fast widget launch, Ask the Sheikh restored, updated Learn the App guide, Android in-app back navigation, next-prayer row countdown, five-minute red prayer warning, and Islamic-event year summary with next-year labeling.' --prerelease
           fi
