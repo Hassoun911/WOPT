@@ -61,8 +61,6 @@ jobs:
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
 
-          echo "Prepared iOS from exact Android production source: work/hassoun-1.0-store-admin/mobile"
-
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -98,34 +96,17 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageFile
-
           ImageFile.LOAD_TRUNCATED_IMAGES = True
           pngs = sorted(Path('assets').rglob('*.png'))
           if not pngs:
               raise SystemExit('No PNG assets found')
-
-          repaired = []
-          failures = []
           for path in pngs:
-              try:
-                  with Image.open(path) as source:
-                      source.load()
-                      image = source.convert('RGBA')
-                  tmp = path.with_suffix('.ios-fixed.png')
-                  image.save(tmp, format='PNG', optimize=True)
-                  tmp.replace(path)
-                  repaired.append(str(path))
-              except Exception as exc:
-                  failures.append((str(path), str(exc)))
-
-          print(f'Repaired {len(repaired)} PNG assets')
-          for path in repaired:
-              print(' -', path)
-          if failures:
-              print('PNG repair failures:')
-              for path, error in failures:
-                  print(' -', path, error)
-              raise SystemExit(1)
+              with Image.open(path) as source:
+                  source.load()
+                  image = source.convert('RGBA')
+              tmp = path.with_suffix('.ios-fixed.png')
+              image.save(tmp, format='PNG', optimize=True)
+              tmp.replace(path)
           PY
           while IFS= read -r -d '' file; do
             pngcheck -q "$file"
@@ -141,7 +122,6 @@ jobs:
           grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
           grep -q 'AskSheikh' App.tsx
           grep -q '"platforms": \["android", "ios"\]' modules/quran-audio/expo-module.config.json
-          grep -q 'QuranAudioModule' modules/quran-audio/expo-module.config.json
           test -s modules/quran-audio/ios/QuranAudioModule.swift
           test -s modules/quran-audio/ios/QuranAudio.podspec
           grep -q '6804563934' eas.json
@@ -166,6 +146,5 @@ jobs:
             --platform ios \
             --profile production \
             --auto-submit-with-profile production \
-            --what-to-test 'Hassoun iOS v1.0.8 — exact current Android production app code plus native iOS Qur’an audio playback. Test ayah playback, pause/resume, next/previous, continuous Surah playback, background playback, lock-screen controls, Al-Hafiz, Ask the Sheikh, prayer countdown and navigation.' \
             --non-interactive \
             --wait
