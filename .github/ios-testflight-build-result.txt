@@ -1,0 +1,76 @@
+queued_at=2026-08-24T18:21:52Z
+head_sha=5a92d491394cc877b50c436f57ebafb06e117aae
+expo_token_present=true
+eas_exit_code=1
+ios_marketing_version=1.0.1
+
+---- eas output ----
+npm warn exec The following package was not found and will be installed: eas-cli@22.3.0
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+npm warn deprecated glob@6.0.4: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+
+app.config.ts is missing ios.infoPlist.ITSAppUsesNonExemptEncryption boolean. Manual configuration is required in App Store Connect before the app can be tested.
+- Incrementing buildNumber from 1 to 2.
+✔ Incremented buildNumber from 1 to 2.
+
+You've used 18 builds beyond your included credits this billing period ($24.00 in additional usage so far).
+Additional builds continue at pay-as-you-go rates. See usage in billing.: https://expo.dev/accounts/hassoun911/settings/billing
+
+✔ Using remote iOS credentials (Expo server)
+
+Distribution Certificate is not validated for non-interactive builds.
+Using App Store Connect API Key from EAS credentials service.
+- Fetching Apple provisioning profiles
+✔ Fetched Apple provisioning profiles
+
+Project Credentials Configuration
+
+Project                   @hassoun911/wopt
+Bundle Identifier         ca.wopt.windsorprayertimes
+                          
+App Store Configuration   
+                          
+Distribution Certificate  
+Serial Number             6EBFF7EEF93D9B008E7EFDBAEB18F728
+Expiration Date           Thu, 12 Aug 2027 21:47:25 UTC
+Apple Team                WZ49WVUVU4 (samer hassoun (Individual))
+Updated                   11 days ago
+                          
+Provisioning Profile      
+Developer Portal ID       2C2YSH5ZBU
+Status                    active
+Expiration                Thu, 12 Aug 2027 21:47:25 UTC
+Apple Team                WZ49WVUVU4 (samer hassoun (Individual))
+Updated                   14 hours ago
+                          
+All credentials are ready to build @hassoun911/wopt (ca.wopt.windsorprayertimes)
+
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Compressing project files
+- Uploading to EAS Build (0 / 118 MB)
+✔ Uploaded to EAS 1s
+- Computing project fingerprint
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/hassoun911/projects/wopt/builds/3ccf657d-db88-4f5b-b194-6d12cbaaf28d
+
+Set ascAppId in the submit profile (eas.json) or re-run this command in interactive mode.
+Submission failed
+    Error: build command failed.
