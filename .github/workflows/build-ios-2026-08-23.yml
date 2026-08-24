@@ -1,4 +1,4 @@
-name: Build + TestFlight Hassoun iOS v1.0.8 Exact Android Parity
+name: Build + TestFlight Hassoun iOS v1.0.8 Current Android Parity
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ concurrency:
 env:
   EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
   EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
-  ANDROID_PARITY_SHA: 728c5f0ed9132408405668153bc0f318c9cdceca
+  ANDROID_PARITY_REF: release/android-current
 
 jobs:
   build-ios-testflight:
@@ -36,11 +36,20 @@ jobs:
           ref: release/ios-current
           fetch-depth: 0
 
-      - name: Prepare exact validated Android APK source plus iOS-only overlay
+      - name: Prepare exact current Android source plus iOS-only overlay
         shell: bash
         working-directory: .
         run: |
           set -euo pipefail
+
+          git fetch origin "${ANDROID_PARITY_REF}:refs/remotes/origin/${ANDROID_PARITY_REF}" --force
+
+          CURRENT_ANDROID_COMMIT="$(git rev-parse "origin/${ANDROID_PARITY_REF}")"
+          CURRENT_ICON_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/assets/icon.png")"
+          CURRENT_APP_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/App.tsx")"
+          CURRENT_HOME_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/src/HomePrayerPanel.tsx")"
+          CURRENT_QURAN_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/src/quran/QuranV3.tsx")"
+
           mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
           cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
           cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
@@ -51,10 +60,15 @@ jobs:
 
           rm -rf /tmp/hassoun-android-mobile
           mkdir -p /tmp/hassoun-android-mobile
-          git archive "${ANDROID_PARITY_SHA}:mobile" | tar -x -C /tmp/hassoun-android-mobile
+          git archive "origin/${ANDROID_PARITY_REF}:mobile" | tar -x -C /tmp/hassoun-android-mobile
 
           find ios -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           cp -a /tmp/hassoun-android-mobile/. ios/
+
+          test "$(git hash-object ios/assets/icon.png)" = "${CURRENT_ICON_BLOB}"
+          test "$(git hash-object ios/App.tsx)" = "${CURRENT_APP_BLOB}"
+          test "$(git hash-object ios/src/HomePrayerPanel.tsx)" = "${CURRENT_HOME_BLOB}"
+          test "$(git hash-object ios/src/quran/QuranV3.tsx)" = "${CURRENT_QURAN_BLOB}"
 
           cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
           cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
@@ -64,11 +78,9 @@ jobs:
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
 
-          test -s ios/src/HomePrayerPanel.tsx
-          test -s ios/src/QiblaDirectionScreen.tsx
-          grep -q 'HomePrayerPanel' ios/App.tsx
-          grep -q 'QiblaDirectionScreen' ios/App.tsx
-          echo "iOS source pinned to validated Android APK commit ${ANDROID_PARITY_SHA}"
+          echo "Current Android commit: ${CURRENT_ANDROID_COMMIT}"
+          echo "Current Android icon blob: ${CURRENT_ICON_BLOB}"
+          echo "Verified App.tsx, HomePrayerPanel, QuranV3 and icon are byte-identical to release/android-current before iOS overlay."
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -89,36 +101,41 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Repair and validate PNG assets for iOS
+      - name: Validate PNG assets and repair only damaged files
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update -y >/dev/null
           sudo apt-get install -y python3-pil pngcheck >/dev/null
-          python3 - <<'PY'
+
+          damaged=0
+          while IFS= read -r -d '' file; do
+            if ! pngcheck -q "$file"; then
+              echo "Repairing damaged PNG only: $file"
+              python3 - "$file" <<'PY'
+          import sys
           from pathlib import Path
           from PIL import Image, ImageFile
           ImageFile.LOAD_TRUNCATED_IMAGES = True
-          pngs = sorted(Path('assets').rglob('*.png'))
-          if not pngs:
-              raise SystemExit('No PNG assets found')
-          for path in pngs:
-              with Image.open(path) as source:
-                  source.load()
-                  image = source.convert('RGBA')
-              tmp = path.with_suffix('.ios-fixed.png')
-              image.save(tmp, format='PNG', optimize=True)
-              tmp.replace(path)
+          path = Path(sys.argv[1])
+          with Image.open(path) as source:
+              source.load()
+              image = source.convert('RGBA')
+          tmp = path.with_suffix('.ios-fixed.png')
+          image.save(tmp, format='PNG', optimize=True)
+          tmp.replace(path)
           PY
-          while IFS= read -r -d '' file; do
-            pngcheck -q "$file"
+              pngcheck -q "$file"
+              damaged=$((damaged+1))
+            fi
           done < <(find assets -type f -name '*.png' -print0)
+          echo "PNG files repaired: ${damaged}"
 
-      - name: Verify exact layout parity and iOS Quran audio source
+      - name: Verify current Android layout and iOS Quran audio source
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
-          grep -q 'buildNumber: "20260825"' app.config.ts
+          grep -q 'buildNumber: "20260826"' app.config.ts
           grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
           grep -q 'ca.wopt.windsorprayertimes' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
