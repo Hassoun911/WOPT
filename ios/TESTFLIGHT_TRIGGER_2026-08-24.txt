@@ -1,0 +1,1 @@
+Build Hassoun iOS v1.0.8 from dedicated ios/ source with native Quran audio fix and submit to TestFlight.
