@@ -44,20 +44,21 @@ if (!s.includes('const [playingWordKey')) {
 if (!s.includes('stillThisWord')) {
   const effectMarker = '  useEffect(() => {\n    if (!loaded) return;\n    void AsyncStorage.setItem(CARD_VIEW_KEY, JSON.stringify(cardViewSettings));\n  }, [cardViewSettings, loaded]);';
   if (!s.includes(effectMarker)) throw new Error('card view persistence effect not found');
-  s = s.replace(effectMarker, effectMarker + `\n\n  useEffect(() => {\n    if (!playingWordUrl || !QuranAudio) return;\n    const timer = setInterval(() => {\n      const status = QuranAudio.getStatus();\n      const stillThisWord = status.url === playingWordUrl && (status.state === "loading" || status.state === "playing" || status.state === "paused");\n      if (!stillThisWord) {\n        setPlayingWordKey("");\n        setPlayingWordUrl("");\n      }\n    }, 150);\n    return () => clearInterval(timer);\n  }, [playingWordUrl]);`);
+  s = s.replace(effectMarker, effectMarker + `\n\n  useEffect(() => {\n    const audio = QuranAudio;\n    if (!playingWordUrl || !audio) return;\n    const timer = setInterval(() => {\n      const status = audio.getStatus();\n      const stillThisWord = status.url === playingWordUrl && (status.state === "loading" || status.state === "playing" || status.state === "paused");\n      if (!stillThisWord) {\n        setPlayingWordKey("");\n        setPlayingWordUrl("");\n      }\n    }, 150);\n    return () => clearInterval(timer);\n  }, [playingWordUrl]);`);
 }
 
 mustReplace(
   'playWord function',
   /  async function playWord\(word: LessonWord\) \{[\s\S]*?\n  \}/,
 `  async function playWord(word: LessonWord) {
-    if (!QuranAudio) return;
+    const audio = QuranAudio;
+    if (!audio) return;
     const url = quranWordAudioUrl(word);
     const key = word.surah + ":" + word.ayah + ":" + word.wordIndex;
     setPlayingWordKey(key);
     setPlayingWordUrl(url);
     try {
-      await QuranAudio.play(url, 1);
+      await audio.play(url, 1);
     } catch (error) {
       setPlayingWordKey("");
       setPlayingWordUrl("");
