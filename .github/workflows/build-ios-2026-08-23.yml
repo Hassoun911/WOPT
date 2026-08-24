@@ -35,6 +35,34 @@ jobs:
           ref: release/ios-current
           fetch-depth: 0
 
+      - name: Prepare exact current Android app source plus iOS-only overlay
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
+          cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
+          cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
+          cp ios/modules/quran-audio/expo-module.config.json /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json
+          cp ios/modules/quran-audio/ios/QuranAudioModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift
+          cp ios/modules/quran-audio/ios/QuranAudio.podspec /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec
+
+          rm -rf /tmp/hassoun-android-mobile
+          mkdir -p /tmp/hassoun-android-mobile
+          git archive origin/work/hassoun-1.0-store-admin:mobile | tar -x -C /tmp/hassoun-android-mobile
+
+          find ios -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cp -a /tmp/hassoun-android-mobile/. ios/
+
+          cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
+          cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
+          mkdir -p ios/modules/quran-audio/ios
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json ios/modules/quran-audio/expo-module.config.json
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
+
+          echo "Prepared iOS from exact Android production source: work/hassoun-1.0-store-admin/mobile"
+
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -54,7 +82,14 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Verify committed Android-parity 1.0.8 source and iOS Quran audio
+      - name: Apply exact same release transforms as current Android APK
+        run: |
+          set -euo pipefail
+          node scripts/apply-v106-clean-home.mjs
+          node scripts/fix-memorize-entry.mjs
+          node scripts/apply-alhafiz-motivation.mjs
+
+      - name: Verify Android parity and iOS Quran audio
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
@@ -89,6 +124,6 @@ jobs:
             --platform ios \
             --profile production \
             --auto-submit-with-profile production \
-            --what-to-test 'Hassoun iOS v1.0.8 — exact Android-current app code plus native iOS Qur’an audio playback. Test ayah playback, pause/resume, next/previous, continuous Surah playback, background playback, lock-screen controls, Al-Hafiz, Ask the Sheikh, prayer countdown and navigation.' \
+            --what-to-test 'Hassoun iOS v1.0.8 — exact current Android production app code plus native iOS Qur’an audio playback. Test ayah playback, pause/resume, next/previous, continuous Surah playback, background playback, lock-screen controls, Al-Hafiz, Ask the Sheikh, prayer countdown and navigation.' \
             --non-interactive \
             --wait
