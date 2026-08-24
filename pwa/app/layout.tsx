@@ -7,6 +7,7 @@ import "./direction-fixes.css";
 import "./parity.css";
 import "./quran-index-fix.css";
 import "./home-app-match.css";
+import "./fluid-dashboard.css";
 import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
