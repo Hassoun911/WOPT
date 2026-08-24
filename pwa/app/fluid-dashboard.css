@@ -1,0 +1,93 @@
+/* Fluid wall-display sizing for the Hassoun web home. Desktop/tablet only. */
+@media (min-width: 820px) {
+  .app-shell{
+    --dash-pad:clamp(12px,1.4vw,28px);
+    padding-left:var(--dash-pad)!important;
+    padding-right:var(--dash-pad)!important;
+  }
+  .topbar,.dashboard,.prayer-section,.daily-light-section,.notice-card{
+    width:100%!important;
+    max-width:none!important;
+  }
+  .topbar{padding-left:clamp(4px,.5vw,10px)!important;padding-right:clamp(4px,.5vw,10px)!important}
+  .dashboard{
+    grid-template-columns:minmax(clamp(235px,21vw,390px),.7fr) minmax(0,1.8fr)!important;
+    gap:clamp(8px,1vw,18px)!important;
+  }
+  .date-column,.next-prayer-card{height:clamp(150px,18vh,230px)!important}
+  .date-column{padding:clamp(11px,1.2vw,22px)!important}
+  .date-column h1{font-size:clamp(22px,2vw,36px)!important}
+  .gregorian-date{font-size:clamp(12px,1vw,18px)!important}
+  .hijri-date{font-size:clamp(9px,.75vw,13px)!important}
+  .next-prayer-card{padding:clamp(14px,1.5vw,28px)!important}
+  .next-card-head h2{font-size:clamp(34px,3.2vw,62px)!important}
+  .live-clock{min-width:clamp(130px,12vw,220px)!important}
+  .live-clock strong{font-size:clamp(15px,1.3vw,24px)!important}
+  .countdown-row strong{font-size:clamp(15px,1.2vw,22px)!important}
+  .countdown-row strong.countdown{font-size:clamp(19px,1.7vw,30px)!important}
+
+  .prayer-section{margin-top:clamp(8px,1vh,16px)!important}
+  .prayer-grid{gap:clamp(7px,.75vw,14px)!important}
+  .prayer-card{
+    min-height:clamp(126px,16vh,205px)!important;
+    height:clamp(126px,16vh,205px)!important;
+    padding:clamp(8px,.85vw,16px)!important;
+  }
+  .prayer-number{width:clamp(34px,3vw,54px)!important;height:clamp(34px,3vw,54px)!important}
+  .prayer-number::before{font-size:clamp(19px,1.7vw,28px)!important}
+  .prayer-name h3{font-size:clamp(13px,1.05vw,19px)!important}
+  .prayer-name span{font-size:clamp(8px,.7vw,12px)!important}
+  .prayer-card time{font-size:clamp(14px,1.15vw,20px)!important}
+
+  .daily-light-section{margin-top:clamp(7px,.9vh,14px)!important}
+  .daily-light-grid{gap:clamp(7px,.75vw,14px)!important}
+  .daily-card{
+    height:clamp(112px,15vh,185px)!important;
+    padding:clamp(9px,.9vw,17px)!important;
+  }
+  .daily-arabic{font-size:clamp(13px,1vw,20px)!important}
+  .daily-meaning{font-size:clamp(8px,.72vw,13px)!important}
+  .notice-card{margin-top:clamp(5px,.65vh,10px)!important}
+}
+
+/* True wall-screen mode: scale to both width and height and keep everything visible. */
+@media (min-width: 900px) and (min-height: 650px) {
+  html,body{height:100%;overflow:hidden}
+  .app-shell{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    overflow:hidden!important;
+    display:grid!important;
+    grid-template-rows:auto auto auto auto auto!important;
+    align-content:space-between!important;
+    padding-top:0!important;
+    padding-bottom:clamp(6px,.8vh,14px)!important;
+  }
+  .topbar{height:clamp(48px,6.5vh,74px)!important;min-height:0!important}
+  .dashboard{margin-top:clamp(3px,.55vh,8px)!important}
+  .date-column,.next-prayer-card{height:clamp(145px,20vh,235px)!important}
+  .prayer-section{margin-top:clamp(5px,.8vh,12px)!important}
+  .section-heading{margin-bottom:clamp(4px,.55vh,9px)!important}
+  .prayer-card{height:clamp(122px,17vh,205px)!important;min-height:0!important}
+  .daily-light-section{margin-top:clamp(5px,.7vh,11px)!important}
+  .daily-card{height:clamp(105px,14vh,172px)!important}
+  .notice-card{min-height:clamp(30px,4.2vh,48px)!important}
+}
+
+/* Very wide desktop screens should use the whole canvas, not a centered narrow column. */
+@media (min-width: 1500px) {
+  .app-shell{--dash-pad:clamp(28px,4vw,84px)}
+  .dashboard{grid-template-columns:minmax(300px,22vw) minmax(0,1fr)!important}
+  .daily-light-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+
+/* Portrait tablets: stack the top cards, but still use full width and scale vertically. */
+@media (min-width: 820px) and (max-aspect-ratio: 4/5) {
+  html,body{overflow:auto!important}
+  .app-shell{height:auto!important;min-height:100dvh!important;display:block!important;overflow:visible!important}
+  .dashboard{grid-template-columns:1fr!important}
+  .date-column,.next-prayer-card{height:auto!important;min-height:150px!important}
+  .prayer-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .prayer-card{height:auto!important;min-height:150px!important}
+  .daily-card{height:auto!important;min-height:135px!important}
+}
