@@ -14,6 +14,7 @@ const config: ExpoConfig = {
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     buildNumber: "20260823",
     infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
       UIBackgroundModes: ["remote-notification", "audio"],
       NSLocationWhenInUseUsageDescription: "Hassoun uses your location to support location-aware features and prayer-time settings when you choose to use them.",
       NSMicrophoneUsageDescription: "Hassoun uses the microphone only when you choose Qur’an recitation practice so the device speech-recognition service can compare your recitation.",
