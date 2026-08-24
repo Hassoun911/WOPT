@@ -8,6 +8,7 @@ const appPath = (path: string) => `${BASE_PATH}${path}`;
 const items = [
   ["/", "🏠", "Home", "Prayer times and daily dashboard"],
   ["/quran/", "۞", "Qur’an", "Read, listen, search and memorize"],
+  ["/ask-sheikh/", "🕌", "Ask the Sheikh", "Qur’an and Sunnah reference assistant"],
   ["/games/", "🎮", "Games", "Daily quiz and multiplayer rooms"],
   ["/events/", "🌙", "Events", "Islamic calendar and upcoming dates"],
   ["/qibla/", "🕋", "Qibla", "Find the Qibla direction"],
@@ -22,7 +23,7 @@ export default function WebAppNav(){
     <button className="web-menu-trigger" type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>
     <div className={open?"web-menu-backdrop open":"web-menu-backdrop"} onClick={()=>setOpen(false)} />
     <aside className={open?"web-slide-menu open":"web-slide-menu"} aria-hidden={!open}>
-      <div className="web-slide-head"><div className="web-slide-brand"><div className="web-slide-mark">ح</div><div><strong>Hassoun</strong><span>Islamic companion</span></div></div><button type="button" onClick={()=>setOpen(false)} aria-label="Close menu">×</button></div>
+      <div className="web-slide-head"><div className="web-slide-brand"><img src={appPath("/hassoun-logo.png?v=20260824-3")} alt="" className="web-slide-logo"/><div><strong>Hassoun</strong><span>Islamic companion</span></div></div><button type="button" onClick={()=>setOpen(false)} aria-label="Close menu">×</button></div>
       <nav aria-label="Hassoun website navigation">{items.map(([href,icon,label,note])=>{const active=href==="/"?localPath==="/":localPath.startsWith(href.replace(/\/$/,""));return <a key={href} href={appPath(href)} className={active?"active":""} onClick={()=>setOpen(false)}><span className="web-slide-icon">{icon}</span><span><strong>{label}</strong><small>{note}</small></span><b>›</b></a>})}</nav>
       <div className="web-slide-foot"><span>Web version</span><small>Designed for desktop, tablet and mobile browsers.</small></div>
     </aside>
