@@ -1,0 +1,3 @@
+Hassoun iOS TestFlight release trigger
+Date: 2026-08-23
+Purpose: rerun signed EAS iOS build and TestFlight submission after EXPO_TOKEN was configured in GitHub Actions.

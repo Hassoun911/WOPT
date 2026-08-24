@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/layout/hassoun_prayer_widget.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/layout/hassoun_prayer_widget.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/layout/hassoun_prayer_widget_vertical.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/layout/hassoun_prayer_widget_vertical.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/layout/hassoun_prayer_widget_lockscreen.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/layout/hassoun_prayer_widget_lockscreen.xml"
+    }
+]

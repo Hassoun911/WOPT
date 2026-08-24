@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/xml-v36/hassoun_lock_widget_info.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/xml-v36/hassoun_lock_widget_info.xml"
+    },
+    {
+        "merged": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/xml-v36/hassoun_prayer_widget_info.xml",
+        "source": "ca.wopt.hassounwidget.wopt-hassoun-widget-main-4:/xml-v36/hassoun_prayer_widget_info.xml"
+    }
+]

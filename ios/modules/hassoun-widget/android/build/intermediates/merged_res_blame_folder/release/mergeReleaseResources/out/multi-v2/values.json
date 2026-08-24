@@ -1,0 +1,48 @@
+{
+    "logs": [
+        {
+            "outputFile": "ca.wopt.hassounwidget.wopt-hassoun-widget-release-3:/values/values.xml",
+            "map": [
+                {
+                    "source": "/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/res/values/strings.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "2",
+                        "startOffsets": "53",
+                        "endColumns": "113",
+                        "endOffsets": "164"
+                    },
+                    "to": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "115",
+                        "endOffsets": "166"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "ca.wopt.hassounwidget.wopt-hassoun-widget-mergeReleaseResources-1:/values/values.xml",
+            "map": [
+                {
+                    "source": "/home/runner/work/WOPT/WOPT/mobile/modules/hassoun-widget/android/src/main/res/values/strings.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "2",
+                        "startOffsets": "53",
+                        "endColumns": "113",
+                        "endOffsets": "164"
+                    },
+                    "to": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "115",
+                        "endOffsets": "166"
+                    }
+                }
+            ]
+        }
+    ]
+}

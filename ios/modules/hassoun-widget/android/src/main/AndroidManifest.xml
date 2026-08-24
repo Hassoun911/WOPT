@@ -1,0 +1,69 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <receiver
+      android:name=".HassounPrayerWidgetProvider"
+      android:enabled="true"
+      android:exported="false"
+      android:label="Hassoun Prayer Times">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+        <action android:name="ca.wopt.hassounwidget.REFRESH" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/hassoun_prayer_widget_info" />
+    </receiver>
+
+    <receiver android:name=".HassounSquareWidgetProvider" android:enabled="true" android:exported="false" android:label="Hassoun Square 2×2">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="ca.wopt.hassounwidget.REFRESH" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hassoun_square_widget_info" />
+    </receiver>
+
+    <receiver android:name=".HassounVerticalWidgetProvider" android:enabled="true" android:exported="false" android:label="Hassoun Vertical 2×4">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="ca.wopt.hassounwidget.REFRESH" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hassoun_vertical_widget_info" />
+    </receiver>
+
+    <receiver android:name=".HassounSlimWidgetProvider" android:enabled="true" android:exported="false" android:label="Hassoun Slim 4×1">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="ca.wopt.hassounwidget.REFRESH" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hassoun_slim_widget_info" />
+    </receiver>
+
+    <receiver
+      android:name=".HassounLockScreenWidgetProvider"
+      android:enabled="true"
+      android:exported="false"
+      android:label="Hassoun Lock Screen — Transparent">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="ca.wopt.hassounwidget.REFRESH" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/hassoun_lock_widget_info" />
+    </receiver>
+  </application>
+</manifest>
