@@ -1,4 +1,4 @@
-name: Build Hassoun iOS v1.0.8 2026-08-23
+name: Build + TestFlight Hassoun iOS v1.0.8 2026-08-23
 
 on:
   workflow_dispatch:
@@ -17,9 +17,9 @@ env:
   EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
 
 jobs:
-  build-ios:
+  build-ios-testflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: mobile
@@ -43,10 +43,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo 'Missing GitHub Actions secret EXPO_TOKEN. Add an Expo access token to repository Actions secrets.'
+            echo 'ERROR: Missing repository Actions secret EXPO_TOKEN.'
+            echo 'Create an Expo access token and save it in GitHub > Settings > Secrets and variables > Actions > New repository secret > EXPO_TOKEN.'
             exit 1
           fi
-          echo 'Expo token is configured.'
+          npx --yes eas-cli@latest whoami
 
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -63,7 +64,7 @@ jobs:
           node scripts/apply-islamic-events-year-summary.mjs
           node scripts/restore-ask-sheikh.mjs
 
-      - name: Verify matched app features
+      - name: Verify matched app features and TypeScript
         run: |
           set -euo pipefail
           grep -q 'LESS THAN 5 MINUTES' src/HomePrayerPanel.tsx
@@ -78,12 +79,28 @@ jobs:
           npx expo config --type public >/tmp/hassoun-ios-expo-config.txt
           grep -q 'ca.wopt.windsorprayertimes' /tmp/hassoun-ios-expo-config.txt
 
-      - name: Start and wait for signed EAS iOS production build
+      - name: Validate iOS native generation
+        run: |
+          set -euo pipefail
+          rm -rf ios
+          npx expo prebuild --platform ios --clean --no-install
+          test -f ios/Podfile
+          test -d ios/Hassoun.xcodeproj || test -d ios/WOPT.xcodeproj || find ios -maxdepth 1 -name '*.xcodeproj' -print -quit | grep -q .
+          rm -rf ios
+
+      - name: Build signed iOS production app and auto-submit to TestFlight
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > /tmp/eas-ios-build.json
+          npx --yes eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --auto-submit-with-profile production \
+            --what-to-test 'Hassoun iOS v1.0.8 • 2026-08-23 — Test current Android-parity layout, prayer countdown/warnings, Qur’an, Al-Hafiz, Ask the Sheikh, Islamic Events, alerts and navigation.' \
+            --non-interactive \
+            --wait \
+            --json > /tmp/eas-ios-build.json
           cat /tmp/eas-ios-build.json
 
       - name: Download dated IPA
@@ -113,3 +130,10 @@ jobs:
           path: mobile/Hassoun-iOS-v1.0.8-2026-08-23.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Confirm TestFlight submission status
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest submit:status --platform ios --profile production --json --non-interactive | tee /tmp/eas-testflight-status.json
