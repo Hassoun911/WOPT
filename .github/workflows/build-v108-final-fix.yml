@@ -10,6 +10,7 @@ on:
       - 'mobile/scripts/fix-prayer-warning-build.mjs'
       - 'mobile/scripts/apply-navigation-guide-next-prayer.mjs'
       - 'mobile/scripts/apply-islamic-events-year-summary.mjs'
+      - 'mobile/scripts/restore-ask-sheikh.mjs'
 
 permissions:
   contents: write
@@ -87,6 +88,9 @@ jobs:
       - name: Improve Islamic events year summary
         run: node scripts/apply-islamic-events-year-summary.mjs
 
+      - name: Restore Ask the Sheikh
+        run: node scripts/restore-ask-sheikh.mjs
+
       - name: Verify latest features and TypeScript
         run: |
           set -euo pipefail
@@ -103,6 +107,9 @@ jobs:
           grep -q 'remainingThisHijriYear' src/IslamicEventsPage.tsx
           grep -q 'NEXT YEAR' src/IslamicEventsPage.tsx
           grep -q 'nextYearPill' src/IslamicEventsPage.tsx
+          grep -q 'AskSheikh' App.tsx
+          grep -q 'ASK THE SHEIKH' App.tsx
+          grep -q 'en:"Ask the Sheikh"' src/FeatureGuidePage.tsx
           grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
           grep -q 'hasBismillahPrefix' src/quran/AlHafizClassroom.tsx
           grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
@@ -151,5 +158,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, improved Learn the App guide, Android in-app back navigation, next-prayer row countdown, five-minute red prayer warning, and Islamic-event year summary with next-year labeling.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Final Fixed APK' --notes 'Known-good APK base with interactive Al-Hafiz, fast widget launch, Ask the Sheikh restored, improved Learn the App guide, Android in-app back navigation, next-prayer row countdown, five-minute red prayer warning, and Islamic-event year summary with next-year labeling.' --prerelease
           fi
