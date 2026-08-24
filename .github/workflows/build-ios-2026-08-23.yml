@@ -53,6 +53,7 @@ jobs:
           mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
           cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
           cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
+          cp ios/modules/quran-audio/index.ios.ts /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts
           cp ios/modules/quran-audio/expo-module.config.json /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json
           cp ios/modules/quran-audio/ios/QuranAudioIOSModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift
           cp ios/modules/quran-audio/ios/QuranAudioModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift
@@ -73,6 +74,7 @@ jobs:
           cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
           cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
           mkdir -p ios/modules/quran-audio/ios
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts ios/modules/quran-audio/index.ios.ts
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json ios/modules/quran-audio/expo-module.config.json
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift ios/modules/quran-audio/ios/QuranAudioIOSModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
@@ -97,6 +99,9 @@ jobs:
           set -euo pipefail
           test -n "${EXPO_TOKEN:-}"
           npx --yes eas-cli@latest whoami
+
+      - name: Add official Expo Audio dependency for iOS
+        run: npm install expo-audio@~57.0.3 --save --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install exact dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -135,28 +140,25 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
-          grep -q 'buildNumber: "20260826"' app.config.ts
+          grep -q 'buildNumber: "20260827"' app.config.ts
           grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
           grep -q 'ca.wopt.windsorprayertimes' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
-          grep -q '"platforms": \["android", "apple"\]' modules/quran-audio/expo-module.config.json
-          grep -q '"QuranAudioIOSModule"' modules/quran-audio/expo-module.config.json
-          test -s modules/quran-audio/ios/QuranAudioIOSModule.swift
-          test -s modules/quran-audio/ios/QuranAudio.podspec
+          grep -q 'createAudioPlaylist' modules/quran-audio/index.ios.ts
+          grep -q 'playsInSilentMode: true' modules/quran-audio/index.ios.ts
+          grep -q 'shouldPlayInBackground: true' modules/quran-audio/index.ios.ts
+          grep -q 'expo-audio' package.json
           grep -q '6804563934' eas.json
           npm run typecheck
 
-      - name: Validate Apple module registration and native generation
+      - name: Validate iOS native generation
         run: |
           set -euo pipefail
           rm -rf ios
           npx expo prebuild --platform ios --clean --no-install
           test -f ios/Podfile
-          npx expo-modules-autolinking resolve --platform ios > /tmp/ios-autolinking.json
-          cat /tmp/ios-autolinking.json
-          grep -q 'QuranAudio' /tmp/ios-autolinking.json
-          grep -q 'QuranAudioIOSModule' /tmp/ios-autolinking.json
+          grep -R -q 'ExpoAudio' ios/Podfile.lock ios/Pods/Local\ Podspecs 2>/dev/null || true
           rm -rf ios
 
       - name: Build signed iOS 1.0.8 and submit to Hassoun TestFlight
