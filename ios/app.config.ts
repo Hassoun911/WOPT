@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
-    buildNumber: "20260823",
+    buildNumber: "20260824",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       UIBackgroundModes: ["remote-notification", "audio"],
