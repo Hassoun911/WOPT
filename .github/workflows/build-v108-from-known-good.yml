@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.8 interactive Al-Hafiz study APK
+name: Build Hassoun v1.0.8 interactive Al-Hafiz + fast widget launch
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
       - 'mobile/src/HomePrayerPanel.tsx'
       - 'mobile/scripts/apply-smart-hafiz-picker.mjs'
       - 'mobile/scripts/apply-interactive-hafiz-study.mjs'
+      - 'mobile/scripts/apply-fast-widget-launch.mjs'
 
 permissions:
   contents: write
@@ -88,12 +89,17 @@ jobs:
       - name: Apply interactive Al-Hafiz study cards
         run: node scripts/apply-interactive-hafiz-study.mjs
 
-      - name: Verify app and approved study features
+      - name: Apply instant widget/cold-start loading
+        run: node scripts/apply-fast-widget-launch.mjs
+
+      - name: Verify app and approved study/startup features
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
           grep -q 'versionCode: 49' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'loadInitialPrayerTimes' App.tsx
+          grep -q 'Refresh live data silently' App.tsx
           grep -q 'All five daily prayers at a glance' src/HomePrayerPanel.tsx
           grep -q 'QUR’AN LESSON PICKER' src/quran/AlHafizClassroom.tsx
           grep -q 'Tap any word to hear that word only' src/quran/AlHafizClassroom.tsx
@@ -125,14 +131,14 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > /tmp/apk-files.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/apk-files.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-hafiz.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-hafiz.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-interactive-hafiz
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-hafiz.apk
+          name: Hassoun-v1.0.8-interactive-fast-launch
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -142,10 +148,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-hafiz.apk'
-          TAG='v1.0.8-good-apk-interactive-hafiz'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8-interactive-fast-launch.apk'
+          TAG='v1.0.8-good-apk-interactive-fast-launch'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Interactive Al-Hafiz' --notes 'Built from the known-good APK foundation. Adds popup Surah selection plus interactive study cards: tap word audio, optional translation, card audio looping, split-card control, fill-in-the-blank and ABC tests, and per-card font size/style controls.' --prerelease
+            gh release create "$TAG" "$APK" --target build/v108-good-apk-layout-only --title 'Hassoun v1.0.8 Interactive Al-Hafiz + Fast Widget Launch' --notes 'Built from the known-good APK foundation. Keeps the approved prayer and Al-Hafiz upgrades and changes app startup so cached/bundled prayer data renders immediately while GPS/network refresh happens in the background.' --prerelease
           fi
