@@ -1,0 +1,39 @@
+submitted_at=2026-08-24T18:40:00Z
+head_sha=ec5bfb05d9765f9fe90434d0e7c56e3d8ed8e96a
+eas_exit_code=0
+
+---- eas submit output ----
+npm warn exec The following package was not found and will be installed: eas-cli@22.3.0
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@6.0.4: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+Using App Store Connect API Key from EAS credentials service.
+Looking up credentials configuration for ca.wopt.windsorprayertimes...
+✔ App Store Connect API Key already set up.
+Using Api Key ID: 839JBU2Q67 ([Expo] EAS Submit O-idw5Q1aC)
+
+ASC App ID:                 6800968060
+Project ID:                 69276452-f6f2-4d13-80e8-399ab32746ff
+App Store Connect API Key:  
+    Key Name  :  [Expo] EAS Submit O-idw5Q1aC
+    Key ID    :  839JBU2Q67
+    Key Source:  EAS servers
+Build:                      
+    Build ID    :  3ccf657d-db88-4f5b-b194-6d12cbaaf28d
+    Build Date  :  8/24/2026, 6:21:52 PM
+    App Version :  1.0.1
+    Build number:  2
+
+- Scheduling iOS submission
+✔ Scheduled iOS submission
+
+Submission details: https://expo.dev/accounts/hassoun911/projects/wopt/submissions/3e8ff6c6-e1be-4f84-ae5b-a7ee61be4cb3
