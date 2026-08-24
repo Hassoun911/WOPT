@@ -1,4 +1,4 @@
-name: Build + TestFlight Hassoun iOS v1.0.8 Current
+name: Build + TestFlight Hassoun iOS v1.0.8 Exact Android Parity
 
 on:
   workflow_dispatch:
@@ -19,6 +19,7 @@ concurrency:
 env:
   EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
   EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+  ANDROID_PARITY_SHA: 728c5f0ed9132408405668153bc0f318c9cdceca
 
 jobs:
   build-ios-testflight:
@@ -29,13 +30,13 @@ jobs:
         working-directory: ios
 
     steps:
-      - name: Checkout current iOS release branch
+      - name: Checkout iOS release branch
         uses: actions/checkout@v4
         with:
           ref: release/ios-current
           fetch-depth: 0
 
-      - name: Prepare exact current Android app source plus iOS-only overlay
+      - name: Prepare exact validated Android APK source plus iOS-only overlay
         shell: bash
         working-directory: .
         run: |
@@ -44,12 +45,13 @@ jobs:
           cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
           cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
           cp ios/modules/quran-audio/expo-module.config.json /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json
+          cp ios/modules/quran-audio/ios/QuranAudioIOSModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift
           cp ios/modules/quran-audio/ios/QuranAudioModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift
           cp ios/modules/quran-audio/ios/QuranAudio.podspec /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec
 
           rm -rf /tmp/hassoun-android-mobile
           mkdir -p /tmp/hassoun-android-mobile
-          git archive origin/work/hassoun-1.0-store-admin:mobile | tar -x -C /tmp/hassoun-android-mobile
+          git archive "${ANDROID_PARITY_SHA}:mobile" | tar -x -C /tmp/hassoun-android-mobile
 
           find ios -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           cp -a /tmp/hassoun-android-mobile/. ios/
@@ -58,8 +60,15 @@ jobs:
           cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
           mkdir -p ios/modules/quran-audio/ios
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json ios/modules/quran-audio/expo-module.config.json
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift ios/modules/quran-audio/ios/QuranAudioIOSModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
+
+          test -s ios/src/HomePrayerPanel.tsx
+          test -s ios/src/QiblaDirectionScreen.tsx
+          grep -q 'HomePrayerPanel' ios/App.tsx
+          grep -q 'QiblaDirectionScreen' ios/App.tsx
+          echo "iOS source pinned to validated Android APK commit ${ANDROID_PARITY_SHA}"
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -77,15 +86,8 @@ jobs:
           test -n "${EXPO_TOKEN:-}"
           npx --yes eas-cli@latest whoami
 
-      - name: Install dependencies
+      - name: Install exact dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-
-      - name: Apply exact same release transforms as current Android APK
-        run: |
-          set -euo pipefail
-          node scripts/apply-v106-clean-home.mjs
-          node scripts/fix-memorize-entry.mjs
-          node scripts/apply-alhafiz-motivation.mjs
 
       - name: Repair and validate PNG assets for iOS
         shell: bash
@@ -112,34 +114,38 @@ jobs:
             pngcheck -q "$file"
           done < <(find assets -type f -name '*.png' -print0)
 
-      - name: Verify Android parity and iOS Quran audio
+      - name: Verify exact layout parity and iOS Quran audio source
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
+          grep -q 'buildNumber: "20260825"' app.config.ts
           grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
           grep -q 'ca.wopt.windsorprayertimes' app.config.ts
-          grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
-          grep -q 'onPress={() => setScreen("memorize")}' src/quran/QuranV3.tsx
-          grep -q 'AskSheikh' App.tsx
-          grep -q '"platforms": \["android", "ios"\]' modules/quran-audio/expo-module.config.json
-          test -s modules/quran-audio/ios/QuranAudioModule.swift
+          grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'QiblaDirectionScreen' App.tsx
+          grep -q '"platforms": \["android", "apple"\]' modules/quran-audio/expo-module.config.json
+          grep -q '"QuranAudioIOSModule"' modules/quran-audio/expo-module.config.json
+          test -s modules/quran-audio/ios/QuranAudioIOSModule.swift
           test -s modules/quran-audio/ios/QuranAudio.podspec
           grep -q '6804563934' eas.json
           npm run typecheck
 
-      - name: Validate iOS native generation and QuranAudio autolinking
+      - name: Validate Apple module registration and native generation
         run: |
           set -euo pipefail
           rm -rf ios
           npx expo prebuild --platform ios --clean --no-install
           test -f ios/Podfile
           npx expo-modules-autolinking resolve --platform ios > /tmp/ios-autolinking.json
+          cat /tmp/ios-autolinking.json
           grep -q 'QuranAudio' /tmp/ios-autolinking.json
+          grep -q 'QuranAudioIOSModule' /tmp/ios-autolinking.json
           rm -rf ios
 
       - name: Build signed iOS 1.0.8 and submit to Hassoun TestFlight
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
         run: |
           set -euo pipefail
           npx --yes eas-cli@latest build \
