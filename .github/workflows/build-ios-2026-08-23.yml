@@ -53,6 +53,7 @@ jobs:
           mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
           cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
           cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
+          cp ios/modules/quran-audio/index.ts /tmp/hassoun-ios-overlay/modules/quran-audio/index.ts
           cp ios/modules/quran-audio/index.ios.ts /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts
           cp ios/modules/quran-audio/expo-module.config.json /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json
           cp ios/modules/quran-audio/ios/QuranAudioIOSModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift
@@ -74,6 +75,7 @@ jobs:
           cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
           cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
           mkdir -p ios/modules/quran-audio/ios
+          cp /tmp/hassoun-ios-overlay/modules/quran-audio/index.ts ios/modules/quran-audio/index.ts
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts ios/modules/quran-audio/index.ios.ts
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json ios/modules/quran-audio/expo-module.config.json
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift ios/modules/quran-audio/ios/QuranAudioIOSModule.swift
@@ -136,18 +138,23 @@ jobs:
           done < <(find assets -type f -name '*.png' -print0)
           echo "PNG files repaired: ${damaged}"
 
-      - name: Verify current Android layout and iOS Quran audio source
+      - name: Verify current Android layout and direct iOS Quran audio source
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.8"' app.config.ts
-          grep -q 'buildNumber: "20260827"' app.config.ts
+          grep -q 'buildNumber: "20260828"' app.config.ts
           grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
           grep -q 'ca.wopt.windsorprayertimes' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
-          grep -q 'createAudioPlaylist' modules/quran-audio/index.ios.ts
-          grep -q 'playsInSilentMode: true' modules/quran-audio/index.ios.ts
-          grep -q 'shouldPlayInBackground: true' modules/quran-audio/index.ios.ts
+          grep -q 'createAudioPlaylist' modules/quran-audio/index.ts
+          grep -q 'setAudioModeAsync' modules/quran-audio/index.ts
+          grep -q 'playsInSilentMode: true' modules/quran-audio/index.ts
+          grep -q 'shouldPlayInBackground: true' modules/quran-audio/index.ts
+          if grep -q 'requireOptionalNativeModule' modules/quran-audio/index.ts; then
+            echo 'ERROR: iOS Quran index.ts still points to optional native module'
+            exit 1
+          fi
           grep -q 'expo-audio' package.json
           grep -q '6804563934' eas.json
           npm run typecheck
@@ -158,7 +165,6 @@ jobs:
           rm -rf ios
           npx expo prebuild --platform ios --clean --no-install
           test -f ios/Podfile
-          grep -R -q 'ExpoAudio' ios/Podfile.lock ios/Pods/Local\ Podspecs 2>/dev/null || true
           rm -rf ios
 
       - name: Build signed iOS 1.0.8 and submit to Hassoun TestFlight
