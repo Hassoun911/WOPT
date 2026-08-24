@@ -1,0 +1,115 @@
+name: Build Hassoun iOS v1.0.8 2026-08-23
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/ios-2026-08-23
+    paths:
+      - '.github/workflows/build-ios-2026-08-23.yml'
+      - 'mobile/**'
+
+permissions:
+  contents: read
+
+env:
+  EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+  EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+
+jobs:
+  build-ios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/ios-2026-08-23
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Verify Expo credentials
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo 'Missing GitHub Actions secret EXPO_TOKEN. Add an Expo access token to repository Actions secrets.'
+            exit 1
+          fi
+          echo 'Expo token is configured.'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply current Hassoun feature set
+        run: |
+          set -euo pipefail
+          node scripts/apply-smart-hafiz-picker.mjs
+          node scripts/apply-interactive-hafiz-study.mjs
+          node scripts/apply-hafiz-study-polish.mjs
+          node scripts/apply-fast-widget-launch.mjs
+          node scripts/fix-prayer-warning-build.mjs
+          node scripts/apply-navigation-guide-next-prayer.mjs
+          node scripts/apply-islamic-events-year-summary.mjs
+          node scripts/restore-ask-sheikh.mjs
+
+      - name: Verify matched app features
+        run: |
+          set -euo pipefail
+          grep -q 'LESS THAN 5 MINUTES' src/HomePrayerPanel.tsx
+          grep -q 'playingWordKey' src/quran/AlHafizClassroom.tsx
+          grep -q 'Fill the blank' src/quran/AlHafizClassroom.tsx
+          grep -q 'ABC question' src/quran/AlHafizClassroom.tsx
+          grep -q 'Split card' src/quran/AlHafizClassroom.tsx
+          grep -q 'hardwareBackPress' App.tsx
+          grep -q 'remainingThisHijriYear' src/IslamicEventsPage.tsx
+          grep -q 'AskSheikh' App.tsx
+          npx tsc --noEmit
+          npx expo config --type public >/tmp/hassoun-ios-expo-config.txt
+          grep -q 'ca.wopt.windsorprayertimes' /tmp/hassoun-ios-expo-config.txt
+
+      - name: Start and wait for signed EAS iOS production build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build --platform ios --profile production --non-interactive --wait --json > /tmp/eas-ios-build.json
+          cat /tmp/eas-ios-build.json
+
+      - name: Download dated IPA
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          const raw = fs.readFileSync('/tmp/eas-ios-build.json','utf8').trim();
+          const start = raw.indexOf('[');
+          const objStart = raw.indexOf('{');
+          const jsonStart = start >= 0 && (objStart < 0 || start < objStart) ? start : objStart;
+          if (jsonStart < 0) throw new Error('Could not find EAS build JSON');
+          const parsed = JSON.parse(raw.slice(jsonStart));
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          const url = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || build?.artifacts?.applicationArchiveURL;
+          if (!url) throw new Error('EAS build completed but no IPA artifact URL was returned');
+          cp.execFileSync('curl', ['-fL', url, '-o', 'Hassoun-iOS-v1.0.8-2026-08-23.ipa'], {stdio:'inherit'});
+          if (!fs.existsSync('Hassoun-iOS-v1.0.8-2026-08-23.ipa') || fs.statSync('Hassoun-iOS-v1.0.8-2026-08-23.ipa').size < 100000) {
+            throw new Error('Downloaded IPA is missing or unexpectedly small');
+          }
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-iOS-v1.0.8-2026-08-23
+          path: mobile/Hassoun-iOS-v1.0.8-2026-08-23.ipa
+          if-no-files-found: error
+          retention-days: 14
