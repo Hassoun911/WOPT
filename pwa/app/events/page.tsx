@@ -1,5 +1,7 @@
 "use client";
 
+import "./events.css";
+
 const EVENTS = [
   [1,1,"🌙","Islamic New Year","The first day of Muharram and the beginning of a new Hijri year."],
   [1,10,"🤲","Day of Ashura","The 10th of Muharram, a significant day of fasting and remembrance."],
@@ -22,6 +24,11 @@ function occurrences(year:number){const found:{date:Date;emoji:string;name:strin
 
 export default function EventsPage(){
   const now=new Date();
-  const all=[...occurrences(now.getUTCFullYear()),...occurrences(now.getUTCFullYear()+1)].filter(e=>e.date.getTime()>=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())).slice(0,12);
-  return <main className="parity-page"><section className="parity-hero"><div><div className="eyebrow">ISLAMIC CALENDAR</div><h1>Islamic events</h1><p>The same core Hijri event calendar used by the Android app.</p></div><div className="hero-badge">🌙</div></section><section className="event-list">{all.map((event)=>{const days=Math.max(0,Math.round((event.date.getTime()-Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()))/86400000));return <article className="event-card" key={`${event.name}-${event.date.toISOString()}`}><div className="event-emoji">{event.emoji}</div><div className="event-body"><div className="event-top"><h2>{event.name}</h2><span>{days===0?"Today":`${days}d`}</span></div><p>{event.description}</p><small>{event.date.toLocaleDateString("en-CA",{weekday:"short",month:"long",day:"numeric",year:"numeric"})} • {event.hijri}</small></div></article>})}</section></main>;
+  const todayStart=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
+  const all=[...occurrences(now.getUTCFullYear()),...occurrences(now.getUTCFullYear()+1)].filter(e=>e.date.getTime()>=todayStart).slice(0,12);
+  return <main className="events-page">
+    <section className="events-hero"><div><div className="eyebrow">ISLAMIC CALENDAR</div><h1>Islamic events</h1><p>Upcoming Hijri dates, Ramadan, Eid, Hajj days and other important moments in one calm calendar view.</p></div><div className="events-hero-mark">🌙</div></section>
+    <div className="events-summary"><h2>Upcoming dates</h2><span>{all.length} events shown</span></div>
+    <section className="event-list">{all.map((event)=>{const days=Math.max(0,Math.round((event.date.getTime()-todayStart)/86400000));return <article className="event-card" key={`${event.name}-${event.date.toISOString()}`}><div className="event-emoji">{event.emoji}</div><div className="event-body"><div className="event-top"><h2>{event.name}</h2><span className="event-countdown">{days===0?"Today":days===1?"Tomorrow":`${days} days`}</span></div><p>{event.description}</p><div className="event-date"><strong>{event.date.toLocaleDateString("en-CA",{weekday:"short",month:"long",day:"numeric",year:"numeric"})}</strong><i>•</i><span>{event.hijri}</span></div></div></article>})}</section>
+  </main>;
 }
