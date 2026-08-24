@@ -1,0 +1,80 @@
+name: Submit Latest Hassoun iOS to TestFlight
+
+on:
+  push:
+    paths:
+      - ".github/ios-submit-trigger.txt"
+      - ".github/workflows/ios-submit-latest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-ios-submit
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Submit latest finished iOS build
+        id: submit
+        working-directory: mobile
+        shell: bash
+        run: |
+          set +e
+          npx eas-cli@latest submit \
+            --platform ios \
+            --latest \
+            --profile production \
+            --non-interactive \
+            --no-wait \
+            2>&1 | tee /tmp/eas-submit.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Record result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "submitted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "head_sha=${GITHUB_SHA}"
+            echo "eas_exit_code=${{ steps.submit.outputs.exit_code }}"
+            echo
+            echo "---- eas submit output ----"
+            tail -n 120 /tmp/eas-submit.log 2>/dev/null || true
+          } > .github/ios-testflight-submit-result.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/ios-testflight-submit-result.txt
+          git commit -m "Record iOS TestFlight submit result" || true
+          git push origin HEAD:main || true
+
+      - name: Fail if submit failed
+        if: steps.submit.outputs.exit_code != '0'
+        run: exit 1
