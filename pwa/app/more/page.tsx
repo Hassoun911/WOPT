@@ -4,6 +4,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path:string)=>`${BASE_PATH}${path}`;
 
 const items = [
+  { icon:"🕌", title:"Ask the Sheikh", text:"Ask an Islamic question and review Qur’an and Sunnah references.", href:"/ask-sheikh/" },
   { icon:"🔔", title:"Prayer alerts", text:"Manage prayer reminders and browser notifications.", href:"/?open=alerts" },
   { icon:"⚙️", title:"Settings", text:"Language, appearance, prayer schedule and app preferences.", href:"/?open=settings" },
   { icon:"🕋", title:"Qibla", text:"Use location and compass direction to face the Kaaba.", href:"/qibla/" },
