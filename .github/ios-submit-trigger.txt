@@ -1,1 +1,3 @@
 Submit latest successful iOS build to TestFlight.
+Correct Hassoun ASC app ID: 6804563934.
+Retry requested after bundle identifier mismatch fix.
