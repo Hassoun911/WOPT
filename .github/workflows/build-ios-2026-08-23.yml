@@ -79,6 +79,46 @@ jobs:
           npx expo config --type public >/tmp/hassoun-ios-expo-config.txt
           grep -q 'ca.wopt.windsorprayertimes' /tmp/hassoun-ios-expo-config.txt
 
+      - name: Normalize iOS PNG assets
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y python3-pil pngcheck >/dev/null
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          assets = Path('assets')
+          pngs = sorted(assets.rglob('*.png'))
+          if not pngs:
+              raise SystemExit('No PNG assets found')
+
+          repaired = []
+          failed = []
+          for path in pngs:
+              try:
+                  with Image.open(path) as source:
+                      source.load()
+                      image = source.convert('RGBA')
+                  tmp = path.with_suffix('.ios-fixed.png')
+                  image.save(tmp, format='PNG', optimize=True)
+                  tmp.replace(path)
+                  repaired.append(str(path))
+              except Exception as exc:
+                  failed.append((str(path), str(exc)))
+
+          print('Normalized PNG assets:')
+          for path in repaired:
+              print(' -', path)
+          if failed:
+              print('Unable to normalize:')
+              for path, error in failed:
+                  print(' -', path, error)
+              raise SystemExit(1)
+          PY
+          while IFS= read -r -d '' file; do pngcheck -q "$file"; done < <(find assets -type f -name '*.png' -print0)
+
       - name: Validate iOS native generation
         run: |
           set -euo pipefail
