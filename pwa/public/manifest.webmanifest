@@ -11,7 +11,7 @@
   "categories": ["lifestyle", "utilities", "education"],
   "prefer_related_applications": false,
   "icons": [
-    { "src": "hassoun-official-logo.jpg?v=20260825-official-1", "sizes": "640x650", "type": "image/jpeg", "purpose": "any" },
-    { "src": "hassoun-official-logo.jpg?v=20260825-official-1", "sizes": "640x650", "type": "image/jpeg", "purpose": "maskable" }
+    { "src": "hassoun-brand.svg?v=20260825-exact-2", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "hassoun-brand.svg?v=20260825-exact-2", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
