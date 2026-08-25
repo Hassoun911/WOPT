@@ -44,7 +44,7 @@ function json(data: unknown, status = 200) {
 
 async function bodyJson(request: Request) {
   const length = Number(request.headers.get("Content-Length") ?? 0);
-  if (length > 131_072) throw new Error("Request body is too large");
+  if (length > 786_432) throw new Error("Request body is too large");
   return (await request.json()) as Record<string, unknown>;
 }
 
@@ -101,23 +101,55 @@ async function logAdmin(env: Env, adminId: number, action: string, entityId: str
   ).bind(adminId, action, entityId, JSON.stringify(details ?? {})).run();
 }
 
+function parseSponsorLogo(value: unknown) {
+  if (typeof value !== "string" || !value) return null;
+  const match = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  if (!match) throw new Error("Sponsor logo must be a PNG or JPEG image");
+  const mime = match[1];
+  const data = match[2];
+  const estimatedBytes = Math.floor(data.length * 0.75);
+  if (estimatedBytes > 350_000) throw new Error("Sponsor logo is too large. Please use an image under 350 KB.");
+  return { mime, data };
+}
+
+function fieldString(body: Record<string, unknown>, key: string, existing: unknown, max: number) {
+  if (!(key in body)) return typeof existing === "string" ? existing : null;
+  if (body[key] === null || body[key] === "") return null;
+  return clean(body[key], max);
+}
+
 async function updateTemplateProfile(env: Env, adminId: number, body: Record<string, unknown>) {
   const key = clean(body.templateKey, 120);
   if (!key) return json({ error: "Template key is required" }, 400);
   const existing = await env.DB.prepare(
     `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
             include_daily_surah, include_occasion_countdown, include_motivation,
-            include_sadaqah_jariyah, include_sponsor
+            include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
+            sponsor_message_en, sponsor_message_ar, sponsor_logo_data, sponsor_logo_mime
      FROM email_template_profiles WHERE template_key = ? LIMIT 1`
   ).bind(key).first<Record<string, unknown>>();
   if (!existing) return json({ error: "Template profile not found" }, 404);
+
+  let sponsorLogoData = typeof existing.sponsor_logo_data === "string" ? existing.sponsor_logo_data : null;
+  let sponsorLogoMime = typeof existing.sponsor_logo_mime === "string" ? existing.sponsor_logo_mime : null;
+  if (body.clearSponsorLogo === true) {
+    sponsorLogoData = null;
+    sponsorLogoMime = null;
+  } else if ("sponsorLogoDataUrl" in body && body.sponsorLogoDataUrl) {
+    const parsed = parseSponsorLogo(body.sponsorLogoDataUrl);
+    if (parsed) {
+      sponsorLogoData = parsed.data;
+      sponsorLogoMime = parsed.mime;
+    }
+  }
 
   await env.DB.prepare(
     `UPDATE email_template_profiles SET
        enabled = ?, include_islamic_occasion = ?, include_daily_hadith = ?,
        include_daily_surah = ?, include_occasion_countdown = ?, include_motivation = ?,
        include_sadaqah_jariyah = ?, include_sponsor = ?, sponsor_name = ?, sponsor_url = ?,
-       sponsor_message_en = ?, sponsor_message_ar = ?, updated_at = CURRENT_TIMESTAMP
+       sponsor_message_en = ?, sponsor_message_ar = ?, sponsor_logo_data = ?, sponsor_logo_mime = ?,
+       updated_at = CURRENT_TIMESTAMP
      WHERE template_key = ?`
   ).bind(
     flag(body.enabled, Number(existing.enabled ?? 1)),
@@ -128,10 +160,39 @@ async function updateTemplateProfile(env: Env, adminId: number, body: Record<str
     flag(body.includeMotivation, Number(existing.include_motivation ?? 1)),
     flag(body.includeSadaqahJariyah, Number(existing.include_sadaqah_jariyah ?? 1)),
     flag(body.includeSponsor, Number(existing.include_sponsor ?? 1)),
-    clean(body.sponsorName, 120), clean(body.sponsorUrl, 500), clean(body.sponsorMessageEn, 1000), clean(body.sponsorMessageAr, 1000), key
+    fieldString(body, "sponsorName", existing.sponsor_name, 120),
+    fieldString(body, "sponsorUrl", existing.sponsor_url, 500),
+    fieldString(body, "sponsorMessageEn", existing.sponsor_message_en, 1000),
+    fieldString(body, "sponsorMessageAr", existing.sponsor_message_ar, 1000),
+    sponsorLogoData,
+    sponsorLogoMime,
+    key
   ).run();
-  await logAdmin(env, adminId, "email_template_profile_updated", key, { fields: Object.keys(body) });
-  return json({ ok: true, templateKey: key });
+  await logAdmin(env, adminId, "email_template_profile_updated", key, { fields: Object.keys(body), sponsorLogo: Boolean(sponsorLogoData) });
+  return json({ ok: true, templateKey: key, sponsorLogoPresent: Boolean(sponsorLogoData) });
+}
+
+export async function getSponsorLogo(url: URL, env: Env) {
+  const prefix = "/email/sponsor-logo/";
+  const rawKey = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : "";
+  let key = "";
+  try { key = decodeURIComponent(rawKey); } catch { return new Response("Not found", { status: 404 }); }
+  if (!key || key.length > 120) return new Response("Not found", { status: 404 });
+  const row = await env.DB.prepare(
+    `SELECT sponsor_logo_data, sponsor_logo_mime FROM email_template_profiles WHERE template_key = ? LIMIT 1`
+  ).bind(key).first<{ sponsor_logo_data: string | null; sponsor_logo_mime: string | null }>();
+  if (!row?.sponsor_logo_data || !row.sponsor_logo_mime) return new Response("Not found", { status: 404 });
+  const binary = atob(row.sponsor_logo_data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": row.sponsor_logo_mime,
+      "Cache-Control": "public, max-age=300",
+      "Content-Disposition": "inline"
+    }
+  });
 }
 
 async function updateContentItem(env: Env, body: Record<string, unknown>) {
@@ -219,7 +280,9 @@ export async function listAdminEmailCampaigns(request: Request, env: Env) {
       `SELECT template_key, name, category, enabled,
               include_islamic_occasion, include_daily_hadith, include_daily_surah,
               include_occasion_countdown, include_motivation, include_sadaqah_jariyah,
-              include_sponsor, sponsor_name, sponsor_url, sponsor_message_en, sponsor_message_ar, updated_at
+              include_sponsor, sponsor_name, sponsor_url, sponsor_message_en, sponsor_message_ar,
+              sponsor_logo_mime, CASE WHEN sponsor_logo_data IS NOT NULL AND sponsor_logo_data <> '' THEN 1 ELSE 0 END AS sponsor_logo_present,
+              updated_at
        FROM email_template_profiles ORDER BY category, name`
     ).all<Record<string, unknown>>(),
     env.DB.prepare(
