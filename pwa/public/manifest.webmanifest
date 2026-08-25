@@ -1,17 +1,17 @@
 {
   "name": "Hassoun",
   "short_name": "Hassoun",
-  "description": "Prayer times, Qur’an reading and audio, smart memorization, Islamic quizzes, reminders, and Islamic tools in one app.",
+  "description": "Prayer times, Qur’an reading and audio, Qur’an School, smart memorization, Islamic quizzes, reminders, and Islamic tools in one app.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f5f2e9",
   "theme_color": "#0b5b47",
-  "categories": ["lifestyle", "utilities"],
+  "categories": ["lifestyle", "utilities", "education"],
   "prefer_related_applications": false,
   "icons": [
-    { "src": "hassoun-logo.png?v=20260824-4", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "hassoun-logo.png?v=20260824-4", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "hassoun-logo.png?v=20260824-5", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "hassoun-logo.png?v=20260824-5", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
