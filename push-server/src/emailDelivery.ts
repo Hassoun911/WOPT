@@ -19,9 +19,12 @@ type ProfileRow = {
   template_key: string; enabled: number; include_islamic_occasion: number; include_daily_hadith: number;
   include_daily_surah: number; include_occasion_countdown: number; include_motivation: number;
   include_sadaqah_jariyah: number; include_sponsor: number; sponsor_name: string | null; sponsor_url: string | null;
-  sponsor_message_en: string | null; sponsor_message_ar: string | null;
+  sponsor_message_en: string | null; sponsor_message_ar: string | null; sponsor_logo_data: string | null; sponsor_logo_mime: string | null;
 };
 type ContentRow = { content_type: "hadith" | "surah" | "motivation"; title_en: string; title_ar: string | null; body_en: string; body_ar: string | null; source_ref: string | null };
+
+const HASSOUN_WEB = "https://hassoun.app";
+const EMAIL_API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 
 function configured(env: Env) { return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM); }
 export function emailDeliveryConfigured(env: Env) { return configured(env); }
@@ -76,7 +79,7 @@ async function loadProfile(env: Env, row: OutboxRow) {
     `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
             include_daily_surah, include_occasion_countdown, include_motivation,
             include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
-            sponsor_message_en, sponsor_message_ar
+            sponsor_message_en, sponsor_message_ar, sponsor_logo_data, sponsor_logo_mime
      FROM email_template_profiles WHERE template_key = ? LIMIT 1`
   ).bind(profileKey(row)).first<ProfileRow>();
 }
@@ -117,22 +120,38 @@ function enhancementHtml(profile: ProfileRow, content: Map<string, ContentRow>, 
     const sponsorName = profile.sponsor_name || (ar ? "قسم الرعاية والدعم" : "Sponsor & Support");
     const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
     const link = profile.sponsor_url ? `<a href="${escapeHtml(profile.sponsor_url)}" style="display:inline-block;margin-top:9px;background:#173f35;color:white;text-decoration:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900">${escapeHtml(ar ? "زيارة الراعي" : "Sponsor / Support")}</a>` : "";
-    blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
+    const logo = profile.sponsor_logo_data ? `<div style="margin-bottom:10px"><img src="${EMAIL_API}/email/sponsor-logo/${encodeURIComponent(profile.template_key)}" alt="${escapeHtml(sponsorName)}" style="display:block;max-width:180px;max-height:72px;width:auto;height:auto;border:0;object-fit:contain"></div>` : "";
+    blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}">${logo}<div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
   }
   if (!blocks.length) return "";
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:14px auto 0">${blocks.join("")}</table>`;
 }
 
-function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow, content: Map<string, ContentRow>, locale: Locale) {
-  if (!extraHtml) return rendered;
+function universalFooter(data: Record<string, unknown>, locale: Locale) {
+  const ar = locale === "ar";
+  const manageUrl = typeof data.manageUrl === "string" ? data.manageUrl : "";
+  const schoolTitle = ar ? "مدرسة تحفيظ القرآن" : "Qur’an Tahfiz School";
+  const schoolText = ar ? "تابع الحفظ والمراجعة والواجبات والتقدم من خلال تجربة الطالب والمعلم وولي الأمر." : "Continue memorization, revision, assignments and progress with the Student, Teacher and Parent Qur’an School experience.";
+  const schoolButton = ar ? "فتح مدرسة القرآن" : "Open Qur’an School";
+  const manageLabel = ar ? "إدارة البريد أو إلغاء الاشتراك" : "Manage email preferences or unsubscribe";
+  const html = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;margin:14px auto 0"><tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#e9f4ef;border:1px solid #c9e0d7;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:15px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:#08735a;font-weight:900">${escapeHtml(schoolTitle)}</div><div style="font-size:13px;line-height:1.6;color:#49645b;margin-top:5px">${escapeHtml(schoolText)}</div><a href="${HASSOUN_WEB}/school/" style="display:inline-block;margin-top:10px;background:#0b604b;color:#fff;text-decoration:none;border-radius:10px;padding:9px 12px;font-size:11px;font-weight:900">${escapeHtml(schoolButton)}</a></td></tr></table></td></tr>${manageUrl ? `<tr><td style="padding:2px 22px 18px;text-align:center"><a href="${escapeHtml(manageUrl)}" style="color:#6e7d77;font-size:11px;text-decoration:underline">${escapeHtml(manageLabel)}</a></td></tr>` : ""}</table>`;
+  const text = `${ar ? "مدرسة تحفيظ القرآن" : "Qur’an Tahfiz School"}: ${HASSOUN_WEB}/school/${manageUrl ? `\n${manageLabel}: ${manageUrl}` : ""}`;
+  return { html, text };
+}
+
+function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow | null, content: Map<string, ContentRow>, locale: Locale, data: Record<string, unknown>) {
   const textParts: string[] = [];
-  if (profile.include_daily_hadith === 1 && content.get("hadith")) textParts.push(`${content.get("hadith")!.title_en}: ${content.get("hadith")!.body_en}${content.get("hadith")!.source_ref ? ` (${content.get("hadith")!.source_ref})` : ""}`);
-  if (profile.include_daily_surah === 1 && content.get("surah")) textParts.push(`${content.get("surah")!.title_en}: ${content.get("surah")!.body_en}${content.get("surah")!.source_ref ? ` (${content.get("surah")!.source_ref})` : ""}`);
-  if (profile.include_motivation === 1 && content.get("motivation")) textParts.push(`${content.get("motivation")!.title_en}: ${content.get("motivation")!.body_en}`);
-  if (profile.include_sadaqah_jariyah === 1) textParts.push("Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.");
-  if (profile.include_sponsor === 1) textParts.push(profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
-  const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${extraHtml}</body>`) : `${rendered.html}${extraHtml}`;
-  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}` };
+  if (profile) {
+    if (profile.include_daily_hadith === 1 && content.get("hadith")) textParts.push(`${content.get("hadith")!.title_en}: ${content.get("hadith")!.body_en}${content.get("hadith")!.source_ref ? ` (${content.get("hadith")!.source_ref})` : ""}`);
+    if (profile.include_daily_surah === 1 && content.get("surah")) textParts.push(`${content.get("surah")!.title_en}: ${content.get("surah")!.body_en}${content.get("surah")!.source_ref ? ` (${content.get("surah")!.source_ref})` : ""}`);
+    if (profile.include_motivation === 1 && content.get("motivation")) textParts.push(`${content.get("motivation")!.title_en}: ${content.get("motivation")!.body_en}`);
+    if (profile.include_sadaqah_jariyah === 1) textParts.push("Hassoun is a Sadaqah Jariyah for Abdul Jalil Hassoun and Salwa Hassoun.");
+    if (profile.include_sponsor === 1) textParts.push(profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
+  }
+  const universal = universalFooter(data, locale);
+  const additions = `${extraHtml}${universal.html}`;
+  const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${additions}</body>`) : `${rendered.html}${additions}`;
+  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}\n\n${universal.text}` };
 }
 
 async function renderEmail(env: Env, row: OutboxRow) {
@@ -153,9 +172,8 @@ async function renderEmail(env: Env, row: OutboxRow) {
     }
   }
 
-  if (!profile || profile.enabled !== 1) return builtIn;
-  const extra = enhancementHtml(profile, content, rawData, row.locale);
-  return appendEnhancements(builtIn, extra, profile, content, row.locale);
+  const extra = profile && profile.enabled === 1 ? enhancementHtml(profile, content, rawData, row.locale) : "";
+  return appendEnhancements(builtIn, extra, profile && profile.enabled === 1 ? profile : null, content, row.locale, rawData);
 }
 
 async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
