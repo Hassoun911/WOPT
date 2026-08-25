@@ -140,7 +140,6 @@ async function getLocationPrayerFile(originalFetch: typeof window.fetch) {
   if (!Object.keys(prayerTimes).length) throw new Error("No location prayer times returned");
   try {
     window.localStorage.setItem(LOCATION_TIMES_KEY, JSON.stringify({ location, prayerTimes, savedAt: Date.now() }));
-    // Keep the existing PWA cache key populated so all current web prayer views use the same data.
     window.localStorage.setItem(LEGACY_TIMES_KEY, JSON.stringify(prayerTimes));
   } catch {}
 
@@ -155,28 +154,38 @@ async function getLocationPrayerFile(originalFetch: typeof window.fetch) {
   };
 }
 
-function markLocationMode() {
-  const apply = () => {
-    const location = readCachedLocation();
-    if (!location) return;
-    document.documentElement.dataset.hassounPrayerLocation = "device";
+function applyLocationLabels() {
+  const location = readCachedLocation();
+  if (!location) return;
+  document.documentElement.dataset.hassounPrayerLocation = "device";
 
-    document.querySelectorAll<HTMLElement>(".dashboard .date-column .eyebrow, .sheet-header .eyebrow").forEach((node) => {
-      const text = node.textContent?.trim() || "";
-      if (/windsor|وندسور/i.test(text)) node.textContent = "Your location";
-    });
-    document.querySelectorAll<HTMLElement>(".source-note").forEach((node) => {
-      node.innerHTML = `<span></span> Location-based prayer times`;
-    });
-    document.querySelectorAll<HTMLElement>(".sync-pill").forEach((node) => {
-      if (!node.textContent?.includes("Location")) node.innerHTML = `<span></span> Location prayer times`;
-    });
-  };
+  document.querySelectorAll<HTMLElement>(".dashboard .date-column .eyebrow, .sheet-header .eyebrow").forEach((node) => {
+    const text = node.textContent?.trim() || "";
+    if (/windsor|وندسور/i.test(text)) node.textContent = "Your location";
+  });
 
-  apply();
-  const observer = new MutationObserver(apply);
-  observer.observe(document.body, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  document.querySelectorAll<HTMLElement>(".source-note").forEach((node) => {
+    const desired = "Location-based prayer times";
+    if ((node.textContent || "").includes(desired)) return;
+    node.replaceChildren();
+    const dot = document.createElement("span");
+    node.append(dot, document.createTextNode(` ${desired}`));
+  });
+
+  document.querySelectorAll<HTMLElement>(".sync-pill").forEach((node) => {
+    const desired = "Location prayer times";
+    if ((node.textContent || "").includes(desired)) return;
+    node.replaceChildren();
+    const dot = document.createElement("span");
+    node.append(dot, document.createTextNode(` ${desired}`));
+  });
+}
+
+function scheduleLocationLabels() {
+  // React may finish painting the home screen after this enhancer mounts. Run a
+  // small, finite set of updates instead of observing and rewriting every DOM mutation.
+  const timers = [0, 150, 500, 1200].map((delay) => window.setTimeout(applyLocationLabels, delay));
+  return () => timers.forEach((timer) => window.clearTimeout(timer));
 }
 
 export default function LocationPrayerTimesEnhancer() {
@@ -188,8 +197,6 @@ export default function LocationPrayerTimesEnhancer() {
     const originalFetch = window.fetch.bind(window);
     let disposed = false;
 
-    // The existing home screen asks for the Windsor JSON. Intercept only that request and
-    // return the same PrayerFile shape populated from the visitor's coordinates instead.
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       if (requestUrl.startsWith(WINDSOR_DATA_URL)) {
@@ -207,15 +214,14 @@ export default function LocationPrayerTimesEnhancer() {
       return originalFetch(input, init);
     }) as typeof window.fetch;
 
-    // Start permission/fetch early so the first prayer render is location-aware whenever possible.
+    const cancelInitialLabels = scheduleLocationLabels();
     void getLocationPrayerFile(originalFetch).then(() => {
-      if (!disposed) markLocationMode();
+      if (!disposed) applyLocationLabels();
     }).catch(() => undefined);
 
-    const stopMarking = markLocationMode();
     return () => {
       disposed = true;
-      stopMarking();
+      cancelInitialLabels();
       window.fetch = originalFetch;
     };
   }, [pathname]);
