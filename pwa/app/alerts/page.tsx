@@ -36,7 +36,7 @@ export default function AlertsPage(){
     if(!("Notification" in window)){setMessage("Notifications are not supported here.");return;}
     const result=Notification.permission==="granted"?"granted":await Notification.requestPermission();setPermission(result);
     if(result!=="granted"){setMessage("Notification permission is required for the test.");return;}
-    new Notification("Hassoun prayer alert",{body:"Your browser notifications are working.",icon:"/hassoun-logo.png?v=20260824-3"});
+    new Notification("Hassoun prayer alert",{body:"Your browser notifications are working.",icon:"/hassoun-official-logo.jpg?v=20260825-official-2"});
     setMessage("Test notification sent.");
   }
   return <main className="utility-page"><section className="utility-hero"><div><div className="eyebrow">PRAYER ALERTS</div><h1>Browser prayer reminders</h1><p>Choose which reminders you want on this browser.</p></div><div className="utility-mark">🔔</div></section>
