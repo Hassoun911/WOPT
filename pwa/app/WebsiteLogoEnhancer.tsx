@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-brand.svg?v=20260825-exact-4";
+const LOGO = "/hassoun-brand.svg?v=20260825-exact-5";
 
 function makeLogo(size = 48, radius = 14) {
   const img = document.createElement("img");
@@ -33,6 +33,8 @@ export default function WebsiteLogoEnhancer() {
         ) {
           if (img.src !== new URL(LOGO, window.location.origin).href) img.src = LOGO;
           img.dataset.hassounBrand = "official";
+        }
+        if (img.dataset.hassounBrand === "official") {
           img.style.objectFit = "contain";
           img.style.background = "#0b5b47";
         }
@@ -40,7 +42,7 @@ export default function WebsiteLogoEnhancer() {
 
       const pageBrandTargets = [
         "main > .parity-hero > .hero-badge",
-        "main > .games-hero > .hero-badge",
+        "main.games-web-page > .games-hero:not(.compact) > .hero-badge",
         "main > .utility-hero > .utility-mark",
       ];
       pageBrandTargets.forEach((selector) => {
@@ -51,6 +53,9 @@ export default function WebsiteLogoEnhancer() {
         target.style.overflow = "hidden";
         target.style.padding = "8px";
         target.style.background = "#0b5b47";
+        target.style.display = "flex";
+        target.style.alignItems = "center";
+        target.style.justifyContent = "center";
         const logo = makeLogo(64, 16);
         logo.style.width = "100%";
         logo.style.height = "100%";
