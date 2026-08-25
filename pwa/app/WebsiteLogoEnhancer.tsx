@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-official-logo.jpg?v=20260825-official-1";
+const LOGO = "/hassoun-brand.svg?v=20260825-exact-2";
 
 export default function WebsiteLogoEnhancer() {
   const pathname = usePathname();
@@ -14,6 +14,7 @@ export default function WebsiteLogoEnhancer() {
         const src = img.getAttribute("src") || "";
         if (
           src.includes("hassoun-logo.png") ||
+          src.includes("hassoun-official-logo.jpg") ||
           src.includes("favicon-logo.png") ||
           src.includes("app-icon.svg") ||
           src.includes("icon-192.png") ||
