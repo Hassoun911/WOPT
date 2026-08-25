@@ -9,7 +9,6 @@ import "./quran-index-fix.css";
 import "./home-app-match.css";
 import "./fluid-dashboard.css";
 import EmailManageRedirect from "./EmailManageRedirect";
-import LocationPrayerTimesEnhancer from "./LocationPrayerTimesEnhancer";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
@@ -48,7 +47,7 @@ const asset = (path: string) => `${basePath}${path}`;
 
 export const metadata: Metadata = {
   title: "Hassoun",
-  description: "Location-aware daily Adhan times with a full Qur’an reader, listening, search, bookmarks, memorization, Qibla, Islamic events and learning tools.",
+  description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, memorization, Qibla, Islamic events and learning tools.",
   manifest: asset("/manifest.webmanifest?v=20260824-4"),
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
@@ -65,7 +64,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <LocationPrayerTimesEnhancer />
         {children}
         <EmailManageRedirect />
         <NavEnhancer />
