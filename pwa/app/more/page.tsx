@@ -2,7 +2,7 @@
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path:string)=>`${BASE_PATH}${path}`;
-const LOGO = "/hassoun-official-logo.jpg?v=20260825-official-2";
+const LOGO = "/hassoun-brand.svg?v=20260825-exact-5";
 
 const items = [
   { icon:"✉️", title:"Contact Us", text:"Send a support request, report an issue or share feedback with Hassoun.", href:"/support/" },
@@ -18,4 +18,4 @@ const items = [
   { icon:"🔒", title:"Privacy", text:"Review privacy and data handling information.", href:"/privacy/" },
 ];
 
-export default function MorePage(){return <main className="parity-page"><section className="parity-hero"><div><div className="eyebrow">HASSOUN</div><h1>More</h1><p>Support, settings and all Hassoun web tools in one place.</p></div><div className="hero-badge" style={{overflow:"hidden",padding:0}}><img src={appPath(LOGO)} alt="Hassoun" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div></section><section className="more-grid">{items.map(item=><a className="more-card" href={appPath(item.href)} key={item.title}><span>{item.icon}</span><div><h2>{item.title}</h2><p>{item.text}</p></div><b>›</b></a>)}</section></main>}
+export default function MorePage(){return <main className="parity-page"><section className="parity-hero"><div><div className="eyebrow">HASSOUN</div><h1>More</h1><p>Support, settings and all Hassoun web tools in one place.</p></div><div className="hero-badge" style={{overflow:"hidden",padding:8,background:"#0b5b47",display:"flex",alignItems:"center",justifyContent:"center"}}><img src={appPath(LOGO)} alt="Hassoun" data-hassoun-brand="official" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/></div></section><section className="more-grid">{items.map(item=><a className="more-card" href={appPath(item.href)} key={item.title}><span>{item.icon}</span><div><h2>{item.title}</h2><p>{item.text}</p></div><b>›</b></a>)}</section></main>}
