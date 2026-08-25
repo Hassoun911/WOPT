@@ -23,7 +23,6 @@ import QuranVerseMenuEnhancer from "./QuranVerseMenuEnhancer";
 import QuranInfoMeaningEnhancer from "./QuranInfoMeaningEnhancer";
 import QuranHeaderSearchEnhancer from "./QuranHeaderSearchEnhancer";
 import QuranHomeLinkFixEnhancer from "./QuranHomeLinkFixEnhancer";
-import QuranMemorizeExperienceEnhancer from "./QuranMemorizeExperienceEnhancer";
 import QuranCleanReadingEnhancer from "./QuranCleanReadingEnhancer";
 import QuranCleanToolbarFixEnhancer from "./QuranCleanToolbarFixEnhancer";
 import QuranMoreMenuEnhancer from "./QuranMoreMenuEnhancer";
@@ -80,7 +79,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranInfoMeaningEnhancer />
         <QuranHeaderSearchEnhancer />
         <QuranHomeLinkFixEnhancer />
-        <QuranMemorizeExperienceEnhancer />
         <QuranCleanReadingEnhancer />
         <QuranCleanToolbarFixEnhancer />
         <QuranMoreMenuEnhancer />
