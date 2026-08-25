@@ -3,14 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-brand.svg?v=20260825-exact-3";
+const LOGO = "/hassoun-brand.svg?v=20260825-exact-4";
 
 function makeLogo(size = 48, radius = 14) {
   const img = document.createElement("img");
   img.src = LOGO;
   img.alt = "Hassoun";
   img.dataset.hassounBrand = "official";
-  img.style.cssText = `width:${size}px;height:${size}px;object-fit:cover;border-radius:${radius}px;display:block`;
+  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;background:#0b5b47;border-radius:${radius}px;display:block`;
   return img;
 }
 
@@ -33,6 +33,8 @@ export default function WebsiteLogoEnhancer() {
         ) {
           if (img.src !== new URL(LOGO, window.location.origin).href) img.src = LOGO;
           img.dataset.hassounBrand = "official";
+          img.style.objectFit = "contain";
+          img.style.background = "#0b5b47";
         }
       });
 
@@ -47,10 +49,12 @@ export default function WebsiteLogoEnhancer() {
         target.dataset.hassounBrandApplied = "true";
         target.textContent = "";
         target.style.overflow = "hidden";
-        target.style.padding = "0";
-        const logo = makeLogo(64, 18);
+        target.style.padding = "8px";
+        target.style.background = "#0b5b47";
+        const logo = makeLogo(64, 16);
         logo.style.width = "100%";
         logo.style.height = "100%";
+        logo.style.objectFit = "contain";
         target.appendChild(logo);
       });
 
@@ -76,22 +80,12 @@ export default function WebsiteLogoEnhancer() {
             node.appendChild(makeLogo(Math.max(42, Math.min(72, node.clientWidth || 48)), 14));
           }
         });
-
-        const nav = document.querySelector<HTMLElement>("nav");
-        if (nav && !nav.querySelector(".hassoun-school-crm-link")) {
-          const school = document.createElement("a");
-          school.className = "hassoun-school-crm-link";
-          school.href = "/admin/school";
-          school.textContent = "Qur’an School CRM";
-          school.style.cssText = "display:inline-flex;align-items:center;justify-content:center;border:1px solid #b8d1c9;border-radius:10px;padding:9px 12px;background:#edf7f3;color:#0f5e4c;text-decoration:none;font-weight:800;font-size:13px";
-          nav.appendChild(school);
-        }
       }
     };
 
     apply();
     const timer = window.setInterval(apply, 700);
-    return () => { window.clearInterval(timer); document.querySelector(".hassoun-school-crm-link")?.remove(); };
+    return () => window.clearInterval(timer);
   }, [pathname]);
 
   return null;
