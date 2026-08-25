@@ -1,4 +1,5 @@
 import { prayerDashboardEmail } from "./prayerEmailTemplate";
+import { subscriberManageUrl } from "./subscribers";
 import type { Env, Locale } from "./types";
 
 type OutboxRow = {
@@ -14,7 +15,8 @@ type OutboxRow = {
   attempts: number;
 };
 type TemplateRow = { subject_en: string; subject_ar: string | null; html_en: string; html_ar: string | null; text_en: string | null; text_ar: string | null };
-type RenderedEmail = { subject: string; html: string; text: string };
+type InlineAttachment = { content: string; filename: string; content_type: string; content_id: string };
+type RenderedEmail = { subject: string; html: string; text: string; attachments?: InlineAttachment[] };
 type ProfileRow = {
   template_key: string; enabled: number; include_islamic_occasion: number; include_daily_hadith: number;
   include_daily_surah: number; include_occasion_countdown: number; include_motivation: number;
@@ -24,7 +26,6 @@ type ProfileRow = {
 type ContentRow = { content_type: "hadith" | "surah" | "motivation"; title_en: string; title_ar: string | null; body_en: string; body_ar: string | null; source_ref: string | null };
 
 const HASSOUN_WEB = "https://hassoun.app";
-const EMAIL_API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 
 function configured(env: Env) { return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM); }
 export function emailDeliveryConfigured(env: Env) { return configured(env); }
@@ -94,6 +95,16 @@ async function loadContent(env: Env) {
   return map;
 }
 
+async function ensureManageUrl(env: Env, row: OutboxRow, data: Record<string, unknown>) {
+  if (typeof data.manageUrl === "string" && data.manageUrl) return data;
+  if (!row.subscriber_id) return data;
+  const subscriber = await env.DB.prepare(
+    `SELECT public_id, email FROM email_subscribers WHERE id = ? LIMIT 1`
+  ).bind(row.subscriber_id).first<{ public_id: string; email: string }>();
+  if (!subscriber?.public_id || !subscriber.email) return data;
+  return { ...data, manageUrl: await subscriberManageUrl(env, subscriber.public_id, subscriber.email) };
+}
+
 function contentCard(item: ContentRow, locale: Locale, accent: string) {
   const ar = locale === "ar"; const title = ar ? (item.title_ar || item.title_en) : item.title_en; const body = ar ? (item.body_ar || item.body_en) : item.body_en;
   return `<tr><td style="padding:0 22px 14px"><table role="presentation" width="100%" style="background:#fffdf8;border:1px solid #e4ddcf;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}"><div style="font-size:10px;letter-spacing:1.2px;color:${accent};font-weight:900">${escapeHtml(title)}</div><div style="font-size:14px;line-height:1.65;color:#31564c;font-weight:700;margin-top:5px">${escapeHtml(body)}</div>${item.source_ref ? `<div style="font-size:10px;color:#89938f;margin-top:6px">${escapeHtml(item.source_ref)}</div>` : ""}</td></tr></table></td></tr>`;
@@ -120,7 +131,7 @@ function enhancementHtml(profile: ProfileRow, content: Map<string, ContentRow>, 
     const sponsorName = profile.sponsor_name || (ar ? "قسم الرعاية والدعم" : "Sponsor & Support");
     const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
     const link = profile.sponsor_url ? `<a href="${escapeHtml(profile.sponsor_url)}" style="display:inline-block;margin-top:9px;background:#173f35;color:white;text-decoration:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900">${escapeHtml(ar ? "زيارة الراعي" : "Sponsor / Support")}</a>` : "";
-    const logo = profile.sponsor_logo_data ? `<div style="margin-bottom:10px"><img src="${EMAIL_API}/email/sponsor-logo/${encodeURIComponent(profile.template_key)}" alt="${escapeHtml(sponsorName)}" style="display:block;max-width:180px;max-height:72px;width:auto;height:auto;border:0;object-fit:contain"></div>` : "";
+    const logo = profile.sponsor_logo_data ? `<div style="margin-bottom:10px"><img src="cid:sponsor-logo" alt="${escapeHtml(sponsorName)}" style="display:block;max-width:180px;max-height:72px;width:auto;height:auto;border:0;object-fit:contain"></div>` : "";
     blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}">${logo}<div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
   }
   if (!blocks.length) return "";
@@ -139,6 +150,12 @@ function universalFooter(data: Record<string, unknown>, locale: Locale) {
   return { html, text };
 }
 
+function sponsorAttachment(profile: ProfileRow | null): InlineAttachment[] | undefined {
+  if (!profile || profile.include_sponsor !== 1 || !profile.sponsor_logo_data || !profile.sponsor_logo_mime) return undefined;
+  const extension = profile.sponsor_logo_mime === "image/jpeg" ? "jpg" : "png";
+  return [{ content: profile.sponsor_logo_data, filename: `sponsor-logo.${extension}`, content_type: profile.sponsor_logo_mime, content_id: "sponsor-logo" }];
+}
+
 function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow | null, content: Map<string, ContentRow>, locale: Locale, data: Record<string, unknown>) {
   const textParts: string[] = [];
   if (profile) {
@@ -151,11 +168,12 @@ function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile:
   const universal = universalFooter(data, locale);
   const additions = `${extraHtml}${universal.html}`;
   const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${additions}</body>`) : `${rendered.html}${additions}`;
-  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}\n\n${universal.text}` };
+  return { ...rendered, html, text: `${rendered.text}${textParts.length ? `\n\n${textParts.join("\n")}` : ""}\n\n${universal.text}`, attachments: sponsorAttachment(profile) };
 }
 
 async function renderEmail(env: Env, row: OutboxRow) {
-  const rawData = dataObject(row.template_data_json);
+  const initialData = dataObject(row.template_data_json);
+  const rawData = await ensureManageUrl(env, row, initialData);
   const [profile, content] = await Promise.all([loadProfile(env, row), loadContent(env)]);
   const data = { ...rawData };
   if (row.kind === "prayer" && profile) data.upcomingEvent = null;
@@ -172,8 +190,9 @@ async function renderEmail(env: Env, row: OutboxRow) {
     }
   }
 
-  const extra = profile && profile.enabled === 1 ? enhancementHtml(profile, content, rawData, row.locale) : "";
-  return appendEnhancements(builtIn, extra, profile && profile.enabled === 1 ? profile : null, content, row.locale, rawData);
+  const activeProfile = profile && profile.enabled === 1 ? profile : null;
+  const extra = activeProfile ? enhancementHtml(activeProfile, content, rawData, row.locale) : "";
+  return appendEnhancements(builtIn, extra, activeProfile, content, row.locale, rawData);
 }
 
 async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
@@ -181,7 +200,7 @@ async function sendResend(env: Env, row: OutboxRow, email: RenderedEmail) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", ...(row.idempotency_key ? { "Idempotency-Key": row.idempotency_key.slice(0, 256) } : {}) },
-    body: JSON.stringify({ from: env.EMAIL_FROM.includes("<") ? env.EMAIL_FROM.replace(/^[^<]+</, "Hassoun <") : `Hassoun <${env.EMAIL_FROM}>`, to: [row.recipient_email], subject: email.subject, html: email.html, text: email.text, ...(env.EMAIL_REPLY_TO ? { reply_to: env.EMAIL_REPLY_TO } : {}) })
+    body: JSON.stringify({ from: env.EMAIL_FROM.includes("<") ? env.EMAIL_FROM.replace(/^[^<]+</, "Hassoun <") : `Hassoun <${env.EMAIL_FROM}>`, to: [row.recipient_email], subject: email.subject, html: email.html, text: email.text, ...(email.attachments?.length ? { attachments: email.attachments } : {}), ...(env.EMAIL_REPLY_TO ? { reply_to: env.EMAIL_REPLY_TO } : {}) })
   });
   const payload = await response.json().catch(() => ({})) as { id?: string; message?: string; error?: { message?: string } };
   if (!response.ok || !payload.id) throw new Error(payload.error?.message || payload.message || `Email provider failed: ${response.status}`);
