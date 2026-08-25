@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path: string) => `${BASE_PATH}${path}`;
-const OFFICIAL_LOGO = "/hassoun-official-logo.jpg?v=20260825-official-1";
+const OFFICIAL_LOGO = "/hassoun-brand.svg?v=20260825-exact-2";
 const items = [
   ["/", "🏠", "Home", "Prayer times and daily dashboard"],
   ["/quran/", "۞", "Qur’an", "Read, listen, search and memorize"],
