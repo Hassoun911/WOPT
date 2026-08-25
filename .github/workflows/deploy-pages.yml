@@ -12,6 +12,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  statuses: write
 
 concurrency:
   group: "pages"
@@ -71,3 +72,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  report:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    steps:
+      - name: Publish Hassoun Pages status
+        uses: actions/github-script@v7
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        with:
+          script: |
+            const ok = process.env.BUILD_RESULT === 'success' && process.env.DEPLOY_RESULT === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: ok ? 'success' : 'failure',
+              context: 'Hassoun Pages',
+              description: ok ? 'hassoun.app deployed successfully' : `build=${process.env.BUILD_RESULT}, deploy=${process.env.DEPLOY_RESULT}`,
+              target_url: 'https://hassoun.app'
+            });
