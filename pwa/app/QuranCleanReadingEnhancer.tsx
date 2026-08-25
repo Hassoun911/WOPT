@@ -28,17 +28,18 @@ export default function QuranCleanReadingEnhancer() {
       .wopt-clean-surah-banner:before{left:14px}.wopt-clean-surah-banner:after{right:14px}
       .wopt-clean-surah-title{position:relative;z-index:1;padding:0 88px;background:rgba(250,248,240,.9);font-family:"Noto Naskh Arabic","Amiri",serif;font-size:26px;line-height:1.4;color:#111;direction:rtl;text-align:center}
       .wopt-clean-bismillah{text-align:center;margin:0 0 26px;font-family:"Noto Naskh Arabic","Amiri",serif;font-size:29px;line-height:1.55;direction:rtl;color:var(--wopt-reader-color,#111)}
-      .wopt-clean-toolbar{position:fixed;z-index:3300;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));transform:translate(-50%,18px);display:flex;align-items:center;gap:6px;padding:7px;border:1px solid rgba(0,0,0,.08);border-radius:999px;background:rgba(255,255,255,.96);box-shadow:0 14px 44px rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;font-family:Arial,sans-serif;backdrop-filter:blur(14px)}
+      .wopt-clean-toolbar{position:fixed;z-index:3300;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));transform:translate(-50%,18px);display:flex;align-items:center;gap:4px;padding:7px;border:1px solid rgba(0,0,0,.08);border-radius:999px;background:rgba(255,255,255,.96);box-shadow:0 14px 44px rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;font-family:Arial,sans-serif;backdrop-filter:blur(14px)}
       .quran-app.wopt-clean-reading.wopt-clean-tools-open .wopt-clean-toolbar{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
-      .wopt-clean-toolbar button{min-width:50px;height:46px;border:0;border-radius:999px;background:transparent;color:#23423a;font-size:11px;font-weight:800;padding:0 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+      .wopt-clean-toolbar button{min-width:48px;height:46px;border:0;border-radius:999px;background:transparent;color:#23423a;font-size:10px;font-weight:800;padding:0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
       .wopt-clean-toolbar button b{font-size:18px;line-height:1}.wopt-clean-toolbar button:active{background:#e9f5f1}
       .wopt-clean-toolbar .play-active{background:#e8f6f2;color:#0b6653}
+      .wopt-clean-toolbar .save-flash{background:#0b5b47;color:#fff}
       .quran-app.wopt-clean-reading .wopt-verse-menu:not(.open),
       .quran-app.wopt-clean-reading .verse-action-dock{display:none!important}
       @media(max-width:700px){
         .wopt-clean-reader-head{padding:24px 18px 8px}.wopt-clean-meta{margin-bottom:20px;font-size:12px}.wopt-clean-surah-banner{min-height:54px;margin-bottom:17px}.wopt-clean-surah-title{font-size:24px;padding:0 72px}.wopt-clean-bismillah{font-size:27px;margin-bottom:22px}
         .quran-app.wopt-clean-reading .mushaf-shell{padding-left:18px!important;padding-right:18px!important}
-        .wopt-clean-toolbar{max-width:calc(100vw - 22px);gap:2px;padding:6px}.wopt-clean-toolbar button{min-width:48px;padding:0 8px;font-size:10px}
+        .wopt-clean-toolbar{max-width:calc(100vw - 14px);gap:1px;padding:5px}.wopt-clean-toolbar button{min-width:45px;padding:0 6px;font-size:9px}
         .wopt-clean-menu-dot{width:32px;height:32px;font-size:20px}
       }
     `;
@@ -66,6 +67,7 @@ export default function QuranCleanReadingEnhancer() {
       <button type="button" data-clean="play"><b>▶</b><span>Audio</span></button>
       <button type="button" data-clean="surahs"><b>☷</b><span>Surahs</span></button>
       <button type="button" data-clean="search"><b>⌕</b><span>Search</span></button>
+      <button type="button" data-clean="bookmark"><b>🔖</b><span>Save</span></button>
       <button type="button" data-clean="settings"><b>Aa</b><span>Reader</span></button>
       <button type="button" data-clean="more"><b>⋯</b><span>More</span></button>`;
     document.body.appendChild(toolbar);
@@ -131,6 +133,37 @@ export default function QuranCleanReadingEnhancer() {
 
     const triggerRef = (name: string) => document.querySelector<HTMLElement>(`.wopt-ref-safe [data-ref='${name}']`)?.click();
 
+    const saveCurrentPlace = () => {
+      try {
+        const raw = window.localStorage.getItem("wopt-quran-last-read");
+        const last = raw ? JSON.parse(raw) as { chapterId?: number; verseKey?: string; page?: number; word?: number } : null;
+        if (!last?.chapterId || !last?.verseKey) return;
+        const savedAt = Date.now();
+        const place = { ...last, scrollY: window.scrollY, savedAt, label: `My reading place · ${last.verseKey}` };
+        window.localStorage.setItem("wopt-quran-easy-place-v1", JSON.stringify(place));
+        const bookmarkRaw = window.localStorage.getItem("wopt-quran-bookmarks");
+        const bookmarks = bookmarkRaw ? JSON.parse(bookmarkRaw) as Array<{ label?: string; verseKey?: string }> : [];
+        const bookmark = { chapterId: last.chapterId, verseKey: last.verseKey, page: last.page, word: last.word, savedAt, label: place.label };
+        const next = [bookmark, ...bookmarks.filter((item) => !item.label?.startsWith("My reading place ·"))].slice(0, 100);
+        window.localStorage.setItem("wopt-quran-bookmarks", JSON.stringify(next));
+        const button = toolbar.querySelector<HTMLButtonElement>("[data-clean='bookmark']");
+        if (button) {
+          const icon = button.querySelector("b");
+          const label = button.querySelector("span");
+          button.classList.add("save-flash");
+          if (icon) icon.textContent = "✓";
+          if (label) label.textContent = "Saved";
+          window.setTimeout(() => {
+            button.classList.remove("save-flash");
+            if (icon) icon.textContent = "🔖";
+            if (label) label.textContent = "Save";
+          }, 1600);
+        }
+      } catch {
+        // Keep reader usable if browser storage is unavailable.
+      }
+    };
+
     const onToolbar = (event: MouseEvent) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-clean]");
       if (!button) return;
@@ -139,6 +172,7 @@ export default function QuranCleanReadingEnhancer() {
       if (action === "play") document.querySelector<HTMLButtonElement>(".wopt-quran-player [data-player='play']")?.click();
       if (action === "surahs") triggerRef("surahs");
       if (action === "search") triggerRef("search");
+      if (action === "bookmark") saveCurrentPlace();
       if (action === "settings") triggerRef("settings");
       if (action === "more") {
         app.classList.remove("wopt-clean-reading");
