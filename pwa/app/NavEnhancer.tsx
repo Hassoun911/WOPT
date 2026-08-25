@@ -12,14 +12,15 @@ export default function NavEnhancer() {
   useEffect(() => {
     const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
 
-    // Keep old home-page buttons working when Alerts/Settings are opened from the Qur’an page.
+    // Top-menu shortcuts open the existing Home sheets even though the old
+    // bottom navigation bar is no longer visible.
     if (localPath === "/") {
       const open = new URLSearchParams(window.location.search).get("open");
-      if (open === "alerts" || open === "settings") {
-        const index = open === "alerts" ? 2 : 3;
+      const indexes: Record<string, number> = { month: 1, alerts: 2, settings: 3 };
+      if (open && open in indexes) {
         const timer = window.setTimeout(() => {
           const buttons = document.querySelectorAll<HTMLButtonElement>(".mobile-nav button");
-          buttons[index]?.click();
+          buttons[indexes[open]]?.click();
           window.history.replaceState({}, "", appPath("/"));
         }, 120);
         return () => window.clearTimeout(timer);
@@ -40,8 +41,6 @@ export default function NavEnhancer() {
         image.setAttribute("src", appPath(src));
       });
 
-      // Register the same service worker at the correct Pages scope. The home page's
-      // root registration may fail on a sub-path, but this one succeeds.
       if ("serviceWorker" in navigator) {
         void navigator.serviceWorker.register(appPath("/sw.js"), { scope: appPath("/"), updateViaCache: "none" })
           .then((registration) => registration.update())
@@ -50,7 +49,5 @@ export default function NavEnhancer() {
     }
   }, [pathname]);
 
-  // Navigation now lives in the main Hassoun menu. Do not inject a second
-  // floating Qur’an shortcut on every page.
   return null;
 }
