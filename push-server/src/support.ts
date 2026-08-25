@@ -1,5 +1,7 @@
 import type { Env, Locale } from "./types";
 
+const SUPPORT_RECIPIENT = "windsor.hassoun@gmail.com";
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -13,10 +15,8 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#039;");
 }
 
-function addressFrom(value: string | undefined) {
-  if (!value) return "";
-  const angle = value.match(/<([^>]+)>/);
-  return (angle?.[1] ?? value).trim();
+function makePublicId() {
+  return `support_${crypto.randomUUID()}`;
 }
 
 export async function submitSupportContact(request: Request, env: Env) {
@@ -33,10 +33,33 @@ export async function submitSupportContact(request: Request, env: Env) {
 
   if (!/^\S+@\S+\.\S+$/.test(email)) return json({ error: "Valid email required" }, 400);
   if (message.length < 10) return json({ error: "Message is too short" }, 400);
-  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) return json({ error: "Support email is temporarily unavailable" }, 503);
 
-  const supportAddress = env.SUPPORT_EMAIL || env.EMAIL_REPLY_TO || addressFrom(env.EMAIL_FROM);
-  if (!supportAddress) return json({ error: "Support recipient is not configured" }, 503);
+  const publicId = makePublicId();
+  await env.DB.prepare(
+    `INSERT INTO support_contacts (
+       public_id, name, email, subject, message, locale, platform, app_version,
+       source, status, email_recipient, email_status
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'contact_form', 'new', ?, 'pending')`
+  ).bind(
+    publicId,
+    name || null,
+    email,
+    subject || "Hassoun app support",
+    message,
+    locale,
+    platform || null,
+    appVersion || null,
+    SUPPORT_RECIPIENT
+  ).run();
+
+  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
+    await env.DB.prepare(
+      `UPDATE support_contacts
+       SET email_status = 'failed', email_error = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE public_id = ?`
+    ).bind("Resend or EMAIL_FROM is not configured", publicId).run();
+    return json({ error: "Support email is temporarily unavailable", savedToCrm: true }, 503);
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -46,13 +69,14 @@ export async function submitSupportContact(request: Request, env: Env) {
     },
     body: JSON.stringify({
       from: env.EMAIL_FROM,
-      to: [supportAddress],
+      to: [SUPPORT_RECIPIENT],
       reply_to: email,
       subject: `[Hassoun Support] ${subject || "App support"}`,
-      text: `Hassoun support request\n\nName: ${name || "Not provided"}\nEmail: ${email}\nLocale: ${locale}\nPlatform: ${platform}\nApp version: ${appVersion}\n\n${message}`,
+      text: `Hassoun support request\n\nCRM ID: ${publicId}\nName: ${name || "Not provided"}\nEmail: ${email}\nLocale: ${locale}\nPlatform: ${platform}\nApp version: ${appVersion}\n\n${message}`,
       html: `
         <div style="font-family:Arial,sans-serif;color:#173f35;max-width:640px;margin:auto">
           <h2 style="color:#0b654f">Hassoun Support</h2>
+          <p><strong>CRM ID:</strong> ${escapeHtml(publicId)}</p>
           <p><strong>From:</strong> ${escapeHtml(name || "Not provided")} &lt;${escapeHtml(email)}&gt;</p>
           <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
           <p><strong>Locale:</strong> ${escapeHtml(locale)} &nbsp; <strong>Platform:</strong> ${escapeHtml(platform)} &nbsp; <strong>Version:</strong> ${escapeHtml(appVersion)}</p>
@@ -64,9 +88,21 @@ export async function submitSupportContact(request: Request, env: Env) {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    await env.DB.prepare(
+      `UPDATE support_contacts
+       SET email_status = 'failed', email_error = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE public_id = ?`
+    ).bind(detail.slice(0, 500) || `Resend HTTP ${response.status}`, publicId).run();
     console.error("Support email delivery failed", response.status, detail.slice(0, 500));
-    return json({ error: "Support email could not be sent" }, 502);
+    return json({ error: "Support email could not be sent", savedToCrm: true, contactId: publicId }, 502);
   }
 
-  return json({ ok: true });
+  const delivered = await response.json().catch(() => ({})) as { id?: string };
+  await env.DB.prepare(
+    `UPDATE support_contacts
+     SET email_status = 'sent', email_provider_id = ?, email_error = NULL, updated_at = CURRENT_TIMESTAMP
+     WHERE public_id = ?`
+  ).bind(delivered.id ?? null, publicId).run();
+
+  return json({ ok: true, savedToCrm: true, emailedTo: SUPPORT_RECIPIENT, contactId: publicId });
 }
