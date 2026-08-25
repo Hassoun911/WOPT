@@ -5,7 +5,7 @@ export default function AboutPage() {
     <main style={{ minHeight: "100vh", background: "linear-gradient(180deg,#f7f2e8,#f3eee2)", color: "#173f35", padding: "28px 16px 64px", fontFamily: "Arial, sans-serif" }}>
       <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <section style={{ background: "linear-gradient(135deg,#0b654f,#123e35)", color: "white", borderRadius: 30, padding: "40px 28px", textAlign: "center", boxShadow: "0 20px 60px rgba(27,70,58,.18)" }}>
-          <img src="/hassoun-logo.png?v=20260824-5" alt="Hassoun" style={{ width: 118, height: 118, objectFit: "contain", margin: "0 auto 12px", display: "block" }} />
+          <img src="/hassoun-official-logo.jpg?v=20260825-official-2" alt="Hassoun" style={{ width: 118, height: 118, objectFit: "cover", borderRadius: 24, margin: "0 auto 12px", display: "block" }} />
           <p style={{ margin: 0, color: "#f2d57d", fontSize: 10, fontWeight: 900, letterSpacing: ".14em" }}>HASSOUN ISLAMIC COMPANION</p>
           <h1 style={{ fontSize: "clamp(38px,7vw,62px)", margin: "7px 0 8px" }}>Hassoun</h1>
           <p style={{ color: "#d1e6df", fontWeight: 700, margin: 0 }}>Prayer • Qur’an • School • Knowledge</p>
