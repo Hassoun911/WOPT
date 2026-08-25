@@ -48,16 +48,13 @@ const asset = (path: string) => `${basePath}${path}`;
 export const metadata: Metadata = {
   title: "Hassoun",
   description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, memorization, Qibla, Islamic events and learning tools.",
-  manifest: asset("/manifest.webmanifest"),
+  manifest: asset("/manifest.webmanifest?v=20260824-4"),
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
   icons: {
-    icon: [
-      { url: asset("/favicon-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
-      { url: asset("/hassoun-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
-    ],
-    shortcut: asset("/favicon-logo.png?v=20260824-3"),
-    apple: asset("/hassoun-logo.png?v=20260824-3"),
+    icon: [{ url: asset("/hassoun-logo.png?v=20260824-4"), type: "image/png", sizes: "512x512" }],
+    shortcut: asset("/hassoun-logo.png?v=20260824-4"),
+    apple: asset("/hassoun-logo.png?v=20260824-4"),
   },
 };
 
