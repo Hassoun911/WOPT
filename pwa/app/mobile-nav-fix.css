@@ -1,4 +1,9 @@
-/* Mobile navigation cleanup: the fixed bottom bar is the only primary menu on phones/tablets. */
+/* Hassoun web navigation cleanup.
+   The top-left Menu button is the single primary navigation on the Home page. */
+.app-shell > .mobile-nav {
+  display: none !important;
+}
+
 @media (max-width: 820px) {
   .header-actions .round-button {
     display: none;
