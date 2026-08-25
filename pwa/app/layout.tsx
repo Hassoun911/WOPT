@@ -35,6 +35,7 @@ import QuranAudioSystem from "./QuranAudioSystem";
 import QuranGlyphSafetyEnhancer from "./QuranGlyphSafetyEnhancer";
 import QuranContextSurahChooserEnhancer from "./QuranContextSurahChooserEnhancer";
 import QuranPageOrderGuardEnhancer from "./QuranPageOrderGuardEnhancer";
+import QuranSchoolLinkEnhancer from "./QuranSchoolLinkEnhancer";
 import WebAppNav from "./WebAppNav";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -45,14 +46,14 @@ const asset = (path: string) => `${basePath}${path}`;
 
 export const metadata: Metadata = {
   title: "Hassoun",
-  description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, memorization, Qibla, Islamic events and learning tools.",
-  manifest: asset("/manifest.webmanifest?v=20260824-4"),
+  description: "Prayer times, Qur’an reading and audio, Qur’an School, memorization, Qibla, Islamic events and learning tools.",
+  manifest: asset("/manifest.webmanifest?v=20260824-5"),
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
   icons: {
-    icon: [{ url: asset("/hassoun-logo.png?v=20260824-4"), type: "image/png", sizes: "512x512" }],
-    shortcut: asset("/hassoun-logo.png?v=20260824-4"),
-    apple: asset("/hassoun-logo.png?v=20260824-4"),
+    icon: [{ url: asset("/hassoun-logo.png?v=20260824-5"), type: "image/png", sizes: "512x512" }],
+    shortcut: asset("/hassoun-logo.png?v=20260824-5"),
+    apple: asset("/hassoun-logo.png?v=20260824-5"),
   },
 };
 
@@ -90,6 +91,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranGlyphSafetyEnhancer />
         <QuranContextSurahChooserEnhancer />
         <QuranPageOrderGuardEnhancer />
+        <QuranSchoolLinkEnhancer />
         <WebAppNav />
       </body>
     </html>
