@@ -44,6 +44,7 @@ export interface Env {
   PUBLIC_APP_URL?: string;
   PUBLIC_API_URL?: string;
   GLOBAL_PRAYER_API_BASE?: string;
+  GOOGLE_MAPS_API_KEY?: string;
   EMAIL_LINK_SECRET?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
