@@ -44,7 +44,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const asset = (path: string) => `${basePath}${path}`;
-const ICON_VERSION = "20260825-official-1";
+const ICON_VERSION = "20260825-exact-2";
 
 export const metadata: Metadata = {
   title: "Hassoun",
@@ -54,10 +54,10 @@ export const metadata: Metadata = {
   other: { "codex-preview": "development" },
   icons: {
     icon: [
-      { url: asset(`/hassoun-official-logo.jpg?v=${ICON_VERSION}`), type: "image/jpeg", sizes: "640x650" },
+      { url: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`), type: "image/svg+xml", sizes: "any" },
     ],
-    shortcut: asset(`/hassoun-official-logo.jpg?v=${ICON_VERSION}`),
-    apple: [{ url: asset(`/hassoun-official-logo.jpg?v=${ICON_VERSION}`), type: "image/jpeg", sizes: "640x650" }],
+    shortcut: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`),
+    apple: [{ url: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`), type: "image/svg+xml", sizes: "any" }],
   },
 };
 
