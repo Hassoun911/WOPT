@@ -4,246 +4,136 @@ import { useEffect, useMemo, useState } from "react";
 import "./school.css";
 
 type Role = "student" | "teacher" | "parent";
-type SchoolClass = { id: string; name: string; teacher: string; inviteCode: string };
-type Student = { id: string; name: string; classId: string; parentName?: string; parentCode: string; streak: number; stars: number };
+type AssignmentStatus = "assigned" | "in-progress" | "submitted" | "reviewed";
+type SchoolClass = { id: string; name: string; teacher: string; inviteCode: string; createdAt: number };
+type Student = { id: string; name: string; classId: string; parentName?: string; parentCode: string; streak: number; stars: number; createdAt: number };
 type Assignment = {
-  id: string;
-  classId: string;
-  studentId?: string;
-  title: string;
-  reference: string;
-  due: string;
-  instructions: string;
-  status: "assigned" | "in-progress" | "submitted" | "reviewed";
-  practiceCount: number;
-  bestScore?: number;
-  teacherFeedback?: string;
-  createdAt: number;
+  id: string; classId: string; studentId?: string; title: string; reference: string; due: string; instructions: string;
+  status: AssignmentStatus; practiceCount: number; studentScore?: number; bestScore?: number; teacherFeedback?: string;
+  createdAt: number; lastPracticedAt?: number; submittedAt?: number; reviewedAt?: number;
 };
 type SchoolState = { classes: SchoolClass[]; students: Student[]; assignments: Assignment[] };
+type PracticeVerse = { key: string; arabic: string; translation: string };
+type PracticeMode = "read" | "first" | "recall";
 
 const STORAGE_KEY = "hassoun-quran-school-v1";
 const ROLE_KEY = "hassoun-quran-school-role";
+const ACTIVE_STUDENT_KEY = "hassoun-quran-school-active-student";
+const PARENT_LINKS_KEY = "hassoun-quran-school-parent-links";
 const EMPTY: SchoolState = { classes: [], students: [], assignments: [] };
+const API = "https://api.quran.com/api/v4";
 
-function id(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function code() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
-}
-
+function makeId(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+function makeCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
+function safeRead<T>(key: string, fallback: T): T { try { const raw = window.localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; } }
 function readState(): SchoolState {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY;
-    const parsed = JSON.parse(raw) as SchoolState;
-    return {
-      classes: Array.isArray(parsed.classes) ? parsed.classes : [],
-      students: Array.isArray(parsed.students) ? parsed.students : [],
-      assignments: Array.isArray(parsed.assignments) ? parsed.assignments : [],
-    };
-  } catch {
-    return EMPTY;
-  }
+  const parsed = safeRead<SchoolState>(STORAGE_KEY, EMPTY);
+  return { classes: Array.isArray(parsed.classes) ? parsed.classes : [], students: Array.isArray(parsed.students) ? parsed.students : [], assignments: Array.isArray(parsed.assignments) ? parsed.assignments : [] };
 }
-
+function stripHtml(value = "") { return value.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim(); }
+function normalizeArabic(value: string) { return value.normalize("NFKD").replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "").replace(/[ٱأإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ـ/g, "").replace(/[^\u0621-\u063A\u0641-\u064A\s]/g, " ").replace(/\s+/g, " ").trim(); }
 function referenceKeys(reference: string) {
   const cleaned = reference.trim();
-  const single = cleaned.match(/^(\d{1,3}):(\d{1,3})$/);
-  if (single) return [`${Number(single[1])}:${Number(single[2])}`];
-  const range = cleaned.match(/^(\d{1,3}):(\d{1,3})\s*[-–]\s*(?:(\d{1,3}):)?(\d{1,3})$/);
-  if (!range) return [];
-  const startSurah = Number(range[1]);
-  const startAyah = Number(range[2]);
-  const endSurah = range[3] ? Number(range[3]) : startSurah;
-  const endAyah = Number(range[4]);
-  if (startSurah !== endSurah || endAyah < startAyah || endAyah - startAyah > 100) return [];
+  const single = cleaned.match(/^(\d{1,3}):(\d{1,3})$/); if (single) return [`${Number(single[1])}:${Number(single[2])}`];
+  const range = cleaned.match(/^(\d{1,3}):(\d{1,3})\s*[-–]\s*(?:(\d{1,3}):)?(\d{1,3})$/); if (!range) return [];
+  const startSurah = Number(range[1]), startAyah = Number(range[2]), endSurah = range[3] ? Number(range[3]) : startSurah, endAyah = Number(range[4]);
+  if (startSurah !== endSurah || endAyah < startAyah || endAyah - startAyah > 60) return [];
   return Array.from({ length: endAyah - startAyah + 1 }, (_, index) => `${startSurah}:${startAyah + index}`);
+}
+function scoreRecitation(target: string, heard: string) {
+  const expected = normalizeArabic(target).split(" ").filter(Boolean), spoken = normalizeArabic(heard).split(" ").filter(Boolean); if (!expected.length) return 0;
+  let cursor = 0, matched = 0;
+  expected.forEach((word) => { for (let i = cursor; i < Math.min(spoken.length, cursor + 6); i += 1) { if (spoken[i] === word) { matched += 1; cursor = i + 1; break; } } });
+  return Math.round((matched / expected.length) * 100);
 }
 
 export default function QuranSchoolPage() {
-  const [ready, setReady] = useState(false);
-  const [role, setRole] = useState<Role>("student");
-  const [state, setState] = useState<SchoolState>(EMPTY);
-  const [activeClass, setActiveClass] = useState("");
-  const [activeStudent, setActiveStudent] = useState("");
-  const [className, setClassName] = useState("");
-  const [teacherName, setTeacherName] = useState("");
-  const [studentName, setStudentName] = useState("");
-  const [parentName, setParentName] = useState("");
-  const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [assignmentReference, setAssignmentReference] = useState("");
-  const [assignmentDue, setAssignmentDue] = useState("");
-  const [assignmentInstructions, setAssignmentInstructions] = useState("");
+  const [ready, setReady] = useState(false), [role, setRole] = useState<Role>("student"), [state, setState] = useState<SchoolState>(EMPTY);
+  const [activeClass, setActiveClass] = useState(""), [activeStudent, setActiveStudent] = useState(""), [parentLinks, setParentLinks] = useState<string[]>([]);
+  const [className, setClassName] = useState(""), [teacherName, setTeacherName] = useState(""), [studentName, setStudentName] = useState(""), [parentName, setParentName] = useState("");
+  const [joinCode, setJoinCode] = useState(""), [parentCode, setParentCode] = useState("");
+  const [assignmentTitle, setAssignmentTitle] = useState(""), [assignmentReference, setAssignmentReference] = useState(""), [assignmentDue, setAssignmentDue] = useState(""), [assignmentInstructions, setAssignmentInstructions] = useState(""), [assignmentStudent, setAssignmentStudent] = useState("");
+  const [practice, setPractice] = useState<Assignment | null>(null), [practiceVerses, setPracticeVerses] = useState<PracticeVerse[]>([]), [practiceMode, setPracticeMode] = useState<PracticeMode>("read"), [practiceLoading, setPracticeLoading] = useState(false), [practiceError, setPracticeError] = useState(""), [listening, setListening] = useState(false), [heard, setHeard] = useState(""), [practiceScore, setPracticeScore] = useState<number | null>(null);
 
-  useEffect(() => {
-    setState(readState());
-    const savedRole = window.localStorage.getItem(ROLE_KEY) as Role | null;
-    if (savedRole === "student" || savedRole === "teacher" || savedRole === "parent") setRole(savedRole);
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    window.localStorage.setItem(ROLE_KEY, role);
-  }, [role, ready]);
-
-  useEffect(() => {
-    if (!activeClass && state.classes[0]) setActiveClass(state.classes[0].id);
-    if (!activeStudent && state.students[0]) setActiveStudent(state.students[0].id);
-  }, [state.classes, state.students, activeClass, activeStudent]);
+  useEffect(() => { setState(readState()); setParentLinks(safeRead(PARENT_LINKS_KEY, [] as string[])); const savedRole = window.localStorage.getItem(ROLE_KEY) as Role | null; if (savedRole === "student" || savedRole === "teacher" || savedRole === "parent") setRole(savedRole); setActiveStudent(window.localStorage.getItem(ACTIVE_STUDENT_KEY) || ""); setReady(true); }, []);
+  useEffect(() => { if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state, ready]);
+  useEffect(() => { if (ready) window.localStorage.setItem(ROLE_KEY, role); }, [role, ready]);
+  useEffect(() => { if (ready) window.localStorage.setItem(PARENT_LINKS_KEY, JSON.stringify(parentLinks)); }, [parentLinks, ready]);
+  useEffect(() => { if (activeStudent) window.localStorage.setItem(ACTIVE_STUDENT_KEY, activeStudent); }, [activeStudent]);
+  useEffect(() => { if (!activeClass && state.classes[0]) setActiveClass(state.classes[0].id); if (!activeStudent && state.students[0]) setActiveStudent(state.students[0].id); }, [state.classes, state.students, activeClass, activeStudent]);
 
   const currentClass = state.classes.find((item) => item.id === activeClass) || null;
-  const currentStudent = state.students.find((item) => item.id === activeStudent) || null;
-  const classStudents = state.students.filter((item) => item.classId === activeClass);
+  const allCurrentStudents = state.students.filter((item) => item.classId === activeClass);
+  const parentStudents = state.students.filter((student) => parentLinks.includes(student.id));
+  const selectableStudents = role === "parent" && parentLinks.length ? parentStudents : state.students;
+  const currentStudent = selectableStudents.find((item) => item.id === activeStudent) || null;
   const visibleAssignments = useMemo(() => {
     if (role === "teacher") return state.assignments.filter((item) => !activeClass || item.classId === activeClass);
     if (!currentStudent) return [];
     return state.assignments.filter((item) => item.classId === currentStudent.classId && (!item.studentId || item.studentId === currentStudent.id));
   }, [state.assignments, role, activeClass, currentStudent]);
-
   const completed = visibleAssignments.filter((item) => item.status === "reviewed" || item.status === "submitted").length;
-  const best = visibleAssignments.reduce((value, item) => Math.max(value, item.bestScore || 0), 0);
+  const best = visibleAssignments.reduce((value, item) => Math.max(value, item.bestScore || item.studentScore || 0), 0);
 
-  const createClass = () => {
-    const name = className.trim();
-    const teacher = teacherName.trim() || "Teacher";
-    if (!name) return;
-    const item: SchoolClass = { id: id("class"), name, teacher, inviteCode: code() };
-    setState((value) => ({ ...value, classes: [item, ...value.classes] }));
-    setActiveClass(item.id);
-    setClassName("");
-  };
+  const createClass = () => { const name = className.trim(); if (!name) return; const item: SchoolClass = { id: makeId("class"), name, teacher: teacherName.trim() || "Teacher", inviteCode: makeCode(), createdAt: Date.now() }; setState((v) => ({ ...v, classes: [item, ...v.classes] })); setActiveClass(item.id); setClassName(""); };
+  const addStudent = () => { const name = studentName.trim(); if (!name || !activeClass) return; const item: Student = { id: makeId("student"), name, classId: activeClass, parentName: parentName.trim() || undefined, parentCode: makeCode(), streak: 0, stars: 0, createdAt: Date.now() }; setState((v) => ({ ...v, students: [item, ...v.students] })); setActiveStudent(item.id); setStudentName(""); setParentName(""); };
+  const joinClass = () => { const target = state.classes.find((item) => item.inviteCode.toUpperCase() === joinCode.trim().toUpperCase()); const name = studentName.trim(); if (!target || !name) return; const item: Student = { id: makeId("student"), name, classId: target.id, parentName: parentName.trim() || undefined, parentCode: makeCode(), streak: 0, stars: 0, createdAt: Date.now() }; setState((v) => ({ ...v, students: [item, ...v.students] })); setActiveStudent(item.id); setJoinCode(""); setStudentName(""); setParentName(""); };
+  const linkParent = () => { const target = state.students.find((item) => item.parentCode.toUpperCase() === parentCode.trim().toUpperCase()); if (!target) return; setParentLinks((v) => [...new Set([...v, target.id])]); setActiveStudent(target.id); setParentCode(""); };
+  const removeStudent = (studentId: string) => { if (!window.confirm("Remove this student and their individual assignments from this device?")) return; setState((v) => ({ ...v, students: v.students.filter((s) => s.id !== studentId), assignments: v.assignments.filter((a) => a.studentId !== studentId) })); setParentLinks((v) => v.filter((id) => id !== studentId)); };
+  const removeClass = (classId: string) => { if (!window.confirm("Remove this class, its students and assignments from this device?")) return; const studentIds = new Set(state.students.filter((s) => s.classId === classId).map((s) => s.id)); setState((v) => ({ classes: v.classes.filter((c) => c.id !== classId), students: v.students.filter((s) => s.classId !== classId), assignments: v.assignments.filter((a) => a.classId !== classId) })); setParentLinks((v) => v.filter((id) => !studentIds.has(id))); setActiveClass(""); };
+  const createAssignment = () => { if (!activeClass || !assignmentTitle.trim() || !assignmentReference.trim() || !referenceKeys(assignmentReference).length) return; const item: Assignment = { id: makeId("assignment"), classId: activeClass, studentId: assignmentStudent || undefined, title: assignmentTitle.trim(), reference: assignmentReference.trim(), due: assignmentDue, instructions: assignmentInstructions.trim(), status: "assigned", practiceCount: 0, createdAt: Date.now() }; setState((v) => ({ ...v, assignments: [item, ...v.assignments] })); setAssignmentTitle(""); setAssignmentReference(""); setAssignmentDue(""); setAssignmentInstructions(""); setAssignmentStudent(""); };
+  const deleteAssignment = (assignmentId: string) => { if (!window.confirm("Delete this assignment?")) return; setState((v) => ({ ...v, assignments: v.assignments.filter((a) => a.id !== assignmentId) })); };
+  const submitAssignment = (assignmentId: string) => setState((v) => ({ ...v, assignments: v.assignments.map((item) => item.id === assignmentId ? { ...item, status: "submitted", submittedAt: Date.now() } : item) }));
+  const reviewAssignment = (assignmentId: string, score: number, feedback: string) => setState((v) => ({ ...v, assignments: v.assignments.map((item) => item.id === assignmentId ? { ...item, status: "reviewed", bestScore: score, teacherFeedback: feedback, reviewedAt: Date.now() } : item) }));
 
-  const addStudent = () => {
-    const name = studentName.trim();
-    if (!name || !activeClass) return;
-    const item: Student = { id: id("student"), name, classId: activeClass, parentName: parentName.trim() || undefined, parentCode: code(), streak: 0, stars: 0 };
-    setState((value) => ({ ...value, students: [item, ...value.students] }));
-    setActiveStudent(item.id);
-    setStudentName("");
-    setParentName("");
+  const openPractice = async (assignment: Assignment) => {
+    const keys = referenceKeys(assignment.reference); if (!keys.length) return;
+    setPractice(assignment); setPracticeMode("read"); setPracticeVerses([]); setPracticeError(""); setPracticeScore(null); setHeard(""); setPracticeLoading(true);
+    try {
+      const verses = await Promise.all(keys.slice(0, 30).map(async (key) => { const response = await fetch(`${API}/verses/by_key/${key}?language=en&words=true&translations=131&fields=text_uthmani&word_fields=text_uthmani`); if (!response.ok) throw new Error("quran"); const data = await response.json(); const verse = data.verse || {}; return { key, arabic: verse.text_uthmani || (verse.words || []).map((w: { text_uthmani?: string; text?: string }) => w.text_uthmani || w.text || "").join(" "), translation: stripHtml(verse.translations?.[0]?.text || "") }; }));
+      setPracticeVerses(verses);
+      setState((v) => ({ ...v, assignments: v.assignments.map((item) => item.id === assignment.id ? { ...item, status: item.status === "assigned" ? "in-progress" : item.status, practiceCount: item.practiceCount + 1, lastPracticedAt: Date.now() } : item), students: v.students.map((student) => student.id === activeStudent ? { ...student, streak: student.streak + 1, stars: student.stars + 1 } : student) }));
+    } catch { setPracticeError("Could not load the Qur’an passage. Check your connection and try again."); } finally { setPracticeLoading(false); }
   };
-
-  const createAssignment = () => {
-    if (!activeClass || !assignmentTitle.trim() || !assignmentReference.trim()) return;
-    const item: Assignment = {
-      id: id("assignment"),
-      classId: activeClass,
-      title: assignmentTitle.trim(),
-      reference: assignmentReference.trim(),
-      due: assignmentDue,
-      instructions: assignmentInstructions.trim(),
-      status: "assigned",
-      practiceCount: 0,
-      createdAt: Date.now(),
-    };
-    setState((value) => ({ ...value, assignments: [item, ...value.assignments] }));
-    setAssignmentTitle("");
-    setAssignmentReference("");
-    setAssignmentDue("");
-    setAssignmentInstructions("");
+  const startListening = () => {
+    const Recognition = (window as typeof window & { webkitSpeechRecognition?: new () => any; SpeechRecognition?: new () => any }).SpeechRecognition || (window as typeof window & { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition;
+    if (!Recognition) { setPracticeError("Arabic speech recognition is not available in this browser. You can still use Read, First-word hints and Recall."); return; }
+    const recognition = new Recognition(); recognition.lang = "ar-SA"; recognition.interimResults = true; recognition.continuous = true; let finalText = ""; setListening(true); setHeard("");
+    recognition.onresult = (event: any) => { let interim = ""; for (let i = event.resultIndex; i < event.results.length; i += 1) { const text = event.results[i][0]?.transcript || ""; if (event.results[i].isFinal) finalText += ` ${text}`; else interim += ` ${text}`; } const result = `${finalText} ${interim}`.trim(); setHeard(result); setPracticeScore(scoreRecitation(practiceVerses.map((v) => v.arabic).join(" "), result)); };
+    recognition.onerror = () => setListening(false); recognition.onend = () => setListening(false); recognition.start(); (window as typeof window & { __hassounSchoolRecognition?: any }).__hassounSchoolRecognition = recognition;
   };
-
-  const practiceAssignment = (assignment: Assignment) => {
-    const keys = referenceKeys(assignment.reference);
-    if (keys.length) window.localStorage.setItem("wopt-quran-memorize-selection", JSON.stringify(keys));
-    setState((value) => ({
-      ...value,
-      assignments: value.assignments.map((item) => item.id === assignment.id ? { ...item, status: "in-progress", practiceCount: item.practiceCount + 1 } : item),
-      students: value.students.map((student) => student.id === activeStudent ? { ...student, streak: student.streak + 1, stars: student.stars + 1 } : student),
-    }));
-    window.location.assign("/quran");
-  };
-
-  const submitAssignment = (assignmentId: string) => {
-    setState((value) => ({ ...value, assignments: value.assignments.map((item) => item.id === assignmentId ? { ...item, status: "submitted" } : item) }));
-  };
-
-  const reviewAssignment = (assignmentId: string, score: number, feedback: string) => {
-    setState((value) => ({ ...value, assignments: value.assignments.map((item) => item.id === assignmentId ? { ...item, status: "reviewed", bestScore: score, teacherFeedback: feedback } : item) }));
-  };
+  const stopListening = () => { (window as typeof window & { __hassounSchoolRecognition?: any }).__hassounSchoolRecognition?.stop?.(); setListening(false); };
+  const savePracticeScore = () => { if (!practice || practiceScore == null) return; setState((v) => ({ ...v, assignments: v.assignments.map((item) => item.id === practice.id ? { ...item, studentScore: Math.max(item.studentScore || 0, practiceScore), status: item.status === "assigned" ? "in-progress" : item.status } : item), students: v.students.map((s) => s.id === activeStudent ? { ...s, stars: s.stars + (practiceScore >= 90 ? 3 : practiceScore >= 75 ? 2 : 1) } : s) })); };
+  const exportSchool = () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `hassoun-quran-school-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); };
 
   if (!ready) return <main className="school-loading">Loading Qur’an School…</main>;
+  return <main className="school-app">
+    <header className="school-header"><a href="/" className="school-brand"><img src="/hassoun-logo.png?v=20260824-5" alt="Hassoun" /><div><small>HASSOUN</small><strong>Qur’an School</strong></div></a><div className="school-header-actions"><a href="/quran">Open Qur’an</a><a href="/admin/school">School CRM</a><button onClick={exportSchool}>Backup</button><a href="/">Today</a></div></header>
+    <section className="school-hero"><div><span className="school-kicker">AL-HAFIZ • COMPLETE SCHOOL EXPERIENCE</span><h1>Learn, teach and follow Qur’an memorization together.</h1><p>Multiple students per device, class and parent codes, assignments, memorization practice, recitation scoring, teacher reviews and family progress in one place.</p></div><img src="/hassoun-logo.png?v=20260824-5" alt="Hassoun Qur’an School" /></section>
+    <nav className="role-tabs" aria-label="School role"><button className={role === "student" ? "active" : ""} onClick={() => setRole("student")}>🎒 Student</button><button className={role === "teacher" ? "active" : ""} onClick={() => setRole("teacher")}>🍎 Teacher</button><button className={role === "parent" ? "active" : ""} onClick={() => setRole("parent")}>👨‍👩‍👧 Parent</button></nav>
 
-  return (
-    <main className="school-app">
-      <header className="school-header">
-        <a href="/" className="school-brand"><img src="/hassoun-logo.png?v=20260824-4" alt="Hassoun" /><div><small>HASSOUN</small><strong>Qur’an School</strong></div></a>
-        <div className="school-header-actions"><a href="/quran">Open Qur’an</a><a href="/">Today</a></div>
-      </header>
+    {role === "teacher" && <div className="school-grid teacher-grid">
+      <section className="school-panel"><div className="panel-head"><div><span>TEACHER DESK</span><h2>Classes</h2></div><b>{state.classes.length}</b></div><div className="form-stack"><input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="Class name"/><input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Teacher name"/><button onClick={createClass}>+ Create class</button></div><div className="item-list">{state.classes.map((item) => <div className={`class-row ${activeClass === item.id ? "selected" : ""}`} key={item.id}><button onClick={() => setActiveClass(item.id)}><div><strong>{item.name}</strong><small>{item.teacher} · Student code {item.inviteCode}</small></div><span>›</span></button><button className="icon-danger" onClick={() => removeClass(item.id)} aria-label="Delete class">×</button></div>)}{!state.classes.length && <p className="empty-copy">Create your first Qur’an class.</p>}</div></section>
+      <section className="school-panel"><div className="panel-head"><div><span>CLASS ROSTER</span><h2>{currentClass?.name || "Students"}</h2></div><b>{allCurrentStudents.length}</b></div><div className="form-stack"><input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Student name" disabled={!activeClass}/><input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="Parent name (optional)" disabled={!activeClass}/><button onClick={addStudent} disabled={!activeClass}>+ Add student</button></div><div className="student-cards">{allCurrentStudents.map((student) => <article key={student.id}><div className="avatar">{student.name.slice(0,1).toUpperCase()}</div><div className="student-copy"><strong>{student.name}</strong><small>Parent code {student.parentCode}</small><p>🔥 {student.streak} · ⭐ {student.stars}</p></div><button className="icon-danger" onClick={() => removeStudent(student.id)} aria-label="Remove student">×</button></article>)}{activeClass && !allCurrentStudents.length && <p className="empty-copy">No students added yet.</p>}</div></section>
+      <section className="school-panel assignment-builder"><div className="panel-head"><div><span>ASSIGNMENT BOARD</span><h2>Create homework</h2></div></div><div className="form-stack"><input value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="Assignment title" disabled={!activeClass}/><input value={assignmentReference} onChange={(e) => setAssignmentReference(e.target.value)} placeholder="Qur’an reference, e.g. 67:1-5" disabled={!activeClass}/><select value={assignmentStudent} onChange={(e) => setAssignmentStudent(e.target.value)} disabled={!activeClass}><option value="">Whole class</option>{allCurrentStudents.map((s) => <option key={s.id} value={s.id}>{s.name} only</option>)}</select><input type="date" value={assignmentDue} onChange={(e) => setAssignmentDue(e.target.value)} disabled={!activeClass}/><textarea value={assignmentInstructions} onChange={(e) => setAssignmentInstructions(e.target.value)} placeholder="Teacher instructions" disabled={!activeClass}/><button onClick={createAssignment} disabled={!activeClass}>Assign</button><small className="form-note">Use a single ayah or same-Surah range, for example 1:1 or 67:1-5.</small></div></section>
+      <section className="school-panel assignment-list-panel"><div className="panel-head"><div><span>REVIEW CENTER</span><h2>Assignments & feedback</h2></div><b>{visibleAssignments.length}</b></div><div className="assignment-list">{visibleAssignments.map((assignment) => <TeacherAssignment key={assignment.id} assignment={assignment} student={state.students.find((s) => s.id === assignment.studentId)} onReview={reviewAssignment} onDelete={deleteAssignment}/>)}{!visibleAssignments.length && <p className="empty-copy">Assignments will appear here for review.</p>}</div></section>
+    </div>}
 
-      <section className="school-hero">
-        <div><span className="school-kicker">AL-HAFIZ • SCHOOL & MEMORIZATION</span><h1>One Qur’an school for students, teachers and parents.</h1><p>Assignments, memorization practice, recitation progress, teacher feedback and family follow-up in one calm experience.</p></div>
-        <img src="/hassoun-logo.png?v=20260824-4" alt="Hassoun Qur’an School" />
-      </section>
+    {role === "student" && <><section className="join-panel"><div><strong>Have a class code?</strong><span>Join another class on this device.</span></div><input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Student name"/><input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="Parent name (optional)"/><input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="Class code"/><button onClick={joinClass}>Join class</button></section><StudentParentView role="student" students={state.students} currentStudent={currentStudent} activeStudent={activeStudent} setActiveStudent={setActiveStudent} assignments={visibleAssignments} classes={state.classes} completed={completed} best={best} onPractice={openPractice} onSubmit={submitAssignment}/></>}
 
-      <nav className="role-tabs" aria-label="School role">
-        <button className={role === "student" ? "active" : ""} onClick={() => setRole("student")}>🎒 Student</button>
-        <button className={role === "teacher" ? "active" : ""} onClick={() => setRole("teacher")}>🍎 Teacher</button>
-        <button className={role === "parent" ? "active" : ""} onClick={() => setRole("parent")}>👨‍👩‍👧 Parent</button>
-      </nav>
+    {role === "parent" && <><section className="join-panel"><div><strong>Link a child</strong><span>Enter the parent code shown on the student profile.</span></div><input value={parentCode} onChange={(e) => setParentCode(e.target.value.toUpperCase())} placeholder="Parent code"/><button onClick={linkParent}>Link child</button></section><StudentParentView role="parent" students={parentLinks.length ? parentStudents : state.students} currentStudent={currentStudent} activeStudent={activeStudent} setActiveStudent={setActiveStudent} assignments={visibleAssignments} classes={state.classes} completed={completed} best={best} onPractice={openPractice} onSubmit={submitAssignment}/></>}
 
-      {role === "teacher" && (
-        <div className="school-grid teacher-grid">
-          <section className="school-panel">
-            <div className="panel-head"><div><span>TEACHER DESK</span><h2>Classes</h2></div><b>{state.classes.length}</b></div>
-            <div className="form-stack"><input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="Class name" /><input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Teacher name" /><button onClick={createClass}>+ Create class</button></div>
-            <div className="item-list">{state.classes.map((item) => <button className={activeClass === item.id ? "selected" : ""} key={item.id} onClick={() => setActiveClass(item.id)}><div><strong>{item.name}</strong><small>{item.teacher} · Code {item.inviteCode}</small></div><span>›</span></button>)}{!state.classes.length && <p className="empty-copy">Create your first Qur’an class.</p>}</div>
-          </section>
+    <footer className="school-footer"><img src="/hassoun-logo.png?v=20260824-5" alt="Hassoun"/><p>Hassoun Qur’an School supports structured practice and family follow-up. A qualified Qur’an teacher remains the best source for precise tajweed and recitation correction.</p></footer>
 
-          <section className="school-panel">
-            <div className="panel-head"><div><span>CLASS ROSTER</span><h2>{currentClass?.name || "Students"}</h2></div><b>{classStudents.length}</b></div>
-            <div className="form-stack"><input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Student name" disabled={!activeClass} /><input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="Parent name (optional)" disabled={!activeClass} /><button onClick={addStudent} disabled={!activeClass}>+ Add student</button></div>
-            <div className="student-cards">{classStudents.map((student) => <article key={student.id}><div className="avatar">{student.name.slice(0, 1).toUpperCase()}</div><div><strong>{student.name}</strong><small>Parent code {student.parentCode}</small><p>🔥 {student.streak} practice · ⭐ {student.stars}</p></div></article>)}{activeClass && !classStudents.length && <p className="empty-copy">No students added yet.</p>}</div>
-          </section>
-
-          <section className="school-panel assignment-builder">
-            <div className="panel-head"><div><span>ASSIGNMENT BOARD</span><h2>Create homework</h2></div></div>
-            <div className="form-stack"><input value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="Assignment title" disabled={!activeClass} /><input value={assignmentReference} onChange={(e) => setAssignmentReference(e.target.value)} placeholder="Qur’an reference, e.g. 67:1-5" disabled={!activeClass} /><input type="date" value={assignmentDue} onChange={(e) => setAssignmentDue(e.target.value)} disabled={!activeClass} /><textarea value={assignmentInstructions} onChange={(e) => setAssignmentInstructions(e.target.value)} placeholder="Teacher instructions" disabled={!activeClass} /><button onClick={createAssignment} disabled={!activeClass}>Assign to class</button></div>
-          </section>
-
-          <section className="school-panel assignment-list-panel">
-            <div className="panel-head"><div><span>REVIEW CENTER</span><h2>Assignments & feedback</h2></div></div>
-            <div className="assignment-list">{visibleAssignments.map((assignment) => <TeacherAssignment key={assignment.id} assignment={assignment} onReview={reviewAssignment} />)}{!visibleAssignments.length && <p className="empty-copy">Assignments will appear here for review.</p>}</div>
-          </section>
-        </div>
-      )}
-
-      {(role === "student" || role === "parent") && (
-        <>
-          <section className="profile-strip">
-            <label><span>{role === "student" ? "Student profile" : "Child"}</span><select value={activeStudent} onChange={(e) => setActiveStudent(e.target.value)}><option value="">Choose</option>{state.students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label>
-            {currentStudent && <div className="profile-name"><div className="avatar large">{currentStudent.name.slice(0,1).toUpperCase()}</div><div><strong>{currentStudent.name}</strong><small>{state.classes.find((item) => item.id === currentStudent.classId)?.name || "Qur’an School"}</small></div></div>}
-          </section>
-
-          {currentStudent ? <>
-            <section className="summary-cards"><article><span>📘</span><strong>{visibleAssignments.length}</strong><small>Assignments</small></article><article><span>✅</span><strong>{completed}</strong><small>Completed</small></article><article><span>🔥</span><strong>{currentStudent.streak}</strong><small>Practice streak</small></article><article><span>⭐</span><strong>{role === "student" ? currentStudent.stars : best || "—"}</strong><small>{role === "student" ? "Stars" : "Best score"}</small></article></section>
-
-            <section className="school-panel wide-panel">
-              <div className="panel-head"><div><span>{role === "student" ? "MY LEARNING" : "FAMILY VIEW"}</span><h2>{role === "student" ? "My assignments" : `${currentStudent.name}'s assignments`}</h2></div></div>
-              <div className="assignment-list">{visibleAssignments.map((assignment) => <article className="assignment-card" key={assignment.id}><div className="assignment-main"><div><span className={`status ${assignment.status}`}>{assignment.status.replace("-", " ")}</span><h3>{assignment.title}</h3><strong className="reference">{assignment.reference}</strong>{assignment.due && <small>Due {new Date(`${assignment.due}T12:00:00`).toLocaleDateString()}</small>}{assignment.instructions && <p>{assignment.instructions}</p>}</div><div className="assignment-score">{assignment.bestScore != null ? <><strong>{assignment.bestScore}%</strong><span>Teacher score</span></> : <><strong>{assignment.practiceCount}</strong><span>Practices</span></>}</div></div>{assignment.teacherFeedback && <div className="teacher-feedback"><b>🍎 Teacher feedback</b><p>{assignment.teacherFeedback}</p></div>}{role === "student" && <div className="assignment-actions"><button onClick={() => practiceAssignment(assignment)}>▶ Practice in Qur’an</button><button className="secondary" onClick={() => submitAssignment(assignment.id)}>✓ Submit for review</button></div>}</article>)}{!visibleAssignments.length && <p className="empty-copy">No assignments yet. Your teacher’s work will appear here.</p>}</div>
-            </section>
-
-            {role === "parent" && <section className="parent-note"><div>👨‍👩‍👧</div><div><strong>Parent connection</strong><p>Linked to {currentStudent.name}. Parent code: <b>{currentStudent.parentCode}</b>. You can follow assignments, practice activity, scores and teacher feedback from this dashboard.</p></div></section>}
-          </> : <section className="school-panel wide-panel"><p className="empty-copy">A teacher needs to add the student first. Then select the student above.</p></section>}
-        </>
-      )}
-
-      <footer className="school-footer"><img src="/hassoun-logo.png?v=20260824-4" alt="Hassoun" /><p>Hassoun Qur’an School supports practice and family follow-up. A qualified Qur’an teacher remains the best source for precise tajweed and recitation correction.</p></footer>
-    </main>
-  );
+    {practice && <div className="practice-backdrop"><section className="practice-modal"><header><div><span>STUDENT PRACTICE</span><h2>{practice.title}</h2><p>{practice.reference}</p></div><button onClick={() => { stopListening(); setPractice(null); }}>×</button></header><div className="practice-tabs"><button className={practiceMode === "read" ? "active" : ""} onClick={() => setPracticeMode("read")}>Read</button><button className={practiceMode === "first" ? "active" : ""} onClick={() => setPracticeMode("first")}>First-word hints</button><button className={practiceMode === "recall" ? "active" : ""} onClick={() => setPracticeMode("recall")}>Recall</button></div>{practiceLoading ? <div className="practice-loading">Loading Qur’an passage…</div> : practiceError ? <div className="practice-error">{practiceError}</div> : <div className={`practice-verses mode-${practiceMode}`} dir="rtl">{practiceVerses.map((verse) => <article key={verse.key}><div className="practice-arabic">{practiceMode === "recall" ? <details><summary>Tap to reveal {verse.key}</summary><p>{verse.arabic}</p></details> : practiceMode === "first" ? <p>{verse.arabic.split(/\s+/).map((w,i) => <span key={i} className={i === 0 ? "" : "hint-hidden"}>{w} </span>)}</p> : <p>{verse.arabic}</p>}</div><small dir="ltr">{verse.key}</small>{practiceMode === "read" && <p className="practice-translation" dir="ltr">{verse.translation}</p>}</article>)}</div>}<section className="recite-box"><div><strong>🎙️ Recitation check</strong><p>Recite the passage in Arabic and Hassoun will compare the recognized words.</p></div><button className={listening ? "recording" : ""} onClick={listening ? stopListening : startListening}>{listening ? "■ Stop listening" : "● Start reciting"}</button>{practiceScore != null && <div className="recite-result"><strong>{practiceScore}%</strong><span>{practiceScore >= 90 ? "Excellent recall" : practiceScore >= 75 ? "Good progress" : "Keep practicing"}</span><button onClick={savePracticeScore}>Save score</button></div>}{heard && <p className="heard" dir="rtl">{heard}</p>}</section><div className="practice-footer"><button onClick={() => submitAssignment(practice.id)}>Submit to teacher</button><button className="secondary" onClick={() => setPractice(null)}>Finish</button></div></section></div>}
+  </main>;
 }
 
-function TeacherAssignment({ assignment, onReview }: { assignment: Assignment; onReview: (id: string, score: number, feedback: string) => void }) {
-  const [score, setScore] = useState(assignment.bestScore != null ? String(assignment.bestScore) : "");
-  const [feedback, setFeedback] = useState(assignment.teacherFeedback || "");
-  return <article className="assignment-card"><div className="assignment-main"><div><span className={`status ${assignment.status}`}>{assignment.status.replace("-", " ")}</span><h3>{assignment.title}</h3><strong className="reference">{assignment.reference}</strong>{assignment.due && <small>Due {new Date(`${assignment.due}T12:00:00`).toLocaleDateString()}</small>}{assignment.instructions && <p>{assignment.instructions}</p>}</div><div className="assignment-score"><strong>{assignment.practiceCount}</strong><span>Practices</span></div></div><div className="review-form"><input type="number" min="0" max="100" value={score} onChange={(e) => setScore(e.target.value)} placeholder="Score %" /><input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Teacher feedback" /><button onClick={() => onReview(assignment.id, Math.max(0, Math.min(100, Number(score) || 0)), feedback.trim())}>Save review</button></div></article>;
+function StudentParentView({ role, students, currentStudent, activeStudent, setActiveStudent, assignments, classes, completed, best, onPractice, onSubmit }: { role: "student"|"parent"; students: Student[]; currentStudent: Student|null; activeStudent: string; setActiveStudent:(id:string)=>void; assignments: Assignment[]; classes: SchoolClass[]; completed:number; best:number; onPractice:(a:Assignment)=>void; onSubmit:(id:string)=>void }) {
+  return <>{<section className="profile-strip"><label><span>{role === "student" ? "Student profile" : "Child"}</span><select value={activeStudent} onChange={(e) => setActiveStudent(e.target.value)}><option value="">Choose</option>{students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}</select></label>{currentStudent && <div className="profile-name"><div className="avatar large">{currentStudent.name.slice(0,1).toUpperCase()}</div><div><strong>{currentStudent.name}</strong><small>{classes.find((item) => item.id === currentStudent.classId)?.name || "Qur’an School"} · Parent code {currentStudent.parentCode}</small></div></div>}</section>}{currentStudent ? <><section className="summary-cards"><article><span>📘</span><strong>{assignments.length}</strong><small>Assignments</small></article><article><span>✅</span><strong>{completed}</strong><small>Completed</small></article><article><span>🔥</span><strong>{currentStudent.streak}</strong><small>Practice</small></article><article><span>⭐</span><strong>{role === "student" ? currentStudent.stars : best || "—"}</strong><small>{role === "student" ? "Stars" : "Best score"}</small></article></section><section className="school-panel wide-panel"><div className="panel-head"><div><span>{role === "student" ? "MY LEARNING" : "FAMILY VIEW"}</span><h2>{role === "student" ? "My assignments" : `${currentStudent.name}'s assignments`}</h2></div></div><div className="assignment-list">{assignments.map((a) => <article className="assignment-card" key={a.id}><div className="assignment-main"><div><span className={`status ${a.status}`}>{a.status.replace("-"," ")}</span><h3>{a.title}</h3><strong className="reference">{a.reference}</strong>{a.due && <small>Due {new Date(`${a.due}T12:00:00`).toLocaleDateString()}</small>}{a.instructions && <p>{a.instructions}</p>}</div><div className="assignment-score"><strong>{a.bestScore ?? a.studentScore ?? a.practiceCount}</strong><span>{a.bestScore != null ? "Teacher %" : a.studentScore != null ? "Practice %" : "Practices"}</span></div></div>{a.teacherFeedback && <div className="teacher-feedback"><b>🍎 Teacher feedback</b><p>{a.teacherFeedback}</p></div>}{role === "student" && <div className="assignment-actions"><button onClick={() => onPractice(a)}>📖 Practice lesson</button>{a.status !== "reviewed" && <button className="secondary" onClick={() => onSubmit(a.id)}>✓ Submit</button>}</div>}</article>)}{!assignments.length && <p className="empty-copy">No assignments yet.</p>}</div></section></> : <section className="school-panel wide-panel"><p className="empty-copy">{role === "student" ? "Join a class or choose a student profile to begin." : "Link a child with a parent code to follow progress."}</p></section>}</>;
+}
+
+function TeacherAssignment({ assignment, student, onReview, onDelete }: { assignment: Assignment; student?: Student; onReview:(id:string,score:number,feedback:string)=>void; onDelete:(id:string)=>void }) {
+  const [score, setScore] = useState(assignment.bestScore != null ? String(assignment.bestScore) : assignment.studentScore != null ? String(assignment.studentScore) : ""), [feedback, setFeedback] = useState(assignment.teacherFeedback || "");
+  return <article className="assignment-card"><div className="assignment-main"><div><span className={`status ${assignment.status}`}>{assignment.status.replace("-"," ")}</span><h3>{assignment.title}</h3><strong className="reference">{assignment.reference}</strong><small>{student ? `Assigned to ${student.name}` : "Whole class"}{assignment.due ? ` · Due ${new Date(`${assignment.due}T12:00:00`).toLocaleDateString()}` : ""}</small>{assignment.instructions && <p>{assignment.instructions}</p>}</div><div className="assignment-score"><strong>{assignment.studentScore ?? assignment.practiceCount}</strong><span>{assignment.studentScore != null ? "Student %" : "Practices"}</span></div></div><div className="review-form"><input type="number" min="0" max="100" value={score} onChange={(e) => setScore(e.target.value)} placeholder="Score %"/><input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Teacher feedback"/><button onClick={() => onReview(assignment.id, Math.max(0,Math.min(100,Number(score)||0)), feedback.trim())}>Save review</button><button className="delete-review" onClick={() => onDelete(assignment.id)}>Delete</button></div></article>;
 }
