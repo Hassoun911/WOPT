@@ -2,6 +2,7 @@ import { getAdminDashboard, listAdminSubscribers, listAdminSupportContacts } fro
 import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
+  getSponsorLogo,
   listAdminEmailCampaigns,
   refreshAdminEmailCampaignStatuses
 } from "./adminEmail";
@@ -230,6 +231,8 @@ export default {
         response = (await handleGames(request, env, url)) ?? json({ error: "Not found" }, 404);
       } else if (request.method === "POST" && url.pathname === "/support/contact") {
         response = await submitSupportContact(request, env);
+      } else if (request.method === "GET" && url.pathname.startsWith("/email/sponsor-logo/")) {
+        response = await getSponsorLogo(url, env);
       } else if (request.method === "POST" && url.pathname === "/email/subscribers") {
         response = await subscribeByEmail(request, env);
       } else if (request.method === "GET" && url.pathname === "/email/subscribers/verify") {
