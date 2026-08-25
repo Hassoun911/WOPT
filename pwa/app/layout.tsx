@@ -35,7 +35,6 @@ import QuranAudioSystem from "./QuranAudioSystem";
 import QuranGlyphSafetyEnhancer from "./QuranGlyphSafetyEnhancer";
 import QuranContextSurahChooserEnhancer from "./QuranContextSurahChooserEnhancer";
 import QuranPageOrderGuardEnhancer from "./QuranPageOrderGuardEnhancer";
-import QuranBookmarkSafetyEnhancer from "./QuranBookmarkSafetyEnhancer";
 import WebAppNav from "./WebAppNav";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -91,7 +90,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranGlyphSafetyEnhancer />
         <QuranContextSurahChooserEnhancer />
         <QuranPageOrderGuardEnhancer />
-        <QuranBookmarkSafetyEnhancer />
         <WebAppNav />
       </body>
     </html>
