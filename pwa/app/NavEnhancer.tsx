@@ -50,8 +50,7 @@ export default function NavEnhancer() {
     }
   }, [pathname]);
 
-  const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
-  if (localPath === "/quran" || localPath === "/quran/") return null;
-
-  return <a className="quran-tab-overlay" href={appPath("/quran/")} aria-label="Open Qur’an"><span aria-hidden="true">۞</span>Qur’an</a>;
+  // Navigation now lives in the main Hassoun menu. Do not inject a second
+  // floating Qur’an shortcut on every page.
+  return null;
 }
