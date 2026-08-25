@@ -12,7 +12,7 @@ export async function getAdminDashboard(request: Request, env: Env) {
   const auth = await requireAdmin(request, env);
   if (!auth.admin) return auth.response!;
 
-  const [subscribers, devices, outbox, pushCampaigns, emails] = await Promise.all([
+  const [subscribers, devices, outbox, pushCampaigns, emails, supportContacts] = await Promise.all([
     env.DB.prepare(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
@@ -42,6 +42,13 @@ export async function getAdminDashboard(request: Request, env: Env) {
               SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
               SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
        FROM email_deliveries`
+    ).first<Record<string, number>>(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) AS new,
+              SUM(CASE WHEN email_status = 'sent' THEN 1 ELSE 0 END) AS emailed,
+              SUM(CASE WHEN email_status = 'failed' THEN 1 ELSE 0 END) AS email_failed
+       FROM support_contacts`
     ).first<Record<string, number>>()
   ]);
 
@@ -52,7 +59,8 @@ export async function getAdminDashboard(request: Request, env: Env) {
     devices: devices ?? {},
     emailOutbox: outbox ?? {},
     pushCampaigns: pushCampaigns ?? {},
-    emailDeliveries: emails ?? {}
+    emailDeliveries: emails ?? {},
+    supportContacts: supportContacts ?? {}
   });
 }
 
@@ -83,4 +91,30 @@ export async function listAdminSubscribers(request: Request, env: Env, url: URL)
   ).bind(status, status, query, search, search, search, limit).all<Record<string, unknown>>();
 
   return json({ ok: true, subscribers: results });
+}
+
+export async function listAdminSupportContacts(request: Request, env: Env, url: URL) {
+  const auth = await requireAdmin(request, env);
+  if (!auth.admin) return auth.response!;
+
+  const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
+  const status = (url.searchParams.get("status") ?? "").trim().slice(0, 30);
+  const platform = (url.searchParams.get("platform") ?? "").trim().slice(0, 30);
+  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 100) || 100));
+  const search = `%${query.replace(/[%_]/g, "")}%`;
+
+  const { results } = await env.DB.prepare(
+    `SELECT public_id, name, email, subject, message, locale, platform, app_version,
+            source, status, email_recipient, email_status, email_provider_id,
+            email_error, created_at, updated_at
+     FROM support_contacts
+     WHERE (? = '' OR status = ?)
+       AND (? = '' OR platform = ?)
+       AND (? = '' OR email LIKE ? COLLATE NOCASE OR COALESCE(name, '') LIKE ? COLLATE NOCASE
+            OR subject LIKE ? COLLATE NOCASE OR message LIKE ? COLLATE NOCASE)
+     ORDER BY id DESC
+     LIMIT ?`
+  ).bind(status, status, platform, platform, query, search, search, search, search, limit).all<Record<string, unknown>>();
+
+  return json({ ok: true, contacts: results });
 }
