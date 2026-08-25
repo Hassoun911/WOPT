@@ -3,13 +3,29 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-logo.png?v=20260824-5";
+const LOGO = "/hassoun-official-logo.jpg?v=20260825-official-1";
 
 export default function WebsiteLogoEnhancer() {
   const pathname = usePathname();
 
   useEffect(() => {
     const apply = () => {
+      document.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+        const src = img.getAttribute("src") || "";
+        if (
+          src.includes("hassoun-logo.png") ||
+          src.includes("favicon-logo.png") ||
+          src.includes("app-icon.svg") ||
+          src.includes("icon-192.png") ||
+          src.includes("icon-512.png") ||
+          src.includes("apple-touch-icon.png") ||
+          src.includes("maskable-icon-512.png")
+        ) {
+          img.src = LOGO;
+          img.dataset.hassounBrand = "official";
+        }
+      });
+
       if (pathname.includes("/quran")) {
         const brand = document.querySelector<HTMLElement>(".quran-brand");
         if (brand && !brand.querySelector("img[data-hassoun-brand]")) {
@@ -18,8 +34,8 @@ export default function WebsiteLogoEnhancer() {
             const img = document.createElement("img");
             img.src = LOGO;
             img.alt = "Hassoun";
-            img.dataset.hassounBrand = "true";
-            img.style.cssText = "width:46px;height:46px;object-fit:contain;border-radius:13px;display:block";
+            img.dataset.hassounBrand = "official";
+            img.style.cssText = "width:46px;height:46px;object-fit:cover;border-radius:13px;display:block";
             old.replaceWith(img);
           }
           const title = brand.querySelector("strong");
@@ -37,7 +53,8 @@ export default function WebsiteLogoEnhancer() {
             const img = document.createElement("img");
             img.src = LOGO;
             img.alt = "Hassoun";
-            img.style.cssText = "width:100%;height:100%;object-fit:contain;display:block";
+            img.dataset.hassounBrand = "official";
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
             node.appendChild(img);
           }
         });
