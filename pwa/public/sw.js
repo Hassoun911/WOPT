@@ -1,16 +1,32 @@
-const CACHE_NAME = "hassoun-v2-20260825-exact-logo-2";
+const CACHE_NAME = "hassoun-v3-20260825-local-prayer-offline-1";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
   scoped("/"),
   scoped("/quran/"),
+  scoped("/school/"),
+  scoped("/games/"),
+  scoped("/events/"),
+  scoped("/qibla/"),
+  scoped("/more/"),
+  scoped("/contact/"),
   scoped("/manifest.webmanifest?v=20260825-exact-2"),
   scoped("/hassoun-brand.svg?v=20260825-exact-2"),
   scoped("/notification-badge.png"),
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.all(APP_SHELL.map(async (url) => {
+        try {
+          await cache.add(url);
+        } catch {
+          // One optional route should never prevent the whole PWA from installing offline support.
+        }
+      }));
+    })
+  );
   self.skipWaiting();
 });
 
@@ -22,18 +38,46 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
-  if (event.request.method !== "GET" || requestUrl.origin !== self.location.origin) return;
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
+  // Same-origin navigations are network-first so published fixes appear quickly,
+  // while the last successful page remains available when the device is offline.
+  if (requestUrl.origin === self.location.origin && event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(async () => {
+          return (await caches.match(event.request)) || (await caches.match(scoped("/"))) || Response.error();
+        })
+    );
+    return;
+  }
+
+  // Cache successful same-origin assets as they are used. This includes Next.js
+  // JavaScript/CSS chunks, logo files and page resources needed for offline launch.
+  if (requestUrl.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const network = fetch(event.request)
+          .then((response) => {
+            if (response.ok) {
+              const copy = response.clone();
+              void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            }
+            return response;
+          })
+          .catch(() => cached || Response.error());
+        return cached || network;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match(scoped("/"))))
-  );
+    );
+  }
 });
 
 self.addEventListener("push", (event) => {
