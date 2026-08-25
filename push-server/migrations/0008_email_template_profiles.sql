@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS email_template_profiles (
   sponsor_url TEXT,
   sponsor_message_en TEXT,
   sponsor_message_ar TEXT,
+  sponsor_logo_data TEXT,
+  sponsor_logo_mime TEXT,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
