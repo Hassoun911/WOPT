@@ -1,11 +1,11 @@
-const CACHE_NAME = "hassoun-v2-20260825-official-logo-1";
+const CACHE_NAME = "hassoun-v2-20260825-exact-logo-2";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
   scoped("/"),
   scoped("/quran/"),
-  scoped("/manifest.webmanifest?v=20260825-official-1"),
-  scoped("/hassoun-official-logo.jpg?v=20260825-official-1"),
+  scoped("/manifest.webmanifest?v=20260825-exact-2"),
+  scoped("/hassoun-brand.svg?v=20260825-exact-2"),
   scoped("/notification-badge.png"),
 ];
 
@@ -48,7 +48,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Hassoun";
   const options = {
     body: data.body || "Prayer time notification",
-    icon: scoped("/hassoun-official-logo.jpg?v=20260825-official-1"),
+    icon: scoped("/hassoun-brand.svg?v=20260825-exact-2"),
     badge: scoped("/notification-badge.png"),
     tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
     renotify: true,
