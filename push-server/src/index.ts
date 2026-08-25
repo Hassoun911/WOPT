@@ -1,4 +1,4 @@
-import { getAdminDashboard, listAdminSubscribers } from "./adminData";
+import { getAdminDashboard, listAdminSubscribers, listAdminSupportContacts } from "./adminData";
 import {
   createAdminEmailCampaign,
   dispatchDueAdminEmailCampaigns,
@@ -258,6 +258,8 @@ export default {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
         response = await listAdminSubscribers(request, env, url);
+      } else if (request.method === "GET" && url.pathname === "/admin/support/contacts") {
+        response = await listAdminSupportContacts(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
         response = await createAdminPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
