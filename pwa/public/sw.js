@@ -1,16 +1,12 @@
-const CACHE_NAME = "hassoun-v2-20260825-web-icon-1";
+const CACHE_NAME = "hassoun-v2-20260825-official-logo-1";
 const SCOPE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const scoped = (path) => `${SCOPE_PATH}${path}` || "/";
 const APP_SHELL = [
   scoped("/"),
   scoped("/quran/"),
-  scoped("/manifest.webmanifest?v=20260825-web-icon-1"),
-  scoped("/hassoun-logo.png?v=20260825-web-icon-1"),
-  scoped("/icon-192.png?v=20260825-web-icon-1"),
-  scoped("/icon-512.png?v=20260825-web-icon-1"),
+  scoped("/manifest.webmanifest?v=20260825-official-1"),
+  scoped("/hassoun-official-logo.jpg?v=20260825-official-1"),
   scoped("/notification-badge.png"),
-  scoped("/maskable-icon-512.png?v=20260825-web-icon-1"),
-  scoped("/apple-touch-icon.png?v=20260825-web-icon-1"),
 ];
 
 self.addEventListener("install", (event) => {
@@ -52,7 +48,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Hassoun";
   const options = {
     body: data.body || "Prayer time notification",
-    icon: scoped("/hassoun-logo.png?v=20260825-web-icon-1"),
+    icon: scoped("/hassoun-official-logo.jpg?v=20260825-official-1"),
     badge: scoped("/notification-badge.png"),
     tag: data.eventId || `wopt-${data.prayer || "prayer"}-${data.kind || "alert"}`,
     renotify: true,
