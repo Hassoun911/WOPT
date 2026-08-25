@@ -44,7 +44,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const asset = (path: string) => `${basePath}${path}`;
-const ICON_VERSION = "20260825-exact-2";
+const ICON_VERSION = "20260825-exact-5";
 
 export const metadata: Metadata = {
   title: "Hassoun",
