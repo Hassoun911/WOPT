@@ -11,7 +11,7 @@
   "categories": ["lifestyle", "utilities"],
   "prefer_related_applications": false,
   "icons": [
-    { "src": "favicon-logo.png?v=20260824-3", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "hassoun-logo.png?v=20260824-3", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "hassoun-logo.png?v=20260824-4", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "hassoun-logo.png?v=20260824-4", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
