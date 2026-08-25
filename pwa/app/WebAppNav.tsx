@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path: string) => `${BASE_PATH}${path}`;
-const OFFICIAL_LOGO = "/hassoun-brand.svg?v=20260825-exact-4";
+const OFFICIAL_LOGO = "/hassoun-brand.svg?v=20260825-exact-5";
 const items = [
   ["/", "🏠", "Today", "Prayer times and daily dashboard"],
   ["/?open=month", "📅", "Monthly Prayer Times", "View the full monthly prayer schedule"],
@@ -28,7 +28,7 @@ export default function WebAppNav(){
     <button className="web-menu-trigger" type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>
     <div className={open?"web-menu-backdrop open":"web-menu-backdrop"} onClick={()=>setOpen(false)} />
     <aside className={open?"web-slide-menu open":"web-slide-menu"} aria-hidden={!open}>
-      <div className="web-slide-head"><div className="web-slide-brand"><img src={appPath(OFFICIAL_LOGO)} alt="Hassoun" style={{width:48,height:48,borderRadius:14,objectFit:"contain",background:"#0b5b47",display:"block",boxShadow:"0 6px 18px rgba(11,91,71,.16)"}}/><div><strong>Hassoun</strong><span>Islamic companion</span></div></div><button type="button" onClick={()=>setOpen(false)} aria-label="Close menu">×</button></div>
+      <div className="web-slide-head"><div className="web-slide-brand"><img src={appPath(OFFICIAL_LOGO)} alt="Hassoun" data-hassoun-brand="official" style={{width:48,height:48,borderRadius:14,objectFit:"contain",background:"#0b5b47",display:"block",boxShadow:"0 6px 18px rgba(11,91,71,.16)"}}/><div><strong>Hassoun</strong><span>Islamic companion</span></div></div><button type="button" onClick={()=>setOpen(false)} aria-label="Close menu">×</button></div>
       <nav aria-label="Hassoun website navigation">{items.map(([href,icon,label,note])=>{const pathOnly=href.split("?")[0];const active=pathOnly==="/"?localPath==="/"&&!href.includes("?"):localPath.startsWith(pathOnly.replace(/\/$/,""));return <a key={href} href={appPath(href)} className={active?"active":""} onClick={()=>setOpen(false)}><span className="web-slide-icon">{icon}</span><span><strong>{label}</strong><small>{note}</small></span><b>›</b></a>})}</nav>
       <div className="web-slide-foot"><span>Web version</span><small>Designed for desktop, tablet and mobile browsers.</small></div>
     </aside>
