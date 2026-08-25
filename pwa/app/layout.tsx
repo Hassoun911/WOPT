@@ -44,17 +44,22 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const asset = (path: string) => `${basePath}${path}`;
+const ICON_VERSION = "20260825-web-icon-1";
 
 export const metadata: Metadata = {
   title: "Hassoun",
   description: "Prayer times, Qur’an reading and audio, Qur’an School, memorization, Qibla, Islamic events and learning tools.",
-  manifest: asset("/manifest.webmanifest?v=20260824-5"),
+  manifest: asset(`/manifest.webmanifest?v=${ICON_VERSION}`),
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
   icons: {
-    icon: [{ url: asset("/hassoun-logo.png?v=20260824-5"), type: "image/png", sizes: "512x512" }],
-    shortcut: asset("/hassoun-logo.png?v=20260824-5"),
-    apple: asset("/hassoun-logo.png?v=20260824-5"),
+    icon: [
+      { url: asset(`/hassoun-logo.png?v=${ICON_VERSION}`), type: "image/png", sizes: "512x512" },
+      { url: asset(`/icon-192.png?v=${ICON_VERSION}`), type: "image/png", sizes: "192x192" },
+      { url: asset(`/favicon.svg?v=${ICON_VERSION}`), type: "image/svg+xml", sizes: "any" },
+    ],
+    shortcut: asset(`/hassoun-logo.png?v=${ICON_VERSION}`),
+    apple: [{ url: asset(`/apple-touch-icon.png?v=${ICON_VERSION}`), type: "image/png", sizes: "180x180" }],
   },
 };
 
