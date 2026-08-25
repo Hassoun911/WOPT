@@ -8,6 +8,7 @@ const appPath = (path: string) => `${BASE_PATH}${path}`;
 const items = [
   ["/", "🏠", "Home", "Prayer times and daily dashboard"],
   ["/quran/", "۞", "Qur’an", "Read, listen, search and memorize"],
+  ["/school/", "🎒", "Qur’an School", "Student, teacher and parent memorization portal"],
   ["/ask-sheikh/", "🕌", "Ask the Sheikh", "Qur’an and Sunnah reference assistant"],
   ["/games/", "🎮", "Games", "Daily quiz and multiplayer rooms"],
   ["/events/", "🌙", "Events", "Islamic calendar and upcoming dates"],
