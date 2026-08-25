@@ -4,14 +4,14 @@ import "./globals.css";
 import "./mobile-nav-fix.css";
 import "./quran.css";
 import "./direction-fixes.css";
-import ActivityTracker from "./ActivityTracker";
+import "./parity.css";
+import "./quran-index-fix.css";
+import "./home-app-match.css";
+import "./fluid-dashboard.css";
 import EmailManageRedirect from "./EmailManageRedirect";
-import LocationPrayerBootstrap from "./LocationPrayerBootstrap";
 import NavEnhancer from "./NavEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
-import RuntimeControlOverlay from "./RuntimeControlOverlay";
-import ScrollingTicker from "./ScrollingTicker";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 import WebPushRegistration from "./WebPushRegistration";
 import QuranUiFixEnhancer from "./QuranUiFixEnhancer";
@@ -37,6 +37,7 @@ import QuranGlyphSafetyEnhancer from "./QuranGlyphSafetyEnhancer";
 import QuranContextSurahChooserEnhancer from "./QuranContextSurahChooserEnhancer";
 import QuranPageOrderGuardEnhancer from "./QuranPageOrderGuardEnhancer";
 import QuranEasyBookmarkEnhancer from "./QuranEasyBookmarkEnhancer";
+import WebAppNav from "./WebAppNav";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -46,17 +47,17 @@ const asset = (path: string) => `${basePath}${path}`;
 
 export const metadata: Metadata = {
   title: "Hassoun",
-  description: "Location-aware five daily prayer times with Windsor official-source support plus Qur’an reading, listening, search, bookmarks, memorization, Islamic events and learning tools.",
+  description: "Accurate five daily Adhan times for Windsor, Ontario with a full Qur’an reader, listening, search, bookmarks, memorization, Qibla, Islamic events and learning tools.",
   manifest: asset("/manifest.webmanifest"),
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
   other: { "codex-preview": "development" },
   icons: {
     icon: [
-      { url: asset("/icon-192.png"), type: "image/png", sizes: "192x192" },
-      { url: asset("/icon-512.png"), type: "image/png", sizes: "512x512" },
+      { url: asset("/favicon-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
+      { url: asset("/hassoun-logo.png?v=20260824-3"), type: "image/png", sizes: "512x512" },
     ],
-    shortcut: asset("/icon-192.png"),
-    apple: asset("/apple-touch-icon.png"),
+    shortcut: asset("/favicon-logo.png?v=20260824-3"),
+    apple: asset("/hassoun-logo.png?v=20260824-3"),
   },
 };
 
@@ -66,11 +67,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <LocationPrayerBootstrap />
-        <ActivityTracker />
-        <ScrollingTicker />
         {children}
-        <RuntimeControlOverlay />
         <EmailManageRedirect />
         <NavEnhancer />
         <PrayerAlertAudioEnhancer />
@@ -100,6 +97,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranContextSurahChooserEnhancer />
         <QuranPageOrderGuardEnhancer />
         <QuranEasyBookmarkEnhancer />
+        <WebAppNav />
       </body>
     </html>
   );
