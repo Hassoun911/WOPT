@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".github/workflows/build-v1012-from-v111-golden.yml"
+      - .github/workflows/build-v1012-from-v111-golden.yml
 
 permissions:
   contents: write
@@ -18,274 +18,78 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     env:
-      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
       EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
       NODE_ENV: production
-    defaults:
-      run:
-        working-directory: mobile
 
     steps:
-      - name: Checkout verified known-good forward lineage
+      - name: Checkout known-good Android lineage
         uses: actions/checkout@v4
         with:
           ref: work/forward-from-latest-good
           fetch-depth: 0
 
-      - name: Setup Node 22
+      - name: Checkout current control files separately
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _control
+          fetch-depth: 1
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle cache
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install dependencies
+      - name: Install mobile dependencies
+        working-directory: mobile
         run: |
           set -euo pipefail
           npm ci --include=dev --no-audit --no-fund
           npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
 
-      - name: Reproduce known-good app transforms
+      - name: Reproduce known-good transforms
+        working-directory: mobile
         run: |
           set -euo pipefail
           node scripts/apply-v106-clean-home.mjs
           node scripts/fix-memorize-entry.mjs
           node scripts/apply-alhafiz-motivation.mjs
 
-      - name: Restore v1.0.11 prayer home and Qibla lineage
+      - name: Apply v1.0.11 prayer UI and messaging overlay
         run: |
           set -euo pipefail
-          # Use the prayer panel/Qibla source present in the v1.0.11-era main tree.
-          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/936d404754d8f4ec3eb5536bd4cfa49ba6b9be49/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
-          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/936d404754d8f4ec3eb5536bd4cfa49ba6b9be49/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
+          cp _control/mobile/src/HomePrayerPanel.tsx mobile/src/HomePrayerPanel.tsx
+          cp _control/mobile/src/QiblaDirectionScreen.tsx mobile/src/QiblaDirectionScreen.tsx
+          cp _control/scripts/apply-v1012-golden-messaging.py scripts/apply-v1012-golden-messaging.py
+          python3 scripts/apply-v1012-golden-messaging.py
 
-          path = Path('App.tsx')
-          text = path.read_text()
-
-          if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
-              text = text.replace(
-                  'import SettingsHub from "./src/SettingsHub";\n',
-                  'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
-                  1,
-              )
-
-          text = text.replace(
-              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
-              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
-              1,
-          )
-
-          home_pattern = re.compile(
-              r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',
-              re.S,
-          )
-          home_replacement = '''\n\n      <HomePrayerPanel
-        locale={locale}
-        today={today}
-        next={next}
-        preferences={phoneAlertPreferences}
-        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
-        onOpenQibla={() => setActiveTab("qibla")}
-      />
-
-      <Pressable onPress={() => setActiveTab("quiz")}'''
-          text, count = home_pattern.subn(home_replacement, text, count=1)
-          if count != 1 and '<HomePrayerPanel' not in text:
-              raise SystemExit('Could not restore v1.0.11 prayer panel')
-
-          body_pattern = re.compile(
-              r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
-              re.S,
-          )
-          body_replacement = ''': activeTab === "events"
-          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
-          : activeTab === "qibla"
-            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
-            : activeTab === "more"'''
-          text, body_count = body_pattern.subn(body_replacement, text, count=1)
-          if body_count != 1 and 'activeTab === "qibla"' not in text:
-              raise SystemExit('Could not restore v1.0.11 Qibla screen')
-          path.write_text(text)
-          PY
-
-      - name: Apply only unified CRM messaging fixes
-        run: |
-          set -euo pipefail
-          cat > src/ScrollingTicker.tsx <<'EOF'
-          import AsyncStorage from "@react-native-async-storage/async-storage";
-          import Constants from "expo-constants";
-          import { useEffect, useMemo, useRef, useState } from "react";
-          import { Animated, AppState, Easing, StyleSheet, Text, View } from "react-native";
-          import { STORAGE_KEYS } from "./config";
-
-          const API_BASE = String(Constants.expoConfig?.extra?.pushApiUrl || "https://wopt-prayer-push.wopt-windsor.workers.dev").replace(/\/$/, "");
-          type TickerSetting = { enabled?: boolean; textEn?: string; textAr?: string; startsAt?: string | null; expiresAt?: string | null; speed?: "slow" | "normal" | "fast" };
-
-          function active(ticker: TickerSetting | null) {
-            if (!ticker?.enabled) return false;
-            const now = Date.now();
-            if (ticker.startsAt) { const v = Date.parse(ticker.startsAt); if (Number.isFinite(v) && now < v) return false; }
-            if (ticker.expiresAt) { const v = Date.parse(ticker.expiresAt); if (Number.isFinite(v) && now >= v) return false; }
-            return true;
-          }
-
-          export default function ScrollingTicker() {
-            const [ticker, setTicker] = useState<TickerSetting | null>(null);
-            const [locale, setLocale] = useState<"en" | "ar">("en");
-            const [containerWidth, setContainerWidth] = useState(0);
-            const [textWidth, setTextWidth] = useState(0);
-            const x = useRef(new Animated.Value(0)).current;
-
-            useEffect(() => {
-              let cancelled = false;
-              const load = async () => {
-                try {
-                  const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
-                  if (!cancelled) setLocale(saved === "ar" ? "ar" : "en");
-                  const response = await fetch(`${API_BASE}/app/runtime?ts=${Date.now()}`, { headers: { Accept: "application/json", "Cache-Control": "no-cache" } });
-                  if (!response.ok) return;
-                  const payload = await response.json() as { settings?: { scrolling_ticker?: TickerSetting } };
-                  if (!cancelled) setTicker(payload.settings?.scrolling_ticker ?? null);
-                } catch {}
-              };
-              void load();
-              const timer = setInterval(() => void load(), 20_000);
-              const appState = AppState.addEventListener("change", state => { if (state === "active") void load(); });
-              return () => { cancelled = true; clearInterval(timer); appState.remove(); };
-            }, []);
-
-            const message = useMemo(() => {
-              if (!active(ticker)) return "";
-              return String(locale === "ar" ? (ticker?.textAr || ticker?.textEn || "") : (ticker?.textEn || ticker?.textAr || "")).trim();
-            }, [locale, ticker]);
-            const duration = useMemo(() => ticker?.speed === "slow" ? 30000 : ticker?.speed === "fast" ? 14000 : 21000, [ticker?.speed]);
-
-            useEffect(() => {
-              x.stopAnimation();
-              if (!message || !containerWidth || !textWidth) return;
-              x.setValue(containerWidth);
-              const loop = Animated.loop(Animated.timing(x, { toValue: -textWidth, duration, easing: Easing.linear, useNativeDriver: true }));
-              loop.start();
-              return () => loop.stop();
-            }, [message, duration, containerWidth, textWidth, x]);
-
-            if (!message) return null;
-            return <View style={styles.wrap} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
-              <View style={styles.badge}><Text style={styles.badgeText}>📢</Text></View>
-              <View style={styles.track}>
-                <Animated.View style={{ transform: [{ translateX: x }] }}>
-                  <Text onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)} numberOfLines={1} style={styles.text}>{message}</Text>
-                </Animated.View>
-              </View>
-            </View>;
-          }
-
-          const styles = StyleSheet.create({
-            wrap: { minHeight: 40, overflow: "hidden", backgroundColor: "#0b5b47", borderBottomWidth: 1, borderBottomColor: "#d7bd72", flexDirection: "row", alignItems: "center" },
-            badge: { width: 42, height: 40, alignItems: "center", justifyContent: "center", backgroundColor: "#0b5b47", zIndex: 2 },
-            badgeText: { fontSize: 16 },
-            track: { flex: 1, height: 40, overflow: "hidden", justifyContent: "center" },
-            text: { color: "#fff4c7", fontSize: 15, lineHeight: 40, fontWeight: "800", paddingHorizontal: 18, includeFontPadding: false }
-          });
-          EOF
-
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('AppWithEmail.tsx')
-          s = p.read_text()
-          # Preserve the existing wrapper and only strengthen device push registration.
-          s = s.replace('  Modal,\n  Pressable,', '  AppState,\n  Modal,\n  Pressable,', 1)
-          old = '''  useEffect(() => {
-    void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
-    void (async () => {
-      await configureNotificationChannels();
-      const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
-      const currentLocale = saved === "ar" ? "ar" : "en";
-      setLocale(currentLocale);
-
-      const permission = await Notifications.getPermissionsAsync();
-      if (permission.granted) {
-        await registerDeviceForServerPush(currentLocale).catch(() => undefined);
-      }
-    })().catch(() => undefined);
-  }, []);'''
-          new = '''  useEffect(() => {
-    let currentLocale: "en" | "ar" = "en";
-    const syncPush = async (allowPrompt: boolean) => {
-      const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
-      currentLocale = saved === "ar" ? "ar" : "en";
-      setLocale(currentLocale);
-      let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && allowPrompt && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
-      if (permission.granted) await registerDeviceForServerPush(currentLocale);
-    };
-    void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
-    void configureNotificationChannels().then(() => syncPush(true)).catch(() => undefined);
-    const sub = AppState.addEventListener("change", state => { if (state === "active") void syncPush(false).catch(() => undefined); });
-    const timer = setInterval(() => void syncPush(false).catch(() => undefined), 6 * 60 * 60 * 1000);
-    return () => { sub.remove(); clearInterval(timer); };
-  }, []);'''
-          if old not in s:
-              raise SystemExit('Golden AppWithEmail push block was not found; refusing broad rewrite')
-          s = s.replace(old, new, 1)
-          p.write_text(s)
-          PY
-
-      - name: Set v1.0.12 while preserving golden branding config
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p = Path('app.config.ts')
-          s = p.read_text()
-          s = re.sub(r'version:\s*"[^"]+"', 'version: "1.0.12"', s, count=1)
-          s = re.sub(r'versionCode:\s*\d+', 'versionCode: 53', s, count=1)
-          # Golden Android builds use the generated full Hassoun icon, not main's adaptive mosque icon.
-          if 'android: {' in s and 'icon: "./assets/icon.png"' not in s.split('android: {',1)[1].split('}',1)[0]:
-              s = s.replace('android: {\n    package:', 'android: {\n    icon: "./assets/icon.png",\n    package:', 1)
-          p.write_text(s)
-          PY
-
-      - name: Prepare exact golden Hassoun logo assets
+      - name: Prepare exact Hassoun bird Quran logo
+        working-directory: mobile
         run: |
           set -euo pipefail
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image, ImageFile
-          ImageFile.LOAD_TRUNCATED_IMAGES = True
-          logo_path = Path('assets/hassoun-logo.png')
-          if not logo_path.exists() or logo_path.stat().st_size == 0:
-              raise SystemExit('Missing golden Hassoun bird/Quran logo')
-          logo = Image.open(logo_path).convert('RGBA')
-          logo.save(logo_path, format='PNG', optimize=True)
-          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
-          splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
-          art = logo.copy(); art.thumbnail((820, 820), Image.Resampling.LANCZOS)
-          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
-          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
-          PY
+          python3 -c "from PIL import Image,ImageFile; from pathlib import Path; ImageFile.LOAD_TRUNCATED_IMAGES=True; p=Path('assets/hassoun-logo.png'); assert p.exists() and p.stat().st_size>0; logo=Image.open(p).convert('RGBA'); logo.save(p,format='PNG',optimize=True); logo.resize((1024,1024),Image.Resampling.LANCZOS).save('assets/icon.png',format='PNG',optimize=True); splash=Image.new('RGBA',(1024,1024),(0,0,0,0)); art=logo.copy(); art.thumbnail((820,820),Image.Resampling.LANCZOS); splash.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2)); splash.save('assets/splash-logo.png',format='PNG',optimize=True)"
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
           pngcheck -q assets/splash-logo.png
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Verify golden features plus messaging only
+      - name: Verify golden features and messaging overlay
+        working-directory: mobile
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.12"' app.config.ts
@@ -302,27 +106,29 @@ jobs:
           npx tsc --noEmit
 
       - name: Generate Android project
+        working-directory: mobile
         run: |
           set -euo pipefail
           rm -rf android
           npx expo prebuild --platform android --clean --no-install
 
       - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
         working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       - name: Verify and rename APK
+        working-directory: mobile
         run: |
           set -euo pipefail
-          APK='android/app/build/outputs/apk/release/app-release.apk'
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          OUT=android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
           test -s "$APK"
-          unzip -l "$APK" > /tmp/v1012-golden.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v1012-golden.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
+          unzip -l "$APK" | grep -E 'assets/(index\.android\.bundle|.*\.hbc)'
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          ls -lh "$OUT"
 
-      - name: Upload APK artifact
+      - name: Upload candidate APK
         uses: actions/upload-artifact@v4
         with:
           name: Hassoun-v1.0.12-from-v1.0.11-golden
@@ -332,17 +138,16 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish candidate prerelease without promoting golden baseline
-        working-directory: .
+      - name: Publish candidate prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk'
-          SUM="$APK.sha256"
-          TAG='v1.0.12-from-v1.0.11-golden'
+          APK=mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
+          SUM=$APK.sha256
+          TAG=v1.0.12-from-v1.0.11-golden
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$SUM" --clobber
           else
-            gh release create "$TAG" "$APK" "$SUM" --target work/forward-from-latest-good --title 'Hassoun v1.0.12 Messaging From v1.0.11 Golden' --notes 'Candidate only. Golden baseline remains Hassoun-v1.0.11-city-highlight-fixed.apk until user confirms this build. Adds only automatic server push registration and CRM-controlled scrolling system messages; preserves known-good branding/build lineage.' --prerelease
+            gh release create "$TAG" "$APK" "$SUM" --target work/forward-from-latest-good --title "Hassoun v1.0.12 Messaging From v1.0.11 Golden" --notes "Candidate only. v1.0.11 remains the golden baseline until user confirms this build. Adds automatic server push registration and CRM scrolling system messages." --prerelease
           fi
