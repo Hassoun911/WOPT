@@ -348,8 +348,8 @@ export async function dispatchDueAdminPushCampaigns(env: Env) {
             deep_link, image_url, audience, target_platform, target_locale,
             target_country_code, target_city, target_timezone, priority, status, scheduled_at
      FROM push_campaigns
-     WHERE status = 'scheduled' AND scheduled_at <= CURRENT_TIMESTAMP
-     ORDER BY scheduled_at, id
+     WHERE status = 'scheduled' AND datetime(scheduled_at) <= CURRENT_TIMESTAMP
+     ORDER BY datetime(scheduled_at), id
      LIMIT 10`
   ).all<CampaignRow>();
 
