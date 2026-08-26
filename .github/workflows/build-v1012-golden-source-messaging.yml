@@ -127,3 +127,5 @@ jobs:
           else
             gh release create "$TAG" "$APK" "$SUM" --target main --title "Hassoun v1.0.12 Golden Features + Messaging Fixed" --notes "Corrected candidate built from the current mobile source that preserves the golden APK bookmark and main-page features. Adds/keeps server push registration and CRM-controlled scrolling system messages. Uses Hassoun bird + Quran branding. v1.0.11 remains golden until user confirms this APK." --prerelease
           fi
+
+# trigger: preserve golden-feature source, no legacy transforms
