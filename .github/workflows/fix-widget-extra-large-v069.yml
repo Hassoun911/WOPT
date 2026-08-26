@@ -1,152 +1,16 @@
-name: Fix Widget Extra Large Sizing v0.6.9
+name: Legacy Widget Extra Large Sizing v0.6.9
 
 on:
-  push:
-    paths:
-      - ".github/workflows/fix-widget-extra-large-v069.yml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix-widget-sizing:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Make widget text actually scale and fill space
+      - name: Legacy workflow retired
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          provider = Path("mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt")
-          text = provider.read_text(encoding="utf-8")
-
-          old = '''        val timeSp = when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 25f; "medium" -> 28f; "xlarge" -> 34f; else -> 31f }
-          "square" -> when (timeSize) { "small" -> 21f; "medium" -> 24f; "xlarge" -> 30f; else -> 27f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 16f; "medium" -> 18f; "xlarge" -> 22f; else -> 20f }
-          else -> when (timeSize) { "small" -> 28f; "medium" -> 31f; "xlarge" -> 38f; else -> 34f }
-        }
-        val prayerNameSp = when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 27f; "medium" -> 30f; "xlarge" -> 36f; else -> 33f }
-          "square" -> when (timeSize) { "small" -> 23f; "medium" -> 26f; "xlarge" -> 32f; else -> 29f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 13f; "medium" -> 15f; "xlarge" -> 19f; else -> 17f }
-          else -> when (timeSize) { "small" -> 30f; "medium" -> 33f; "xlarge" -> 40f; else -> 36f }
-        }
-'''
-          new = '''        // Text size must visibly respond to the user's setting.  The previous
-        // xlarge values were only a few sp larger and several XML auto-size caps
-        // silently forced them back down, which is why Extra Large still looked small.
-        val sparseBoost = when {
-          !showAllPrayers && !showCountdown -> 1.28f
-          !showAllPrayers -> 1.18f
-          !showGregorian && !showHijri && !showLocation -> 1.10f
-          else -> 1.0f
-        }
-        val timeSpBase = when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 27f; "medium" -> 32f; "xlarge" -> 43f; else -> 36f }
-          "square" -> when (timeSize) { "small" -> 23f; "medium" -> 28f; "xlarge" -> 38f; else -> 32f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 18f; "medium" -> 21f; "xlarge" -> 29f; else -> 24f }
-          else -> when (timeSize) { "small" -> 31f; "medium" -> 37f; "xlarge" -> 50f; else -> 42f }
-        }
-        val prayerNameSpBase = when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 29f; "medium" -> 34f; "xlarge" -> 45f; else -> 38f }
-          "square" -> when (timeSize) { "small" -> 25f; "medium" -> 30f; "xlarge" -> 40f; else -> 34f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 15f; "medium" -> 18f; "xlarge" -> 25f; else -> 21f }
-          else -> when (timeSize) { "small" -> 33f; "medium" -> 39f; "xlarge" -> 52f; else -> 44f }
-        }
-        val timeSp = timeSpBase * sparseBoost
-        val prayerNameSp = prayerNameSpBase * sparseBoost
-'''
-          if old not in text:
-              raise SystemExit("Main widget sizing block not found")
-          text = text.replace(old, new)
-
-          old = '''          val countdownSp = if (countdownStyle != "circle") 10f else when {
-            isLockScreen -> 15f
-            layout == "slim" || layout == "compact" -> 9f
-            layout == "square" -> 11f
-            layout == "vertical" -> 12f
-            else -> 13f
-          }
-'''
-          new = '''          val countdownSp = if (countdownStyle != "circle") {
-            when (timeSize) { "small" -> 10f; "medium" -> 11.5f; "xlarge" -> 15f; else -> 13f }
-          } else when {
-            isLockScreen -> if (timeSize == "xlarge") 18f else 15f
-            layout == "slim" || layout == "compact" -> if (timeSize == "xlarge") 12f else 9f
-            layout == "square" -> if (timeSize == "xlarge") 15f else 11f
-            layout == "vertical" -> if (timeSize == "xlarge") 16f else 12f
-            else -> if (timeSize == "xlarge") 18f else 14f
-          }
-'''
-          if old not in text:
-              raise SystemExit("Countdown sizing block not found")
-          text = text.replace(old, new)
-
-          old = '''        val stripSp = if (lockScreen) 9.5f else when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 8.4f; "medium" -> 9.2f; "xlarge" -> 10.4f; else -> 9.8f }
-          "square" -> when (timeSize) { "small" -> 5.0f; "medium" -> 5.6f; "xlarge" -> 6.6f; else -> 6.1f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 4.0f; "medium" -> 4.5f; "xlarge" -> 5.4f; else -> 5.0f }
-          else -> when (timeSize) { "small" -> 7.2f; "medium" -> 8.0f; "xlarge" -> 9.2f; else -> 8.6f }
-        }
-'''
-          new = '''        val stripSp = if (lockScreen) {
-          when (timeSize) { "small" -> 9.5f; "medium" -> 10.5f; "xlarge" -> 13.5f; else -> 11.5f }
-        } else when (layout) {
-          "vertical" -> when (timeSize) { "small" -> 9.5f; "medium" -> 11f; "xlarge" -> 14.5f; else -> 12.5f }
-          "square" -> when (timeSize) { "small" -> 6.5f; "medium" -> 7.5f; "xlarge" -> 10.5f; else -> 9f }
-          "slim", "compact", "next" -> when (timeSize) { "small" -> 5.5f; "medium" -> 6.5f; "xlarge" -> 9f; else -> 7.5f }
-          else -> when (timeSize) { "small" -> 8.5f; "medium" -> 10f; "xlarge" -> 13.5f; else -> 11.5f }
-        }
-'''
-          if old not in text:
-              raise SystemExit("Prayer strip sizing block not found")
-          text = text.replace(old, new)
-          provider.write_text(text, encoding="utf-8")
-
-          # Remove XML auto-size ceilings that were overriding the user's Extra Large choice.
-          layouts = [
-              Path("mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget.xml"),
-              Path("mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_vertical.xml"),
-              Path("mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_square.xml"),
-              Path("mobile/modules/hassoun-widget/android/src/main/res/layout/hassoun_prayer_widget_slim.xml"),
-          ]
-          for p in layouts:
-              s = p.read_text(encoding="utf-8")
-              s = s.replace('android:autoSizeMinTextSize="8sp" android:autoSizeMaxTextSize="11sp"', 'android:autoSizeMinTextSize="9sp" android:autoSizeMaxTextSize="16sp"')
-              s = s.replace('android:autoSizeMinTextSize="24sp"\n            android:autoSizeMaxTextSize="38sp"', 'android:autoSizeMinTextSize="26sp"\n            android:autoSizeMaxTextSize="56sp"')
-              s = s.replace('android:autoSizeMinTextSize="18sp"', 'android:autoSizeMinTextSize="20sp"')
-              s = s.replace('android:autoSizeMaxTextSize="34sp"', 'android:autoSizeMaxTextSize="48sp"')
-              s = s.replace('android:autoSizeMaxTextSize="30sp"', 'android:autoSizeMaxTextSize="42sp"')
-              s = s.replace('android:autoSizeMaxTextSize="24sp"', 'android:autoSizeMaxTextSize="34sp"')
-              p.write_text(s, encoding="utf-8")
-
-          # Make the settings preview match the real native widget scale better.
-          settings = Path("mobile/src/SettingsHub.tsx")
-          s = settings.read_text(encoding="utf-8")
-          s = s.replace('const previewTimeSize = widgetPrefs.timeSize === "xlarge" ? 28 : widgetPrefs.timeSize === "large" ? 23 : widgetPrefs.timeSize === "medium" ? 19 : 16;',
-                        'const previewTimeSize = widgetPrefs.timeSize === "xlarge" ? 36 : widgetPrefs.timeSize === "large" ? 27 : widgetPrefs.timeSize === "medium" ? 22 : 17;')
-          s = s.replace('const previewPrayerSize = widgetPrefs.focus === "next" ? 29 : widgetPrefs.focus === "balanced" ? 25 : 21;',
-                        'const previewPrayerSize = (widgetPrefs.focus === "next" ? 34 : widgetPrefs.focus === "balanced" ? 29 : 25) + (widgetPrefs.timeSize === "xlarge" ? 5 : 0);')
-          settings.write_text(s, encoding="utf-8")
-          PY
-
-      - name: Validate Android widget resources and TypeScript
-        working-directory: mobile
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-
-      - name: Commit widget sizing fix
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/modules/hassoun-widget/android/src/main/java/ca/wopt/hassounwidget/HassounPrayerWidgetProvider.kt mobile/modules/hassoun-widget/android/src/main/res/layout mobile/src/SettingsHub.tsx
-          git diff --cached --quiet && exit 0
-          git commit -m "Make widget Extra Large text visibly larger and adaptive"
-          git push origin HEAD:main
+          echo "This legacy v0.6.9 widget mutation workflow is retired."
+          echo "Current Android builds must use the golden v1.0.11 lineage workflows instead."
