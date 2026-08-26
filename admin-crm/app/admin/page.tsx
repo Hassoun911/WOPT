@@ -1,1 +1,1 @@
-export { default } from "../CrmDashboard";
+export { default } from "../AdminDashboardShell";
