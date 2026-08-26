@@ -1,9 +1,23 @@
-import { getAdminDashboard, listAdminSubscribers, listAdminSupportContacts } from "./adminData";
+import { getAdminDashboard, listAdminSupportContacts } from "./adminData";
 import {
-  createAdminEmailCampaign,
+  createAppContent,
+  getAdminCrmOverview,
+  listAdminTeam,
+  listAppContent,
+  updateAdminTeamMember,
+  updateAppContent
+} from "./adminCrm";
+import { createAdminTeamMember } from "./adminTeamCreate";
+import {
+  getAdminUser360,
+  listAdminDevices360,
+  updateAdminDevice360,
+  updateAdminSubscriberPreferences,
+  updateAdminSubscriberProfile
+} from "./adminUser360";
+import {
   dispatchDueAdminEmailCampaigns,
   getSponsorLogo,
-  listAdminEmailCampaigns,
   refreshAdminEmailCampaignStatuses
 } from "./adminEmail";
 import {
@@ -14,11 +28,18 @@ import {
   logoutAdmin
 } from "./adminAuth";
 import { requestAdminPasswordReset, resetAdminPassword } from "./adminPasswordReset";
+import { dispatchDueAdminPushCampaigns } from "./adminPush";
 import {
-  createAdminPushCampaign,
-  dispatchDueAdminPushCampaigns,
-  listAdminPushCampaigns
-} from "./adminPush";
+  createRestrictedEmailCampaign,
+  createRestrictedPushCampaign,
+  listRestrictedAppSettings,
+  listRestrictedAuditLog,
+  listRestrictedEmailCampaigns,
+  listRestrictedPushCampaigns,
+  listRestrictedSubscribers,
+  updateRestrictedAppSetting,
+  updateRestrictedSubscriberStatus
+} from "./adminRestricted";
 import { dispatchEvent } from "./dispatch";
 import { emailDeliveryConfigured, processEmailOutbox } from "./emailDelivery";
 import { dispatchGlobalPrayerEmails } from "./globalPrayerEmail";
@@ -190,7 +211,6 @@ async function runScheduled(env: Env, scheduledTime: number) {
 
   await dispatchDueAdminPushCampaigns(env);
   await dispatchDueAdminEmailCampaigns(env);
-
   await dispatchGlobalPrayerEmails(env, scheduledTime);
   await processEmailOutbox(env);
   await refreshAdminEmailCampaignStatuses(env);
@@ -260,17 +280,49 @@ export default {
       } else if (request.method === "GET" && url.pathname === "/admin/dashboard") {
         response = await getAdminDashboard(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/subscribers") {
-        response = await listAdminSubscribers(request, env, url);
+        response = await listRestrictedSubscribers(request, env, url);
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) {
+        response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3] ?? "");
+      } else if (request.method === "GET" && /^\/admin\/subscribers\/[^/]+\/360$/.test(url.pathname)) {
+        response = await getAdminUser360(request, env, url.pathname.split("/")[3] ?? "");
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/profile$/.test(url.pathname)) {
+        response = await updateAdminSubscriberProfile(request, env, url.pathname.split("/")[3] ?? "");
+      } else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/preferences$/.test(url.pathname)) {
+        response = await updateAdminSubscriberPreferences(request, env, url.pathname.split("/")[3] ?? "");
+      } else if (request.method === "GET" && url.pathname === "/admin/devices") {
+        response = await listAdminDevices360(request, env, url);
+      } else if (request.method === "POST" && /^\/admin\/devices\/\d+$/.test(url.pathname)) {
+        response = await updateAdminDevice360(request, env, Number(url.pathname.split("/")[3]));
+      } else if (request.method === "GET" && url.pathname === "/admin/crm/overview") {
+        response = await getAdminCrmOverview(request, env);
+      } else if (request.method === "GET" && url.pathname === "/admin/settings") {
+        response = await listRestrictedAppSettings(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/settings/")) {
+        response = await updateRestrictedAppSetting(request, env, decodeURIComponent(url.pathname.slice("/admin/settings/".length)));
+      } else if (request.method === "GET" && url.pathname === "/admin/content") {
+        response = await listAppContent(request, env, url);
+      } else if (request.method === "POST" && url.pathname === "/admin/content") {
+        response = await createAppContent(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/content/")) {
+        response = await updateAppContent(request, env, url.pathname.slice("/admin/content/".length));
+      } else if (request.method === "GET" && url.pathname === "/admin/team") {
+        response = await listAdminTeam(request, env);
+      } else if (request.method === "POST" && url.pathname === "/admin/team") {
+        response = await createAdminTeamMember(request, env);
+      } else if (request.method === "POST" && url.pathname.startsWith("/admin/team/")) {
+        response = await updateAdminTeamMember(request, env, url.pathname.slice("/admin/team/".length));
+      } else if (request.method === "GET" && url.pathname === "/admin/audit") {
+        response = await listRestrictedAuditLog(request, env, url);
       } else if (request.method === "GET" && url.pathname === "/admin/support/contacts") {
         response = await listAdminSupportContacts(request, env, url);
       } else if (request.method === "POST" && url.pathname === "/admin/push/campaigns") {
-        response = await createAdminPushCampaign(request, env);
+        response = await createRestrictedPushCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/push/campaigns") {
-        response = await listAdminPushCampaigns(request, env);
+        response = await listRestrictedPushCampaigns(request, env);
       } else if (request.method === "POST" && url.pathname === "/admin/email/campaigns") {
-        response = await createAdminEmailCampaign(request, env);
+        response = await createRestrictedEmailCampaign(request, env);
       } else if (request.method === "GET" && url.pathname === "/admin/email/campaigns") {
-        response = await listAdminEmailCampaigns(request, env);
+        response = await listRestrictedEmailCampaigns(request, env);
       } else {
         response = json({ error: "Not found" }, 404);
       }
