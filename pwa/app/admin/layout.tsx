@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import EmailSponsorSaveFix from "./EmailSponsorSaveFix";
 
+const TOKEN_KEY = "wopt:admin-token:v1";
+const STORAGE_KEY = "hassoun:admin-sidebar-expanded";
+
 const sections = [
   {
     label: "MAIN",
@@ -40,12 +43,25 @@ const sections = [
   },
 ] as const;
 
-const STORAGE_KEY = "hassoun:admin-sidebar-expanded";
-
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/admin/";
   const isDashboard = pathname === "/admin" || pathname === "/admin/";
   const [expanded, setExpanded] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const syncAuth = () => {
+      try { setSignedIn(Boolean(localStorage.getItem(TOKEN_KEY))); }
+      catch { setSignedIn(false); }
+    };
+    syncAuth();
+    const timer = window.setInterval(syncAuth, 500);
+    window.addEventListener("storage", syncAuth);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", syncAuth);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -90,22 +106,36 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const active = (href: string) =>
-    href === "/admin/"
-      ? isDashboard
-      : pathname.startsWith(href.replace(/\/$/, ""));
+    href === "/admin/" ? isDashboard : pathname.startsWith(href.replace(/\/$/, ""));
+
+  if (!signedIn) {
+    return (
+      <div className="admin-login-shell">
+        <style>{`
+          .web-menu-trigger,.web-menu-backdrop,.web-slide-menu{display:none!important}
+          .admin-login-shell{min-height:100dvh;background:#0b493b;overflow:auto}
+          @media(max-width:760px){
+            .admin-login-shell main{padding:28px 18px 40px!important;align-items:flex-start!important}
+            .admin-login-shell form{width:min(100%,620px)!important;margin:34px auto 0!important;padding:28px 22px!important;border-radius:26px!important}
+            .admin-login-shell input{min-height:54px!important;font-size:16px!important}
+            .admin-login-shell button{min-height:56px!important;font-size:18px!important}
+          }
+        `}</style>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="admin-shell" data-expanded={expanded ? "1" : "0"}>
       <EmailSponsorSaveFix />
       <style>{`
         .web-menu-trigger,.web-menu-backdrop,.web-slide-menu{display:none!important}
-
         ${isDashboard ? `
           body main > header + nav{display:none!important}
           body main > header a[href="/admin/email"],
           body main > header a[href="/admin/email/"]{display:none!important}
         ` : ""}
-
         .admin-shell{--side-collapsed:68px;--side-expanded:238px;min-height:100dvh;background:#f7f5ef}
         .admin-sidebar{position:fixed;left:0;top:0;bottom:0;z-index:1100;width:var(--side-collapsed);background:#103f35;color:white;border-right:1px solid rgba(255,255,255,.12);box-shadow:4px 0 22px rgba(17,57,48,.11);transition:width .22s ease;overflow-x:hidden;overflow-y:auto}
         .admin-shell[data-expanded="1"] .admin-sidebar{width:var(--side-expanded)}
@@ -130,7 +160,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         .admin-shell[data-expanded="0"] .admin-side-link:hover::after{opacity:1;transform:none}
         .admin-side-bottom{padding:14px 8px 20px;margin-top:8px;border-top:1px solid rgba(255,255,255,.08)}
         .admin-side-bottom a{display:flex;align-items:center;height:42px;padding:0 12px;gap:12px;border-radius:11px;text-decoration:none;color:#c9ddd7}
-
         @media(max-width:760px){
           .admin-sidebar{width:60px}.admin-content{margin-left:60px}.admin-shell[data-expanded="1"] .admin-sidebar{width:min(250px,84vw);box-shadow:10px 0 40px rgba(0,0,0,.28)}.admin-shell[data-expanded="1"] .admin-content{margin-left:60px}
           .admin-shell[data-expanded="1"]::after{content:"";position:fixed;inset:0 0 0 60px;background:rgba(10,40,33,.24);z-index:1050;pointer-events:none}
@@ -145,17 +174,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <small>Owner Control Center</small>
           </div>
         </div>
-
-        <button
-          className="admin-side-toggle"
-          type="button"
-          aria-label={expanded ? "Collapse admin menu" : "Expand admin menu"}
-          title={expanded ? "Collapse menu" : "Expand menu"}
-          onClick={() => setExpanded((v) => !v)}
-        >
+        <button className="admin-side-toggle" type="button" aria-label={expanded ? "Collapse admin menu" : "Expand admin menu"} title={expanded ? "Collapse menu" : "Expand menu"} onClick={() => setExpanded((v) => !v)}>
           {expanded ? "‹" : "›"}
         </button>
-
         <nav>
           {sections.map((section) => (
             <div key={section.label}>
@@ -163,14 +184,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {section.items.map(([href, icon, label]) => {
                 const isActive = active(href);
                 return (
-                  <a
-                    key={href}
-                    href={href}
-                    className={`admin-side-link${isActive ? " active" : ""}`}
-                    data-label={label}
-                    title={!expanded ? label : undefined}
-                    aria-current={isActive ? "page" : undefined}
-                  >
+                  <a key={href} href={href} className={`admin-side-link${isActive ? " active" : ""}`} data-label={label} title={!expanded ? label : undefined} aria-current={isActive ? "page" : undefined}>
                     <span className="admin-side-icon">{icon}</span>
                     <span className="admin-side-text">{label}</span>
                   </a>
@@ -179,7 +193,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-
         <div className="admin-side-bottom">
           <a href="/" target="_blank" rel="noreferrer" data-label="Open Hassoun">
             <span className="admin-side-icon">🌐</span>
@@ -187,7 +200,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </a>
         </div>
       </aside>
-
       <div className="admin-content">{children}</div>
     </div>
   );
