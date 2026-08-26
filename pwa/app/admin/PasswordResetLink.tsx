@@ -14,23 +14,28 @@ export default function PasswordResetLink() {
   if (!show) return null;
 
   return (
-    <a
-      href="/admin/reset/"
+    <div
       style={{
-        position: "fixed",
-        left: "50%",
-        top: "calc(50% + 190px)",
-        transform: "translateX(-50%)",
-        zIndex: 10001,
-        color: "#0b5b47",
-        fontFamily: "system-ui,-apple-system,sans-serif",
-        fontSize: 13,
-        fontWeight: 800,
-        textDecoration: "underline",
-        textUnderlineOffset: 3
+        width: "min(620px, calc(100% - 36px))",
+        margin: "14px auto 0",
+        textAlign: "center",
+        fontFamily: "system-ui,-apple-system,sans-serif"
       }}
     >
-      Forgot password? Reset it here
-    </a>
+      <a
+        href="/admin/reset/"
+        style={{
+          display: "inline-block",
+          color: "#0b5b47",
+          fontSize: 14,
+          fontWeight: 800,
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+          padding: "10px 12px"
+        }}
+      >
+        Forgot password? Reset it here
+      </a>
+    </div>
   );
 }
