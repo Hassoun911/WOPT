@@ -11,6 +11,7 @@ import "./fluid-dashboard.css";
 import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import LocationPrayerTimesEnhancer from "./LocationPrayerTimesEnhancer";
+import LocationMovementRefresh from "./LocationMovementRefresh";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <EmailManageRedirect />
         <NavEnhancer />
         <LocationPrayerTimesEnhancer />
+        <LocationMovementRefresh />
         <PrayerAlertAudioEnhancer />
         <PrayerCardInteractionEnhancer />
         <ServiceWorkerRegistration />
