@@ -66,8 +66,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved !== null) setExpanded(saved !== "0");
-      else if (window.innerWidth < 900) setExpanded(false);
+      if (window.innerWidth < 900) setExpanded(false);
+      else if (saved !== null) setExpanded(saved !== "0");
     } catch {}
   }, []);
 
@@ -108,6 +108,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const active = (href: string) =>
     href === "/admin/" ? isDashboard : pathname.startsWith(href.replace(/\/$/, ""));
 
+  const closeOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 900) setExpanded(false);
+  };
+
   if (!signedIn) {
     return (
       <div className="admin-login-shell">
@@ -115,10 +119,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           .web-menu-trigger,.web-menu-backdrop,.web-slide-menu{display:none!important}
           .admin-login-shell{min-height:100dvh;background:#0b493b;overflow:auto}
           @media(max-width:760px){
-            .admin-login-shell main{padding:28px 18px 40px!important;align-items:flex-start!important}
-            .admin-login-shell form{width:min(100%,620px)!important;margin:34px auto 0!important;padding:28px 22px!important;border-radius:26px!important}
-            .admin-login-shell input{min-height:54px!important;font-size:16px!important}
-            .admin-login-shell button{min-height:56px!important;font-size:18px!important}
+            .admin-login-shell main{padding:22px 14px 32px!important;align-items:flex-start!important;min-height:100dvh!important}
+            .admin-login-shell form{width:min(100%,620px)!important;margin:20px auto 0!important;padding:24px 20px!important;border-radius:24px!important;box-sizing:border-box!important}
+            .admin-login-shell input{min-height:52px!important;font-size:16px!important}
+            .admin-login-shell button{min-height:54px!important;font-size:18px!important}
           }
         `}</style>
         {children}
@@ -132,14 +136,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <style>{`
         .web-menu-trigger,.web-menu-backdrop,.web-slide-menu{display:none!important}
         ${isDashboard ? `
-          body main > header + nav{display:none!important}
-          body main > header a[href="/admin/email"],
-          body main > header a[href="/admin/email/"]{display:none!important}
+          .admin-content main > header + nav{display:none!important}
+          .admin-content main > header a[href="/admin/email"],
+          .admin-content main > header a[href="/admin/email/"]{display:none!important}
         ` : ""}
         .admin-shell{--side-collapsed:68px;--side-expanded:238px;min-height:100dvh;background:#f7f5ef}
         .admin-sidebar{position:fixed;left:0;top:0;bottom:0;z-index:1100;width:var(--side-collapsed);background:#103f35;color:white;border-right:1px solid rgba(255,255,255,.12);box-shadow:4px 0 22px rgba(17,57,48,.11);transition:width .22s ease;overflow-x:hidden;overflow-y:auto}
         .admin-shell[data-expanded="1"] .admin-sidebar{width:var(--side-expanded)}
-        .admin-content{min-height:100dvh;margin-left:var(--side-collapsed);transition:margin-left .22s ease;overflow:visible}
+        .admin-content{min-width:0;min-height:100dvh;margin-left:var(--side-collapsed);transition:margin-left .22s ease;overflow-x:hidden;overflow-y:visible}
+        .admin-content main{max-width:100%;overflow-x:hidden;box-sizing:border-box}
         .admin-shell[data-expanded="1"] .admin-content{margin-left:var(--side-expanded)}
         .admin-side-head{height:66px;display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;background:#103f35;z-index:2}
         .admin-side-logo{width:44px;height:44px;object-fit:contain;border-radius:12px;flex:0 0 auto;background:#0b5b47}
@@ -160,11 +165,35 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         .admin-shell[data-expanded="0"] .admin-side-link:hover::after{opacity:1;transform:none}
         .admin-side-bottom{padding:14px 8px 20px;margin-top:8px;border-top:1px solid rgba(255,255,255,.08)}
         .admin-side-bottom a{display:flex;align-items:center;height:42px;padding:0 12px;gap:12px;border-radius:11px;text-decoration:none;color:#c9ddd7}
-        @media(max-width:760px){
-          .admin-sidebar{width:60px}.admin-content{margin-left:60px}.admin-shell[data-expanded="1"] .admin-sidebar{width:min(250px,84vw);box-shadow:10px 0 40px rgba(0,0,0,.28)}.admin-shell[data-expanded="1"] .admin-content{margin-left:60px}
-          .admin-shell[data-expanded="1"]::after{content:"";position:fixed;inset:0 0 0 60px;background:rgba(10,40,33,.24);z-index:1050;pointer-events:none}
+        .admin-drawer-backdrop{display:none}
+
+        @media(max-width:899px){
+          .admin-sidebar{width:60px}
+          .admin-content,.admin-shell[data-expanded="1"] .admin-content{margin-left:60px}
+          .admin-shell[data-expanded="1"] .admin-sidebar{width:min(250px,84vw);box-shadow:10px 0 40px rgba(0,0,0,.28)}
+          .admin-shell[data-expanded="1"] .admin-drawer-backdrop{display:block;position:fixed;inset:0 0 0 60px;z-index:1050;border:0;background:rgba(10,40,33,.34);padding:0;cursor:pointer}
+          .admin-content main > header{padding:14px 14px!important;gap:10px!important;flex-wrap:wrap!important;align-items:center!important}
+          .admin-content main > header h1{font-size:clamp(24px,7vw,34px)!important;line-height:1.08!important;margin:.2em 0!important}
+          .admin-content main > section{max-width:100%!important;box-sizing:border-box!important}
+          .admin-content main section > div[style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+          .admin-content main section[style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+          .admin-content main [style*="grid-template-columns: repeat"]{grid-template-columns:minmax(0,1fr)!important}
+          .admin-content main table{font-size:12px!important}
+          .admin-content main input,.admin-content main select,.admin-content main textarea,.admin-content main button{max-width:100%;box-sizing:border-box}
+        }
+
+        @media(max-width:520px){
+          .admin-sidebar{width:56px}
+          .admin-content,.admin-shell[data-expanded="1"] .admin-content{margin-left:56px}
+          .admin-side-link{margin:3px 6px;padding:0 8px}
+          .admin-side-icon{width:26px;flex-basis:26px;font-size:17px}
+          .admin-side-logo{width:38px;height:38px}
+          .admin-side-head{padding:8px;height:58px}
+          .admin-shell[data-expanded="1"] .admin-drawer-backdrop{inset:0 0 0 56px}
         }
       `}</style>
+
+      <button className="admin-drawer-backdrop" type="button" aria-label="Close admin menu" onClick={() => setExpanded(false)} />
 
       <aside className="admin-sidebar" aria-label="Hassoun admin navigation">
         <div className="admin-side-head">
@@ -184,7 +213,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               {section.items.map(([href, icon, label]) => {
                 const isActive = active(href);
                 return (
-                  <a key={href} href={href} className={`admin-side-link${isActive ? " active" : ""}`} data-label={label} title={!expanded ? label : undefined} aria-current={isActive ? "page" : undefined}>
+                  <a key={href} href={href} onClick={closeOnMobile} className={`admin-side-link${isActive ? " active" : ""}`} data-label={label} title={!expanded ? label : undefined} aria-current={isActive ? "page" : undefined}>
                     <span className="admin-side-icon">{icon}</span>
                     <span className="admin-side-text">{label}</span>
                   </a>
