@@ -72,6 +72,7 @@ jobs:
           set -euo pipefail
           cp _control/mobile/src/HomePrayerPanel.tsx mobile/src/HomePrayerPanel.tsx
           cp _control/mobile/src/QiblaDirectionScreen.tsx mobile/src/QiblaDirectionScreen.tsx
+          mkdir -p scripts
           cp _control/scripts/apply-v1012-golden-messaging.py scripts/apply-v1012-golden-messaging.py
           python3 scripts/apply-v1012-golden-messaging.py
 
