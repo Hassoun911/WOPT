@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1039561609141",
+    "project_id": "hassoun-8c7a9",
+    "storage_bucket": "hassoun-8c7a9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1039561609141:android:d8239e8041acae5317d3fc",
+        "android_client_info": {
+          "package_name": "ca.wopt.windsorprayertimes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPUi8JOM98s2FxOes6ZIH54-rG6BnjHO0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
