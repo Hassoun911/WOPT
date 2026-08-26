@@ -9,7 +9,6 @@ def patch_prayer_home() -> None:
     path = MOBILE / "App.tsx"
     text = path.read_text()
 
-    # Restore the exact known-good prayer panel/qibla components copied in by CI.
     if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
         text = text.replace(
             'import SettingsHub from "./src/SettingsHub";\n',
@@ -30,25 +29,28 @@ def patch_prayer_home() -> None:
             1,
         )
 
+    # The known-good transform adds the Sheikh tab before this overlay runs.
+    text = text.replace(
+        'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "sheikh" | "more";',
+        'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "sheikh" | "qibla" | "more";',
+        1,
+    )
     text = text.replace(
         'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
         'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
         1,
     )
 
-    # The v1.0.11 lineage has changed several times around the cards below the
-    # next-prayer card. Match ONLY the legacy next-prayer card itself instead of
-    # assuming the Quiz card is immediately after it.
+    # After the known-good v1.0.6 transform, the prayer area is v106Hero.
+    # Replace only that prayer block with the v1.0.11 HomePrayerPanel and leave
+    # every card below it untouched.
     if '<HomePrayerPanel' not in text:
-        start_marker = '{next ? <View style={styles.nextCard}>'
+        start_marker = '{next ? <View style={styles.v106Hero}>'
+        end_marker = '<View style={styles.v106SectionRow}>'
         start = text.find(start_marker)
-        if start < 0:
-            raise SystemExit('Refusing build: could not locate golden next-prayer card')
-        end_marker = '</View> : null}'
         end = text.find(end_marker, start)
-        if end < 0:
-            raise SystemExit('Refusing build: could not locate end of golden next-prayer card')
-        end += len(end_marker)
+        if start < 0 or end < 0:
+            raise SystemExit('Refusing build: could not locate transformed golden prayer block')
         replacement = '''<HomePrayerPanel
         locale={locale}
         today={today}
@@ -56,29 +58,34 @@ def patch_prayer_home() -> None:
         preferences={phoneAlertPreferences}
         onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
         onOpenQibla={() => setActiveTab("qibla")}
-      />'''
+      />\n\n      '''
         text = text[:start] + replacement + text[end:]
 
-    # Mount the CRM-controlled ticker on the Home screen only, directly below
-    # the existing Hassoun header. Do not alter the rest of the golden layout.
-    home_anchor = 'const homeScreen = (\n    <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n      {header}\n'
+    # Mount the CRM ticker immediately under the existing header. Support both
+    # current and v106 content containers without altering the rest of Home.
     if '<ScrollingTicker />' not in text:
-        if home_anchor not in text:
+        anchors = [
+            'const homeScreen = (\n    <ScrollView style={styles.flex} contentContainerStyle={styles.v106Content} showsVerticalScrollIndicator={false}>\n      {header}\n',
+            'const homeScreen = (\n    <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n      {header}\n',
+        ]
+        for anchor in anchors:
+            if anchor in text:
+                text = text.replace(anchor, anchor + '      <ScrollingTicker />\n', 1)
+                break
+        else:
             raise SystemExit('Refusing build: could not locate golden Home header for ticker')
-        text = text.replace(home_anchor, home_anchor + '      <ScrollingTicker />\n', 1)
 
-    body_pattern = re.compile(
-        r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
-        re.S,
-    )
-    body_replacement = ''': activeTab === "events"
-          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
-          : activeTab === "qibla"
-            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
-            : activeTab === "more"'''
-    text, count2 = body_pattern.subn(body_replacement, text, count=1)
-    if count2 != 1 and 'activeTab === "qibla"' not in text:
-        raise SystemExit('Refusing build: could not restore known-good Qibla route')
+    # Insert Qibla before Sheikh/More without disturbing any other routing.
+    if 'activeTab === "qibla"' not in text:
+        sheikh_anchor = '          : activeTab === "sheikh"\n'
+        more_anchor = '          : activeTab === "more"\n'
+        route = '          : activeTab === "qibla"\n            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />\n'
+        if sheikh_anchor in text:
+            text = text.replace(sheikh_anchor, route + sheikh_anchor, 1)
+        elif more_anchor in text:
+            text = text.replace(more_anchor, route + more_anchor, 1)
+        else:
+            raise SystemExit('Refusing build: could not restore known-good Qibla route')
 
     path.write_text(text)
 
