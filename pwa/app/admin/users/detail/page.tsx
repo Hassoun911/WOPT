@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
 const KEY = "wopt:admin-token:v1";
@@ -26,8 +25,7 @@ async function call<T>(path: string, t: string, init: RequestInit = {}): Promise
 }
 
 export default function User360() {
-  const search = useSearchParams();
-  const id = decodeURIComponent(search.get("id") || "");
+  const [id, setId] = useState("");
   const [token, setToken] = useState("");
   const [data, setData] = useState<D | null>(null);
   const [error, setError] = useState("");
@@ -36,9 +34,9 @@ export default function User360() {
   const [city, setCity] = useState("");
   const [status, setStatus] = useState("active");
 
-  const load = async (t = token) => {
-    if (!id) throw new Error("Missing user id");
-    const d = await call<D>(`/admin/subscribers/${encodeURIComponent(id)}/360`, t);
+  const load = async (userId: string, t = token) => {
+    if (!userId) throw new Error("Missing user id");
+    const d = await call<D>(`/admin/subscribers/${encodeURIComponent(userId)}/360`, t);
     setData(d);
     setName(String(d.subscriber.display_name || ""));
     setCity(String(d.subscriber.city || ""));
@@ -46,13 +44,16 @@ export default function User360() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const userId = decodeURIComponent(params.get("id") || "");
     const t = localStorage.getItem(KEY) || "";
+    setId(userId);
     setToken(t);
-    if (t && id) void load(t).catch((e) => setError(String((e as Error).message || e)));
-  }, [id]);
+    if (t && userId) void load(userId, t).catch((e) => setError(String((e as Error).message || e)));
+  }, []);
 
   const save = async () => {
-    if (!data) return;
+    if (!data || !id) return;
     try {
       await call(`/admin/subscribers/${encodeURIComponent(id)}/profile`, token, {
         method: "POST",
@@ -65,7 +66,7 @@ export default function User360() {
         }),
       });
       setNotice("Profile saved");
-      await load();
+      await load(id);
     } catch (e) {
       setError(String((e as Error).message || e));
     }
