@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.12 v55 ticker and native push check
+name: Build Hassoun v1.0.12 v56 Firebase native push
 
 on:
   push:
@@ -6,14 +6,16 @@ on:
       - release/v1.0.12-messaging-from-v1.0.11-good
     paths:
       - '.github/workflows/build-v112-v55-ticker-push-check.yml'
+      - 'mobile/google-services.json'
       - 'mobile/scripts/apply-v112-ticker-position-fix.mjs'
+      - 'mobile/scripts/apply-v112-firebase-native-push.mjs'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v112-v55-${{ github.ref }}
+  group: hassoun-v112-v56-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,42 +62,8 @@ jobs:
       - name: Move scrolling ticker into top header gap
         run: node scripts/apply-v112-ticker-position-fix.mjs
 
-      - name: Check and inject Firebase Android config
-        env:
-          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
-          FIREBASE_GOOGLE_SERVICES_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          set -euo pipefail
-          rm -f google-services.json
-          if [ -n "${GOOGLE_SERVICES_JSON_B64:-}" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 -d > google-services.json
-          elif [ -n "${FIREBASE_GOOGLE_SERVICES_JSON_B64:-}" ]; then
-            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_B64" | base64 -d > google-services.json
-          elif [ -n "${GOOGLE_SERVICES_JSON:-}" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
-          fi
-
-          if [ -s google-services.json ]; then
-            python3 - <<'PY'
-          from pathlib import Path
-          import json
-          cfg = Path('google-services.json')
-          json.loads(cfg.read_text())
-          p = Path('app.config.ts')
-          s = p.read_text()
-          anchor = '  android: {\n    package: "ca.wopt.windsorprayertimes",'
-          repl = '  android: {\n    googleServicesFile: "./google-services.json",\n    package: "ca.wopt.windsorprayertimes",'
-          if anchor not in s:
-              raise SystemExit('Android config anchor missing')
-          p.write_text(s.replace(anchor, repl, 1))
-          PY
-            echo 'present' > /tmp/fcm-config-status.txt
-            echo 'Android Firebase config: PRESENT' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo 'absent' > /tmp/fcm-config-status.txt
-            echo 'Android Firebase config: ABSENT - remote APK push cannot obtain an FCM token in this local Gradle build.' >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Enable Firebase native Android push
+        run: node scripts/apply-v112-firebase-native-push.mjs
 
       - name: Prepare Hassoun logo
         run: |
@@ -121,20 +89,35 @@ jobs:
           pngcheck -q assets/icon.png
           pngcheck -q assets/splash-logo.png
 
-      - name: Verify exact-lineage fixes
+      - name: Verify exact-lineage fixes and Firebase config
         run: |
           set -euo pipefail
           npm run typecheck
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'versionCode: 55' app.config.ts
+          grep -q 'versionCode: 56' app.config.ts
+          grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
           grep -q 'nextAccent: { width: 24' src/HomePrayerPanel.tsx
           grep -q 'systemTickerOverlay' AppWithEmail.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
           grep -q 'syncServerPush' AppWithEmail.tsx
+          grep -q 'getExpoPushTokenAsync' src/push.ts
           grep -q 'setPrayerLocation(refreshed.location)' App.tsx
+          python3 - <<'PY'
+          import json
+          data=json.load(open('google-services.json'))
+          packages=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
+          assert 'ca.wopt.windsorprayertimes' in packages
+          PY
 
-      - name: Generate Android project
+      - name: Generate Android project with Firebase
         run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Verify generated Firebase Android wiring
+        run: |
+          set -euo pipefail
+          test -s android/app/google-services.json
+          grep -q 'ca.wopt.windsorprayertimes' android/app/google-services.json
+          grep -R -q 'com.google.gms.google-services' android || { echo 'Google services Gradle plugin missing'; exit 1; }
 
       - name: Build release APK
         run: |
@@ -147,19 +130,18 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v55-layout-ticker-fixed.apk"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v56-firebase-native-push.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           ls -lh "$OUT"
 
-      - name: Upload APK and push config status
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-v55-layout-ticker-fixed
+          name: Hassoun-v1.0.12-v56-firebase-native-push
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v55-layout-ticker-fixed.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v55-layout-ticker-fixed.apk.sha256
-            /tmp/fcm-config-status.txt
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v56-firebase-native-push.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v56-firebase-native-push.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -169,14 +151,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v55-layout-ticker-fixed.apk'
-          TAG='v1.0.12-v55-layout-ticker-fixed'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v56-firebase-native-push.apk'
+          TAG='v1.0.12-v56-firebase-native-push'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
               --target release/v1.0.12-messaging-from-v1.0.11-good \
-              --title 'Hassoun v1.0.12 v55 Layout + Ticker Fix' \
-              --notes 'Exact v1.0.11 golden lineage. Keeps messaging, fixes Next Prayer card responsiveness, moves the scrolling CRM message into the top header gap, and checks/injects Android Firebase configuration when a configured repository secret is available.' \
+              --title 'Hassoun v1.0.12 v56 Firebase Native Push' \
+              --notes 'Exact v1.0.11 golden lineage. Keeps the messaging ticker and Next Prayer layout fixes, and adds the Hassoun Firebase Android client configuration so the installed APK can obtain/register a native Expo/FCM push token.' \
               --prerelease
           fi
