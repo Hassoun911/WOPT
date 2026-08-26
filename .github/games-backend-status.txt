@@ -1,5 +1,5 @@
 games_backend=ready
 worker=https://wopt-prayer-push.wopt-windsor.workers.dev
-verified_room_code=ND34LX
-verified_at=2026-08-26T03:41:29Z
-source_commit=6fe2871cf90be45da56fea9519a31c1ecbf6221a
+verified_room_code=GGNLY2
+verified_at=2026-08-26T03:42:11Z
+source_commit=3245113d80d68d9cf17cfe3a6103408ea3a770d8
