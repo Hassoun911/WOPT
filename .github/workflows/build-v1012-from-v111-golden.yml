@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - .github/workflows/build-v1012-from-v111-golden.yml
+      - scripts/apply-v1012-golden-messaging.py
 
 permissions:
   contents: write
