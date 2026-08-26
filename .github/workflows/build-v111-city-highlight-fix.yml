@@ -1,0 +1,119 @@
+name: Build Hassoun v1.0.11 city highlight fixed APK
+
+on:
+  push:
+    branches:
+      - release/android-current
+    paths:
+      - '.github/workflows/build-v111-city-highlight-fix.yml'
+      - 'mobile/scripts/apply-v111-city-highlight-fix.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v111-city-highlight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout v1.0.9 release baseline
+        uses: actions/checkout@v4
+        with:
+          ref: release/android-current
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply v1.0.10 location fix
+        run: node scripts/apply-v110-location-fix.mjs
+
+      - name: Apply v1.0.11 city and highlight fix
+        run: node scripts/apply-v111-city-highlight-fix.mjs
+
+      - name: Prepare launcher and widget logo
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          logo_path = Path('assets/hassoun-logo.png')
+          if not logo_path.exists() or logo_path.stat().st_size == 0:
+              raise SystemExit('Missing assets/hassoun-logo.png')
+          logo = Image.open(logo_path).convert('RGBA')
+          logo.save(logo_path, format='PNG', optimize=True)
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
+          splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          art = logo.copy()
+          art.thumbnail((820, 820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+          n = Path('assets/notification-icon.png')
+          if n.exists() and n.stat().st_size:
+              Image.open(n).convert('RGBA').save(n, format='PNG', optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Validate v1.0.11 build
+        run: |
+          npm run typecheck
+          grep -q 'version: "1.0.11"' app.config.ts
+          grep -q 'versionCode: 52' app.config.ts
+          grep -q 'Windsor, Ontario' src/prayerData.ts
+          grep -q 'backgroundColor: "#edf5f0"' src/HomePrayerPanel.tsx
+          grep -q 'setPrayerLocation(refreshed.location)' App.tsx
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify and name APK
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.11-city-highlight-fixed.apk"
+          cp "$APK" "$OUT"
+          ls -lh "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+
+      - name: Upload Hassoun v1.0.11 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.11-city-highlight-fixed
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.11-city-highlight-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.11-city-highlight-fixed.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
