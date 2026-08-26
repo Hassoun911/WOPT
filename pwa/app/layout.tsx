@@ -40,69 +40,11 @@ import QuranPageOrderGuardEnhancer from "./QuranPageOrderGuardEnhancer";
 import QuranSchoolLinkEnhancer from "./QuranSchoolLinkEnhancer";
 import WebsiteLogoEnhancer from "./WebsiteLogoEnhancer";
 import WebAppNav from "./WebAppNav";
+import RemoteAppControl from "./RemoteAppControl";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-const asset = (path: string) => `${basePath}${path}`;
-const ICON_VERSION = "20260825-exact-5";
-
-export const metadata: Metadata = {
-  title: "Hassoun",
-  description: "Prayer times, Qur’an reading and audio, Qur’an School, memorization, Qibla, Islamic events and learning tools.",
-  manifest: asset(`/manifest.webmanifest?v=${ICON_VERSION}`),
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hassoun" },
-  other: { "codex-preview": "development" },
-  icons: {
-    icon: [
-      { url: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`), type: "image/svg+xml", sizes: "any" },
-    ],
-    shortcut: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`),
-    apple: [{ url: asset(`/hassoun-brand.svg?v=${ICON_VERSION}`), type: "image/svg+xml", sizes: "any" }],
-  },
-};
-
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0b5b47" };
-
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
-        <EmailManageRedirect />
-        <NavEnhancer />
-        <LocationPrayerTimesEnhancer />
-        <LocationMovementRefresh />
-        <PrayerAlertAudioEnhancer />
-        <PrayerCardInteractionEnhancer />
-        <ServiceWorkerRegistration />
-        <WebPushRegistration />
-        <QuranUiFixEnhancer />
-        <QuranReferenceLayoutEnhancer />
-        <QuranReferenceControlsEnhancer />
-        <QuranViewModeEnhancer />
-        <QuranTranslationLanguageEnhancer />
-        <QuranVerseMenuEnhancer />
-        <QuranInfoMeaningEnhancer />
-        <QuranHeaderSearchEnhancer />
-        <QuranHomeLinkFixEnhancer />
-        <QuranCleanReadingEnhancer />
-        <QuranCleanToolbarFixEnhancer />
-        <QuranMoreMenuEnhancer />
-        <QuranTapAnchorEnhancer />
-        <QuranPrintedPageEnhancer />
-        <QuranScriptTajweedEnhancer />
-        <QuranPrintedScrollEnhancer />
-        <QuranIndexEnhancer />
-        <QuranAudioSystem />
-        <QuranGlyphSafetyEnhancer />
-        <QuranContextSurahChooserEnhancer />
-        <QuranPageOrderGuardEnhancer />
-        <QuranSchoolLinkEnhancer />
-        <WebsiteLogoEnhancer />
-        <WebAppNav />
-      </body>
-    </html>
-  );
-}
+const geistSans=Geist({variable:"--font-geist-sans",subsets:["latin"]});
+const geistMono=Geist_Mono({variable:"--font-geist-mono",subsets:["latin"]});
+const basePath=process.env.NEXT_PUBLIC_BASE_PATH||"";const asset=(path:string)=>`${basePath}${path}`;const ICON_VERSION="20260825-exact-5";
+export const metadata:Metadata={title:"Hassoun",description:"Prayer times, Qur’an reading and audio, Qur’an School, memorization, Qibla, Islamic events and learning tools.",manifest:asset(`/manifest.webmanifest?v=${ICON_VERSION}`),appleWebApp:{capable:true,statusBarStyle:"black-translucent",title:"Hassoun"},other:{"codex-preview":"development"},icons:{icon:[{url:asset(`/hassoun-brand.svg?v=${ICON_VERSION}`),type:"image/svg+xml",sizes:"any"}],shortcut:asset(`/hassoun-brand.svg?v=${ICON_VERSION}`),apple:[{url:asset(`/hassoun-brand.svg?v=${ICON_VERSION}`),type:"image/svg+xml",sizes:"any"}]}};
+export const viewport:Viewport={width:"device-width",initialScale:1,viewportFit:"cover",themeColor:"#0b5b47"};
+export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><body className={`${geistSans.variable} ${geistMono.variable}`}><RemoteAppControl/>{children}<EmailManageRedirect/><NavEnhancer/><LocationPrayerTimesEnhancer/><LocationMovementRefresh/><PrayerAlertAudioEnhancer/><PrayerCardInteractionEnhancer/><ServiceWorkerRegistration/><WebPushRegistration/><QuranUiFixEnhancer/><QuranReferenceLayoutEnhancer/><QuranReferenceControlsEnhancer/><QuranViewModeEnhancer/><QuranTranslationLanguageEnhancer/><QuranVerseMenuEnhancer/><QuranInfoMeaningEnhancer/><QuranHeaderSearchEnhancer/><QuranHomeLinkFixEnhancer/><QuranCleanReadingEnhancer/><QuranCleanToolbarFixEnhancer/><QuranMoreMenuEnhancer/><QuranTapAnchorEnhancer/><QuranPrintedPageEnhancer/><QuranScriptTajweedEnhancer/><QuranPrintedScrollEnhancer/><QuranIndexEnhancer/><QuranAudioSystem/><QuranGlyphSafetyEnhancer/><QuranContextSurahChooserEnhancer/><QuranPageOrderGuardEnhancer/><QuranSchoolLinkEnhancer/><WebsiteLogoEnhancer/><WebAppNav/></body></html>}
