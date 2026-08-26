@@ -1,0 +1,23 @@
+import { requireAdmin } from "./adminAuth";
+import type { Env } from "./types";
+
+const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json"}});
+const text=(v:unknown,n=4000)=>typeof v==="string"?v.trim().slice(0,n):"";
+async function body(request:Request){return await request.json().catch(()=>({})) as Record<string,unknown>}
+async function auth(request:Request,env:Env){const a=await requireAdmin(request,env);if(!a.admin)return {admin:null,response:a.response!};if(!["owner","admin"].includes(a.admin.role))return {admin:null,response:json({error:"Owner or admin access required"},403)};return {admin:a.admin,response:null}}
+
+export async function updateSupportContact(request:Request,env:Env,publicId:string){const a=await auth(request,env);if(!a.admin)return a.response!;const b=await body(request);const status=["new","open","waiting","resolved","closed","spam"].includes(String(b.status))?String(b.status):"open";await env.DB.prepare("UPDATE support_contacts SET status=?,internal_notes=?,assigned_admin_id=?,resolved_at=CASE WHEN ? IN ('resolved','closed') THEN CURRENT_TIMESTAMP ELSE resolved_at END,updated_at=CURRENT_TIMESTAMP WHERE public_id=?").bind(status,text(b.internalNotes,8000)||null,a.admin.id,status,publicId).run();await env.DB.prepare("INSERT INTO admin_audit_log(admin_user_id,action,entity_type,entity_id,summary) VALUES(?,?,?,?,?)").bind(a.admin.id,"update","support_contact",publicId,`Support ticket changed to ${status}`).run().catch(()=>{});return json({ok:true,status})}
+
+export async function getAdminReports(request:Request,env:Env){const a=await auth(request,env);if(!a.admin)return a.response!;const one=async(sql:string)=>(await env.DB.prepare(sql).first<Record<string,unknown>>())||{};const [users,devices,email,push,support,school,content,admins,audit]=await Promise.all([
+ one("SELECT COUNT(*) total,SUM(status='active') active,SUM(status='unsubscribed') unsubscribed,SUM(status='bounced') bounced FROM email_subscribers"),
+ one("SELECT COUNT(*) total,SUM(enabled=1) active,SUM(platform='android' AND enabled=1) android,SUM(platform='ios' AND enabled=1) ios,SUM(platform='web' AND enabled=1) web FROM subscriptions"),
+ one("SELECT COUNT(*) total,SUM(status='sent') sent,SUM(status='failed') failed,SUM(status='pending') pending FROM email_outbox"),
+ one("SELECT COUNT(*) total,SUM(status='sent') sent,SUM(status='failed') failed,SUM(status='scheduled') scheduled,SUM(status='sending') sending FROM push_campaigns"),
+ one("SELECT COUNT(*) total,SUM(status='new') new,SUM(status='open') open,SUM(status='waiting') waiting,SUM(status='resolved') resolved FROM support_contacts"),
+ one("SELECT (SELECT COUNT(*) FROM school_students WHERE status='active') students,(SELECT COUNT(*) FROM school_teachers WHERE status='active') teachers,(SELECT COUNT(*) FROM school_classes WHERE status='active') classes,(SELECT COUNT(*) FROM school_assignment_progress WHERE status='submitted') awaiting_review,(SELECT COUNT(*) FROM school_attendance WHERE attendance_date=date('now')) attendance_today"),
+ one("SELECT COUNT(*) total,SUM(status='published') published,SUM(status='draft') draft FROM app_content"),
+ one("SELECT COUNT(*) total,SUM(status='active') active FROM admin_users"),
+ one("SELECT COUNT(*) total FROM admin_audit_log")
+ ]);return json({ok:true,generatedAt:new Date().toISOString(),users,devices,email,push,support,school,content,admins,audit})}
+
+export async function getSystemHealth(request:Request,env:Env){const a=await auth(request,env);if(!a.admin)return a.response!;const checks:Record<string,unknown>={worker:true,time:new Date().toISOString()};try{checks.database=!!(await env.DB.prepare("SELECT 1 ok").first())}catch(e){checks.database=false;checks.databaseError=String(e)};try{const p=await env.DB.prepare("SELECT COUNT(*) count FROM email_outbox WHERE status='failed' AND created_at>=datetime('now','-24 hours')").first<{count:number}>();checks.emailFailures24h=p?.count||0}catch{};try{const p=await env.DB.prepare("SELECT COUNT(*) count FROM push_campaigns WHERE status='failed' AND created_at>=datetime('now','-24 hours')").first<{count:number}>();checks.pushFailures24h=p?.count||0}catch{};try{const p=await env.DB.prepare("SELECT COUNT(*) count FROM support_contacts WHERE status='new'").first<{count:number}>();checks.newSupport=p?.count||0}catch{};try{const p=await env.DB.prepare("SELECT COUNT(*) count FROM admin_sessions WHERE revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP").first<{count:number}>();checks.activeAdminSessions=p?.count||0}catch{};return json({ok:true,checks})}
