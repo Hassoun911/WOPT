@@ -8,7 +8,14 @@ export default function PasswordResetLink() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    setShow(!window.localStorage.getItem(TOKEN_KEY));
+    const refresh = () => setShow(!window.localStorage.getItem(TOKEN_KEY));
+    refresh();
+    const timer = window.setInterval(refresh, 300);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   if (!show) return null;
