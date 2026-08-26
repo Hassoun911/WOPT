@@ -1,0 +1,129 @@
+name: Build v1.0.12 Corrected From Golden Feature Source
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-v1012-golden-source-messaging.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v1012-golden-source-messaging
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout current golden-feature mobile source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+
+      - name: Preserve exact Hassoun bird Quran branding and bump install code
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 -c "from pathlib import Path; import re; p=Path('app.config.ts'); s=p.read_text(); s=re.sub(r'version:\\s*\"[^\"]+\"','version: \"1.0.12\"',s,count=1); s=re.sub(r'versionCode:\\s*\\d+','versionCode: 54',s,count=1); p.write_text(s)"
+          python3 -c "from PIL import Image,ImageFile; from pathlib import Path; ImageFile.LOAD_TRUNCATED_IMAGES=True; p=Path('assets/hassoun-logo.png'); assert p.exists() and p.stat().st_size>0; logo=Image.open(p).convert('RGBA'); logo.save(p,format='PNG',optimize=True); logo.resize((1024,1024),Image.Resampling.LANCZOS).save('assets/icon.png',format='PNG',optimize=True); splash=Image.new('RGBA',(1024,1024),(0,0,0,0)); art=logo.copy(); art.thumbnail((820,820),Image.Resampling.LANCZOS); splash.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2)); splash.save('assets/splash-logo.png',format='PNG',optimize=True)"
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Verify golden features plus messaging
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          grep -q 'bookmarkedKeys' src/quran/QuranV3.tsx
+          grep -q 'HomePrayerPanel' App.tsx
+          grep -q 'QiblaDirectionScreen' App.tsx
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
+          grep -q 'Notifications.requestPermissionsAsync' AppWithEmail.tsx
+          grep -q 'AppState.addEventListener' AppWithEmail.tsx
+          grep -q 'version: "1.0.12"' app.config.ts
+          grep -q 'versionCode: 54' app.config.ts
+          npx tsc --noEmit
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and rename APK
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          OUT=android/app/build/outputs/apk/release/Hassoun-v1.0.12-golden-features-messaging-fixed.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -E 'assets/(index\\.android\\.bundle|.*\\.hbc)'
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          ls -lh "$OUT"
+
+      - name: Upload corrected APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.12-golden-features-messaging-fixed
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-golden-features-messaging-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-golden-features-messaging-fixed.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish corrected prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK=mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-golden-features-messaging-fixed.apk
+          SUM=$APK.sha256
+          TAG=v1.0.12-golden-features-messaging-fixed
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$SUM" --clobber
+          else
+            gh release create "$TAG" "$APK" "$SUM" --target main --title "Hassoun v1.0.12 Golden Features + Messaging Fixed" --notes "Corrected candidate built from the current mobile source that preserves the golden APK bookmark and main-page features. Adds/keeps server push registration and CRM-controlled scrolling system messages. Uses Hassoun bird + Quran branding. v1.0.11 remains golden until user confirms this APK." --prerelease
+          fi
