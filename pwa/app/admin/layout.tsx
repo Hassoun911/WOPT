@@ -42,6 +42,7 @@ const groups = [
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/admin/";
+  const isDashboard = pathname === "/admin" || pathname === "/admin/";
 
   useEffect(() => {
     const html = document.documentElement;
@@ -74,7 +75,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const active = (href: string) =>
-    href === "/admin/" ? pathname === "/admin" || pathname === "/admin/" : pathname.startsWith(href.replace(/\/$/, ""));
+    href === "/admin/" ? isDashboard : pathname.startsWith(href.replace(/\/$/, ""));
 
   const groupActive = (items: readonly (readonly [string, string])[]) => items.some(([href]) => active(href));
 
@@ -82,11 +83,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div style={{ minHeight: "100dvh", overflow: "visible", paddingBottom: 24 }}>
       <EmailSponsorSaveFix />
       <style>{`
+        ${isDashboard ? `
         /* The dashboard used to render a second duplicate CRM tab bar. The
            global admin navigation below is now the single source of truth. */
         body main > header + nav { display: none !important; }
         body main > header a[href="/admin/email"],
         body main > header a[href="/admin/email/"] { display: none !important; }
+        ` : ""}
         .hassoun-admin-nav details > summary::-webkit-details-marker { display:none; }
         .hassoun-admin-nav details[open] > summary { background:#0b735b !important; color:white !important; }
         @media (max-width: 760px) {
