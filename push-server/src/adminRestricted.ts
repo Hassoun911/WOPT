@@ -8,6 +8,7 @@ import {
 } from "./adminCrm";
 import { createAdminEmailCampaign, listAdminEmailCampaigns } from "./adminEmail";
 import { createAdminPushCampaign, listAdminPushCampaigns } from "./adminPush";
+import { subscribeByEmail } from "./subscribers";
 import type { Env } from "./types";
 
 function json(data: unknown, status = 200) {
@@ -43,6 +44,37 @@ export async function listRestrictedSubscribers(request: Request, env: Env, url:
   return listAdminSubscribers(request, env, url);
 }
 
+async function createRestrictedSubscriber(request: Request, env: Env) {
+  const auth = await requireOperator(request, env);
+  if (!auth.admin) return auth.response!;
+
+  const clone = request.clone();
+  const body = await clone.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body) return json({ error: "Invalid request body" }, 400);
+
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (!email) return json({ error: "Email is required" }, 400);
+
+  const signup = await subscribeByEmail(request, env);
+  if (!signup.ok) return signup;
+
+  const row = await env.DB.prepare(
+    "SELECT id, public_id, email FROM email_subscribers WHERE email = ? COLLATE NOCASE LIMIT 1"
+  ).bind(email).first<{ id: number; public_id: string; email: string }>();
+  if (!row) return json({ error: "Subscriber creation failed" }, 500);
+
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE email_subscribers SET status = 'active', unsubscribed_at = NULL, verification_token_hash = NULL, verification_expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).bind(row.id),
+    env.DB.prepare(
+      "UPDATE email_outbox SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE subscriber_id = ? AND kind = 'verification' AND status = 'pending'"
+    ).bind(row.id)
+  ]);
+
+  return json({ ok: true, subscriber: { public_id: row.public_id, email: row.email, status: "active" } });
+}
+
 export async function listRestrictedAppSettings(request: Request, env: Env) {
   const auth = await authenticated(request, env);
   if (!auth.admin) return auth.response!;
@@ -60,6 +92,7 @@ export async function updateRestrictedSubscriberStatus(request: Request, env: En
   const auth = await requireOperator(request, env);
   if (!auth.admin) return auth.response!;
   if (!publicId) return json({ error: "Subscriber id is required" }, 400);
+  if (publicId === "create") return createRestrictedSubscriber(request, env);
   return updateSubscriberStatus(request, env, publicId);
 }
 
