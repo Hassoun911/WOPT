@@ -26,7 +26,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             push-server/package-lock.json
-            admin-crm/package-lock.json
       - name: Validate Worker
         working-directory: push-server
         run: |
@@ -42,7 +41,7 @@ jobs:
       - name: Validate Admin CRM
         working-directory: admin-crm
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --ignore-scripts --no-audit --no-fund
           npm run build
       - name: Smoke test Worker
         run: |
