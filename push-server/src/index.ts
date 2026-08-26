@@ -8,6 +8,7 @@ import {
   updateAppContent
 } from "./adminCrm";
 import { handleAdminSchool } from "./adminSchool";
+import { handleAdminOperations } from "./adminOperations";
 import { createAdminTeamMember } from "./adminTeamCreate";
 import {
   getAdminUser360,
@@ -156,6 +157,7 @@ export default {
       else if (request.method === "POST" && url.pathname === "/admin/password/reset") response = await resetAdminPassword(request, env);
       else if (request.method === "GET" && url.pathname === "/admin/dashboard") response = await getAdminDashboard(request, env);
       else if (url.pathname.startsWith("/admin/school")) response = await handleAdminSchool(request, env, url);
+      else if (url.pathname.startsWith("/admin/support/contacts/") || url.pathname === "/admin/reports" || url.pathname === "/admin/system/health") response = await handleAdminOperations(request, env, url);
       else if (request.method === "GET" && url.pathname === "/admin/subscribers") response = await listRestrictedSubscribers(request, env, url);
       else if (request.method === "POST" && /^\/admin\/subscribers\/[^/]+\/status$/.test(url.pathname)) response = await updateRestrictedSubscriberStatus(request, env, url.pathname.split("/")[3] ?? "");
       else if (request.method === "GET" && /^\/admin\/subscribers\/[^/]+\/360$/.test(url.pathname)) response = await getAdminUser360(request, env, url.pathname.split("/")[3] ?? "");
