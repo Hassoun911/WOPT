@@ -1,5 +1,5 @@
-import UserControlCenter from "../../UserControlCenter";
+import AdminUsersManager from "../../AdminUsersManager";
 
 export default function AdminUsersPage() {
-  return <UserControlCenter />;
+  return <AdminUsersManager />;
 }
