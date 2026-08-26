@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useEffect, useState } from "react";
 import {
+  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -21,6 +22,17 @@ import BrandMark from "./src/BrandMark";
 import { STORAGE_KEYS } from "./src/config";
 import { configureNotificationChannels } from "./src/notifications";
 import { registerDeviceForServerPush } from "./src/push";
+import SystemMessageTicker from "./src/SystemMessageTicker";
+
+async function syncServerPush(locale: "en" | "ar", allowPrompt: boolean) {
+  let permission = await Notifications.getPermissionsAsync();
+  if (!permission.granted && allowPrompt && permission.canAskAgain) {
+    permission = await Notifications.requestPermissionsAsync();
+  }
+  if (!permission.granted) return false;
+  await registerDeviceForServerPush(locale);
+  return true;
+}
 
 function AppWithEmailShell() {
   const insets = useSafeAreaInsets();
@@ -29,17 +41,35 @@ function AppWithEmailShell() {
   const [completion, setCompletion] = useState<EmailSignupCompletion | null>(null);
 
   useEffect(() => {
+    let currentLocale: "en" | "ar" = "en";
     void (async () => {
       await configureNotificationChannels();
       const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
-      const currentLocale = saved === "ar" ? "ar" : "en";
+      currentLocale = saved === "ar" ? "ar" : "en";
       setLocale(currentLocale);
-
-      const permission = await Notifications.getPermissionsAsync();
-      if (permission.granted) {
-        await registerDeviceForServerPush(currentLocale).catch(() => undefined);
-      }
+      await syncServerPush(currentLocale, true).catch(() => false);
     })().catch(() => undefined);
+
+    const subscription = AppState.addEventListener("change", state => {
+      if (state !== "active") return;
+      void AsyncStorage.getItem(STORAGE_KEYS.locale).then(saved => {
+        const activeLocale = saved === "ar" ? "ar" : "en";
+        setLocale(activeLocale);
+        return syncServerPush(activeLocale, false);
+      }).catch(() => undefined);
+    });
+
+    const refreshTimer = setInterval(() => {
+      void AsyncStorage.getItem(STORAGE_KEYS.locale).then(saved => {
+        const activeLocale = saved === "ar" ? "ar" : "en";
+        return syncServerPush(activeLocale, false);
+      }).catch(() => undefined);
+    }, 6 * 60 * 60 * 1000);
+
+    return () => {
+      subscription.remove();
+      clearInterval(refreshTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -64,6 +94,7 @@ function AppWithEmailShell() {
 
   return (
     <View style={styles.root}>
+      <SystemMessageTicker locale={locale} />
       <App onOpenEmailAlerts={() => void open()} />
 
       {completion ? (
@@ -163,7 +194,7 @@ export default function AppWithEmail() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: "#f7f4ec" },
   receipt: {
     position: "absolute",
     left: 16,
