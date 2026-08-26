@@ -1,17 +1,18 @@
-# Final Hassoun v1.0.8 Android APK build
-name: Build Hassoun v1.0.8 APK
+name: Build Hassoun v1.0.12 APK
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
+      - "mobile/**"
       - ".github/workflows/android-debug.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v108-final-apk
+  group: hassoun-v1012-apk
   cancel-in-progress: true
 
 jobs:
@@ -20,17 +21,15 @@ jobs:
     timeout-minutes: 45
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
       NODE_ENV: production
     defaults:
       run:
         working-directory: mobile
 
     steps:
-      - name: Checkout verified forward source
+      - name: Checkout current main
         uses: actions/checkout@v4
-        with:
-          ref: work/forward-from-latest-good
-          fetch-depth: 0
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -54,113 +53,14 @@ jobs:
           npm ci --include=dev --no-audit --no-fund
           npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
 
-      - name: Reproduce verified v1.0.7 baseline transforms
+      - name: Verify messaging-enabled source
         run: |
           set -euo pipefail
-          node scripts/apply-v106-clean-home.mjs
-          node scripts/fix-memorize-entry.mjs
-          node scripts/apply-alhafiz-motivation.mjs
-
-      - name: Overlay redesigned prayer home and smart Qibla
-        run: |
-          set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/HomePrayerPanel.tsx -o src/HomePrayerPanel.tsx
-          curl -fsSL https://raw.githubusercontent.com/Hassoun911/WOPT/728c5f0ed9132408405668153bc0f318c9cdceca/mobile/src/QiblaDirectionScreen.tsx -o src/QiblaDirectionScreen.tsx
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('App.tsx')
-          text = path.read_text()
-
-          if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
-              text = text.replace(
-                  'import SettingsHub from "./src/SettingsHub";\n',
-                  'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
-                  1,
-              )
-
-          text = text.replace(
-              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
-              'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
-              1,
-          )
-
-          home_pattern = re.compile(
-              r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',
-              re.S,
-          )
-          home_replacement = '''\n\n      <HomePrayerPanel
-        locale={locale}
-        today={today}
-        next={next}
-        preferences={phoneAlertPreferences}
-        onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
-        onOpenQibla={() => setActiveTab("qibla")}
-      />
-
-      <Pressable onPress={() => setActiveTab("quiz")}'''
-          text, count = home_pattern.subn(home_replacement, text, count=1)
-          if count != 1 and '<HomePrayerPanel' not in text:
-              raise SystemExit('Could not replace legacy home prayer block')
-
-          body_pattern = re.compile(
-              r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
-              re.S,
-          )
-          body_replacement = ''': activeTab === "events"
-          ? <IslamicEventsPage locale={locale} todayKey={todayKey} onBack={() => setActiveTab("home")} />
-          : activeTab === "qibla"
-            ? <QiblaDirectionScreen locale={locale} onBack={() => setActiveTab("home")} />
-            : activeTab === "more"'''
-          text, body_count = body_pattern.subn(body_replacement, text, count=1)
-          if body_count != 1 and 'activeTab === "qibla"' not in text:
-              raise SystemExit('Could not wire Qibla screen')
-
-          path.write_text(text)
-          PY
-
-      - name: Prepare exact Hassoun logo assets
-        run: |
-          set -euo pipefail
-          sudo apt-get update -y
-          sudo apt-get install -y python3-pil pngcheck
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image, ImageFile
-
-          ImageFile.LOAD_TRUNCATED_IMAGES = True
-          logo_path = Path('assets/hassoun-logo.png')
-          if not logo_path.exists() or logo_path.stat().st_size == 0:
-              raise SystemExit('Missing exact Hassoun logo')
-
-          logo = Image.open(logo_path).convert('RGBA')
-          logo.save(logo_path, format='PNG', optimize=True)
-          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
-
-          splash = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
-          art = logo.copy()
-          art.thumbnail((820, 820), Image.Resampling.LANCZOS)
-          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
-          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
-          PY
-          pngcheck -q assets/hassoun-logo.png
-          pngcheck -q assets/icon.png
-          pngcheck -q assets/splash-logo.png
-          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
-          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
-
-      - name: Verify v1.0.8 features
-        run: |
-          set -euo pipefail
-          grep -q 'version: "1.0.8"' app.config.ts
-          grep -q 'versionCode: 49' app.config.ts
-          grep -q 'SmartMemorize' src/quran/QuranV3.tsx
-          grep -q 'AI MEMORIZATION COACH' src/quran/AlHafizClassroom.tsx
-          grep -q 'HomePrayerPanel' App.tsx
-          grep -q 'QiblaDirectionScreen' App.tsx
-          grep -q 'Vibration.vibrate' src/QiblaDirectionScreen.tsx
-          grep -q 'alignmentFlash' src/QiblaDirectionScreen.tsx
+          grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.12"' app.config.ts
+          grep -q 'versionCode: 53' app.config.ts
+          grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          test -f src/SystemMessageTicker.tsx
           npx tsc --noEmit
 
       - name: Generate Android project
@@ -170,68 +70,41 @@ jobs:
           npx expo prebuild --platform android --clean --no-install
 
       - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
         working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       - name: Verify and rename APK
         run: |
           set -euo pipefail
           APK='android/app/build/outputs/apk/release/app-release.apk'
           test -s "$APK"
-          unzip -l "$APK" > /tmp/hassoun-v108.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v108.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+          unzip -l "$APK" > /tmp/hassoun-v1012.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v1012.txt
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.8-APK
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk
+          name: Hassoun-v1.0.12-messaging-APK
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish fixed prerelease APK
+      - name: Publish prerelease APK
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.8.apk'
-          TAG='v1.0.8-forward-final'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk'
+          TAG='v1.0.12-messaging'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --target work/forward-from-latest-good \
-              --title 'Hassoun v1.0.8 Forward Final' \
-              --notes 'Android v1.0.8 / code 49 built from the verified v1.0.7 baseline. Includes redesigned prayer home, per-prayer Adhan controls, smart Qibla, and preserved Smart Memorize/Tahfiz.' \
+              --target main \
+              --title 'Hassoun v1.0.12 Messaging' \
+              --notes 'Android build with automatic server push registration and CRM-controlled scrolling system messages.' \
               --prerelease
-          fi
-
-      - name: Write success marker to main
-        working-directory: .
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v1.0.8-forward-final/Hassoun-v1.0.8.apk"
-          printf 'status=success\nversion=1.0.8\nversionCode=49\nrun_id=%s\nrun=%s\ndownload=%s\n' "$RUN_ID" "$RUN_URL" "$DOWNLOAD_URL" > /tmp/v108-release-result.txt
-          CONTENT="$(base64 -w0 /tmp/v108-release-result.txt)"
-          EXISTING_SHA="$(gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt?ref=main --jq .sha 2>/dev/null || true)"
-          if [ -n "$EXISTING_SHA" ]; then
-            gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt \
-              -X PUT \
-              -f message='Record successful Hassoun v1.0.8 APK build' \
-              -f branch='main' \
-              -f content="$CONTENT" \
-              -f sha="$EXISTING_SHA"
-          else
-            gh api repos/${{ github.repository }}/contents/.github/v108-release-result.txt \
-              -X PUT \
-              -f message='Record successful Hassoun v1.0.8 APK build' \
-              -f branch='main' \
-              -f content="$CONTENT"
           fi
