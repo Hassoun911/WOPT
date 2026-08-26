@@ -3,7 +3,7 @@ import { getInstallationId } from "./installation";
 
 const API_URL = "https://wopt-prayer-push.wopt-windsor.workers.dev/activity";
 
-export type HassounActivity = "app_open" | "home" | "quran" | "games" | "alerts" | "events" | "sheikh" | "more" | "email_alerts";
+export type HassounActivity = "app_open" | "home" | "quran" | "games" | "alerts" | "events" | "sheikh" | "qibla" | "more" | "email_alerts";
 
 const DETAILS: Record<HassounActivity, string> = {
   app_open: "Opened the Hassoun mobile app",
@@ -13,6 +13,7 @@ const DETAILS: Record<HassounActivity, string> = {
   alerts: "Reviewed prayer alerts",
   events: "Viewed Islamic events",
   sheikh: "Opened Ask the Sheikh",
+  qibla: "Opened Qibla compass",
   more: "Opened app settings",
   email_alerts: "Reviewed email prayer alerts"
 };
