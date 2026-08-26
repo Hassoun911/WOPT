@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/build-v112-messaging-from-v111-good.yml'
       - 'mobile/scripts/apply-v112-messaging-fix.mjs'
+      - 'mobile/scripts/apply-v112-next-prayer-layout-fix.mjs'
       - 'mobile/src/SystemMessageTicker.tsx'
   workflow_dispatch:
 
@@ -55,6 +56,9 @@ jobs:
       - name: Apply messaging-only v1.0.12 patch
         run: node scripts/apply-v112-messaging-fix.mjs
 
+      - name: Fix next prayer card responsive layout
+        run: node scripts/apply-v112-next-prayer-layout-fix.mjs
+
       - name: Prepare exact Hassoun bird Quran logo
         run: |
           sudo apt-get update -y
@@ -84,14 +88,16 @@ jobs:
           mkdir -p modules/hassoun-widget/android/src/main/res/drawable
           cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
-      - name: Verify golden features plus messaging only
+      - name: Verify golden features messaging and layout fix
         run: |
           set -euo pipefail
           npm run typecheck
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'versionCode: 53' app.config.ts
+          grep -q 'versionCode: 54' app.config.ts
           grep -q 'Windsor, Ontario' src/prayerData.ts
           grep -q 'backgroundColor: "#edf5f0"' src/HomePrayerPanel.tsx
+          grep -q 'nextAccent: { width: 24' src/HomePrayerPanel.tsx
+          grep -q 'numberOfLines={1} adjustsFontSizeToFit' src/HomePrayerPanel.tsx
           grep -q 'setPrayerLocation(refreshed.location)' App.tsx
           grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
           grep -q 'syncServerPush' AppWithEmail.tsx
@@ -112,7 +118,7 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-layout-fixed-from-v1.0.11-good.apk"
           cp "$APK" "$OUT"
           ls -lh "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
@@ -120,10 +126,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-messaging-from-v1.0.11-good
+          name: Hassoun-v1.0.12-messaging-layout-fixed-from-v1.0.11-good
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-layout-fixed-from-v1.0.11-good.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-layout-fixed-from-v1.0.11-good.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -133,14 +139,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk'
-          TAG='v1.0.12-messaging-from-v1.0.11-good'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-layout-fixed-from-v1.0.11-good.apk'
+          TAG='v1.0.12-messaging-layout-fixed-from-v1.0.11-good'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
               --target release/v1.0.12-messaging-from-v1.0.11-good \
-              --title 'Hassoun v1.0.12 Messaging from v1.0.11 Good' \
-              --notes 'Built from the exact release/android-current v1.0.11 golden lineage. Only messaging changes added: automatic push registration and CRM scrolling system message.' \
+              --title 'Hassoun v1.0.12 Messaging + Layout Fix from v1.0.11 Good' \
+              --notes 'Built from the exact v1.0.11 golden lineage. Adds CRM push registration, scrolling system message, and fixes the broken responsive Next Prayer card layout. Android versionCode 54.' \
               --prerelease
           fi
