@@ -8,34 +8,65 @@ MOBILE = ROOT / "mobile"
 def patch_prayer_home() -> None:
     path = MOBILE / "App.tsx"
     text = path.read_text()
+
+    # Restore the exact known-good prayer panel/qibla components copied in by CI.
     if 'import HomePrayerPanel from "./src/HomePrayerPanel";' not in text:
         text = text.replace(
             'import SettingsHub from "./src/SettingsHub";\n',
             'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
             1,
         )
+    elif 'import QiblaDirectionScreen from "./src/QiblaDirectionScreen";' not in text:
+        text = text.replace(
+            'import HomePrayerPanel from "./src/HomePrayerPanel";\n',
+            'import HomePrayerPanel from "./src/HomePrayerPanel";\nimport QiblaDirectionScreen from "./src/QiblaDirectionScreen";\n',
+            1,
+        )
+
+    if 'import ScrollingTicker from "./src/ScrollingTicker";' not in text:
+        text = text.replace(
+            'import SettingsHub from "./src/SettingsHub";\n',
+            'import SettingsHub from "./src/SettingsHub";\nimport ScrollingTicker from "./src/ScrollingTicker";\n',
+            1,
+        )
+
     text = text.replace(
         'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "more";',
         'type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";',
         1,
     )
-    home_pattern = re.compile(
-        r'\n\s*\{next \? <View style=\{styles\.nextCard\}>.*?\n\s*<Pressable onPress=\{\(\) => setActiveTab\("quiz"\)\}',
-        re.S,
-    )
-    replacement = '''\n\n      <HomePrayerPanel
+
+    # The v1.0.11 lineage has changed several times around the cards below the
+    # next-prayer card. Match ONLY the legacy next-prayer card itself instead of
+    # assuming the Quiz card is immediately after it.
+    if '<HomePrayerPanel' not in text:
+        start_marker = '{next ? <View style={styles.nextCard}>'
+        start = text.find(start_marker)
+        if start < 0:
+            raise SystemExit('Refusing build: could not locate golden next-prayer card')
+        end_marker = '</View> : null}'
+        end = text.find(end_marker, start)
+        if end < 0:
+            raise SystemExit('Refusing build: could not locate end of golden next-prayer card')
+        end += len(end_marker)
+        replacement = '''<HomePrayerPanel
         locale={locale}
         today={today}
         next={next}
         preferences={phoneAlertPreferences}
         onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}
         onOpenQibla={() => setActiveTab("qibla")}
-      />
+      />'''
+        text = text[:start] + replacement + text[end:]
 
-      <Pressable onPress={() => setActiveTab("quiz")}'''
-    text, count = home_pattern.subn(replacement, text, count=1)
-    if count != 1 and '<HomePrayerPanel' not in text:
-        raise SystemExit('Refusing build: could not restore known-good HomePrayerPanel')
+    # Mount the CRM-controlled ticker on the Home screen only, directly below
+    # the existing Hassoun header. Do not alter the rest of the golden layout.
+    home_anchor = 'const homeScreen = (\n    <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n      {header}\n'
+    if '<ScrollingTicker />' not in text:
+        if home_anchor not in text:
+            raise SystemExit('Refusing build: could not locate golden Home header for ticker')
+        text = text.replace(home_anchor, home_anchor + '      <ScrollingTicker />\n', 1)
+
     body_pattern = re.compile(
         r': activeTab === "events"\s*\n\s*\? <IslamicEventsPage locale=\{locale\} todayKey=\{todayKey\} onBack=\{\(\) => setActiveTab\("home"\)\} />\s*\n\s*: activeTab === "more"',
         re.S,
@@ -48,13 +79,16 @@ def patch_prayer_home() -> None:
     text, count2 = body_pattern.subn(body_replacement, text, count=1)
     if count2 != 1 and 'activeTab === "qibla"' not in text:
         raise SystemExit('Refusing build: could not restore known-good Qibla route')
+
     path.write_text(text)
 
 
 def patch_push_registration() -> None:
     path = MOBILE / "AppWithEmail.tsx"
     text = path.read_text()
-    text = text.replace('  Modal,\n  Pressable,', '  AppState,\n  Modal,\n  Pressable,', 1)
+    if '  AppState,\n' not in text:
+        text = text.replace('  Modal,\n  Pressable,', '  AppState,\n  Modal,\n  Pressable,', 1)
+
     old = '''  useEffect(() => {
     void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
     void (async () => {
@@ -69,6 +103,7 @@ def patch_push_registration() -> None:
       }
     })().catch(() => undefined);
   }, []);'''
+
     new = '''  useEffect(() => {
     let currentLocale: "en" | "ar" = "en";
     const syncPush = async (allowPrompt: boolean) => {
@@ -76,18 +111,29 @@ def patch_push_registration() -> None:
       currentLocale = saved === "ar" ? "ar" : "en";
       setLocale(currentLocale);
       let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && allowPrompt && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
-      if (permission.granted) await registerDeviceForServerPush(currentLocale);
+      if (!permission.granted && allowPrompt && permission.canAskAgain) {
+        permission = await Notifications.requestPermissionsAsync();
+      }
+      if (permission.granted) {
+        await registerDeviceForServerPush(currentLocale).catch(() => undefined);
+      }
     };
+
     void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
     void configureNotificationChannels().then(() => syncPush(true)).catch(() => undefined);
-    const sub = AppState.addEventListener("change", state => { if (state === "active") void syncPush(false).catch(() => undefined); });
+
+    const sub = AppState.addEventListener("change", state => {
+      if (state === "active") void syncPush(false).catch(() => undefined);
+    });
     const timer = setInterval(() => void syncPush(false).catch(() => undefined), 6 * 60 * 60 * 1000);
     return () => { sub.remove(); clearInterval(timer); };
   }, []);'''
-    if old not in text:
+
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif 'const syncPush = async (allowPrompt: boolean)' not in text:
         raise SystemExit('Refusing build: golden AppWithEmail push block did not match')
-    path.write_text(text.replace(old, new, 1))
+    path.write_text(text)
 
 
 def write_ticker() -> None:
