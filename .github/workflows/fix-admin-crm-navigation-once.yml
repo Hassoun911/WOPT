@@ -1,0 +1,131 @@
+name: Fix Admin CRM Navigation Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-admin-crm-navigation-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/hassoun-1.0-store-admin
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-crm/package.json
+
+      - name: Repair CRM routes and dashboard navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('admin-crm/app/CrmDashboard.tsx')
+          s = p.read_text()
+
+          old = 'export default function CrmDashboard() {'
+          new = 'export default function CrmDashboard({ initialView = "dashboard" }: { initialView?: View }) {'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('CrmDashboard export anchor not found')
+
+          old = 'const [view, setView] = useState<View>("dashboard");'
+          new = 'const [view, setView] = useState<View>(initialView);'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('view state anchor not found')
+
+          sync = '  useEffect(() => { setView(initialView); }, [initialView]);\n'
+          anchor = '  useEffect(() => { const saved = window.localStorage.getItem(TOKEN_KEY);'
+          if sync.strip() not in s:
+              if anchor not in s:
+                  raise SystemExit('useEffect anchor not found')
+              s = s.replace(anchor, sync + anchor, 1)
+
+          old_stats = '''[["Active subscribers", dashboard.subscribers?.active || 0, "👥"],["Push devices",dashboard.devices?.active || 0,"📱"],["Android",dashboard.devices?.android || 0,"🤖"],["iOS",dashboard.devices?.ios || 0,"🍎"],["Published content",crm.content?.published || 0,"📖"],["Admins",crm.admins?.active || 0,"🔐"],["Audit events",crm.audit?.total || 0,"🧾"]].map(([label,value,emoji]) => <div key={String(label)} style={s.stat}><span style={{fontSize:20}}>{emoji}</span><strong style={s.statValue}>{value}</strong><span style={s.statLabel}>{label}</span></div>)'''
+          new_stats = '''[["Active subscribers", dashboard.subscribers?.active || 0, "👥", "/admin/users"],["Push devices",dashboard.devices?.active || 0,"📱","/admin/push"],["Android",dashboard.devices?.android || 0,"🤖","/admin/push"],["iOS",dashboard.devices?.ios || 0,"🍎","/admin/push"],["Published content",crm.content?.published || 0,"📖","/admin/quran"],["Admins",crm.admins?.active || 0,"🔐","team"],["Audit events",crm.audit?.total || 0,"🧾","audit"]].map(([label,value,emoji,target]) => <button type="button" key={String(label)} style={{...s.stat,cursor:"pointer",textAlign:"left",font:"inherit",width:"100%"}} onClick={() => String(target).startsWith("/") ? window.location.assign(String(target)) : setView(target as View)} title={`Open ${label}`}><span style={{fontSize:20}}>{emoji}</span><strong style={s.statValue}>{value}</strong><span style={s.statLabel}>{label}</span></button>)'''
+          if old_stats in s:
+              s = s.replace(old_stats, new_stats, 1)
+          elif new_stats not in s:
+              raise SystemExit('dashboard stat cards anchor not found')
+
+          p.write_text(s)
+
+          route_map = {
+              'quran': 'content',
+              'push': 'push',
+              'settings': 'control',
+          }
+          for route, view in route_map.items():
+              rp = Path(f'admin-crm/app/admin/{route}/page.tsx')
+              rp.parent.mkdir(parents=True, exist_ok=True)
+              rp.write_text(f'''import CrmDashboard from "../../CrmDashboard";\nimport PasswordResetLink from "../../PasswordResetLink";\n\nexport default function Admin{route.title()}Page() {{\n  return <>\n    <CrmDashboard initialView="{view}" />\n    <PasswordResetLink />\n  </>;\n}}\n''')
+
+          support = Path('admin-crm/app/admin/support/page.tsx')
+          support.parent.mkdir(parents=True, exist_ok=True)
+          support.write_text(r'''"use client";
+
+import { useEffect, useState } from "react";
+
+const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
+const TOKEN_KEY = "wopt:admin-token:v1";
+type Contact = { id?: number; public_id?: string; name?: string | null; email: string; subject?: string | null; message?: string | null; platform?: string | null; status?: string | null; email_status?: string | null; created_at?: string | null };
+
+export default function AdminSupportPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const token = window.localStorage.getItem(TOKEN_KEY);
+    if (!token) { window.location.replace("/admin/"); return; }
+    fetch(`${API}/admin/support/contacts?limit=200`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async r => { const data = await r.json().catch(() => ({})); if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`); return data; })
+      .then(data => setContacts(data.contacts || []))
+      .catch(e => setError(e instanceof Error ? e.message : "Unable to load support contacts"))
+      .finally(() => setLoading(false));
+  }, []);
+  return <main style={{minHeight:"100vh",background:"#f6f3e9",padding:"28px",color:"#163f35",fontFamily:"system-ui,sans-serif"}}>
+    <div style={{maxWidth:1250,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}><div><div style={{fontSize:12,fontWeight:800,letterSpacing:2,color:"#08765d"}}>HASSOUN ADMIN</div><h1 style={{margin:"6px 0 0"}}>Support</h1></div><a href="/admin/" style={{padding:"11px 16px",border:"1px solid #b7c9c2",borderRadius:12,color:"#163f35",textDecoration:"none",fontWeight:800}}>← Dashboard</a></div>
+      {loading ? <p>Loading support contacts…</p> : null}{error ? <div style={{marginTop:18,padding:14,background:"#fff0ee",borderRadius:12,color:"#9c2626"}}>{error}</div> : null}
+      <div style={{overflowX:"auto",marginTop:22,border:"1px solid #d7dfd9",borderRadius:16,background:"white"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:850}}><thead><tr>{["From","Subject","Message","Platform","Status","Received"].map(h => <th key={h} style={{textAlign:"left",padding:14,borderBottom:"1px solid #dde4df",fontSize:12,letterSpacing:1}}>{h}</th>)}</tr></thead><tbody>{contacts.map((c,i) => <tr key={c.public_id || c.id || i}><td style={{padding:14,borderBottom:"1px solid #eef1ee"}}><strong>{c.name || c.email}</strong><div style={{fontSize:12,opacity:.7}}>{c.email}</div></td><td style={{padding:14,borderBottom:"1px solid #eef1ee"}}>{c.subject || "—"}</td><td style={{padding:14,borderBottom:"1px solid #eef1ee",maxWidth:420}}>{c.message || "—"}</td><td style={{padding:14,borderBottom:"1px solid #eef1ee"}}>{c.platform || "—"}</td><td style={{padding:14,borderBottom:"1px solid #eef1ee"}}>{c.status || c.email_status || "—"}</td><td style={{padding:14,borderBottom:"1px solid #eef1ee"}}>{c.created_at ? new Date(c.created_at).toLocaleString() : "—"}</td></tr>)}</tbody></table>{!loading && !contacts.length && !error ? <p style={{padding:18}}>No support contacts yet.</p> : null}</div>
+    </div>
+  </main>;
+}
+''')
+
+          # Force the connected Vercel project to see a source change under admin-crm.
+          Path('admin-crm/.vercel-force-navigation-fix-20260825.txt').write_text('admin CRM navigation/routes/cards repaired\n')
+          PY
+
+          git diff --check
+
+      - name: Build admin CRM
+        working-directory: admin-crm
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run build
+
+      - name: Commit repair to production CRM branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin-crm
+          git commit -m "Fix admin CRM routes and clickable dashboard cards"
+          git push origin HEAD:work/hassoun-1.0-store-admin
