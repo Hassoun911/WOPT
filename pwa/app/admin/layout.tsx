@@ -83,6 +83,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div style={{ minHeight: "100dvh", overflow: "visible", paddingBottom: 24 }}>
       <EmailSponsorSaveFix />
       <style>{`
+        /* Public-site navigation is intentionally hidden inside the owner CRM. */
+        .web-menu-trigger,
+        .web-menu-backdrop,
+        .web-slide-menu { display:none !important; }
+
         ${isDashboard ? `
         /* The dashboard used to render a second duplicate CRM tab bar. The
            global admin navigation below is now the single source of truth. */
