@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "push-server/**"
-      - "admin-crm/**"
+      - "pwa/**"
       - ".github/workflows/finalize-mobile-email-layout-20260821.yml"
   workflow_dispatch:
 
@@ -19,9 +19,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Worker and Admin CRM
+    name: Validate Worker and PWA Admin CRM
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout current main
@@ -36,7 +36,7 @@ jobs:
           cache: npm
           cache-dependency-path: |
             push-server/package-lock.json
-            admin-crm/package-lock.json
+            pwa/package-lock.json
 
       - name: Install Worker dependencies
         working-directory: push-server
@@ -50,12 +50,12 @@ jobs:
         working-directory: push-server
         run: npm test
 
-      - name: Install Admin CRM dependencies
-        working-directory: admin-crm
+      - name: Install PWA/Admin dependencies
+        working-directory: pwa
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Build Admin CRM
-        working-directory: admin-crm
+      - name: Build PWA/Admin CRM
+        working-directory: pwa
         run: npm run build
 
   deploy-worker:
