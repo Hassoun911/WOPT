@@ -24,6 +24,10 @@ export default function WebAppNav(){
   const pathname=usePathname();
   const [open,setOpen]=useState(false);
   const localPath=BASE_PATH&&pathname.startsWith(BASE_PATH)?pathname.slice(BASE_PATH.length)||"/":pathname;
+
+  // Admin is a separate application shell. Never mount the public user menu there.
+  if(localPath==="/admin"||localPath.startsWith("/admin/")) return null;
+
   return <>
     <button className="web-menu-trigger" type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>
     <div className={open?"web-menu-backdrop open":"web-menu-backdrop"} onClick={()=>setOpen(false)} />
