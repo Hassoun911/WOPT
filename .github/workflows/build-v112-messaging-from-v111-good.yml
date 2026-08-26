@@ -1,0 +1,146 @@
+name: Build Hassoun v1.0.12 messaging from v1.0.11 good
+
+on:
+  push:
+    branches:
+      - release/v1.0.12-messaging-from-v1.0.11-good
+    paths:
+      - '.github/workflows/build-v112-messaging-from-v111-good.yml'
+      - 'mobile/scripts/apply-v112-messaging-fix.mjs'
+      - 'mobile/src/SystemMessageTicker.tsx'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v112-messaging-good-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout exact v1.0.11 golden forward branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.12-messaging-from-v1.0.11-good
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Reproduce exact v1.0.11 good source state
+        run: |
+          node scripts/apply-v110-location-fix.mjs
+          node scripts/apply-v111-city-highlight-fix.mjs
+
+      - name: Apply messaging-only v1.0.12 patch
+        run: node scripts/apply-v112-messaging-fix.mjs
+
+      - name: Prepare exact Hassoun bird Quran logo
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          logo_path = Path('assets/hassoun-logo.png')
+          if not logo_path.exists() or logo_path.stat().st_size == 0:
+              raise SystemExit('Missing assets/hassoun-logo.png')
+          logo = Image.open(logo_path).convert('RGBA')
+          logo.save(logo_path, format='PNG', optimize=True)
+          logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
+          splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          art = logo.copy()
+          art.thumbnail((820, 820), Image.Resampling.LANCZOS)
+          splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+          splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+          n = Path('assets/notification-icon.png')
+          if n.exists() and n.stat().st_size:
+              Image.open(n).convert('RGBA').save(n, format='PNG', optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          mkdir -p modules/hassoun-widget/android/src/main/res/drawable
+          cp assets/hassoun-logo.png modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+
+      - name: Verify golden features plus messaging only
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          grep -q 'version: "1.0.12"' app.config.ts
+          grep -q 'versionCode: 53' app.config.ts
+          grep -q 'Windsor, Ontario' src/prayerData.ts
+          grep -q 'backgroundColor: "#edf5f0"' src/HomePrayerPanel.tsx
+          grep -q 'setPrayerLocation(refreshed.location)' App.tsx
+          grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
+          grep -q 'syncServerPush' AppWithEmail.tsx
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          test -f src/SystemMessageTicker.tsx
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify and name APK
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk"
+          cp "$APK" "$OUT"
+          ls -lh "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.12-messaging-from-v1.0.11-good
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish prerelease APK
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging-from-v1.0.11-good.apk'
+          TAG='v1.0.12-messaging-from-v1.0.11-good'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --target release/v1.0.12-messaging-from-v1.0.11-good \
+              --title 'Hassoun v1.0.12 Messaging from v1.0.11 Good' \
+              --notes 'Built from the exact release/android-current v1.0.11 golden lineage. Only messaging changes added: automatic push registration and CRM scrolling system message.' \
+              --prerelease
+          fi
