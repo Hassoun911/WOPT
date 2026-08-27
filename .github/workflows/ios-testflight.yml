@@ -23,7 +23,7 @@ jobs:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
       IOS_APP_VERSION: "1.0.2"
-      IOS_BUILD_NUMBER: "20260830"
+      IOS_BUILD_NUMBER: "20260831"
       NODE_ENV: production
 
     steps:
@@ -72,13 +72,49 @@ jobs:
         working-directory: ios
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Validate and repair PNG assets for iOS
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y python3-pil pngcheck >/dev/null
+
+          damaged=0
+          while IFS= read -r -d '' file; do
+            if ! pngcheck -q "$file"; then
+              echo "Repairing damaged PNG: $file"
+              python3 - "$file" <<'PY'
+          import sys
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          path = Path(sys.argv[1])
+          with Image.open(path) as src:
+              src.load()
+              img = src.convert('RGBA')
+          tmp = path.with_suffix('.ios-fixed.png')
+          img.save(tmp, format='PNG', optimize=True)
+          tmp.replace(path)
+          PY
+              pngcheck -q "$file"
+              damaged=$((damaged+1))
+            fi
+          done < <(find assets -type f -name '*.png' -print0)
+
+          echo "PNG files repaired: ${damaged}"
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          pngcheck -q assets/notification-icon.png
+          pngcheck -q assets/hassoun-logo.png
+
       - name: Verify synchronized Android-parity features
         working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.2"' app.config.ts
-          grep -q 'buildNumber: "20260830"' app.config.ts
+          grep -q 'buildNumber: "20260831"' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
@@ -131,5 +167,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message "Hassoun iOS v1.0.2 synced Android layout/features parity" \
+            --message "Hassoun iOS v1.0.2 build 20260831 synced parity with repaired PNG assets" \
             --wait
