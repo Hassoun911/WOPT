@@ -1,15 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import BrandMark from "./BrandMark";
 import GameHistoryCards from "./GameHistoryCards";
 
 type Locale = "en" | "ar";
-export type MultiplayerGameType = "trivia" | "imposter" | "clue";
-type Category = "islamic" | "sports";
+export type MultiplayerGameType = "trivia" | "imposter" | "clue" | "wordrace" | "wordpuzzle";
+type Category = "islamic" | "sports" | "general";
 type Localized = { en: string; ar: string };
-
 type Player = { id: string; name: string; score: number; isHost: boolean };
 type Room = {
   code: string;
@@ -18,44 +17,54 @@ type Room = {
   status: "lobby" | "playing" | "finished";
   hostPlayerId: string;
   players: Player[];
+  winners?: Player[];
   state: {
     phase?: string;
     round?: number;
+    maxRounds?: number;
     endsAt?: number | null;
     activePlayerId?: string | null;
     question?: { prompt: Localized; choices: Localized[] };
     answeredPlayerIds?: string[];
     correctIndex?: number;
-    votedPlayerIds?: string[];
-    imposterId?: string;
-    word?: Localized;
-    caught?: boolean;
-    lastResult?: { kind: "correct" | "skip"; guessedBy?: string } | null;
+    letter?: Localized | null;
+    wordRaceCategories?: string[];
+    submittedPlayerIds?: string[];
+    puzzle?: { clue: Localized; scrambled: Localized };
+    puzzleAnswer?: Localized;
   };
-  private: { answer?: number | null; role?: "imposter" | "player"; word?: Localized; vote?: string | null };
+  private: {
+    answer?: number | null;
+    role?: "imposter" | "player";
+    word?: Localized;
+    vote?: string | null;
+    wordRaceAnswers?: Record<string, string> | null;
+    textAnswer?: string | null;
+  };
 };
 
 type Props = { locale: Locale; initialGame?: MultiplayerGameType; onBack: () => void };
-
 const API_BASE = String(Constants.expoConfig?.extra?.pushApiUrl || "https://wopt-prayer-push.wopt-windsor.workers.dev").replace(/\/$/, "");
 const PLAYER_ID_KEY = "wopt:games:player-id:v1";
 const PLAYER_NAME_KEY = "wopt:games:player-name:v1";
-
-const META: Record<MultiplayerGameType, { icon: string; en: string; ar: string; noteEn: string; noteAr: string }> = {
-  trivia: { icon: "⚡", en: "Live Trivia", ar: "مسابقة مباشرة", noteEn: "Timed questions • fastest minds win", noteAr: "أسئلة مؤقتة • تنافس مباشر" },
-  imposter: { icon: "🕵️", en: "Imposter", ar: "المندس", noteEn: "Find who does not know the secret", noteAr: "اكتشف من لا يعرف الكلمة السرية" },
-  clue: { icon: "🎯", en: "Clue Battle", ar: "معركة التلميحات", noteEn: "Give clues • friends guess • score together", noteAr: "أعط تلميحات • خمنوا • اجمعوا النقاط" }
+const WORD_RACE_LABELS: Record<string, { en: string; ar: string }> = {
+  insan: { en: "Insan / Name", ar: "إنسان / اسم" },
+  haiwan: { en: "Haiwan / Animal", ar: "حيوان" },
+  nabat: { en: "Nabat / Plant or Food", ar: "نبات / طعام" },
+  jamad: { en: "Jamad / Object", ar: "جماد / شيء" },
+  balad: { en: "Balad / Country or City", ar: "بلد / مدينة" }
+};
+const META: Record<MultiplayerGameType, { icon: string; en: string; ar: string; noteEn: string; noteAr: string; general?: boolean }> = {
+  trivia: { icon: "⚡", en: "Live Trivia", ar: "مسابقة مباشرة", noteEn: "5 timed rounds • highest score wins", noteAr: "٥ جولات مؤقتة • أعلى نتيجة تفوز" },
+  imposter: { icon: "🕵️", en: "Imposter", ar: "المندس", noteEn: "5 rounds • find who does not know the secret", noteAr: "٥ جولات • اكتشف من لا يعرف الكلمة" },
+  clue: { icon: "🎯", en: "Clue Battle", ar: "معركة التلميحات", noteEn: "5 clue rounds • score together", noteAr: "٥ جولات تلميحات • اجمعوا النقاط" },
+  wordrace: { icon: "✍️", en: "Insan • Haiwan • Shiee", ar: "إنسان • حيوان • شيء", noteEn: "Name • Animal • Plant • Object • Country/City", noteAr: "اسم • حيوان • نبات • جماد • بلد/مدينة", general: true },
+  wordpuzzle: { icon: "🧩", en: "Word Puzzle", ar: "لغز الكلمات", noteEn: "Unscramble and solve 5 timed puzzles", noteAr: "حل ٥ ألغاز كلمات مؤقتة", general: true }
 };
 
-function makePlayerId() {
-  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
+function makePlayerId() { return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`; }
 async function api(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json" }
-  });
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json" } });
   const payload = await response.json() as { room?: Room; error?: string };
   if (!response.ok || !payload.room) throw new Error(payload.error || `Request failed (${response.status})`);
   return payload.room;
@@ -73,158 +82,100 @@ export default function MultiplayerGames({ locale, initialGame, onBack }: Props)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [wordRace, setWordRace] = useState<Record<string, string>>({});
+  const [puzzleAnswer, setPuzzleAnswer] = useState("");
 
-  useEffect(() => {
-    void (async () => {
-      let id = await AsyncStorage.getItem(PLAYER_ID_KEY);
-      if (!id) {
-        id = makePlayerId();
-        await AsyncStorage.setItem(PLAYER_ID_KEY, id);
-      }
-      setPlayerId(id);
-      setPlayerName((await AsyncStorage.getItem(PLAYER_NAME_KEY)) ?? "");
-    })();
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, []);
-
+  useEffect(() => { void (async () => {
+    let id = await AsyncStorage.getItem(PLAYER_ID_KEY);
+    if (!id) { id = makePlayerId(); await AsyncStorage.setItem(PLAYER_ID_KEY, id); }
+    setPlayerId(id); setPlayerName((await AsyncStorage.getItem(PLAYER_NAME_KEY)) ?? "");
+  })(); }, []);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(timer); }, []);
   useEffect(() => {
     if (!room?.code || !playerId) return;
-    const timer = setInterval(() => {
-      void api(`/games/rooms/${room.code}?playerId=${encodeURIComponent(playerId)}`)
-        .then(setRoom)
-        .catch(() => {});
-    }, 1200);
+    const timer = setInterval(() => { void api(`/games/rooms/${room.code}?playerId=${encodeURIComponent(playerId)}`).then(setRoom).catch(() => {}); }, 1200);
     return () => clearInterval(timer);
   }, [room?.code, playerId]);
 
   const isHost = room?.hostPlayerId === playerId;
-  const activePlayer = room?.players.find((p) => p.id === room.state.activePlayerId);
   const secondsLeft = room?.state.endsAt ? Math.max(0, Math.ceil((room.state.endsAt - now) / 1000)) : null;
   const meta = game ? META[game] : null;
-
+  const sortedPlayers = useMemo(() => room ? [...room.players].sort((a, b) => b.score - a.score) : [], [room]);
   const withBusy = async (run: () => Promise<Room>) => {
     setBusy(true); setError(null);
     try { setRoom(await run()); }
     catch (e) { setError(e instanceof Error ? e.message : t("Something went wrong", "حدث خطأ")); }
     finally { setBusy(false); }
   };
-
   const rememberName = async () => {
     const clean = playerName.trim().replace(/\s+/g, " ").slice(0, 24);
-    setPlayerName(clean);
-    if (clean) await AsyncStorage.setItem(PLAYER_NAME_KEY, clean);
-    return clean;
+    setPlayerName(clean); if (clean) await AsyncStorage.setItem(PLAYER_NAME_KEY, clean); return clean;
   };
-
   const createRoom = async () => {
     if (!game || !playerId) return;
-    const name = await rememberName();
-    if (name.length < 2) { setError(t("Enter your name first.", "اكتب اسمك أولاً.")); return; }
-    await withBusy(() => api("/games/rooms", { method: "POST", body: JSON.stringify({ playerId, playerName: name, gameType: game, category }) }));
+    const name = await rememberName(); if (name.length < 2) { setError(t("Enter your name first.", "اكتب اسمك أولاً.")); return; }
+    await withBusy(() => api("/games/rooms", { method: "POST", body: JSON.stringify({ playerId, playerName: name, gameType: game, category: META[game].general ? "general" : category }) }));
   };
-
   const joinRoom = async () => {
     if (!playerId) return;
-    const name = await rememberName();
-    const code = joinCode.trim().toUpperCase();
+    const name = await rememberName(); const code = joinCode.trim().toUpperCase();
     if (name.length < 2 || code.length !== 6) { setError(t("Enter your name and 6-character room code.", "اكتب اسمك ورمز الغرفة المكون من ٦ أحرف.")); return; }
-    await withBusy(async () => {
-      const joined = await api("/games/rooms/join", { method: "POST", body: JSON.stringify({ playerId, playerName: name, code }) });
-      setGame(joined.gameType);
-      setCategory(joined.category);
-      return joined;
-    });
+    await withBusy(async () => { const joined = await api("/games/rooms/join", { method: "POST", body: JSON.stringify({ playerId, playerName: name, code }) }); setGame(joined.gameType); setCategory(joined.category); return joined; });
   };
-
   const act = async (type: string, extra: Record<string, unknown> = {}) => {
     if (!room || !playerId) return;
     await withBusy(() => api(`/games/rooms/${room.code}/action`, { method: "POST", body: JSON.stringify({ playerId, type, ...extra }) }));
   };
-
-  const leaveRoom = () => { setRoom(null); setJoinCode(""); };
+  const leaveRoom = () => { setRoom(null); setJoinCode(""); setWordRace({}); setPuzzleAnswer(""); };
 
   if (!game && !room) {
-    return (
-      <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.headerCopy}><Text style={styles.eyebrow}>HASSOUN • MULTIPLAYER</Text><Text style={styles.title}>{t("Choose a game", "اختر لعبة")}</Text><Text style={styles.subtitle}>{t("Multiplayer only • Islamic or sports topics", "متعدد اللاعبين فقط • مواضيع إسلامية أو رياضية")}</Text></View></View>
-        {(Object.keys(META) as MultiplayerGameType[]).map((id) => {
-          const item = META[id];
-          return <Pressable key={id} onPress={() => setGame(id)} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{item.icon}</Text></View><View style={styles.gameCopy}><Text style={styles.gameTitle}>{ar ? item.ar : item.en}</Text><Text style={styles.gameNote}>{ar ? item.noteAr : item.noteEn}</Text><View style={styles.topicRow}><Text style={styles.topicPill}>☾ {t("Islamic", "إسلامي")}</Text><Text style={styles.topicPill}>⚽ {t("Sports", "رياضة")}</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>;
-        })}
-        <GameHistoryCards locale={locale} />
-      </ScrollView>
-    );
+    return <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44}/><View style={styles.copy}><Text style={styles.eyebrow}>HASSOUN • MULTIPLAYER</Text><Text style={styles.title}>{t("Choose a game", "اختر لعبة")}</Text><Text style={styles.subtitle}>{t("Every match has a score, round limit and winner.", "كل لعبة لها نتيجة وعدد جولات وفائز.")}</Text></View></View>
+      {(Object.keys(META) as MultiplayerGameType[]).map(id => { const item=META[id]; return <Pressable key={id} onPress={()=>setGame(id)} style={styles.gameCard}><View style={styles.gameIcon}><Text style={styles.gameEmoji}>{item.icon}</Text></View><View style={styles.copy}><Text style={styles.gameTitle}>{ar?item.ar:item.en}</Text><Text style={styles.gameNote}>{ar?item.noteAr:item.noteEn}</Text><View style={styles.tags}><Text style={styles.tag}>🏁 5 {t("rounds","جولات")}</Text><Text style={styles.tag}>👥 2–12</Text></View></View><Text style={styles.arrow}>›</Text></Pressable>; })}
+      <GameHistoryCards locale={locale}/>
+    </ScrollView>;
   }
 
   if (!room) {
-    return (
-      <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><Pressable onPress={() => setGame(null)} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44} /><View style={styles.headerCopy}><Text style={styles.eyebrow}>HASSOUN • GAMES</Text><Text style={styles.title}>{ar ? meta?.ar : meta?.en}</Text><Text style={styles.subtitle}>{ar ? meta?.noteAr : meta?.noteEn}</Text></View></View>
-        <View style={styles.setupCard}>
-          <Text style={styles.label}>{t("YOUR NAME", "اسمك")}</Text>
-          <TextInput value={playerName} onChangeText={setPlayerName} placeholder={t("Player name", "اسم اللاعب")} placeholderTextColor="#9aa39f" style={styles.input} maxLength={24} />
-          <Text style={styles.label}>{t("TOPIC", "الموضوع")}</Text>
-          <View style={styles.categoryRow}>
-            <Pressable onPress={() => setCategory("islamic")} style={[styles.categoryButton, category === "islamic" && styles.categoryActive]}><Text style={[styles.categoryText, category === "islamic" && styles.categoryTextActive]}>☾ {t("Islamic", "إسلامي")}</Text></Pressable>
-            <Pressable onPress={() => setCategory("sports")} style={[styles.categoryButton, category === "sports" && styles.categoryActive]}><Text style={[styles.categoryText, category === "sports" && styles.categoryTextActive]}>⚽ {t("Sports", "رياضة")}</Text></Pressable>
-          </View>
-          <Pressable onPress={() => void createRoom()} disabled={busy} style={styles.primary}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>＋ {t("Create multiplayer room", "إنشاء غرفة جماعية")}</Text>}</Pressable>
-        </View>
-        <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>{t("OR JOIN FRIENDS", "أو انضم لأصدقائك")}</Text><View style={styles.orLine} /></View>
-        <View style={styles.joinCard}><TextInput value={joinCode} onChangeText={(v) => setJoinCode(v.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6))} autoCapitalize="characters" placeholder="ROOM CODE" placeholderTextColor="#9aa39f" style={[styles.input, styles.codeInput]} maxLength={6} /><Pressable onPress={() => void joinRoom()} disabled={busy} style={styles.secondary}><Text style={styles.secondaryText}>{t("Join room", "انضم للغرفة")}</Text></Pressable></View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
-    );
+    return <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}><Pressable onPress={()=>setGame(null)} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={44}/><View style={styles.copy}><Text style={styles.eyebrow}>HASSOUN • GAMES</Text><Text style={styles.title}>{ar?meta?.ar:meta?.en}</Text><Text style={styles.subtitle}>{ar?meta?.noteAr:meta?.noteEn}</Text></View></View>
+      <View style={styles.setupCard}><Text style={styles.label}>{t("YOUR NAME","اسمك")}</Text><TextInput value={playerName} onChangeText={setPlayerName} placeholder={t("Player name","اسم اللاعب")} placeholderTextColor="#9aa39f" style={styles.input} maxLength={24}/>{meta?.general?<View style={styles.generalPill}><Text style={styles.generalPillText}>🌍 {t("General word game • 5 rounds","لعبة كلمات عامة • ٥ جولات")}</Text></View>:<><Text style={styles.label}>{t("TOPIC","الموضوع")}</Text><View style={styles.categoryRow}><Pressable onPress={()=>setCategory("islamic")} style={[styles.categoryButton,category==="islamic"&&styles.categoryActive]}><Text style={[styles.categoryText,category==="islamic"&&styles.categoryTextActive]}>☾ {t("Islamic","إسلامي")}</Text></Pressable><Pressable onPress={()=>setCategory("sports")} style={[styles.categoryButton,category==="sports"&&styles.categoryActive]}><Text style={[styles.categoryText,category==="sports"&&styles.categoryTextActive]}>⚽ {t("Sports","رياضة")}</Text></Pressable></View></>}
+      <Pressable onPress={()=>void createRoom()} disabled={busy} style={styles.primary}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.primaryText}>＋ {t("Create multiplayer room","إنشاء غرفة جماعية")}</Text>}</Pressable></View>
+      <View style={styles.orRow}><View style={styles.orLine}/><Text style={styles.orText}>{t("OR JOIN FRIENDS","أو انضم لأصدقائك")}</Text><View style={styles.orLine}/></View>
+      <View style={styles.joinCard}><TextInput value={joinCode} onChangeText={v=>setJoinCode(v.toUpperCase().replace(/[^A-Z2-9]/g,"").slice(0,6))} autoCapitalize="characters" placeholder="ROOM CODE" placeholderTextColor="#9aa39f" style={[styles.input,styles.codeInput]} maxLength={6}/><Pressable onPress={()=>void joinRoom()} disabled={busy} style={styles.secondary}><Text style={styles.secondaryText}>{t("Join room","انضم للغرفة")}</Text></Pressable></View>
+      {error?<Text style={styles.error}>{error}</Text>:null}
+    </ScrollView>;
   }
 
-  const phase = room.state.phase ?? "lobby";
-  return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-      <View style={styles.roomTop}><Pressable onPress={leaveRoom} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={40} /><View style={styles.roomCodeWrap}><Text style={styles.roomCodeLabel}>{t("ROOM", "الغرفة")}</Text><Text style={styles.roomCode}>{room.code}</Text></View><View style={styles.roundPill}><Text style={styles.roundText}>{phase === "lobby" ? t("Lobby", "انتظار") : `${t("Round", "جولة")} ${room.state.round ?? 1}`}</Text></View></View>
+  const phase=room.state.phase??"lobby";
+  const submitted=Boolean(room.state.submittedPlayerIds?.includes(playerId));
+  return <ScrollView style={styles.flex} contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
+    <View style={styles.roomTop}><Pressable onPress={leaveRoom} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={40}/><View style={styles.roomCodeWrap}><Text style={styles.roomCodeLabel}>{t("ROOM","الغرفة")}</Text><Text style={styles.roomCode}>{room.code}</Text></View><View style={styles.roundPill}><Text style={styles.roundText}>{phase==="lobby"?t("Lobby","انتظار"):`${t("Round","جولة")} ${room.state.round??1}/${room.state.maxRounds??5}`}</Text></View></View>
+    <View style={styles.roomHero}><Text style={styles.roomHeroIcon}>{META[room.gameType].icon}</Text><View style={styles.copy}><Text style={styles.roomHeroTitle}>{ar?META[room.gameType].ar:META[room.gameType].en}</Text><Text style={styles.roomHeroMeta}>👥 {room.players.length}/12 • 🏁 {room.state.maxRounds??5} {t("rounds","جولات")}</Text></View>{secondsLeft!==null&&room.status==="playing"?<View style={styles.timer}><Text style={styles.timerText}>{secondsLeft}s</Text></View>:null}</View>
 
-      <View style={styles.roomHero}><Text style={styles.roomHeroIcon}>{META[room.gameType].icon}</Text><View style={styles.headerCopy}><Text style={styles.roomHeroTitle}>{ar ? META[room.gameType].ar : META[room.gameType].en}</Text><Text style={styles.roomHeroMeta}>{room.category === "islamic" ? `☾ ${t("Islamic", "إسلامي")}` : `⚽ ${t("Sports", "رياضة")}`} • {room.players.length}/12</Text></View></View>
+    {room.status==="finished"?<View style={styles.playCard}><Text style={styles.resultIcon}>🏆</Text><Text style={styles.playTitle}>{(room.winners?.length??0)>1?t("It’s a tie!","تعادل!"):t("We have a winner!","لدينا فائز!")}</Text><Text style={styles.winnerText}>{(room.winners??[]).map(w=>`${w.name} • ${w.score}`).join(" · ")}</Text><Text style={styles.playText}>{t("The game ended automatically and the result was saved.","انتهت اللعبة تلقائياً وتم حفظ النتيجة.")}</Text><Pressable onPress={leaveRoom} style={styles.primary}><Text style={styles.primaryText}>{t("Back to games","العودة للألعاب")}</Text></Pressable></View>:null}
 
-      {room.status === "finished" ? <View style={styles.playCard}><Text style={styles.resultIcon}>🏁</Text><Text style={styles.playTitle}>{t("Game saved to session history", "تم حفظ اللعبة في سجل الجلسات")}</Text><Text style={styles.playText}>{t("Your scores, players and result are now saved. Leave the room to see the new history card.", "تم حفظ النتائج واللاعبين. اخرج من الغرفة لرؤية بطاقة السجل الجديدة.")}</Text><Pressable onPress={leaveRoom} style={styles.primary}><Text style={styles.primaryText}>{t("View game history", "عرض سجل الألعاب")}</Text></Pressable></View> : room.status === "playing" && isHost ? <Pressable onPress={() => void act("finish")} disabled={busy} style={styles.finishButton}><Text style={styles.finishButtonText}>🏁 {t("End game & save results", "إنهاء اللعبة وحفظ النتيجة")}</Text></Pressable> : null}
+    <View style={styles.scoreboard}>{sortedPlayers.map(p=><View key={p.id} style={[styles.playerRow,p.id===playerId&&styles.playerMe]}><View style={styles.avatar}><Text style={styles.avatarText}>{p.name.slice(0,1).toUpperCase()}</Text></View><Text style={styles.playerName}>{p.name}{p.isHost?" 👑":""}</Text><Text style={styles.playerScore}>{p.score}</Text></View>)}</View>
 
-      <View style={styles.scoreboard}>{room.players.map((p) => <View key={p.id} style={[styles.playerRow, p.id === playerId && styles.playerMe]}><View style={styles.avatar}><Text style={styles.avatarText}>{p.name.slice(0, 1).toUpperCase()}</Text></View><Text style={styles.playerName}>{p.name}{p.isHost ? " 👑" : ""}</Text><Text style={styles.playerScore}>{p.score}</Text></View>)}</View>
+    {room.status!=="finished"&&phase==="lobby"?<View style={styles.playCard}><Text style={styles.playTitle}>{t("Invite friends with the room code","ادعُ أصدقاءك باستخدام رمز الغرفة")}</Text><Text style={styles.playText}>{t(`At least 2 players. This match ends automatically after ${room.state.maxRounds??5} rounds.`,`يلزم لاعبان على الأقل. تنتهي اللعبة تلقائياً بعد ${room.state.maxRounds??5} جولات.`)}</Text>{isHost?<Pressable onPress={()=>void act("start")} disabled={busy||room.players.length<2} style={[styles.primary,(busy||room.players.length<2)&&styles.disabled]}><Text style={styles.primaryText}>▶ {t("Start game","ابدأ اللعبة")}</Text></Pressable>:<Text style={styles.waiting}>{t("Waiting for the host…","بانتظار المضيف…")}</Text>}</View>:null}
 
-      {phase === "lobby" ? <View style={styles.playCard}><Text style={styles.playTitle}>{t("Invite friends with the room code", "ادعُ أصدقاءك باستخدام رمز الغرفة")}</Text><Text style={styles.playText}>{t("At least 2 players are required. Everyone can join from another phone using this code.", "يلزم لاعبان على الأقل. يمكن للجميع الانضمام من هاتف آخر باستخدام الرمز.")}</Text>{isHost ? <Pressable onPress={() => void act("start")} disabled={busy || room.players.length < 2} style={[styles.primary, room.players.length < 2 && styles.disabled]}><Text style={styles.primaryText}>▶ {t("Start game", "ابدأ اللعبة")}</Text></Pressable> : <Text style={styles.waiting}>⌛ {t("Waiting for host to start…", "بانتظار المضيف لبدء اللعبة…")}</Text>}</View> : null}
+    {room.status!=="finished"&&room.gameType==="trivia"&&phase==="question"&&room.state.question?<View style={styles.playCard}><Text style={styles.playTitle}>{ar?room.state.question.prompt.ar:room.state.question.prompt.en}</Text>{room.state.question.choices.map((c,i)=><Pressable key={i} disabled={room.private.answer!=null} onPress={()=>void act("answer",{answer:i})} style={[styles.choice,room.private.answer===i&&styles.choicePicked]}><Text style={styles.choiceText}>{ar?c.ar:c.en}</Text></Pressable>)}</View>:null}
 
-      {room.gameType === "trivia" && phase === "question" && room.state.question ? <View style={styles.playCard}><View style={styles.timerCircle}><Text style={styles.timerNumber}>{secondsLeft ?? 20}</Text><Text style={styles.timerLabel}>{t("SEC", "ث")}</Text></View><Text style={styles.question}>{room.state.question.prompt[locale]}</Text><View style={styles.answers}>{room.state.question.choices.map((choice, index) => { const mine = room.private.answer === index; const locked = room.private.answer !== null && room.private.answer !== undefined; return <Pressable key={index} disabled={locked} onPress={() => void act("answer", { answer: index })} style={[styles.answer, mine && styles.answerSelected, locked && !mine && styles.answerLocked]}><Text style={styles.answerLetter}>{String.fromCharCode(65 + index)}</Text><Text style={styles.answerText}>{choice[locale]}</Text></Pressable>; })}</View>{room.private.answer !== null && room.private.answer !== undefined ? <Text style={styles.waiting}>✓ {t("Answer locked — waiting for everyone", "تم تثبيت إجابتك — بانتظار الجميع")}</Text> : null}</View> : null}
+    {room.status!=="finished"&&room.gameType==="imposter"&&phase==="discussion"?<View style={styles.playCard}><Text style={styles.playTitle}>{room.private.role==="imposter"?t("🕵️ You are the Imposter","🕵️ أنت المندس"):t("Secret word","الكلمة السرية")}</Text><Text style={styles.secret}>{room.private.role==="imposter"?t("Blend in without knowing the secret","حاول الاندماج دون معرفة الكلمة"):(ar?room.private.word?.ar:room.private.word?.en)}</Text><Text style={styles.playText}>{t("Discuss, then vote before time runs out.","ناقشوا ثم صوّتوا قبل انتهاء الوقت.")}</Text>{room.players.filter(p=>p.id!==playerId).map(p=><Pressable key={p.id} disabled={room.private.vote!=null} onPress={()=>void act("vote",{targetPlayerId:p.id})} style={styles.choice}><Text style={styles.choiceText}>{p.name}</Text></Pressable>)}</View>:null}
 
-      {room.gameType === "trivia" && phase === "results" && room.state.question ? <View style={styles.playCard}><Text style={styles.resultIcon}>🏆</Text><Text style={styles.playTitle}>{t("Answer", "الإجابة")}</Text><Text style={styles.resultAnswer}>{room.state.question.choices[room.state.correctIndex ?? 0]?.[locale]}</Text>{isHost ? <Pressable onPress={() => void act("next")} style={styles.primary}><Text style={styles.primaryText}>{t("Next question", "السؤال التالي")} ›</Text></Pressable> : <Text style={styles.waiting}>{t("Waiting for host…", "بانتظار المضيف…")}</Text>}</View> : null}
+    {room.status!=="finished"&&room.gameType==="clue"&&phase==="clue"?<View style={styles.playCard}><Text style={styles.playTitle}>{t("Clue Battle","معركة التلميحات")}</Text>{room.state.activePlayerId===playerId?<><Text style={styles.playText}>{t("Give clues for this word:","أعط تلميحات لهذه الكلمة:")}</Text><Text style={styles.secret}>{ar?room.private.word?.ar:room.private.word?.en}</Text>{room.players.filter(p=>p.id!==playerId).map(p=><Pressable key={p.id} onPress={()=>void act("clue_correct",{guessedBy:p.id})} style={styles.choice}><Text style={styles.choiceText}>✓ {p.name} {t("guessed it","خمنها")}</Text></Pressable>)}<Pressable onPress={()=>void act("clue_skip")} style={styles.secondary}><Text style={styles.secondaryText}>{t("Skip","تخطي")}</Text></Pressable></>:<Text style={styles.waiting}>{t("Listen to the clue and guess before time runs out.","استمع للتلميح وخمّن قبل انتهاء الوقت.")}</Text>}</View>:null}
 
-      {room.gameType === "imposter" && phase === "discussion" ? <View style={styles.playCard}>{room.private.role === "imposter" ? <><Text style={styles.secretIcon}>🕵️</Text><Text style={styles.secretDanger}>{t("YOU ARE THE IMPOSTER", "أنت المندس")}</Text><Text style={styles.playText}>{t("You do not know the secret. Blend in, listen carefully, and avoid being voted out.", "أنت لا تعرف الكلمة السرية. اندمج واستمع جيداً وحاول ألا يتم كشفك.")}</Text></> : <><Text style={styles.secretIcon}>🔐</Text><Text style={styles.playTitle}>{t("Your secret", "كلمتك السرية")}</Text><Text style={styles.secretWord}>{room.private.word?.[locale]}</Text><Text style={styles.playText}>{t("Describe it without saying the word. Then vote for the imposter.", "صفها دون ذكر الكلمة ثم صوّت للمندس.")}</Text></>}<Text style={styles.voteTitle}>{t("WHO IS THE IMPOSTER?", "من هو المندس؟")}</Text><View style={styles.voteGrid}>{room.players.filter((p) => p.id !== playerId).map((p) => <Pressable key={p.id} disabled={Boolean(room.private.vote)} onPress={() => void act("vote", { targetPlayerId: p.id })} style={[styles.voteButton, room.private.vote === p.id && styles.voteSelected]}><Text style={styles.voteText}>{p.name}</Text></Pressable>)}</View>{room.private.vote ? <Text style={styles.waiting}>✓ {t("Vote submitted — waiting for everyone", "تم التصويت — بانتظار الجميع")}</Text> : null}</View> : null}
+    {room.status!=="finished"&&room.gameType==="wordrace"&&phase==="wordrace"?<View style={styles.playCard}><Text style={styles.playTitle}>✍️ {t("Letter","الحرف")} {room.state.letter?.en} • {room.state.letter?.ar}</Text><Text style={styles.playText}>{t("10 unique • 5 duplicate • 0 blank/wrong letter • 20 if only valid answer","١٠ فريد • ٥ مكرر • ٠ فارغ/حرف خاطئ • ٢٠ إذا كنت الوحيد بإجابة صحيحة")}</Text>{(room.state.wordRaceCategories??Object.keys(WORD_RACE_LABELS)).map(k=>{const l=WORD_RACE_LABELS[k]??{en:k,ar:k};return <View key={k}><Text style={styles.label}>{ar?l.ar:l.en}</Text><TextInput editable={!submitted} value={wordRace[k]??""} onChangeText={v=>setWordRace(current=>({...current,[k]:v}))} placeholder={room.state.letter?.en??""} placeholderTextColor="#9aa39f" style={styles.input}/></View>})}<Pressable disabled={busy||submitted} onPress={()=>void act("wordrace_submit",{answers:wordRace})} style={[styles.primary,(busy||submitted)&&styles.disabled]}><Text style={styles.primaryText}>{submitted?t("Submitted ✓","تم الإرسال ✓"):t("STOP! Submit answers","توقف! أرسل الإجابات")}</Text></Pressable></View>:null}
 
-      {room.gameType === "imposter" && phase === "results" ? <View style={styles.playCard}><Text style={styles.resultIcon}>{room.state.caught ? "🎯" : "🕵️"}</Text><Text style={styles.playTitle}>{room.state.caught ? t("Imposter caught!", "تم كشف المندس!") : t("The imposter escaped!", "نجا المندس!")}</Text><Text style={styles.resultAnswer}>{room.players.find((p) => p.id === room.state.imposterId)?.name}</Text><Text style={styles.playText}>{t("Secret", "الكلمة")}: {room.state.word?.[locale]}</Text>{isHost ? <Pressable onPress={() => void act("next")} style={styles.primary}><Text style={styles.primaryText}>{t("Next round", "الجولة التالية")} ›</Text></Pressable> : <Text style={styles.waiting}>{t("Waiting for host…", "بانتظار المضيف…")}</Text>}</View> : null}
+    {room.status!=="finished"&&room.gameType==="wordpuzzle"&&phase==="puzzle"&&room.state.puzzle?<View style={styles.playCard}><Text style={styles.playTitle}>🧩 {t("Word Puzzle","لغز الكلمات")}</Text><Text style={styles.playText}>{ar?room.state.puzzle.clue.ar:room.state.puzzle.clue.en}</Text><Text style={styles.scramble}>{ar?room.state.puzzle.scrambled.ar:room.state.puzzle.scrambled.en}</Text><TextInput editable={room.private.textAnswer==null} value={puzzleAnswer} onChangeText={setPuzzleAnswer} placeholder={t("Your answer","إجابتك")} placeholderTextColor="#9aa39f" style={styles.input}/><Pressable disabled={busy||!puzzleAnswer.trim()||room.private.textAnswer!=null} onPress={()=>void act("puzzle_answer",{answer:puzzleAnswer})} style={[styles.primary,(busy||!puzzleAnswer.trim()||room.private.textAnswer!=null)&&styles.disabled]}><Text style={styles.primaryText}>{room.private.textAnswer!=null?t("Submitted ✓","تم الإرسال ✓"):t("Submit answer","أرسل الإجابة")}</Text></Pressable></View>:null}
 
-      {room.gameType === "clue" && phase === "clue" ? <View style={styles.playCard}><Text style={styles.secretIcon}>🎯</Text><Text style={styles.playTitle}>{activePlayer?.id === playerId ? t("You give the clues", "أنت تعطي التلميحات") : t(`${activePlayer?.name ?? "Player"} gives the clues`, `${activePlayer?.name ?? "اللاعب"} يعطي التلميحات`)}</Text>{activePlayer?.id === playerId ? <><Text style={styles.secretWord}>{room.private.word?.[locale]}</Text><Text style={styles.playText}>{t("Describe the word without saying it. When someone guesses, tap their name.", "صف الكلمة دون قولها. عندما يخمن أحدهم اضغط على اسمه.")}</Text><View style={styles.voteGrid}>{room.players.filter((p) => p.id !== playerId).map((p) => <Pressable key={p.id} onPress={() => void act("clue_correct", { guessedBy: p.id })} style={styles.voteButton}><Text style={styles.voteText}>✓ {p.name}</Text></Pressable>)}</View><Pressable onPress={() => void act("clue_skip")} style={styles.skip}><Text style={styles.skipText}>{t("Skip word", "تخطي الكلمة")}</Text></Pressable></> : <><Text style={styles.bigHint}>💭</Text><Text style={styles.playText}>{t("Listen to the clues and guess the secret word out loud.", "استمع للتلميحات وحاول تخمين الكلمة بصوت عالٍ.")}</Text></>}</View> : null}
+    {room.status!=="finished"&&phase==="results"?<View style={styles.playCard}><Text style={styles.resultIcon}>✅</Text><Text style={styles.playTitle}>{t("Round complete","انتهت الجولة")}</Text>{room.state.puzzleAnswer?<Text style={styles.secret}>{t("Answer","الإجابة")}: {ar?room.state.puzzleAnswer.ar:room.state.puzzleAnswer.en}</Text>:null}{isHost?<Pressable onPress={()=>{setWordRace({});setPuzzleAnswer("");void act("next")}} style={styles.primary}><Text style={styles.primaryText}>{t("Next round","الجولة التالية")}</Text></Pressable>:<Text style={styles.waiting}>{t("Waiting for host…","بانتظار المضيف…")}</Text>}</View>:null}
 
-      {room.gameType === "clue" && phase === "results" ? <View style={styles.playCard}><Text style={styles.resultIcon}>{room.state.lastResult?.kind === "correct" ? "✨" : "↻"}</Text><Text style={styles.playTitle}>{room.state.lastResult?.kind === "correct" ? t("Great clue!", "تلميح رائع!") : t("Word skipped", "تم تخطي الكلمة")}</Text>{room.state.lastResult?.guessedBy ? <Text style={styles.playText}>{t("Guessed by", "خمنها")}: {room.players.find((p) => p.id === room.state.lastResult?.guessedBy)?.name}</Text> : null}{(isHost || room.state.activePlayerId === playerId) ? <Pressable onPress={() => void act("next")} style={styles.primary}><Text style={styles.primaryText}>{t("Next word", "الكلمة التالية")} ›</Text></Pressable> : <Text style={styles.waiting}>{t("Waiting for next word…", "بانتظار الكلمة التالية…")}</Text>}</View> : null}
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {busy ? <ActivityIndicator style={{ marginTop: 12 }} color="#0b654f" /> : null}
-    </ScrollView>
-  );
+    {room.status==="playing"&&isHost?<Pressable onPress={()=>void act("finish")} style={styles.finish}><Text style={styles.finishText}>🏁 {t("End match early","إنهاء اللعبة مبكراً")}</Text></Pressable>:null}
+    {error?<Text style={styles.error}>{error}</Text>:null}
+  </ScrollView>;
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#f7f4ec" }, screen: { padding: 17, paddingBottom: 38 },
-  header: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 17 }, headerCopy: { flex: 1 },
-  back: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#dedbd3" }, backText: { color: "#0b654f", fontSize: 31, lineHeight: 33 },
-  eyebrow: { color: "#a27d32", fontSize: 9, fontWeight: "900", letterSpacing: 1.1 }, title: { color: "#173f35", fontSize: 27, fontWeight: "900", marginTop: 4 }, subtitle: { color: "#76837e", fontSize: 11, lineHeight: 16, marginTop: 3 },
-  gameCard: { minHeight: 126, borderRadius: 24, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 14, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 12 }, gameIcon: { width: 62, height: 62, borderRadius: 21, backgroundColor: "#e9f4ef", alignItems: "center", justifyContent: "center" }, gameEmoji: { fontSize: 31 }, gameCopy: { flex: 1 }, gameTitle: { color: "#173f35", fontSize: 18, fontWeight: "900" }, gameNote: { color: "#7d8984", fontSize: 9, lineHeight: 14, marginTop: 3 }, arrow: { color: "#0b654f", fontSize: 28 }, topicRow: { flexDirection: "row", gap: 5, marginTop: 8 }, topicPill: { color: "#45665d", fontSize: 7.5, fontWeight: "800", backgroundColor: "#f2f4f0", paddingHorizontal: 7, paddingVertical: 4, borderRadius: 99, overflow: "hidden" },
-  setupCard: { backgroundColor: "#fff", borderRadius: 24, borderWidth: 1, borderColor: "#e1ddd4", padding: 16 }, label: { color: "#9a7b3f", fontSize: 8, fontWeight: "900", letterSpacing: 1, marginBottom: 6, marginTop: 5 }, input: { minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: "#dedad1", backgroundColor: "#faf9f6", paddingHorizontal: 13, color: "#173f35", fontSize: 12 }, categoryRow: { flexDirection: "row", gap: 8, marginBottom: 7 }, categoryButton: { flex: 1, minHeight: 48, borderRadius: 15, backgroundColor: "#f1f1ed", alignItems: "center", justifyContent: "center" }, categoryActive: { backgroundColor: "#0b654f" }, categoryText: { color: "#64736e", fontWeight: "900", fontSize: 11 }, categoryTextActive: { color: "#fff" },
-  primary: { minHeight: 52, borderRadius: 17, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center", marginTop: 12, paddingHorizontal: 12 }, primaryText: { color: "#fff", fontSize: 11, fontWeight: "900", textAlign: "center" }, secondary: { minHeight: 50, borderRadius: 16, backgroundColor: "#e8f3ee", alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }, secondaryText: { color: "#0b654f", fontSize: 11, fontWeight: "900" }, disabled: { opacity: .35 },
-  orRow: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 17 }, orLine: { flex: 1, height: 1, backgroundColor: "#dedad1" }, orText: { color: "#969d99", fontSize: 7, fontWeight: "900" }, joinCard: { gap: 8 }, codeInput: { textAlign: "center", letterSpacing: 4, fontSize: 18, fontWeight: "900" }, error: { color: "#9b3d37", backgroundColor: "#fdeceb", borderRadius: 13, padding: 10, marginTop: 10, fontSize: 10, textAlign: "center" },
-  roomTop: { flexDirection: "row", alignItems: "center", gap: 10 }, roomCodeWrap: { flex: 1 }, roomCodeLabel: { color: "#94815a", fontSize: 7, fontWeight: "900" }, roomCode: { color: "#173f35", fontSize: 23, fontWeight: "900", letterSpacing: 3 }, roundPill: { borderRadius: 99, backgroundColor: "#e8f3ee", paddingHorizontal: 11, paddingVertical: 7 }, roundText: { color: "#0b654f", fontSize: 9, fontWeight: "900" }, roomHero: { marginTop: 13, borderRadius: 22, backgroundColor: "#103f35", padding: 14, flexDirection: "row", alignItems: "center", gap: 10 }, roomHeroIcon: { fontSize: 30 }, roomHeroTitle: { color: "#fff", fontSize: 17, fontWeight: "900" }, roomHeroMeta: { color: "#bfd7cf", fontSize: 9, marginTop: 3 },
-  scoreboard: { marginTop: 10, gap: 6 }, playerRow: { minHeight: 50, borderRadius: 15, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2dfd7", flexDirection: "row", alignItems: "center", paddingHorizontal: 10, gap: 8 }, playerMe: { borderColor: "#89baa9", backgroundColor: "#f2faf6" }, avatar: { width: 32, height: 32, borderRadius: 11, backgroundColor: "#e9f4ef", alignItems: "center", justifyContent: "center" }, avatarText: { color: "#0b654f", fontSize: 12, fontWeight: "900" }, playerName: { flex: 1, color: "#264b41", fontSize: 11, fontWeight: "900" }, playerScore: { color: "#a17c36", fontSize: 16, fontWeight: "900" },
-  finishButton: { marginTop: 14, minHeight: 50, borderRadius: 16, backgroundColor: "#efe6d4", borderWidth: 1, borderColor: "#d7c299", alignItems: "center", justifyContent: "center", paddingHorizontal: 14 }, finishButtonText: { color: "#715628", fontSize: 12, fontWeight: "900" },
-  playCard: { marginTop: 12, borderRadius: 24, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e1ddd4", padding: 16 }, playTitle: { color: "#173f35", fontSize: 17, fontWeight: "900", textAlign: "center" }, playText: { color: "#76837e", fontSize: 10, lineHeight: 16, textAlign: "center", marginTop: 6 }, waiting: { color: "#6e7c77", fontSize: 9, fontWeight: "800", textAlign: "center", marginTop: 13 },
-  timerCircle: { width: 68, height: 68, borderRadius: 34, alignSelf: "center", backgroundColor: "#0b654f", borderWidth: 4, borderColor: "#e6ca7b", alignItems: "center", justifyContent: "center" }, timerNumber: { color: "#fff", fontSize: 23, fontWeight: "900" }, timerLabel: { color: "#d7e8e2", fontSize: 6, fontWeight: "900" }, question: { color: "#173f35", fontSize: 20, lineHeight: 27, fontWeight: "900", textAlign: "center", marginTop: 13 }, answers: { gap: 8, marginTop: 14 }, answer: { minHeight: 56, borderRadius: 16, borderWidth: 1, borderColor: "#dedad1", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10 }, answerSelected: { borderColor: "#0b654f", backgroundColor: "#e8f5ef" }, answerLocked: { opacity: .55 }, answerLetter: { width: 32, height: 32, borderRadius: 11, textAlign: "center", textAlignVertical: "center", backgroundColor: "#edf5f1", color: "#0b654f", fontWeight: "900" }, answerText: { flex: 1, color: "#294b42", fontSize: 11, fontWeight: "800" },
-  resultIcon: { fontSize: 38, textAlign: "center", marginBottom: 5 }, resultAnswer: { color: "#a17c36", fontSize: 22, fontWeight: "900", textAlign: "center", marginTop: 10 }, secretIcon: { fontSize: 39, textAlign: "center" }, secretDanger: { color: "#9c443e", fontSize: 17, fontWeight: "900", textAlign: "center", marginTop: 7 }, secretWord: { color: "#0b654f", fontSize: 29, lineHeight: 36, fontWeight: "900", textAlign: "center", marginTop: 10 }, voteTitle: { color: "#9a7a3c", fontSize: 8, fontWeight: "900", letterSpacing: 1, marginTop: 18, textAlign: "center" }, voteGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 8 }, voteButton: { minWidth: "47%", flexGrow: 1, minHeight: 46, borderRadius: 14, backgroundColor: "#edf5f1", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }, voteSelected: { backgroundColor: "#d9bd70" }, voteText: { color: "#264b41", fontSize: 10, fontWeight: "900" }, skip: { minHeight: 43, borderRadius: 14, marginTop: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#f4eee5" }, skipText: { color: "#816a4c", fontSize: 9, fontWeight: "900" }, bigHint: { fontSize: 46, textAlign: "center", marginTop: 10 }
+const styles=StyleSheet.create({
+  flex:{flex:1,backgroundColor:"#f7f4ec"},screen:{padding:17,paddingBottom:40},header:{flexDirection:"row",gap:11,alignItems:"center",marginBottom:15},copy:{flex:1},back:{width:44,height:44,borderRadius:15,backgroundColor:"#fff",borderWidth:1,borderColor:"#dedbd3",alignItems:"center",justifyContent:"center"},backText:{color:"#0b654f",fontSize:31,lineHeight:33},eyebrow:{color:"#a17c36",fontSize:9,fontWeight:"900",letterSpacing:1.1},title:{color:"#173f35",fontSize:26,fontWeight:"900",marginTop:4},subtitle:{color:"#76837e",fontSize:10,lineHeight:15,marginTop:4},gameCard:{minHeight:108,borderRadius:22,backgroundColor:"#fff",borderWidth:1,borderColor:"#e1ddd4",padding:13,marginBottom:9,flexDirection:"row",alignItems:"center",gap:11},gameIcon:{width:56,height:56,borderRadius:18,backgroundColor:"#edf5f1",alignItems:"center",justifyContent:"center"},gameEmoji:{fontSize:28},gameTitle:{color:"#173f35",fontSize:16,fontWeight:"900"},gameNote:{color:"#7d8984",fontSize:8.5,lineHeight:13,marginTop:3},tags:{flexDirection:"row",gap:5,marginTop:7},tag:{fontSize:7,color:"#5e716b",backgroundColor:"#f3f4f0",paddingHorizontal:7,paddingVertical:4,borderRadius:99,overflow:"hidden"},arrow:{color:"#0b654f",fontSize:27},setupCard:{backgroundColor:"#fff",borderRadius:22,borderWidth:1,borderColor:"#e1ddd4",padding:15},label:{fontSize:8,fontWeight:"900",letterSpacing:.8,color:"#6f7e78",marginTop:10,marginBottom:5},input:{height:48,borderWidth:1,borderColor:"#d9d6ce",borderRadius:13,paddingHorizontal:13,color:"#173f35",backgroundColor:"#fff",fontSize:15},categoryRow:{flexDirection:"row",gap:8,marginBottom:14},categoryButton:{flex:1,borderWidth:1,borderColor:"#d7d7d0",borderRadius:12,paddingVertical:11,alignItems:"center"},categoryActive:{backgroundColor:"#0b654f",borderColor:"#0b654f"},categoryText:{color:"#586a64",fontWeight:"800"},categoryTextActive:{color:"#fff"},primary:{marginTop:14,minHeight:50,borderRadius:14,backgroundColor:"#0b654f",alignItems:"center",justifyContent:"center",paddingHorizontal:14},primaryText:{color:"#fff",fontWeight:"900",fontSize:14},secondary:{marginTop:10,minHeight:47,borderRadius:14,borderWidth:1,borderColor:"#0b654f",alignItems:"center",justifyContent:"center",paddingHorizontal:14},secondaryText:{color:"#0b654f",fontWeight:"900"},disabled:{opacity:.45},generalPill:{marginTop:12,padding:11,borderRadius:12,backgroundColor:"#edf5f1"},generalPillText:{color:"#0b654f",fontWeight:"800"},orRow:{flexDirection:"row",alignItems:"center",gap:8,marginVertical:15},orLine:{height:1,backgroundColor:"#ddd9d0",flex:1},orText:{fontSize:8,color:"#8b948f",fontWeight:"900"},joinCard:{backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#e1ddd4",padding:14},codeInput:{textAlign:"center",letterSpacing:3,fontWeight:"900"},error:{color:"#a43c31",backgroundColor:"#fff0ed",padding:11,borderRadius:12,marginTop:12},roomTop:{flexDirection:"row",alignItems:"center",gap:9},roomCodeWrap:{flex:1},roomCodeLabel:{fontSize:7,fontWeight:"900",color:"#9a814f"},roomCode:{fontSize:21,fontWeight:"900",letterSpacing:2,color:"#173f35"},roundPill:{backgroundColor:"#edf5f1",paddingHorizontal:10,paddingVertical:7,borderRadius:99},roundText:{fontSize:8,fontWeight:"900",color:"#0b654f"},roomHero:{marginTop:13,borderRadius:22,backgroundColor:"#173f35",padding:14,flexDirection:"row",alignItems:"center",gap:12},roomHeroIcon:{fontSize:30},roomHeroTitle:{color:"#fff",fontSize:18,fontWeight:"900"},roomHeroMeta:{color:"#c8ddd5",fontSize:9,marginTop:3},timer:{width:50,height:50,borderRadius:25,backgroundColor:"#fff",alignItems:"center",justifyContent:"center"},timerText:{color:"#0b654f",fontSize:15,fontWeight:"900"},scoreboard:{marginTop:12,backgroundColor:"#fff",borderRadius:19,borderWidth:1,borderColor:"#e1ddd4",overflow:"hidden"},playerRow:{flexDirection:"row",alignItems:"center",padding:10,borderBottomWidth:1,borderBottomColor:"#eeeae2",gap:9},playerMe:{backgroundColor:"#f0f7f3"},avatar:{width:30,height:30,borderRadius:15,backgroundColor:"#173f35",alignItems:"center",justifyContent:"center"},avatarText:{color:"#fff",fontWeight:"900"},playerName:{flex:1,color:"#173f35",fontWeight:"800"},playerScore:{fontWeight:"900",fontSize:17,color:"#a17c36"},playCard:{marginTop:12,backgroundColor:"#fff",borderRadius:21,borderWidth:1,borderColor:"#e1ddd4",padding:15},playTitle:{fontSize:18,fontWeight:"900",color:"#173f35",textAlign:"center"},playText:{fontSize:10,lineHeight:15,color:"#71807a",textAlign:"center",marginTop:7},waiting:{color:"#71807a",textAlign:"center",fontWeight:"800",padding:14},choice:{borderWidth:1,borderColor:"#dcd9d2",borderRadius:13,padding:12,marginTop:8,backgroundColor:"#faf9f5"},choicePicked:{borderColor:"#0b654f",backgroundColor:"#eaf5ef"},choiceText:{color:"#173f35",fontWeight:"800",textAlign:"center"},secret:{fontSize:22,fontWeight:"900",color:"#0b654f",textAlign:"center",paddingVertical:15},scramble:{fontSize:27,fontWeight:"900",letterSpacing:4,color:"#a17c36",textAlign:"center",paddingVertical:16},resultIcon:{fontSize:34,textAlign:"center",marginBottom:6},winnerText:{fontSize:18,color:"#a17c36",fontWeight:"900",textAlign:"center",marginTop:7},finish:{marginTop:12,borderRadius:14,borderWidth:1,borderColor:"#efc5be",backgroundColor:"#fff0ed",padding:12,alignItems:"center"},finishText:{color:"#9b3429",fontWeight:"900"}
 });
