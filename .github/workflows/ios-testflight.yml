@@ -45,9 +45,20 @@ jobs:
         working-directory: ios
         run: npm ci --include=dev --no-audit --no-fund
 
-      - name: Add missing iOS audio dependency
+      - name: Add iOS audio dependency and config plugin
         working-directory: ios
-        run: npx expo install expo-audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo install expo-audio || test -d node_modules/expo-audio
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app.config.ts')
+          s=p.read_text()
+          if '"expo-audio"' not in s:
+              s=s.replace('  plugins: [\n', '  plugins: [\n    "expo-audio",\n', 1)
+          p.write_text(s)
+          PY
 
       - name: Import latest shared feature files into iOS app
         shell: bash
@@ -97,6 +108,8 @@ jobs:
           test -s modules/quran-audio/ios/QuranAudioModule.swift
           test -s modules/quran-audio/ios/QuranAudio.podspec
           test -s src/SystemMessageTicker.tsx
+          test -d node_modules/expo-audio
+          grep -q '"expo-audio"' app.config.ts
           grep -q 'wordrace' src/MultiplayerGames.tsx
           grep -q 'wordpuzzle' src/MultiplayerGames.tsx
           grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
