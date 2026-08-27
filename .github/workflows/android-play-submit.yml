@@ -63,17 +63,26 @@ jobs:
           node scripts/apply-v112-v60-reader-adhan-fixes.mjs
           node scripts/apply-v112-v61-exclusive-quran-browse.mjs
 
-      - name: Set Play Store version
+      - name: Set Play Store version and EAS production config
         working-directory: mobile
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          p=Path('app.config.ts')
-          s=p.read_text()
-          s=re.sub(r'version:\s*"[^"]+"', 'version: "1.0.12"', s, count=1)
-          s=re.sub(r'versionCode:\s*\d+', 'versionCode: 63', s, count=1)
-          p.write_text(s)
+          import json, re
+
+          app = Path('app.config.ts')
+          s = app.read_text()
+          s = re.sub(r'version:\s*"[^"]+"', 'version: "1.0.12"', s, count=1)
+          s = re.sub(r'versionCode:\s*\d+', 'versionCode: 63', s, count=1)
+          app.write_text(s)
+
+          eas_path = Path('eas.json')
+          eas = json.loads(eas_path.read_text())
+          production = eas.setdefault('build', {}).setdefault('production', {})
+          production.pop('autoIncrement', None)
+          production.setdefault('android', {})['buildType'] = 'app-bundle'
+          eas_path.write_text(json.dumps(eas, indent=2) + '\n')
           PY
 
       - name: Repair and verify Android image assets
@@ -113,6 +122,12 @@ jobs:
           grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
           grep -q 'appearance.browseMode !== "vertical"' src/quran/QuranV3.tsx
           grep -q 'Only a current validated prayer-alarm broadcast may play' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
+          node - <<'NODE'
+          const fs = require('fs');
+          const eas = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+          if (eas.build?.production?.autoIncrement !== undefined) throw new Error('autoIncrement must be removed for app.config.ts');
+          if (eas.build?.production?.android?.buildType !== 'app-bundle') throw new Error('production Android build must be app-bundle');
+          NODE
 
       - name: Validate Android native generation
         working-directory: mobile
@@ -135,5 +150,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message 'Hassoun Android 1.0.12 versionCode 63 Play Store release' \
+            --message 'Hassoun Android 1.0.12 versionCode 63 Play Store release from verified v62 code' \
             --wait
