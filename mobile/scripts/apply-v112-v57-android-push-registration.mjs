@@ -7,12 +7,67 @@ function replaceOnce(text, from, to, label) {
 
 const pushPath = 'src/push.ts';
 let push = fs.readFileSync(pushPath, 'utf8');
+const start = push.indexOf('export async function registerDeviceForServerPush(locale: "en" | "ar") {');
+if (start < 0) throw new Error('Missing registerDeviceForServerPush function');
 
-const oldFunction = `export async function registerDeviceForServerPush(locale: "en" | "ar") {\n  if (!Device.isDevice) return null;\n  const projectId = expoProjectId();\n  const pushApiUrl = Constants.expoConfig?.extra?.pushApiUrl as string | undefined;\n  if (!projectId || !pushApiUrl) return null;\n\n  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;\n  const installationId = await getInstallationId();\n\n  // Always refresh the server registration. This is intentionally not skipped\n  // when the token matches local storage because subscriber/device links and\n  // server-side preferences can change after the token was first created.\n  const response = await fetch(\`${pushApiUrl.replace(/\\\/$/, "")}/subscriptions/expo\`, {\n    method: "POST",\n    headers: { "Content-Type": "application/json" },\n    body: JSON.stringify({\n      installationId,\n      token,\n      platform: Platform.OS,\n      locale,\n      scheduleTimeZone: WINDSOR_TIME_ZONE,\n      appVersion: Constants.expoConfig?.version ?? "unknown"\n    })\n  });\n  if (!response.ok) throw new Error(\`Push registration failed: \${response.status}\`);\n  await AsyncStorage.setItem(STORAGE_KEYS.pushToken, token);\n  return token;\n}`;
+const newFunction = [
+  'export async function registerDeviceForServerPush(locale: "en" | "ar") {',
+  '  if (!Device.isDevice) return null;',
+  '  const projectId = expoProjectId();',
+  '  const pushApiUrl = Constants.expoConfig?.extra?.pushApiUrl as string | undefined;',
+  '  if (!projectId || !pushApiUrl) throw new Error("Push configuration is incomplete");',
+  '',
+  '  // Force native Firebase registration first on Android so an FCM token exists',
+  '  // before Expo creates the project-scoped push token.',
+  '  let nativeToken: string | null = null;',
+  '  let nativeTokenType: string | null = null;',
+  '  if (Platform.OS === "android") {',
+  '    const native = await Notifications.getDevicePushTokenAsync();',
+  '    nativeToken = typeof native.data === "string" ? native.data : String(native.data ?? "");',
+  '    nativeTokenType = native.type;',
+  '    if (!nativeToken) throw new Error("Android FCM token was empty");',
+  '  }',
+  '',
+  '  const expoTokenResult = await Notifications.getExpoPushTokenAsync({ projectId });',
+  '  const token = expoTokenResult.data;',
+  '  if (!token) throw new Error("Expo push token was empty");',
+  '  const installationId = await getInstallationId();',
+  '',
+  '  const response = await fetch(`${pushApiUrl.replace(/\\\/$/, "")}/subscriptions/expo`, {',
+  '    method: "POST",',
+  '    headers: { "Content-Type": "application/json" },',
+  '    body: JSON.stringify({',
+  '      installationId,',
+  '      token,',
+  '      nativeToken,',
+  '      nativeTokenType,',
+  '      platform: Platform.OS,',
+  '      locale,',
+  '      scheduleTimeZone: WINDSOR_TIME_ZONE,',
+  '      appVersion: Constants.expoConfig?.version ?? "unknown"',
+  '    })',
+  '  });',
+  '  if (!response.ok) {',
+  '    const detail = await response.text().catch(() => "");',
+  '    throw new Error(`Push registration failed: ${response.status} ${detail.slice(0, 180)}`);',
+  '  }',
+  '',
+  '  await Promise.all([',
+  '    AsyncStorage.setItem(STORAGE_KEYS.pushToken, token),',
+  '    AsyncStorage.setItem("hassoun:push:last-success:v1", JSON.stringify({',
+  '      at: new Date().toISOString(),',
+  '      platform: Platform.OS,',
+  '      expoTokenPrefix: token.slice(0, 24),',
+  '      nativeTokenPresent: Boolean(nativeToken),',
+  '      nativeTokenType',
+  '    }))',
+  '  ]);',
+  '  return token;',
+  '}',
+  ''
+].join('\n');
 
-const newFunction = `export async function registerDeviceForServerPush(locale: "en" | "ar") {\n  if (!Device.isDevice) return null;\n  const projectId = expoProjectId();\n  const pushApiUrl = Constants.expoConfig?.extra?.pushApiUrl as string | undefined;\n  if (!projectId || !pushApiUrl) throw new Error("Push configuration is incomplete");\n\n  // On Android, force Firebase/FCM registration first. This gives\n  // expo-notifications a real native device token before requesting the Expo token.\n  let nativeToken: string | null = null;\n  let nativeTokenType: string | null = null;\n  if (Platform.OS === "android") {\n    const native = await Notifications.getDevicePushTokenAsync();\n    nativeToken = typeof native.data === "string" ? native.data : String(native.data ?? "");\n    nativeTokenType = native.type;\n    if (!nativeToken) throw new Error("Android FCM token was empty");\n  }\n\n  const expoTokenResult = await Notifications.getExpoPushTokenAsync({ projectId });\n  const token = expoTokenResult.data;\n  if (!token) throw new Error("Expo push token was empty");\n  const installationId = await getInstallationId();\n\n  const response = await fetch(\`${pushApiUrl.replace(/\\\/$/, "")}/subscriptions/expo\`, {\n    method: "POST",\n    headers: { "Content-Type": "application/json" },\n    body: JSON.stringify({\n      installationId,\n      token,\n      nativeToken,\n      nativeTokenType,\n      platform: Platform.OS,\n      locale,\n      scheduleTimeZone: WINDSOR_TIME_ZONE,\n      appVersion: Constants.expoConfig?.version ?? "unknown"\n    })\n  });\n  if (!response.ok) {\n    const detail = await response.text().catch(() => "");\n    throw new Error(\`Push registration failed: \${response.status} \${detail.slice(0, 180)}\`);\n  }\n\n  await Promise.all([\n    AsyncStorage.setItem(STORAGE_KEYS.pushToken, token),\n    AsyncStorage.setItem("hassoun:push:last-success:v1", JSON.stringify({\n      at: new Date().toISOString(),\n      platform: Platform.OS,\n      expoTokenPrefix: token.slice(0, 24),\n      nativeTokenPresent: Boolean(nativeToken),\n      nativeTokenType\n    }))\n  ]);\n  return token;\n}`;
-
-push = replaceOnce(push, oldFunction, newFunction, 'Android native-first push registration');
+push = push.slice(0, start) + newFunction;
 fs.writeFileSync(pushPath, push);
 
 const configPath = 'app.config.ts';
