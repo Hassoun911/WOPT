@@ -184,3 +184,5 @@ jobs:
           git add .github/games-backend-status.txt
           git commit -m "Record Hassoun multiplayer backend ready" || true
           git push origin HEAD:main || true
+
+# trigger native FCM secret redeploy
