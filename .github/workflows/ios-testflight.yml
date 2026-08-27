@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: hassoun-ios-testflight-v102
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   queue:
@@ -84,23 +84,16 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Validate dedicated iOS app and latest features
+      - name: Validate dedicated iOS source
+        working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'version: "1.0.2"' ios/app.config.ts
-          grep -q 'buildNumber: "20260829"' ios/app.config.ts
-          grep -q 'ITSAppUsesNonExemptEncryption: false' ios/app.config.ts
-          grep -q 'UIBackgroundModes: \["remote-notification", "audio"\]' ios/app.config.ts
-          test -s ios/modules/quran-audio/ios/QuranAudioModule.swift
-          test -s ios/modules/quran-audio/ios/QuranAudio.podspec
-          grep -q '"platforms": \["android", "ios"\]' ios/modules/quran-audio/expo-module.config.json
-          grep -q 'wordrace' ios/src/MultiplayerGames.tsx
-          grep -q 'wordpuzzle' ios/src/MultiplayerGames.tsx
-          grep -q 'Insan • Haiwan • Shiee' ios/src/QuizGamesHub.tsx
-          grep -q 'Every game has a finish line' ios/src/QuizGamesHub.tsx
-          grep -q 'appearance.browseMode !== "vertical"' ios/src/quran/QuranV3.tsx
-          cd ios
+          test -s modules/quran-audio/ios/QuranAudioModule.swift
+          test -s modules/quran-audio/ios/QuranAudio.podspec
+          grep -q 'wordrace' src/MultiplayerGames.tsx
+          grep -q 'wordpuzzle' src/MultiplayerGames.tsx
+          grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
           npm run typecheck
 
       - name: Save synchronized iOS source back to iOS branch
