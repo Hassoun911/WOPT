@@ -23,7 +23,7 @@ jobs:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
       IOS_APP_VERSION: "1.0.12"
-      IOS_BUILD_NUMBER: "2026082701"
+      IOS_BUILD_NUMBER: "2026082702"
       NODE_ENV: production
 
     steps:
@@ -32,6 +32,10 @@ jobs:
         with:
           ref: release/ios-current
           fetch-depth: 0
+
+      - name: Apply iOS alert toggle fix
+        working-directory: ios
+        run: node scripts/apply-ios-alert-toggle-fix.mjs
 
       - name: Restore proven iOS native configuration
         working-directory: ios
@@ -108,13 +112,13 @@ jobs:
           pngcheck -q assets/notification-icon.png
           pngcheck -q assets/hassoun-logo.png
 
-      - name: Verify synchronized Android-parity features
+      - name: Verify synchronized Android-parity features and iOS alert fix
         working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'buildNumber: "2026082701"' app.config.ts
+          grep -q 'buildNumber: "2026082702"' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
@@ -124,6 +128,12 @@ jobs:
           grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
           grep -q 'bookmarks' src/quran/QuranV3.tsx
           grep -q 'pages' src/quran/QuranV3.tsx
+          grep -q 'masterAlertBusy' App.tsx
+          grep -q 'Linking.openSettings' App.tsx
+          grep -q 'Platform.OS === "android"' App.tsx
+          grep -q 'accessibilityRole="switch"' App.tsx
+          grep -q 'activeTimeZone = prayerLocation.timezone' App.tsx
+          grep -q 'locationLabel: activeLocationLabel' App.tsx
           grep -q 'createAudioPlaylist' modules/quran-audio/index.ts
           grep -q 'setAudioModeAsync' modules/quran-audio/index.ts
           grep -q 'playsInSilentMode: true' modules/quran-audio/index.ts
@@ -167,5 +177,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message "Hassoun iOS v1.0.12 build 2026082701 latest games push ticker Android parity" \
+            --message "Hassoun iOS v1.0.12 build 2026082702 alert toggle fix dynamic location" \
             --wait
