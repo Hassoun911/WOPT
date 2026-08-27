@@ -100,7 +100,7 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Validate dedicated iOS source
+      - name: Validate dedicated iOS source and Expo bundle
         working-directory: ios
         shell: bash
         run: |
@@ -113,7 +113,9 @@ jobs:
           grep -q 'wordrace' src/MultiplayerGames.tsx
           grep -q 'wordpuzzle' src/MultiplayerGames.tsx
           grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
-          npm run typecheck
+          npx expo config --type public > /tmp/hassoun-ios-expo-config.json
+          npx expo export --platform ios --output-dir /tmp/hassoun-ios-export
+          test -d /tmp/hassoun-ios-export
 
       - name: Save synchronized iOS source back to iOS branch
         shell: bash
