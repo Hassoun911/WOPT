@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.12 v58 final native push
+name: Build Hassoun v1.0.12 v59 native push + notification icon
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v112-v58-${{ github.ref }}
+  group: hassoun-v112-v59-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,47 +69,73 @@ jobs:
       - name: Force Android native token registration before Expo token
         run: node scripts/apply-v112-v57-android-push-registration.mjs
 
-      - name: Bump final install version to 58
+      - name: Bump install version to 59
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app.config.ts')
           s=p.read_text()
-          s=s.replace('versionCode: 57', 'versionCode: 58')
+          for old in ('versionCode: 57','versionCode: 58'):
+              s=s.replace(old, 'versionCode: 59')
           p.write_text(s)
           PY
 
-      - name: Prepare Hassoun logo
+      - name: Prepare Hassoun launcher and notification icons
         run: |
           sudo apt-get update -y
           sudo apt-get install -y python3-pil pngcheck
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageFile
+          from PIL import Image, ImageFile, ImageFilter
           ImageFile.LOAD_TRUNCATED_IMAGES = True
+
           logo_path = Path('assets/hassoun-logo.png')
           if not logo_path.exists() or logo_path.stat().st_size == 0:
               raise SystemExit('Missing assets/hassoun-logo.png')
+
           logo = Image.open(logo_path).convert('RGBA')
           logo.save(logo_path, format='PNG', optimize=True)
           logo.resize((1024, 1024), Image.Resampling.LANCZOS).save('assets/icon.png', format='PNG', optimize=True)
+
           splash = Image.new('RGBA', (1024, 1024), (0,0,0,0))
           art = logo.copy()
           art.thumbnail((820, 820), Image.Resampling.LANCZOS)
           splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
           splash.save('assets/splash-logo.png', format='PNG', optimize=True)
+
+          # Android small notification icons must be a white silhouette on transparent background.
+          # Extract the bright gold Hassoun bird/Quran artwork from the dark-green logo.
+          rgb = logo.convert('RGB')
+          gray = rgb.convert('L')
+          mask = gray.point(lambda p: 255 if p >= 95 else 0)
+          # Remove isolated noise and thicken fine bird/Quran strokes for Samsung status bars.
+          mask = mask.filter(ImageFilter.MedianFilter(3)).filter(ImageFilter.MaxFilter(5))
+          bbox = mask.getbbox()
+          if not bbox:
+              raise SystemExit('Could not derive Hassoun notification silhouette')
+          crop = mask.crop(bbox)
+          canvas_mask = Image.new('L', (192, 192), 0)
+          crop.thumbnail((148, 148), Image.Resampling.LANCZOS)
+          x=(192-crop.width)//2
+          y=(192-crop.height)//2
+          canvas_mask.paste(crop,(x,y))
+          notif = Image.new('RGBA', (192,192), (255,255,255,0))
+          notif.putalpha(canvas_mask)
+          notif.save('assets/notification-icon.png', format='PNG', optimize=True)
           PY
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
           pngcheck -q assets/splash-logo.png
+          pngcheck -q assets/notification-icon.png
 
-      - name: Verify exact-lineage fixes and Android push registration
+      - name: Verify exact-lineage fixes Android push and notification icon
         run: |
           set -euo pipefail
           npm run typecheck
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'versionCode: 58' app.config.ts
+          grep -q 'versionCode: 59' app.config.ts
           grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
+          grep -q 'notification-icon.png' app.config.ts
           grep -q 'nextAccent: { width: 24' src/HomePrayerPanel.tsx
           grep -q 'systemTickerOverlay' AppWithEmail.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
@@ -118,22 +144,28 @@ jobs:
           grep -q 'getExpoPushTokenAsync' src/push.ts
           grep -q 'nativeTokenPresent' src/push.ts
           grep -q 'setPrayerLocation(refreshed.location)' App.tsx
+          test -s assets/notification-icon.png
           python3 - <<'PY'
           import json
+          from PIL import Image
           data=json.load(open('google-services.json'))
           packages=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
           assert 'ca.wopt.windsorprayertimes' in packages
+          im=Image.open('assets/notification-icon.png').convert('RGBA')
+          alpha=im.getchannel('A')
+          assert alpha.getbbox(), 'notification icon is empty'
           PY
 
       - name: Generate Android project with Firebase
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Verify generated Firebase Android wiring
+      - name: Verify generated Firebase and notification icon wiring
         run: |
           set -euo pipefail
           test -s android/app/google-services.json
           grep -q 'ca.wopt.windsorprayertimes' android/app/google-services.json
           grep -R -q 'com.google.gms.google-services' android || { echo 'Google services Gradle plugin missing'; exit 1; }
+          find android/app/src/main/res -type f | grep -E 'notification|expo_notification' || true
 
       - name: Build release APK
         run: |
@@ -146,7 +178,7 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           ls -lh "$OUT"
@@ -154,10 +186,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-v58-native-push-final
+          name: Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -167,14 +199,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk'
-          TAG='v1.0.12-v58-native-push-final'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk'
+          TAG='v1.0.12-v59-native-push-hassoun-notification-icon'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
               --target release/v1.0.12-messaging-from-v1.0.11-good \
-              --title 'Hassoun v1.0.12 v58 Native Push Final' \
-              --notes 'Exact v1.0.11 golden lineage with scrolling message placement fix, Next Prayer layout fix, Firebase Android configuration, native FCM token creation/registration, and backend direct-FCM support.' \
+              --title 'Hassoun v1.0.12 v59 Native Push + Hassoun Notification Icon' \
+              --notes 'Exact v1.0.11 golden lineage with working native Android push, scrolling message placement fix, Next Prayer layout fix, and custom Hassoun bird/Quran Android notification silhouette replacing the generic bell.' \
               --prerelease
           fi
