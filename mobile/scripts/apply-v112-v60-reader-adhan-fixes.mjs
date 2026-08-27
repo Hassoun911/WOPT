@@ -34,8 +34,30 @@ function mustReplace(text, oldValue, newValue, label){
   const path='modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt';
   let s=read(path);
   if (!s.includes('import kotlin.math.abs')) s=s.replace('import java.util.Locale','import java.util.Locale\nimport kotlin.math.abs');
-  const marker='''    if (intent?.action == ACTION_STOP) {\n      finishPlayback()\n      return START_NOT_STICKY\n    }\n\n    val prayer = intent?.getStringExtra("prayer")?.replaceFirstChar {''';
-  const replacement='''    if (intent?.action == ACTION_STOP) {\n      finishPlayback()\n      return START_NOT_STICKY\n    }\n\n    // Never start Adhan just because Android recreated the service during an\n    // install/update. Only a current validated prayer-alarm broadcast may play.\n    if (intent?.action != ACTION_PLAY) {\n      stopSelf()\n      return START_NOT_STICKY\n    }\n    val scheduledAtMs = intent.getLongExtra("scheduledAtMs", 0L)\n    if (scheduledAtMs <= 0L || abs(System.currentTimeMillis() - scheduledAtMs) > MAX_TRIGGER_DRIFT_MS) {\n      stopSelf()\n      return START_NOT_STICKY\n    }\n\n    val prayer = intent.getStringExtra("prayer")?.replaceFirstChar {''';
+  const marker=`    if (intent?.action == ACTION_STOP) {
+      finishPlayback()
+      return START_NOT_STICKY
+    }
+
+    val prayer = intent?.getStringExtra("prayer")?.replaceFirstChar {`;
+  const replacement=`    if (intent?.action == ACTION_STOP) {
+      finishPlayback()
+      return START_NOT_STICKY
+    }
+
+    // Never start Adhan just because Android recreated the service during an
+    // install/update. Only a current validated prayer-alarm broadcast may play.
+    if (intent?.action != ACTION_PLAY) {
+      stopSelf()
+      return START_NOT_STICKY
+    }
+    val scheduledAtMs = intent.getLongExtra("scheduledAtMs", 0L)
+    if (scheduledAtMs <= 0L || abs(System.currentTimeMillis() - scheduledAtMs) > MAX_TRIGGER_DRIFT_MS) {
+      stopSelf()
+      return START_NOT_STICKY
+    }
+
+    val prayer = intent.getStringExtra("prayer")?.replaceFirstChar {`;
   if (!s.includes('Only a current validated prayer-alarm broadcast may play.')) {
     if (!s.includes(marker)) throw new Error('Missing patch marker: Adhan service start guard');
     s=s.replace(marker,replacement);
