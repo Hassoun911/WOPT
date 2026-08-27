@@ -85,6 +85,18 @@ jobs:
           eas_path.write_text(json.dumps(eas, indent=2) + '\n')
           PY
 
+      - name: Include Firebase config in EAS build archive
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          test -s google-services.json
+          sed -i '/^google-services\.json$/d' .gitignore
+          if [ -f .easignore ]; then
+            sed -i '/^google-services\.json$/d' .easignore
+          fi
+          grep -q '"package_name": "ca.wopt.windsorprayertimes"' google-services.json
+          echo 'Firebase config will be included in the EAS archive.'
+
       - name: Repair and verify Android image assets
         working-directory: mobile
         run: |
@@ -115,6 +127,8 @@ jobs:
           grep -q 'version: "1.0.12"' app.config.ts
           grep -q 'versionCode: 63' app.config.ts
           grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
+          test -s google-services.json
+          ! grep -q '^google-services\.json$' .gitignore
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
           grep -q 'getDevicePushTokenAsync' src/push.ts
           grep -q 'wordrace' src/MultiplayerGames.tsx
@@ -145,6 +159,7 @@ jobs:
           EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
         run: |
           set -euo pipefail
+          test -s google-services.json
           npx --yes eas-cli@latest build \
             --platform android \
             --profile production \
