@@ -47,6 +47,9 @@ jobs:
       - name: Align Email Center sponsor-logo schema with production
         run: node scripts/fix-email-logo-column.mjs
 
+      - name: Wire finite games v2 and CRM routes
+        run: node scripts/apply-games-v2-routing.mjs
+
       - name: Validate Worker
         run: |
           npm run typecheck
@@ -125,8 +128,8 @@ jobs:
           player_id="smoke_$(date +%s)_$RANDOM"
           games_ok=false
           for attempt in $(seq 1 10); do
-            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/games/rooms" -H 'Content-Type: application/json' --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
-            if [ "$http_code" = "200" ] && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null && jq -e '.room.gameType == "trivia" and .room.category == "islamic"' /tmp/game-room.json >/dev/null; then games_ok=true; break; fi
+            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/games/rooms" -H 'Content-Type: application/json' --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"wordrace\",\"category\":\"general\"}")"
+            if [ "$http_code" = "200" ] && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null && jq -e '.room.gameType == "wordrace" and .room.category == "general"' /tmp/game-room.json >/dev/null; then games_ok=true; break; fi
             sleep 2
           done
           test "$games_ok" = true
@@ -138,6 +141,7 @@ jobs:
           cat > .github/games-backend-status.txt <<EOF
           games_backend=ready
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
+          verified_game=wordrace
           verified_room_code=${code}
           verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           source_commit=$(git rev-parse HEAD)
