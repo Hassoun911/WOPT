@@ -1,1 +1,1 @@
-Queue iOS TestFlight build for Quran audio fix.
+Queue dedicated ios folder sync and TestFlight build with latest Hassoun features - 2026-08-27.
