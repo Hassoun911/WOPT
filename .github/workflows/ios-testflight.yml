@@ -1,4 +1,4 @@
-name: Build and Submit Hassoun iOS v1.0.2 Android v62 Parity
+name: Build and Submit Hassoun iOS v1.0.2 Synced Parity
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-ios-testflight-v102-parity
+  group: hassoun-ios-testflight-v102-synced
   cancel-in-progress: true
 
 jobs:
@@ -22,73 +22,18 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
-      ANDROID_FEATURE_REF: release/v1.0.12-messaging-from-v1.0.11-good
       IOS_APP_VERSION: "1.0.2"
       IOS_BUILD_NUMBER: "20260830"
       NODE_ENV: production
 
     steps:
-      - name: Checkout dedicated iOS branch
+      - name: Checkout synchronized dedicated iOS source
         uses: actions/checkout@v4
         with:
           ref: release/ios-current
           fetch-depth: 0
 
-      - name: Prepare Android v62 shared source plus iOS-only overlay
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin "${ANDROID_FEATURE_REF}:refs/remotes/origin/${ANDROID_FEATURE_REF}" --force
-          git fetch origin main --force
-
-          mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
-          cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
-          cp ios/eas.json /tmp/hassoun-ios-overlay/eas.json
-          cp ios/modules/quran-audio/index.ts /tmp/hassoun-ios-overlay/modules/quran-audio/index.ts
-          cp ios/modules/quran-audio/index.ios.ts /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts
-          cp ios/modules/quran-audio/expo-module.config.json /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json
-          cp ios/modules/quran-audio/ios/QuranAudioIOSModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift
-          cp ios/modules/quran-audio/ios/QuranAudioModule.swift /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift
-          cp ios/modules/quran-audio/ios/QuranAudio.podspec /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec
-
-          rm -rf /tmp/hassoun-android-mobile
-          mkdir -p /tmp/hassoun-android-mobile
-          git archive "origin/${ANDROID_FEATURE_REF}:mobile" | tar -x -C /tmp/hassoun-android-mobile
-
-          find ios -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-          cp -a /tmp/hassoun-android-mobile/. ios/
-
-          cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
-          cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
-          mkdir -p ios/modules/quran-audio/ios
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/index.ts ios/modules/quran-audio/index.ts
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/index.ios.ts ios/modules/quran-audio/index.ios.ts
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/expo-module.config.json ios/modules/quran-audio/expo-module.config.json
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioIOSModule.swift ios/modules/quran-audio/ios/QuranAudioIOSModule.swift
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
-          cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
-
-          git show "origin/${ANDROID_FEATURE_REF}:mobile/src/MultiplayerGames.tsx" > ios/src/MultiplayerGames.tsx
-          git show "origin/${ANDROID_FEATURE_REF}:mobile/src/QuizGamesHub.tsx" > ios/src/QuizGamesHub.tsx
-          git show "origin/main:mobile/src/SystemMessageTicker.tsx" > ios/src/SystemMessageTicker.tsx
-
-      - name: Apply accepted Android v62 shared fixes to iOS source
-        working-directory: ios
-        shell: bash
-        run: |
-          set -euo pipefail
-          for script in \
-            apply-v110-location-fix.mjs \
-            apply-v111-city-highlight-fix.mjs \
-            apply-v112-messaging-fix.mjs \
-            apply-v112-next-prayer-layout-fix.mjs \
-            apply-v112-ticker-position-fix.mjs \
-            apply-v112-v61-exclusive-quran-browse.mjs
-          do
-            node "scripts/$script"
-          done
-
-      - name: Restore proven iOS config and set TestFlight version
+      - name: Restore proven iOS native configuration
         working-directory: ios
         shell: bash
         run: |
@@ -119,7 +64,7 @@ jobs:
           test -n "${EXPO_TOKEN:-}"
           npx --yes eas-cli@latest whoami
 
-      - name: Add proven Expo Audio dependency for iOS
+      - name: Pin proven Expo Audio dependency
         working-directory: ios
         run: npm install expo-audio@~57.0.3 --save --package-lock-only --ignore-scripts --no-audit --no-fund
 
@@ -127,15 +72,13 @@ jobs:
         working-directory: ios
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Verify latest layout, games, bookmarks and push features
+      - name: Verify synchronized Android-parity features
         working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'version: "1.0.2"' app.config.ts
           grep -q 'buildNumber: "20260830"' app.config.ts
-          grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
-          grep -q 'ca.wopt.windsorprayertimes' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
@@ -150,12 +93,12 @@ jobs:
           grep -q 'playsInSilentMode: true' modules/quran-audio/index.ts
           grep -q 'shouldPlayInBackground: true' modules/quran-audio/index.ts
           if grep -q 'requireOptionalNativeModule' modules/quran-audio/index.ts; then
-            echo 'ERROR: iOS Quran audio route regressed to optional native module'
+            echo 'ERROR: direct iOS Quran audio route is not active'
             exit 1
           fi
           grep -q 'expo-audio' package.json
           if grep -q '^    "expo-audio",' app.config.ts; then
-            echo 'ERROR: expo-audio config plugin must remain disabled for proven iOS build path'
+            echo 'ERROR: expo-audio config plugin must remain disabled on proven iOS path'
             exit 1
           fi
           grep -q '6804563934' eas.json
@@ -188,5 +131,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message "Hassoun iOS v1.0.2 Android v62 layout/features parity" \
+            --message "Hassoun iOS v1.0.2 synced Android layout/features parity" \
             --wait
