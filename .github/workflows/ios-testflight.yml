@@ -45,12 +45,17 @@ jobs:
         working-directory: ios
         run: npm ci --include=dev --no-audit --no-fund
 
-      - name: Import latest multiplayer games into iOS app
+      - name: Add missing iOS audio dependency
+        working-directory: ios
+        run: npx expo install expo-audio
+
+      - name: Import latest shared feature files into iOS app
         shell: bash
         run: |
           set -euo pipefail
           git show origin/release/v1.0.12-messaging-from-v1.0.11-good:mobile/src/MultiplayerGames.tsx > ios/src/MultiplayerGames.tsx
           git show origin/release/v1.0.12-messaging-from-v1.0.11-good:mobile/src/QuizGamesHub.tsx > ios/src/QuizGamesHub.tsx
+          git show origin/main:mobile/src/SystemMessageTicker.tsx > ios/src/SystemMessageTicker.tsx
 
       - name: Apply latest accepted shared fixes to dedicated iOS source
         working-directory: ios
@@ -91,6 +96,7 @@ jobs:
           set -euo pipefail
           test -s modules/quran-audio/ios/QuranAudioModule.swift
           test -s modules/quran-audio/ios/QuranAudio.podspec
+          test -s src/SystemMessageTicker.tsx
           grep -q 'wordrace' src/MultiplayerGames.tsx
           grep -q 'wordpuzzle' src/MultiplayerGames.tsx
           grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
