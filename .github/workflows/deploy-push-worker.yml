@@ -1,4 +1,4 @@
-# Deploy Hassoun Worker with prayer alerts, support, and multiplayer games
+# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, and native Android FCM
 name: Deploy Hassoun Push Worker
 
 on:
@@ -37,6 +37,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply native Android FCM routing patch
+        run: node scripts/apply-native-fcm-routing.mjs
 
       - name: Validate Worker
         run: |
@@ -84,6 +87,7 @@ jobs:
           EMAIL_LINK_SECRET: ${{ secrets.EMAIL_LINK_SECRET }}
           ADMIN_BOOTSTRAP_KEY: ${{ secrets.ADMIN_BOOTSTRAP_KEY }}
           EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
 
@@ -112,6 +116,7 @@ jobs:
           put_optional_secret EMAIL_LINK_SECRET "$EMAIL_LINK_SECRET"
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
+          put_optional_secret FIREBASE_SERVICE_ACCOUNT_JSON "$FIREBASE_SERVICE_ACCOUNT_JSON"
 
       - name: Smoke test Worker and multiplayer room creation
         run: |
