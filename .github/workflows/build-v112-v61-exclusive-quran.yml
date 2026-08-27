@@ -1,0 +1,150 @@
+name: Build Hassoun v1.0.12 v61 exclusive Quran browse
+
+on:
+  push:
+    branches:
+      - release/v1.0.12-messaging-from-v1.0.11-good
+    paths:
+      - '.github/workflows/build-v112-v61-exclusive-quran.yml'
+      - 'mobile/scripts/apply-v112-v61-exclusive-quran-browse.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v112-v61-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout exact v1.0.11-derived branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.12-messaging-from-v1.0.11-good
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Reproduce exact good source and all accepted fixes
+        run: |
+          node scripts/apply-v110-location-fix.mjs
+          node scripts/apply-v111-city-highlight-fix.mjs
+          node scripts/apply-v112-messaging-fix.mjs
+          node scripts/apply-v112-next-prayer-layout-fix.mjs
+          node scripts/apply-v112-ticker-position-fix.mjs
+          node scripts/apply-v112-firebase-native-push.mjs
+          node scripts/apply-v112-v57-android-push-registration.mjs
+          node scripts/apply-v112-v60-reader-adhan-fixes.mjs
+          node scripts/apply-v112-v61-exclusive-quran-browse.mjs
+
+      - name: Bump install version to 61
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app.config.ts')
+          s=p.read_text()
+          import re
+          s=re.sub(r'versionCode:\s*\d+', 'versionCode: 61', s)
+          p.write_text(s)
+          PY
+
+      - name: Prepare Hassoun launcher and notification icons
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pil pngcheck
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile, ImageFilter
+          ImageFile.LOAD_TRUNCATED_IMAGES=True
+          logo=Image.open(Path('assets/hassoun-logo.png')).convert('RGBA')
+          logo.save('assets/hassoun-logo.png',format='PNG',optimize=True)
+          logo.resize((1024,1024),Image.Resampling.LANCZOS).save('assets/icon.png',format='PNG',optimize=True)
+          splash=Image.new('RGBA',(1024,1024),(0,0,0,0)); art=logo.copy(); art.thumbnail((820,820),Image.Resampling.LANCZOS); splash.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2)); splash.save('assets/splash-logo.png',format='PNG',optimize=True)
+          gray=logo.convert('RGB').convert('L'); mask=gray.point(lambda p:255 if p>=95 else 0).filter(ImageFilter.MedianFilter(3)).filter(ImageFilter.MaxFilter(5)); bbox=mask.getbbox()
+          if not bbox: raise SystemExit('Could not derive notification icon')
+          crop=mask.crop(bbox); canvas=Image.new('L',(192,192),0); crop.thumbnail((148,148),Image.Resampling.LANCZOS); canvas.paste(crop,((192-crop.width)//2,(192-crop.height)//2)); notif=Image.new('RGBA',(192,192),(255,255,255,0)); notif.putalpha(canvas); notif.save('assets/notification-icon.png',format='PNG',optimize=True)
+          PY
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/notification-icon.png
+
+      - name: Verify v61 fixes
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          grep -q 'versionCode: 61' app.config.ts
+          grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
+          grep -q 'appearance.browseMode !== "vertical"' src/quran/QuranV3.tsx
+          grep -q 'if (appearance.browseMode === "vertical") handleVerticalTouchStart' src/quran/QuranV3.tsx
+          grep -q 'readerLastScrollY.current <= 48' src/quran/QuranV3.tsx
+          grep -q 'Only a current validated prayer-alarm broadcast may play' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          grep -q 'getDevicePushTokenAsync' src/push.ts
+
+      - name: Generate Android project with Firebase
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Verify Firebase wiring
+        run: |
+          test -s android/app/google-services.json
+          grep -q 'ca.wopt.windsorprayertimes' android/app/google-services.json
+          grep -R -q 'com.google.gms.google-services' android
+
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify and name APK
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v61-exclusive-quran-browse.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          ls -lh "$OUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.12-v61-exclusive-quran-browse
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v61-exclusive-quran-browse.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v61-exclusive-quran-browse.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish prerelease APK
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v61-exclusive-quran-browse.apk'
+          TAG='v1.0.12-v61-exclusive-quran-browse'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --target release/v1.0.12-messaging-from-v1.0.11-good --title 'Hassoun v1.0.12 v61 Exclusive Quran Browse' --notes 'Same exact v1.0.11-derived Hassoun line with all v60 fixes plus strict Qur’an browse modes: Horizontal changes pages only by left/right swipe; Vertical changes pages only by vertical edge gestures.' --prerelease
+          fi
