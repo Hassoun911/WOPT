@@ -1,4 +1,4 @@
-name: Build + TestFlight Hassoun iOS v1.0.8 Current Android Parity
+name: Build + TestFlight Hassoun iOS v1.0.2 Android v62 Parity
 
 on:
   workflow_dispatch:
@@ -19,7 +19,9 @@ concurrency:
 env:
   EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
   EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
-  ANDROID_PARITY_REF: release/android-current
+  ANDROID_FEATURE_REF: release/v1.0.12-messaging-from-v1.0.11-good
+  IOS_APP_VERSION: '1.0.2'
+  IOS_BUILD_NUMBER: '20260830'
 
 jobs:
   build-ios-testflight:
@@ -30,25 +32,19 @@ jobs:
         working-directory: ios
 
     steps:
-      - name: Checkout iOS release branch
+      - name: Checkout dedicated iOS release branch
         uses: actions/checkout@v4
         with:
           ref: release/ios-current
           fetch-depth: 0
 
-      - name: Prepare exact current Android source plus iOS-only overlay
+      - name: Prepare Android v62 shared source plus iOS-only overlay
         shell: bash
         working-directory: .
         run: |
           set -euo pipefail
-
-          git fetch origin "${ANDROID_PARITY_REF}:refs/remotes/origin/${ANDROID_PARITY_REF}" --force
-
-          CURRENT_ANDROID_COMMIT="$(git rev-parse "origin/${ANDROID_PARITY_REF}")"
-          CURRENT_ICON_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/assets/icon.png")"
-          CURRENT_APP_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/App.tsx")"
-          CURRENT_HOME_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/src/HomePrayerPanel.tsx")"
-          CURRENT_QURAN_BLOB="$(git rev-parse "origin/${ANDROID_PARITY_REF}:mobile/src/quran/QuranV3.tsx")"
+          git fetch origin "${ANDROID_FEATURE_REF}:refs/remotes/origin/${ANDROID_FEATURE_REF}" --force
+          git fetch origin main --force
 
           mkdir -p /tmp/hassoun-ios-overlay/modules/quran-audio/ios
           cp ios/app.config.ts /tmp/hassoun-ios-overlay/app.config.ts
@@ -62,15 +58,10 @@ jobs:
 
           rm -rf /tmp/hassoun-android-mobile
           mkdir -p /tmp/hassoun-android-mobile
-          git archive "origin/${ANDROID_PARITY_REF}:mobile" | tar -x -C /tmp/hassoun-android-mobile
+          git archive "origin/${ANDROID_FEATURE_REF}:mobile" | tar -x -C /tmp/hassoun-android-mobile
 
           find ios -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           cp -a /tmp/hassoun-android-mobile/. ios/
-
-          test "$(git hash-object ios/assets/icon.png)" = "${CURRENT_ICON_BLOB}"
-          test "$(git hash-object ios/App.tsx)" = "${CURRENT_APP_BLOB}"
-          test "$(git hash-object ios/src/HomePrayerPanel.tsx)" = "${CURRENT_HOME_BLOB}"
-          test "$(git hash-object ios/src/quran/QuranV3.tsx)" = "${CURRENT_QURAN_BLOB}"
 
           cp /tmp/hassoun-ios-overlay/app.config.ts ios/app.config.ts
           cp /tmp/hassoun-ios-overlay/eas.json ios/eas.json
@@ -82,9 +73,43 @@ jobs:
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudioModule.swift ios/modules/quran-audio/ios/QuranAudioModule.swift
           cp /tmp/hassoun-ios-overlay/modules/quran-audio/ios/QuranAudio.podspec ios/modules/quran-audio/ios/QuranAudio.podspec
 
-          echo "Current Android commit: ${CURRENT_ANDROID_COMMIT}"
-          echo "Current Android icon blob: ${CURRENT_ICON_BLOB}"
-          echo "Verified App.tsx, HomePrayerPanel, QuranV3 and icon are byte-identical to release/android-current before iOS overlay."
+          git show "origin/${ANDROID_FEATURE_REF}:mobile/src/MultiplayerGames.tsx" > ios/src/MultiplayerGames.tsx
+          git show "origin/${ANDROID_FEATURE_REF}:mobile/src/QuizGamesHub.tsx" > ios/src/QuizGamesHub.tsx
+          git show "origin/main:mobile/src/SystemMessageTicker.tsx" > ios/src/SystemMessageTicker.tsx
+
+          echo "Base shared source: $(git rev-parse origin/${ANDROID_FEATURE_REF})"
+
+      - name: Apply accepted Android v62 shared fixes to iOS source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in \
+            apply-v110-location-fix.mjs \
+            apply-v111-city-highlight-fix.mjs \
+            apply-v112-messaging-fix.mjs \
+            apply-v112-next-prayer-layout-fix.mjs \
+            apply-v112-ticker-position-fix.mjs \
+            apply-v112-v61-exclusive-quran-browse.mjs
+          do
+            node "scripts/$script"
+          done
+
+      - name: Restore proven iOS config and set new TestFlight version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path('app.config.ts')
+          s = p.read_text()
+          s = re.sub(r'version:\s*"[^"]+"', f'version: "{os.environ["IOS_APP_VERSION"]}"', s, count=1)
+          s = re.sub(r'buildNumber:\s*"[^"]+"', f'buildNumber: "{os.environ["IOS_BUILD_NUMBER"]}"', s, count=1)
+          # Keep the last proven iOS configuration: expo-audio is a dependency,
+          # not an Expo config plugin for this app.
+          s = s.replace('    "expo-audio",\n', '')
+          p.write_text(s)
+          PY
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -102,64 +127,52 @@ jobs:
           test -n "${EXPO_TOKEN:-}"
           npx --yes eas-cli@latest whoami
 
-      - name: Add official Expo Audio dependency for iOS
+      - name: Add proven Expo Audio dependency for iOS
         run: npm install expo-audio@~57.0.3 --save --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install exact dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Validate PNG assets and repair only damaged files
+      - name: Verify Android layout parity and required latest features
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -y >/dev/null
-          sudo apt-get install -y python3-pil pngcheck >/dev/null
-
-          damaged=0
-          while IFS= read -r -d '' file; do
-            if ! pngcheck -q "$file"; then
-              echo "Repairing damaged PNG only: $file"
-              python3 - "$file" <<'PY'
-          import sys
-          from pathlib import Path
-          from PIL import Image, ImageFile
-          ImageFile.LOAD_TRUNCATED_IMAGES = True
-          path = Path(sys.argv[1])
-          with Image.open(path) as source:
-              source.load()
-              image = source.convert('RGBA')
-          tmp = path.with_suffix('.ios-fixed.png')
-          image.save(tmp, format='PNG', optimize=True)
-          tmp.replace(path)
-          PY
-              pngcheck -q "$file"
-              damaged=$((damaged+1))
-            fi
-          done < <(find assets -type f -name '*.png' -print0)
-          echo "PNG files repaired: ${damaged}"
-
-      - name: Verify current Android layout and direct iOS Quran audio source
-        run: |
-          set -euo pipefail
-          grep -q 'version: "1.0.8"' app.config.ts
-          grep -q 'buildNumber: "20260828"' app.config.ts
+          grep -q 'version: "1.0.2"' app.config.ts
+          grep -q 'buildNumber: "20260830"' app.config.ts
           grep -q 'ITSAppUsesNonExemptEncryption: false' app.config.ts
           grep -q 'ca.wopt.windsorprayertimes' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
+          grep -q 'wordrace' src/MultiplayerGames.tsx
+          grep -q 'wordpuzzle' src/MultiplayerGames.tsx
+          grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
+          grep -q 'bookmarks' src/quran/QuranV3.tsx
+          grep -q 'pages' src/quran/QuranV3.tsx
           grep -q 'createAudioPlaylist' modules/quran-audio/index.ts
           grep -q 'setAudioModeAsync' modules/quran-audio/index.ts
           grep -q 'playsInSilentMode: true' modules/quran-audio/index.ts
           grep -q 'shouldPlayInBackground: true' modules/quran-audio/index.ts
           if grep -q 'requireOptionalNativeModule' modules/quran-audio/index.ts; then
-            echo 'ERROR: iOS Quran index.ts still points to optional native module'
+            echo 'ERROR: iOS Quran audio route regressed to optional native module'
             exit 1
           fi
           grep -q 'expo-audio' package.json
+          if grep -q '^    "expo-audio",' app.config.ts; then
+            echo 'ERROR: expo-audio config plugin must remain disabled for proven iOS build path'
+            exit 1
+          fi
           grep -q '6804563934' eas.json
-          npm run typecheck
 
-      - name: Validate iOS native generation
+      - name: Validate Expo iOS bundle
+        run: |
+          set -euo pipefail
+          npx expo config --type public > /tmp/hassoun-ios-config.json
+          npx expo export --platform ios --output-dir /tmp/hassoun-ios-export
+          test -d /tmp/hassoun-ios-export
+
+      - name: Validate iOS native generation before paid cloud build
         run: |
           set -euo pipefail
           rm -rf ios
@@ -167,7 +180,7 @@ jobs:
           test -f ios/Podfile
           rm -rf ios
 
-      - name: Build signed iOS 1.0.8 and submit to Hassoun TestFlight
+      - name: Build signed iOS 1.0.2 and submit to TestFlight
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
@@ -178,4 +191,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
+            --message "Hassoun iOS v1.0.2 Android v62 layout/features parity" \
             --wait
