@@ -41,6 +41,9 @@ jobs:
       - name: Apply native Android FCM routing patch
         run: node scripts/apply-native-fcm-routing.mjs
 
+      - name: Apply CRM push campaign actions
+        run: node scripts/apply-crm-push-actions.mjs
+
       - name: Validate Worker
         run: |
           npm run typecheck
@@ -71,7 +74,6 @@ jobs:
               exit 0
             fi
           done
-
           echo "Unable to create a workers.dev subdomain"
           exit 1
 
@@ -90,25 +92,8 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
-
-          put_required_secret() {
-            name="$1"
-            value="$2"
-            test -n "$value"
-            printf '%s' "$value" | npx wrangler secret put "$name"
-          }
-
-          put_optional_secret() {
-            name="$1"
-            value="$2"
-            if [ -n "$value" ]; then
-              printf '%s' "$value" | npx wrangler secret put "$name"
-              echo "Installed optional Worker secret: $name"
-            else
-              echo "Optional Worker secret not configured: $name"
-            fi
-          }
-
+          put_required_secret() { name="$1"; value="$2"; test -n "$value"; printf '%s' "$value" | npx wrangler secret put "$name"; }
+          put_optional_secret() { name="$1"; value="$2"; if [ -n "$value" ]; then printf '%s' "$value" | npx wrangler secret put "$name"; echo "Installed optional Worker secret: $name"; else echo "Optional Worker secret not configured: $name"; fi; }
           put_required_secret VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
           put_optional_secret RESEND_API_KEY "$RESEND_API_KEY"
           put_optional_secret EMAIL_FROM "$EMAIL_FROM"
@@ -121,52 +106,27 @@ jobs:
       - name: Smoke test Worker and multiplayer room creation
         run: |
           set -euo pipefail
-
           health_ok=false
           for attempt in $(seq 1 10); do
-            if curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json \
-              && jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null; then
-              health_ok=true
-              break
-            fi
+            if curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json && jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null; then health_ok=true; break; fi
             sleep 2
           done
           test "$health_ok" = true
-
           config_ok=false
           for attempt in $(seq 1 15); do
-            if curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json \
-              && jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json >/dev/null \
-              && jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null; then
-              config_ok=true
-              break
-            fi
+            if curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json && jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json >/dev/null && jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null; then config_ok=true; break; fi
             echo "Waiting for latest Worker config to propagate (${attempt}/15)…"
             sleep 2
           done
           test "$config_ok" = true
-
           player_id="smoke_$(date +%s)_$RANDOM"
           games_ok=false
           for attempt in $(seq 1 10); do
-            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' \
-              -X POST "${PUSH_WORKER_URL}/games/rooms" \
-              -H 'Content-Type: application/json' \
-              --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
-            if [ "$http_code" = "200" ] \
-              && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null \
-              && jq -e '.room.gameType == "trivia" and .room.category == "islamic"' /tmp/game-room.json >/dev/null; then
-              games_ok=true
-              break
-            fi
-            echo "Multiplayer endpoint not ready yet (${attempt}/10), HTTP ${http_code}"
-            cat /tmp/game-room.json || true
+            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/games/rooms" -H 'Content-Type: application/json' --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
+            if [ "$http_code" = "200" ] && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null && jq -e '.room.gameType == "trivia" and .room.category == "islamic"' /tmp/game-room.json >/dev/null; then games_ok=true; break; fi
             sleep 2
           done
           test "$games_ok" = true
-
-          echo "Worker health, config, D1 multiplayer tables, and create-room endpoint all passed."
-          jq '{room: {code: .room.code, gameType: .room.gameType, category: .room.category}}' /tmp/game-room.json
 
       - name: Record multiplayer backend ready
         working-directory: .
@@ -184,5 +144,3 @@ jobs:
           git add .github/games-backend-status.txt
           git commit -m "Record Hassoun multiplayer backend ready" || true
           git push origin HEAD:main || true
-
-# trigger native FCM secret redeploy
