@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Apply CRM message and Email Center fixes
+        run: node scripts/apply-crm-message-email-fixes.mjs
+
       - name: Build static PWA
         run: npx next build
         env:
@@ -49,6 +52,8 @@ jobs:
         run: |
           test -f out/index.html
           test -f out/quran/index.html
+          test -f out/admin/push/index.html
+          test -f out/admin/email/index.html
           test -f out/manifest.webmanifest
           test -f out/sw.js
           test -f out/CNAME
