@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.12 v57 Android push registration
+name: Build Hassoun v1.0.12 v58 final native push
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v112-v57-${{ github.ref }}
+  group: hassoun-v112-v58-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,6 +69,16 @@ jobs:
       - name: Force Android native token registration before Expo token
         run: node scripts/apply-v112-v57-android-push-registration.mjs
 
+      - name: Bump final install version to 58
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app.config.ts')
+          s=p.read_text()
+          s=s.replace('versionCode: 57', 'versionCode: 58')
+          p.write_text(s)
+          PY
+
       - name: Prepare Hassoun logo
         run: |
           sudo apt-get update -y
@@ -98,7 +108,7 @@ jobs:
           set -euo pipefail
           npm run typecheck
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'versionCode: 57' app.config.ts
+          grep -q 'versionCode: 58' app.config.ts
           grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
           grep -q 'nextAccent: { width: 24' src/HomePrayerPanel.tsx
           grep -q 'systemTickerOverlay' AppWithEmail.tsx
@@ -136,7 +146,7 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v57-android-push-registration.apk"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           ls -lh "$OUT"
@@ -144,10 +154,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-v57-android-push-registration
+          name: Hassoun-v1.0.12-v58-native-push-final
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v57-android-push-registration.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v57-android-push-registration.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -157,14 +167,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v57-android-push-registration.apk'
-          TAG='v1.0.12-v57-android-push-registration'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v58-native-push-final.apk'
+          TAG='v1.0.12-v58-native-push-final'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
               --target release/v1.0.12-messaging-from-v1.0.11-good \
-              --title 'Hassoun v1.0.12 v57 Android Push Registration' \
-              --notes 'Exact v1.0.11 golden lineage. Keeps the scrolling message and Next Prayer layout fixes, keeps Firebase Android configuration, and forces native FCM device-token creation before requesting/registering the Expo push token.' \
+              --title 'Hassoun v1.0.12 v58 Native Push Final' \
+              --notes 'Exact v1.0.11 golden lineage with scrolling message placement fix, Next Prayer layout fix, Firebase Android configuration, native FCM token creation/registration, and backend direct-FCM support.' \
               --prerelease
           fi
