@@ -44,6 +44,9 @@ jobs:
       - name: Make resend reactivate scrolling ticker
         run: node scripts/apply-resend-ticker-fix.mjs
 
+      - name: Add Games to CRM navigation
+        run: node scripts/apply-games-crm-nav.mjs
+
       - name: Build static PWA
         run: npx next build
         env:
@@ -55,8 +58,10 @@ jobs:
         run: |
           test -f out/index.html
           test -f out/quran/index.html
+          test -f out/games/index.html
           test -f out/admin/push/index.html
           test -f out/admin/email/index.html
+          test -f out/admin/games/index.html
           test -f out/manifest.webmanifest
           test -f out/sw.js
           test -f out/CNAME
