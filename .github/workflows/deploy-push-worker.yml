@@ -44,6 +44,9 @@ jobs:
       - name: Apply CRM push campaign actions
         run: node scripts/apply-crm-push-actions.mjs
 
+      - name: Align Email Center sponsor-logo schema with production
+        run: node scripts/fix-email-logo-column.mjs
+
       - name: Validate Worker
         run: |
           npm run typecheck
