@@ -1,4 +1,4 @@
-name: Build and Submit Hassoun iOS v1.0.2 Synced Parity
+name: Build and Submit Hassoun iOS v1.0.12 Synced Parity
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-ios-testflight-v102-synced
+  group: hassoun-ios-testflight-v1012-synced
   cancel-in-progress: true
 
 jobs:
@@ -22,8 +22,8 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
-      IOS_APP_VERSION: "1.0.2"
-      IOS_BUILD_NUMBER: "20260831"
+      IOS_APP_VERSION: "1.0.12"
+      IOS_BUILD_NUMBER: "2026082701"
       NODE_ENV: production
 
     steps:
@@ -113,8 +113,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'version: "1.0.2"' app.config.ts
-          grep -q 'buildNumber: "20260831"' app.config.ts
+          grep -q 'version: "1.0.12"' app.config.ts
+          grep -q 'buildNumber: "2026082701"' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
@@ -156,7 +156,7 @@ jobs:
           test -f ios/Podfile
           rm -rf ios
 
-      - name: Build signed iOS 1.0.2 and submit to TestFlight
+      - name: Build signed iOS 1.0.12 and submit to TestFlight
         working-directory: ios
         env:
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
@@ -167,5 +167,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message "Hassoun iOS v1.0.2 build 20260831 synced parity with repaired PNG assets" \
+            --message "Hassoun iOS v1.0.12 build 2026082701 latest games push ticker Android parity" \
             --wait
