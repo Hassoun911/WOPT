@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";
 import {
+  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -22,12 +23,23 @@ import BrandMark from "./src/BrandMark";
 import { STORAGE_KEYS } from "./src/config";
 import { configureNotificationChannels } from "./src/notifications";
 import { registerDeviceForServerPush } from "./src/push";
+import SystemMessageTicker from "./src/SystemMessageTicker";
 import {
   DEFAULT_RUNTIME_CONFIG,
   loadHassounRuntimeConfig,
   versionIsBelow,
   type HassounRuntimeConfig
 } from "./src/remoteConfig";
+
+async function syncServerPush(locale: "en" | "ar", allowPrompt: boolean) {
+  let permission = await Notifications.getPermissionsAsync();
+  if (!permission.granted && allowPrompt && permission.canAskAgain) {
+    permission = await Notifications.requestPermissionsAsync();
+  }
+  if (!permission.granted) return false;
+  await registerDeviceForServerPush(locale);
+  return true;
+}
 
 
 class EmailFeatureBoundary extends Component<{ children: ReactNode; locale: "en" | "ar"; onClose: () => void }, { failed: boolean }> {
@@ -60,17 +72,36 @@ function AppWithEmailShell() {
 
   useEffect(() => {
     void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
+
     void (async () => {
       await configureNotificationChannels();
       const saved = await AsyncStorage.getItem(STORAGE_KEYS.locale);
       const currentLocale = saved === "ar" ? "ar" : "en";
       setLocale(currentLocale);
-
-      const permission = await Notifications.getPermissionsAsync();
-      if (permission.granted) {
-        await registerDeviceForServerPush(currentLocale).catch(() => undefined);
-      }
+      await syncServerPush(currentLocale, true).catch(() => false);
     })().catch(() => undefined);
+
+    const subscription = AppState.addEventListener("change", state => {
+      if (state !== "active") return;
+      void loadHassounRuntimeConfig().then(setRuntime).catch(() => undefined);
+      void AsyncStorage.getItem(STORAGE_KEYS.locale).then(saved => {
+        const currentLocale = saved === "ar" ? "ar" : "en";
+        setLocale(currentLocale);
+        return syncServerPush(currentLocale, false);
+      }).catch(() => undefined);
+    });
+
+    const refreshTimer = setInterval(() => {
+      void AsyncStorage.getItem(STORAGE_KEYS.locale).then(saved => {
+        const currentLocale = saved === "ar" ? "ar" : "en";
+        return syncServerPush(currentLocale, false);
+      }).catch(() => undefined);
+    }, 6 * 60 * 60 * 1000);
+
+    return () => {
+      subscription.remove();
+      clearInterval(refreshTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -123,6 +154,9 @@ function AppWithEmailShell() {
   return (
     <View style={styles.root}>
       <App onOpenEmailAlerts={runtime.emailEnabled ? () => void open() : undefined} />
+      <View pointerEvents="none" style={[styles.systemTickerOverlay, { top: Math.max(insets.top, 0) }]}>
+        <SystemMessageTicker locale={locale} />
+      </View>
 
       {runtime.systemBanner.enabled && (runtime.systemBanner.title || runtime.systemBanner.message) ? (
         <View style={[styles.systemBanner, { top: bannerTop }]}>
@@ -234,6 +268,7 @@ const styles = StyleSheet.create({
   emailErrorButton: { marginTop: 16, minHeight: 46, paddingHorizontal: 18, borderRadius: 14, backgroundColor: "#0b654f", alignItems: "center", justifyContent: "center" },
   emailErrorButtonText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   root: { flex: 1 },
+  systemTickerOverlay: { position: "absolute", left: 0, right: 0, zIndex: 95, elevation: 15 },
   runtimeBlock: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f6f0e5", paddingHorizontal: 28 },
   runtimeEyebrow: { color: "#9a8a70", fontSize: 10, fontWeight: "900", letterSpacing: 2, marginTop: 16 },
   runtimeTitle: { color: "#153f35", fontSize: 28, lineHeight: 34, fontWeight: "900", textAlign: "center", marginTop: 8 },

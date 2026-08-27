@@ -972,8 +972,8 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
       {audioPrefs.readerMode === "mushaf" ? (
         <View
           style={styles.readerBody}
-          onTouchStart={(event) => { handleReaderSurfaceTouchStart(event); handleVerticalTouchStart(event); }}
-          onTouchEnd={(event) => { handleReaderSurfaceTouchEnd(event); handleVerticalTouchEnd(event); }}
+          onTouchStart={(event) => { handleReaderSurfaceTouchStart(event); if (appearance.browseMode === "vertical") handleVerticalTouchStart(event); }}
+          onTouchEnd={(event) => { handleReaderSurfaceTouchEnd(event); if (appearance.browseMode === "vertical") handleVerticalTouchEnd(event); }}
           {...readerPanResponder.panHandlers}
         >
           <ScrollView
@@ -1002,6 +1002,12 @@ export default function QuranV3({ locale, onBackHome, onAppNavVisibilityChange, 
               readerAtBottom.current = y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 8;
             }}
             onScrollEndDrag={() => {
+              // Page turns from vertical scrolling are allowed only in Vertical browse mode.
+              // Horizontal mode must be exclusive: vertical movement may never change pages.
+              if (appearance.browseMode !== "vertical") {
+                readerScrollDirection.current = null;
+                return;
+              }
               const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;
               if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) {
                 turnReaderPage(1);

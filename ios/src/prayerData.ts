@@ -94,10 +94,13 @@ async function cachedLocation() {
 export async function loadInitialPrayerTimes(): Promise<LoadedPrayerTimes> {
   const cached = await cachedLocation();
   if (cached) {
+    const cachedLabel = cached.location.label === "Current location" && cached.location.source === "windsor_islamic_association"
+      ? "Windsor, Ontario"
+      : cached.location.label;
     return {
       prayerTimes: cached.prayerTimes,
       live: false,
-      location: { ...cached.location, source: "saved" }
+      location: { ...cached.location, label: cachedLabel, source: "saved" }
     };
   }
   const bundled = bundledSchedule as PrayerFile;
@@ -108,7 +111,7 @@ export async function loadInitialPrayerTimes(): Promise<LoadedPrayerTimes> {
       latitude: 42.3149,
       longitude: -83.0364,
       timezone: WINDSOR_TIME_ZONE,
-      label: CITY_LABEL,
+      label: "Windsor, Ontario",
       source: "saved"
     }
   };
@@ -144,7 +147,7 @@ export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {
       latitude,
       longitude,
       timezone,
-      label: current.source === "windsor_islamic_association" ? CITY_LABEL : label,
+      label: current.source === "windsor_islamic_association" && label === "Current location" ? "Windsor, Ontario" : label,
       source: current.source || "aladhan"
     };
     await AsyncStorage.setItem(STORAGE_KEYS.locationSchedule, JSON.stringify({ prayerTimes, location, savedAt: new Date().toISOString() } satisfies CachedLocationPayload));

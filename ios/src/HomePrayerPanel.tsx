@@ -113,10 +113,10 @@ export default function HomePrayerPanel({ locale, today, next, preferences, onTo
           <View style={styles.nextCopy}>
             <Text style={[styles.nextEyebrow, urgent && styles.urgentText]}>{urgent ? (locale === "ar" ? "تبقّى أقل من ٥ دقائق" : "LESS THAN 5 MINUTES") : (locale === "ar" ? "الصلاة القادمة" : "NEXT PRAYER")}</Text>
             <View style={styles.nextNameRow}>
-              <Text style={[styles.nextArabic, urgent && styles.urgentTitle]}>{NAMES[next.prayer].ar}</Text>
-              <Text style={[styles.nextEnglish, urgent && styles.urgentText]}>{NAMES[next.prayer].en}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78} style={[styles.nextArabic, urgent && styles.urgentTitle]}>{NAMES[next.prayer].ar}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.nextEnglish, urgent && styles.urgentText]}>{NAMES[next.prayer].en}</Text>
             </View>
-            <Text style={[styles.nextTime, urgent && styles.urgentTitle]}>{formatPrayerTime(next.time, locale)}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.nextTime, urgent && styles.urgentTitle]}>{formatPrayerTime(next.time, locale)}</Text>
             {next.isTomorrow ? <Text style={styles.tomorrowTag}>{locale === "ar" ? "غداً" : "Tomorrow"}</Text> : null}
           </View>
 
@@ -204,20 +204,20 @@ const cream = "#f7f3e8";
 const warningRed = "#d83838";
 
 const styles = StyleSheet.create({
-  nextCard: { marginTop: 14, minHeight: 148, borderRadius: 28, backgroundColor: cream, borderWidth: 1, borderColor: "#dfc987", overflow: "hidden", flexDirection: "row", alignItems: "stretch", shadowColor: "#143f35", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  nextCard: { marginTop: 14, minHeight: 148, borderRadius: 28, backgroundColor: "#edf5f0", borderWidth: 3, borderColor: gold, overflow: "hidden", flexDirection: "row", alignItems: "stretch", shadowColor: "#0b5b47", shadowOpacity: 0.20, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 7 },
   nextCardUrgent: { borderWidth: 3, shadowColor: warningRed, shadowRadius: 14, elevation: 8 },
-  nextAccent: { width: 72, backgroundColor: green },
+  nextAccent: { width: 24, backgroundColor: green },
   nextAccentUrgent: { backgroundColor: warningRed },
-  nextCopy: { flex: 1, paddingVertical: 17, paddingLeft: 16, justifyContent: "center" },
+  nextCopy: { flex: 1, minWidth: 132, paddingVertical: 17, paddingLeft: 16, paddingRight: 8, justifyContent: "center" },
   nextEyebrow: { color: "#8e7137", fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },
-  nextNameRow: { flexDirection: "row", alignItems: "baseline", gap: 7, marginTop: 5, flexWrap: "wrap" },
+  nextNameRow: { flexDirection: "column", alignItems: "flex-start", gap: 2, marginTop: 5 },
   nextArabic: { color: deepGreen, fontSize: 27, fontWeight: "900" },
   nextEnglish: { color: "#9c7a35", fontSize: 14, fontWeight: "900" },
   nextTime: { color: deepGreen, fontSize: 18, fontWeight: "900", marginTop: 5 },
   urgentText: { color: warningRed },
   urgentTitle: { color: "#a91f1f" },
   tomorrowTag: { alignSelf: "flex-start", marginTop: 5, color: green, backgroundColor: "#e8f2ed", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3, fontSize: 8, fontWeight: "900", overflow: "hidden" },
-  countdownCard: { width: 185, margin: 11, borderRadius: 22, backgroundColor: "#fffaf0", borderWidth: 1, borderColor: "#dfc987", paddingHorizontal: 11, justifyContent: "center" },
+  countdownCard: { width: 174, marginVertical: 11, marginRight: 11, marginLeft: 5, borderRadius: 22, backgroundColor: "#fffaf0", borderWidth: 1, borderColor: "#dfc987", paddingHorizontal: 9, justifyContent: "center" },
   countdownCardUrgent: { backgroundColor: "#fff4f2", borderColor: "#e79a94", borderWidth: 2 },
   countdownHeading: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 7 },
   hourglass: { fontSize: 14 },

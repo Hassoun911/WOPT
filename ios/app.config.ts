@@ -5,14 +5,14 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "1.0.8",
+  version: "1.0.2",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: false,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
-    buildNumber: "20260828",
+    buildNumber: "20260829",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       UIBackgroundModes: ["remote-notification", "audio"],
@@ -23,7 +23,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 49,
+    versionCode: 55,
     icon: "./assets/icon.png",
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
@@ -39,6 +39,7 @@ const config: ExpoConfig = {
     ]
   },
   plugins: [
+    "expo-audio",
     [
       "expo-notifications",
       {
