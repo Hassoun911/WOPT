@@ -1,0 +1,139 @@
+name: Build and Submit Hassoun Android 1.0.12 to Google Play
+
+on:
+  push:
+    paths:
+      - '.github/workflows/android-play-submit.yml'
+      - '.github/android-play-trigger.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-android-play-1012
+  cancel-in-progress: true
+
+jobs:
+  build-submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout latest Android v62 source
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.12-messaging-from-v1.0.11-good
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Verify Expo credentials
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_TOKEN:-}"
+          npx --yes eas-cli@latest whoami
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply all accepted v62 fixes
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node scripts/apply-v110-location-fix.mjs
+          node scripts/apply-v111-city-highlight-fix.mjs
+          node scripts/apply-v112-messaging-fix.mjs
+          node scripts/apply-v112-next-prayer-layout-fix.mjs
+          node scripts/apply-v112-ticker-position-fix.mjs
+          node scripts/apply-v112-firebase-native-push.mjs
+          node scripts/apply-v112-v57-android-push-registration.mjs
+          node scripts/apply-v112-v60-reader-adhan-fixes.mjs
+          node scripts/apply-v112-v61-exclusive-quran-browse.mjs
+
+      - name: Set Play Store version
+        working-directory: mobile
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('app.config.ts')
+          s=p.read_text()
+          s=re.sub(r'version:\s*"[^"]+"', 'version: "1.0.12"', s, count=1)
+          s=re.sub(r'versionCode:\s*\d+', 'versionCode: 63', s, count=1)
+          p.write_text(s)
+          PY
+
+      - name: Repair and verify Android image assets
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y python3-pil pngcheck >/dev/null
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageFile, ImageFilter
+          ImageFile.LOAD_TRUNCATED_IMAGES=True
+          logo=Image.open(Path('assets/hassoun-logo.png')).convert('RGBA')
+          logo.save('assets/hassoun-logo.png',format='PNG',optimize=True)
+          logo.resize((1024,1024),Image.Resampling.LANCZOS).save('assets/icon.png',format='PNG',optimize=True)
+          splash=Image.new('RGBA',(1024,1024),(0,0,0,0)); art=logo.copy(); art.thumbnail((820,820),Image.Resampling.LANCZOS); splash.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2)); splash.save('assets/splash-logo.png',format='PNG',optimize=True)
+          gray=logo.convert('RGB').convert('L'); mask=gray.point(lambda p:255 if p>=95 else 0).filter(ImageFilter.MedianFilter(3)).filter(ImageFilter.MaxFilter(5)); bbox=mask.getbbox()
+          if not bbox: raise SystemExit('Could not derive notification icon')
+          crop=mask.crop(bbox); canvas=Image.new('L',(192,192),0); crop.thumbnail((148,148),Image.Resampling.LANCZOS); canvas.paste(crop,((192-crop.width)//2,(192-crop.height)//2)); notif=Image.new('RGBA',(192,192),(255,255,255,0)); notif.putalpha(canvas); notif.save('assets/notification-icon.png',format='PNG',optimize=True)
+          PY
+          pngcheck -q assets/hassoun-logo.png
+          pngcheck -q assets/icon.png
+          pngcheck -q assets/splash-logo.png
+          pngcheck -q assets/notification-icon.png
+
+      - name: Verify latest Android features
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.12"' app.config.ts
+          grep -q 'versionCode: 63' app.config.ts
+          grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
+          grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          grep -q 'getDevicePushTokenAsync' src/push.ts
+          grep -q 'wordrace' src/MultiplayerGames.tsx
+          grep -q 'wordpuzzle' src/MultiplayerGames.tsx
+          grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
+          grep -q 'appearance.browseMode !== "vertical"' src/quran/QuranV3.tsx
+          grep -q 'Only a current validated prayer-alarm broadcast may play' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
+
+      - name: Validate Android native generation
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+          test -s android/app/google-services.json
+          grep -R -q 'com.google.gms.google-services' android
+          rm -rf android
+
+      - name: Build production AAB and submit to Google Play
+        working-directory: mobile
+        env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform android \
+            --profile production \
+            --auto-submit-with-profile production \
+            --non-interactive \
+            --message 'Hassoun Android 1.0.12 versionCode 63 Play Store release' \
+            --wait
