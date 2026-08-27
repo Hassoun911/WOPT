@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.12 v59 native push + notification icon
+name: Build Hassoun v1.0.12 v60 Quran scroll + Adhan guard
 
 on:
   push:
@@ -10,13 +10,14 @@ on:
       - 'mobile/scripts/apply-v112-ticker-position-fix.mjs'
       - 'mobile/scripts/apply-v112-firebase-native-push.mjs'
       - 'mobile/scripts/apply-v112-v57-android-push-registration.mjs'
+      - 'mobile/scripts/apply-v112-v60-reader-adhan-fixes.mjs'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v112-v59-${{ github.ref }}
+  group: hassoun-v112-v60-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,14 +70,17 @@ jobs:
       - name: Force Android native token registration before Expo token
         run: node scripts/apply-v112-v57-android-push-registration.mjs
 
-      - name: Bump install version to 59
+      - name: Fix Quran reverse paging and stale Adhan starts
+        run: node scripts/apply-v112-v60-reader-adhan-fixes.mjs
+
+      - name: Bump install version to 60
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app.config.ts')
           s=p.read_text()
-          for old in ('versionCode: 57','versionCode: 58'):
-              s=s.replace(old, 'versionCode: 59')
+          for old in ('versionCode: 57','versionCode: 58','versionCode: 59'):
+              s=s.replace(old, 'versionCode: 60')
           p.write_text(s)
           PY
 
@@ -103,12 +107,9 @@ jobs:
           splash.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
           splash.save('assets/splash-logo.png', format='PNG', optimize=True)
 
-          # Android small notification icons must be a white silhouette on transparent background.
-          # Extract the bright gold Hassoun bird/Quran artwork from the dark-green logo.
           rgb = logo.convert('RGB')
           gray = rgb.convert('L')
           mask = gray.point(lambda p: 255 if p >= 95 else 0)
-          # Remove isolated noise and thicken fine bird/Quran strokes for Samsung status bars.
           mask = mask.filter(ImageFilter.MedianFilter(3)).filter(ImageFilter.MaxFilter(5))
           bbox = mask.getbbox()
           if not bbox:
@@ -128,12 +129,12 @@ jobs:
           pngcheck -q assets/splash-logo.png
           pngcheck -q assets/notification-icon.png
 
-      - name: Verify exact-lineage fixes Android push and notification icon
+      - name: Verify exact-lineage fixes
         run: |
           set -euo pipefail
           npm run typecheck
           grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'versionCode: 59' app.config.ts
+          grep -q 'versionCode: 60' app.config.ts
           grep -q 'googleServicesFile: "./google-services.json"' app.config.ts
           grep -q 'notification-icon.png' app.config.ts
           grep -q 'nextAccent: { width: 24' src/HomePrayerPanel.tsx
@@ -143,7 +144,10 @@ jobs:
           grep -q 'getDevicePushTokenAsync' src/push.ts
           grep -q 'getExpoPushTokenAsync' src/push.ts
           grep -q 'nativeTokenPresent' src/push.ts
-          grep -q 'setPrayerLocation(refreshed.location)' App.tsx
+          grep -q 'readerLastScrollY.current <= 48' src/quran/QuranV3.tsx
+          grep -q 'readerAtTop.current = y <= 48' src/quran/QuranV3.tsx
+          grep -q 'Only a current validated prayer-alarm broadcast may play' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
+          grep -q 'putExtra("scheduledAtMs", scheduledAtMs)' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt
           test -s assets/notification-icon.png
           python3 - <<'PY'
           import json
@@ -152,8 +156,7 @@ jobs:
           packages=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
           assert 'ca.wopt.windsorprayertimes' in packages
           im=Image.open('assets/notification-icon.png').convert('RGBA')
-          alpha=im.getchannel('A')
-          assert alpha.getbbox(), 'notification icon is empty'
+          assert im.getchannel('A').getbbox(), 'notification icon is empty'
           PY
 
       - name: Generate Android project with Firebase
@@ -178,7 +181,7 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk"
+          OUT="android/app/build/outputs/apk/release/Hassoun-v1.0.12-v60-quran-scroll-adhan-guard.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           ls -lh "$OUT"
@@ -186,10 +189,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon
+          name: Hassoun-v1.0.12-v60-quran-scroll-adhan-guard
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v60-quran-scroll-adhan-guard.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v60-quran-scroll-adhan-guard.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -199,14 +202,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v59-native-push-hassoun-notification-icon.apk'
-          TAG='v1.0.12-v59-native-push-hassoun-notification-icon'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-v60-quran-scroll-adhan-guard.apk'
+          TAG='v1.0.12-v60-quran-scroll-adhan-guard'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
               --target release/v1.0.12-messaging-from-v1.0.11-good \
-              --title 'Hassoun v1.0.12 v59 Native Push + Hassoun Notification Icon' \
-              --notes 'Exact v1.0.11 golden lineage with working native Android push, scrolling message placement fix, Next Prayer layout fix, and custom Hassoun bird/Quran Android notification silhouette replacing the generic bell.' \
+              --title 'Hassoun v1.0.12 v60 Quran Scroll + Adhan Guard' \
+              --notes 'Exact v1.0.11 golden lineage with native Android push, scrolling message placement fix, Next Prayer layout fix, Hassoun notification icon, easier bidirectional Quran page scrolling, and a native stale-alarm guard preventing accidental Adhan playback after install/update.' \
               --prerelease
           fi
