@@ -83,15 +83,27 @@ jobs:
           sudo apt-get install -y -qq pngcheck
           python3 -m pip install --quiet Pillow
 
-          cat ../.github/logo-exact/part*.b64 | tr -d '\n\r ' | base64 --decode > /tmp/hassoun-exact.png
+          cat ../.github/logo-exact/part*.b64 | tr -d '\n\r ' | base64 --decode > /tmp/hassoun-exact-source.png
+          python3 - <<'PY'
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          source = '/tmp/hassoun-exact-source.png'
+          output = '/tmp/hassoun-exact.png'
+          with Image.open(source) as image:
+              image.load()
+              image.convert('RGBA').save(output, format='PNG', optimize=True)
+          print('Re-encoded exact Hassoun logo:', output)
+          PY
           pngcheck -q /tmp/hassoun-exact.png
+
           for target in assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png; do
             cp /tmp/hassoun-exact.png "$target"
           done
 
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
           roots = [Path('assets'), Path('src')]
           repaired = []
           for root in roots:
