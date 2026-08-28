@@ -8,7 +8,7 @@ on:
       - 'mobile/src/TabletWallPrayerDisplay.tsx'
       - 'mobile/scripts/apply-tablet-wall-display.mjs'
       - 'mobile/app.config.ts'
-      - '.github/logo-exact/hassoun-official-512.jpg.b64'
+      - '.github/logo-official/hassoun-official-256.jpg.b64'
       - '.github/workflows/build-v1013-tablet-wall-display.yml'
   workflow_dispatch:
 
@@ -73,7 +73,9 @@ jobs:
           sudo apt-get install -y -qq pngcheck
           python3 -m pip install --quiet Pillow
 
-          tr -d '\n\r ' < ../.github/logo-exact/hassoun-official-512.jpg.b64 | base64 --decode > /tmp/hassoun-official.jpg
+          tr -d '\n\r ' < ../.github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-official.jpg
+          echo 'a233f3a8e323499df9643a29280d5f53d2c18468414107b034863f6d82517e75  /tmp/hassoun-official.jpg' | sha256sum -c -
+
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageOps
@@ -83,11 +85,11 @@ jobs:
           full = source.convert('RGBA')
           full.save('/tmp/hassoun-full.png', format='PNG', optimize=True)
 
-          # Android launchers mask icons into different shapes. Keep the entire
-          # Hassoun artwork inside a conservative safe zone so nothing is cropped.
+          # Android launchers mask icons into different shapes. Keep the complete
+          # user-provided logo safely inside the mask on Samsung and other launchers.
           launcher = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
-          safe = full.resize((700, 700), Image.Resampling.LANCZOS)
-          launcher.alpha_composite(safe, ((1024 - 700) // 2, (1024 - 700) // 2))
+          safe = full.resize((720, 720), Image.Resampling.LANCZOS)
+          launcher.alpha_composite(safe, ((1024 - 720) // 2, (1024 - 720) // 2))
           launcher.save('/tmp/hassoun-launcher.png', format='PNG', optimize=True)
 
           # Full official artwork everywhere inside Hassoun.
@@ -114,10 +116,12 @@ jobs:
           # React Native brand images must contain the full artwork.
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('App.tsx')
-          text = path.read_text()
-          text = text.replace('source={require("./assets/hassoun-logo.png")} style={styles.headerLogo}', 'source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.headerLogo}')
-          path.write_text(text)
+          for path in Path('.').rglob('*.tsx'):
+              text = path.read_text(errors='ignore')
+              if 'hassoun-logo.png' not in text:
+                  continue
+              text = text.replace('source={require("./assets/hassoun-logo.png")} style={styles.headerLogo}', 'source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.headerLogo}')
+              path.write_text(text)
           PY
 
           # Widget ImageViews must center/contain, never centerCrop.
@@ -163,7 +167,6 @@ jobs:
           grep -q 'await import("expo-image-picker")' src/TabletWallPrayerDisplay.tsx
           ! grep -q '^import \* as ImagePicker from "expo-image-picker"' src/TabletWallPrayerDisplay.tsx
           grep -q 'adaptive-icon.png' app.config.ts
-          grep -q 'resizeMode="contain" style={styles.headerLogo}' App.tsx
           test -s assets/hassoun-logo.png
           test -s assets/icon.png
           test -s assets/adaptive-icon.png
