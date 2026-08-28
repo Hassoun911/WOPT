@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useKeepAwake } from "expo-keep-awake";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { PrayerAlertPreferences } from "./alertPreferences";
 import { formatPrayerTime } from "./time";
 import { PRAYER_KEYS, type PrayerDay, type PrayerKey } from "./types";
@@ -41,10 +42,20 @@ const GLYPHS: Record<PrayerKey, string> = {
   isha: "☾"
 };
 
+const WALL_SLIDE_MS = 9000;
+const LOCK_SECONDS = 5 * 60;
+
 function remainingLabel(seconds: number, locale: Locale) {
   const safe = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+
+  if (safe <= LOCK_SECONDS) {
+    if (locale === "ar") return `${minutes}:${String(secs).padStart(2, "0")}`;
+    return `${minutes}m ${String(secs).padStart(2, "0")}s`;
+  }
+
   if (locale === "ar") return `${hours ? `${hours} س ` : ""}${minutes} د`;
   return `${hours ? `${hours}h ` : ""}${minutes}m`;
 }
@@ -53,154 +64,418 @@ export default function TabletWallPrayerDisplay({
   locale,
   now,
   shortDate,
-  hijriDate,
   today,
   next,
   preferences,
-  onTogglePrayer,
-  onOpenQibla
+  onTogglePrayer
 }: Props) {
-  // Wall-display mode must stay visible while the tablet remains plugged in.
   useKeepAwake("hassoun-tablet-wall-display");
 
-  const localTime = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(now);
+  const nextIndex = next && !next.isTomorrow ? PRAYER_KEYS.indexOf(next.prayer) : -1;
+  const sliderLocked = nextIndex >= 0 && next !== null && next.secondsRemaining <= LOCK_SECONDS;
+  const [visibleIndex, setVisibleIndex] = useState(nextIndex >= 0 ? nextIndex : 0);
+  const transition = useRef(new Animated.Value(1)).current;
+  const previousIndex = useRef(visibleIndex);
+
+  useEffect(() => {
+    if (sliderLocked && nextIndex >= 0) setVisibleIndex(nextIndex);
+  }, [sliderLocked, nextIndex]);
+
+  useEffect(() => {
+    if (sliderLocked) return;
+    const id = setInterval(() => {
+      setVisibleIndex((current) => (current + 1) % PRAYER_KEYS.length);
+    }, WALL_SLIDE_MS);
+    return () => clearInterval(id);
+  }, [sliderLocked]);
+
+  useEffect(() => {
+    if (previousIndex.current === visibleIndex) return;
+    previousIndex.current = visibleIndex;
+    transition.setValue(0);
+    Animated.timing(transition, {
+      toValue: 1,
+      duration: 520,
+      useNativeDriver: true
+    }).start();
+  }, [transition, visibleIndex]);
+
+  const localTime = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(now),
+    [locale, now]
+  );
+
+  const prayer = PRAYER_KEYS[visibleIndex] ?? PRAYER_KEYS[0];
+  const prayerTime = today?.[prayer] ?? (next?.prayer === prayer ? next.time : "");
+  const isUpcoming = next?.prayer === prayer && !next.isTomorrow;
+  const muted = !preferences[prayer].athan;
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topRow}>
-        <View style={styles.locationBlock}>
-          <Text style={styles.location}>Windsor, Ontario</Text>
-          <Text style={styles.scheduleLabel}>{locale === "ar" ? "جدول الأذان المحلي الرسمي" : "Official local Adhan schedule"}</Text>
-        </View>
-        <View style={styles.dateBlock}>
-          <Text style={styles.clock}>{localTime}</Text>
-          <Text style={styles.date}>{shortDate}</Text>
-          {hijriDate ? <Text style={styles.hijri}>{hijriDate}</Text> : null}
-        </View>
+      <View style={styles.clockArea}>
+        <Text
+          style={styles.clock}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          accessibilityLabel={`Local time ${localTime}`}
+        >
+          {localTime}
+        </Text>
+        <Text style={styles.date}>{shortDate}</Text>
       </View>
 
-      {next ? (
-        <View style={styles.nextHero}>
-          <View style={styles.nextCopy}>
-            <Text style={styles.eyebrow}>{locale === "ar" ? "الصلاة القادمة" : "NEXT PRAYER"}</Text>
-            <View style={styles.nextNameRow}>
-              <Text style={styles.nextName}>{NAMES[next.prayer].en}</Text>
-              <Text style={styles.nextArabic}>{NAMES[next.prayer].ar}</Text>
-            </View>
-            <Text style={styles.nextTime}>{formatPrayerTime(next.time, locale)}</Text>
-          </View>
-          <View style={styles.remainingBlock}>
-            <Text style={styles.remainingIcon}>⌛</Text>
-            <Text style={styles.remaining}>{remainingLabel(next.secondsRemaining, locale)}</Text>
-            <Text style={styles.remainingLabel}>{locale === "ar" ? "متبقي" : "LEFT"}</Text>
-          </View>
-        </View>
-      ) : null}
+      <View style={styles.divider} />
 
-      <View style={styles.prayerGrid}>
-        {today ? PRAYER_KEYS.map((prayer) => {
-          const active = next?.prayer === prayer && !next.isTomorrow;
-          const muted = !preferences[prayer].athan;
-          return (
+      <View style={styles.galleryArea}>
+        <Animated.View
+          style={[
+            styles.cardWrap,
+            {
+              opacity: transition,
+              transform: [
+                {
+                  translateX: transition.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [42, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
+          <View style={[styles.prayerCard, isUpcoming && styles.prayerCardUpcoming]}>
+            {sliderLocked && isUpcoming ? (
+              <View style={styles.lockPill}>
+                <Text style={styles.lockText}>{locale === "ar" ? "الصلاة خلال أقل من ٥ دقائق • ثابت" : "PRAYER UNDER 5 MIN • SLIDER LOCKED"}</Text>
+              </View>
+            ) : isUpcoming ? (
+              <View style={styles.nextPill}>
+                <Text style={styles.nextPillText}>{locale === "ar" ? "الصلاة القادمة" : "NEXT PRAYER"}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.glyph}>{GLYPHS[prayer]}</Text>
+            <Text style={styles.arabicName}>{NAMES[prayer].ar}</Text>
+            <View style={styles.goldRule} />
+            <Text style={styles.englishName}>{NAMES[prayer].en}</Text>
+            <Text style={styles.prayerTime}>{prayerTime ? formatPrayerTime(prayerTime, locale) : "—"}</Text>
+
+            {isUpcoming && next ? (
+              <View style={styles.countdownBlock}>
+                <Text style={styles.startsIn}>{locale === "ar" ? "يبدأ خلال" : "STARTS IN"}</Text>
+                <Text style={styles.countdown}>{remainingLabel(next.secondsRemaining, locale)}</Text>
+              </View>
+            ) : null}
+
             <Pressable
-              key={prayer}
               onPress={() => onTogglePrayer(prayer)}
-              style={({ pressed }) => [styles.prayerCard, active && styles.prayerCardActive, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.adhanControl, muted && styles.adhanControlMuted, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={`${NAMES[prayer].en} ${muted ? "Adhan muted" : "Adhan enabled"}`}
             >
-              {active ? <Text style={styles.nextBadge}>{locale === "ar" ? "القادمة" : "NEXT"}</Text> : null}
-              <Text style={[styles.glyph, active && styles.activeText]}>{GLYPHS[prayer]}</Text>
-              <Text style={[styles.prayerName, active && styles.activeText]}>{NAMES[prayer].en}</Text>
-              <Text style={[styles.prayerArabic, active && styles.activeSubText]}>{NAMES[prayer].ar}</Text>
-              <Text style={[styles.prayerTime, active && styles.activeText]}>{formatPrayerTime(today[prayer], locale)}</Text>
-              <View style={[styles.audioPill, active && styles.audioPillActive, muted && styles.audioPillMuted]}>
-                <Text style={[styles.audioText, active && styles.activeText]}>{muted ? "🔇 Adhan" : "🔊 Adhan"}</Text>
+              <Text style={styles.adhanIcon}>{muted ? "🔇" : "🔊"}</Text>
+              <View>
+                <Text style={styles.adhanTitle}>{locale === "ar" ? "الأذان" : "Adhan"}</Text>
+                <Text style={[styles.adhanState, muted && styles.adhanStateMuted]}>{muted ? "OFF" : "ON"}</Text>
               </View>
             </Pressable>
-          );
-        }) : null}
-      </View>
+          </View>
+        </Animated.View>
 
-      <View style={styles.bottomGrid}>
-        <View style={styles.dailyCard}>
-          <Text style={styles.dailyEyebrow}>{locale === "ar" ? "آية اليوم" : "AYAH OF THE DAY"}</Text>
-          <Text style={styles.dailyArabic}>أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ</Text>
-          <Text style={styles.dailyText}>{locale === "ar" ? "ألا بذكر الله تطمئن القلوب." : "Surely, hearts find comfort in the remembrance of Allah."}</Text>
-          <Text style={styles.dailyRef}>Qur’an 13:28</Text>
+        <View style={styles.prayerTabs}>
+          {PRAYER_KEYS.map((key, index) => {
+            const selected = index === visibleIndex;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setVisibleIndex(index)}
+                style={({ pressed }) => [styles.prayerTab, selected && styles.prayerTabSelected, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${NAMES[key].en}`}
+              >
+                <Text style={[styles.tabArabic, selected && styles.tabSelectedText]}>{NAMES[key].ar}</Text>
+                <Text style={[styles.tabEnglish, selected && styles.tabSelectedText]}>{NAMES[key].en}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <View style={styles.dailyCard}>
-          <Text style={styles.dailyEyebrow}>{locale === "ar" ? "دعاء اليوم" : "DUA OF THE DAY"}</Text>
-          <Text style={styles.dailyArabic}>رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ</Text>
-          <Text style={styles.dailyText}>{locale === "ar" ? "ربنا آتنا في الدنيا حسنة وفي الآخرة حسنة وقنا عذاب النار." : "Our Lord, grant us good in this world and the Hereafter, and protect us from the Fire."}</Text>
-          <Text style={styles.dailyRef}>Qur’an 2:201</Text>
+
+        <View style={styles.dots}>
+          {PRAYER_KEYS.map((key, index) => (
+            <View key={key} style={[styles.dot, index === visibleIndex && styles.dotActive]} />
+          ))}
         </View>
       </View>
-
-      <Pressable onPress={onOpenQibla} style={({ pressed }) => [styles.qiblaStrip, pressed && styles.pressed]}>
-        <Text style={styles.qiblaText}>🕋 {locale === "ar" ? "اضغط لفتح اتجاه القبلة" : "Tap for Qibla direction"}</Text>
-        <Text style={styles.qiblaArrow}>›</Text>
-      </Pressable>
     </View>
   );
 }
 
-const green = "#075f4a";
-const deepGreen = "#043f34";
-const cream = "#f8f4e9";
+const deepGreen = "#031b17";
+const cardGreen = "#052a23";
+const cardGreenBright = "#07372e";
 const gold = "#d7b45e";
+const softGold = "#f1d181";
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: cream, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 16, justifyContent: "space-between" },
-  topRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  locationBlock: { flex: 1 },
-  location: { color: deepGreen, fontSize: 35, fontWeight: "900", letterSpacing: -0.6 },
-  scheduleLabel: { color: "#9c7a35", fontSize: 14, fontWeight: "800", marginTop: 2 },
-  dateBlock: { alignItems: "flex-end", minWidth: 260 },
-  clock: { color: deepGreen, fontSize: 54, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 58 },
-  date: { color: deepGreen, fontSize: 20, fontWeight: "900" },
-  hijri: { color: "#9c7a35", fontSize: 16, fontWeight: "800", marginTop: 2 },
-
-  nextHero: { minHeight: 225, borderRadius: 30, backgroundColor: deepGreen, borderWidth: 2, borderColor: gold, paddingHorizontal: 30, paddingVertical: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowColor: "#173f36", shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
-  nextCopy: { flex: 1 },
-  eyebrow: { color: gold, fontSize: 15, fontWeight: "900", letterSpacing: 2.3 },
-  nextNameRow: { flexDirection: "row", alignItems: "baseline", gap: 18, marginTop: 6, flexWrap: "wrap" },
-  nextName: { color: "#fffaf0", fontSize: 65, fontWeight: "900", letterSpacing: -1.5 },
-  nextArabic: { color: "#fffaf0", fontSize: 48, fontWeight: "900" },
-  nextTime: { color: "#fffaf0", fontSize: 46, fontWeight: "900", marginTop: 6 },
-  remainingBlock: { minWidth: 240, alignItems: "center", justifyContent: "center", borderLeftWidth: 1, borderLeftColor: "#d7b45e77", paddingLeft: 24 },
-  remainingIcon: { fontSize: 32 },
-  remaining: { color: gold, fontSize: 52, fontWeight: "900", fontVariant: ["tabular-nums"], marginTop: 6 },
-  remainingLabel: { color: "#f7e7b9", fontSize: 15, fontWeight: "900", letterSpacing: 2 },
-
-  prayerGrid: { flexDirection: "row", gap: 10 },
-  prayerCard: { flex: 1, minHeight: 230, borderRadius: 25, backgroundColor: "#fffdf8", borderWidth: 1.5, borderColor: "#dccb9d", alignItems: "center", justifyContent: "center", paddingHorizontal: 8, position: "relative" },
-  prayerCardActive: { backgroundColor: green, borderColor: gold, borderWidth: 3, shadowColor: "#0b4639", shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
-  nextBadge: { position: "absolute", top: 9, right: 9, backgroundColor: gold, color: deepGreen, borderRadius: 99, overflow: "hidden", paddingHorizontal: 9, paddingVertical: 4, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  glyph: { color: "#9d7d35", fontSize: 38, fontWeight: "900" },
-  prayerName: { color: deepGreen, fontSize: 27, fontWeight: "900", marginTop: 6 },
-  prayerArabic: { color: "#71807a", fontSize: 16, fontWeight: "700", marginTop: 1 },
-  prayerTime: { color: deepGreen, fontSize: 31, fontWeight: "900", marginTop: 9 },
-  activeText: { color: "#fffaf0" },
-  activeSubText: { color: "#e7d8ad" },
-  audioPill: { marginTop: 11, borderRadius: 99, backgroundColor: "#e9f2ee", paddingHorizontal: 11, paddingVertical: 6 },
-  audioPillActive: { backgroundColor: "#ffffff20" },
-  audioPillMuted: { opacity: 0.55 },
-  audioText: { color: deepGreen, fontSize: 11, fontWeight: "900" },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-
-  bottomGrid: { flexDirection: "row", gap: 14 },
-  dailyCard: { flex: 1, minHeight: 220, borderRadius: 25, backgroundColor: "#fffdf8", borderWidth: 1.5, borderColor: "#dccb9d", padding: 22, alignItems: "center", justifyContent: "center" },
-  dailyEyebrow: { color: "#9c7a35", fontSize: 13, fontWeight: "900", letterSpacing: 1.7 },
-  dailyArabic: { color: deepGreen, fontSize: 30, fontWeight: "800", textAlign: "center", lineHeight: 46, marginTop: 10 },
-  dailyText: { color: "#485a54", fontSize: 16, fontWeight: "600", textAlign: "center", lineHeight: 23, marginTop: 10 },
-  dailyRef: { color: "#9c7a35", fontSize: 13, fontWeight: "900", marginTop: 7 },
-
-  qiblaStrip: { minHeight: 54, borderRadius: 18, backgroundColor: "#e9f2ee", borderWidth: 1, borderColor: "#bfd9cf", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18 },
-  qiblaText: { color: deepGreen, fontSize: 17, fontWeight: "900" },
-  qiblaArrow: { color: green, fontSize: 30, fontWeight: "700" }
+  screen: {
+    flex: 1,
+    backgroundColor: deepGreen,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 16
+  },
+  clockArea: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    paddingTop: 2,
+    paddingBottom: 12
+  },
+  clock: {
+    width: "100%",
+    color: "#ffffff",
+    fontSize: 126,
+    lineHeight: 132,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"]
+  },
+  date: {
+    color: gold,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "800",
+    textAlign: "center",
+    marginTop: 1
+  },
+  divider: {
+    height: 2,
+    width: "100%",
+    backgroundColor: gold,
+    opacity: 0.85,
+    marginBottom: 16
+  },
+  galleryArea: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  cardWrap: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 760,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  prayerCard: {
+    width: "94%",
+    minHeight: 620,
+    flex: 1,
+    maxHeight: 850,
+    borderRadius: 34,
+    borderWidth: 2,
+    borderColor: "#8a6d36",
+    backgroundColor: cardGreen,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 28,
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10
+  },
+  prayerCardUpcoming: {
+    borderColor: softGold,
+    borderWidth: 3,
+    backgroundColor: cardGreenBright
+  },
+  lockPill: {
+    position: "absolute",
+    top: 20,
+    backgroundColor: softGold,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 9
+  },
+  lockText: {
+    color: deepGreen,
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 1.1
+  },
+  nextPill: {
+    position: "absolute",
+    top: 20,
+    borderWidth: 1,
+    borderColor: gold,
+    backgroundColor: "#d7b45e18",
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8
+  },
+  nextPillText: {
+    color: softGold,
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 1.6
+  },
+  glyph: {
+    color: gold,
+    fontSize: 40,
+    lineHeight: 46,
+    marginBottom: 8
+  },
+  arabicName: {
+    color: softGold,
+    fontSize: 92,
+    lineHeight: 116,
+    fontWeight: "900",
+    textAlign: "center",
+    writingDirection: "rtl",
+    includeFontPadding: true
+  },
+  goldRule: {
+    width: 190,
+    height: 2,
+    backgroundColor: gold,
+    marginTop: 4,
+    marginBottom: 16
+  },
+  englishName: {
+    color: "#ffffff",
+    fontSize: 58,
+    lineHeight: 66,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  prayerTime: {
+    color: "#ffffff",
+    fontSize: 84,
+    lineHeight: 92,
+    fontWeight: "900",
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+    marginTop: 8
+  },
+  countdownBlock: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14
+  },
+  startsIn: {
+    color: gold,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 2.1
+  },
+  countdown: {
+    color: softGold,
+    fontSize: 48,
+    lineHeight: 54,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    marginTop: 4
+  },
+  adhanControl: {
+    marginTop: 20,
+    minWidth: 210,
+    minHeight: 70,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#ffffff2e",
+    backgroundColor: "#ffffff10",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12
+  },
+  adhanControlMuted: {
+    opacity: 0.62
+  },
+  adhanIcon: {
+    fontSize: 30
+  },
+  adhanTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  adhanState: {
+    color: "#6ce0a1",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  adhanStateMuted: {
+    color: "#d7b45e"
+  },
+  prayerTabs: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 7,
+    paddingTop: 14,
+    paddingBottom: 8
+  },
+  prayerTab: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#8a6d3670",
+    backgroundColor: "#ffffff08",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3
+  },
+  prayerTabSelected: {
+    backgroundColor: gold,
+    borderColor: softGold
+  },
+  tabArabic: {
+    color: gold,
+    fontSize: 22,
+    fontWeight: "900",
+    writingDirection: "rtl"
+  },
+  tabEnglish: {
+    color: "#b9b6aa",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 1
+  },
+  tabSelectedText: {
+    color: deepGreen
+  },
+  dots: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingBottom: 2
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "#ffffff32"
+  },
+  dotActive: {
+    width: 27,
+    backgroundColor: gold
+  },
+  pressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }]
+  }
 });
