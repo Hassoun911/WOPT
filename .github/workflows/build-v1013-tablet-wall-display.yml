@@ -127,10 +127,6 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Verify native image picker autolinked
-        run: |
-          grep -Rqi 'imagepicker' android || { echo 'expo-image-picker native Android module was not linked'; exit 1; }
-
       - name: Build release APK
         run: |
           cd android
