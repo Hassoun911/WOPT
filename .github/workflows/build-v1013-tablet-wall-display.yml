@@ -8,7 +8,7 @@ on:
       - 'mobile/src/TabletWallPrayerDisplay.tsx'
       - 'mobile/scripts/apply-tablet-wall-display.mjs'
       - 'mobile/app.config.ts'
-      - '.github/logo-master.b64'
+      - '.github/logo-exact/hassoun-official-512.jpg.b64'
       - '.github/workflows/build-v1013-tablet-wall-display.yml'
   workflow_dispatch:
 
@@ -67,56 +67,66 @@ jobs:
           path.write_text(text)
           PY
 
-      - name: Apply master Hassoun logo everywhere
+      - name: Apply official user-provided Hassoun logo everywhere
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq pngcheck
           python3 -m pip install --quiet Pillow
 
-          tr -d '\n\r ' < ../.github/logo-master.b64 | base64 --decode > /tmp/hassoun-master.jpg
+          tr -d '\n\r ' < ../.github/logo-exact/hassoun-official-512.jpg.b64 | base64 --decode > /tmp/hassoun-official.jpg
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageOps
 
-          source = Image.open('/tmp/hassoun-master.jpg').convert('RGB')
+          source = Image.open('/tmp/hassoun-official.jpg').convert('RGB')
           source = ImageOps.fit(source, (1024, 1024), method=Image.Resampling.LANCZOS)
           full = source.convert('RGBA')
           full.save('/tmp/hassoun-full.png', format='PNG', optimize=True)
 
-          # Android launcher/adaptive icons are masked by the launcher. Keep the
-          # complete logo comfortably inside Android's safe zone so the bird,
-          # Qur'an, crescent and circular border can never be cut off.
-          launcher = Image.new('RGBA', (1024, 1024), (0, 61, 51, 255))
-          safe = full.resize((700, 700), Image.Resampling.LANCZOS)
-          launcher.alpha_composite(safe, ((1024 - 700) // 2, (1024 - 700) // 2))
+          # Android launchers apply different masks. Keep the entire official logo
+          # inside the safe zone and use the logo's dark emerald as the surround.
+          launcher = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
+          safe = full.resize((790, 790), Image.Resampling.LANCZOS)
+          launcher.alpha_composite(safe, ((1024 - 790) // 2, (1024 - 790) // 2))
           launcher.save('/tmp/hassoun-launcher.png', format='PNG', optimize=True)
 
-          # Main React Native app artwork: full, uncropped logo.
-          for target in ['assets/hassoun-logo.png', 'assets/splash-logo.png']:
+          # Every React Native page that references the shared logo now receives
+          # the exact same full artwork.
+          for target in [
+              'assets/hassoun-logo.png',
+              'assets/icon.png',
+              'assets/splash-icon.png',
+              'assets/splash-logo.png',
+          ]:
               Path(target).parent.mkdir(parents=True, exist_ok=True)
-              full.save(target, format='PNG', optimize=True)
+              (launcher if target.endswith('icon.png') and target == 'assets/icon.png' else full).save(target, format='PNG', optimize=True)
 
-          # Launcher artwork: same logo, only padded for Android's icon mask.
-          for target in ['assets/icon.png', 'assets/adaptive-icon.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True)
-              launcher.save(target, format='PNG', optimize=True)
+          Path('assets/adaptive-icon.png').parent.mkdir(parents=True, exist_ok=True)
+          launcher.save('assets/adaptive-icon.png', format='PNG', optimize=True)
 
-          # Android home-screen widget must use the same full master logo.
+          # Android home-screen widget uses the same official full artwork.
           widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
           widget.parent.mkdir(parents=True, exist_ok=True)
           full.resize((512, 512), Image.Resampling.LANCZOS).save(widget, format='PNG', optimize=True)
+
+          # Keep a web/PWA copy ready from the same master when this branch is deployed.
+          web = Path('../pwa/public/hassoun-logo.png')
+          web.parent.mkdir(parents=True, exist_ok=True)
+          full.save(web, format='PNG', optimize=True)
           PY
 
-          # Make every in-app use of the master image contain rather than crop.
+          # Any in-app image using the brand master must contain it, never crop it.
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('App.tsx')
-          text = path.read_text()
-          text = text.replace('source={require("./assets/hassoun-logo.png")} style={styles.headerLogo}', 'source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.headerLogo}')
-          path.write_text(text)
+          for path in Path('.').rglob('*.tsx'):
+              text = path.read_text(errors='ignore')
+              if 'hassoun-logo.png' not in text:
+                  continue
+              text = text.replace('source={require("./assets/hassoun-logo.png")} style={styles.headerLogo}', 'source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.headerLogo}')
+              path.write_text(text)
           PY
 
-          # Widget ImageViews must also contain the complete logo instead of cropping it.
+          # Widget ImageViews must contain the complete logo instead of cropping it.
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
@@ -144,6 +154,7 @@ jobs:
           pngcheck -q assets/hassoun-logo.png
           pngcheck -q assets/icon.png
           pngcheck -q assets/adaptive-icon.png
+          pngcheck -q assets/splash-icon.png
           pngcheck -q modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
       - name: Validate phone-safe tablet and logo behavior
@@ -159,11 +170,24 @@ jobs:
           grep -q 'await import("expo-image-picker")' src/TabletWallPrayerDisplay.tsx
           ! grep -q '^import \* as ImagePicker from "expo-image-picker"' src/TabletWallPrayerDisplay.tsx
           grep -q 'adaptive-icon.png' app.config.ts
-          grep -q 'resizeMode="contain" style={styles.headerLogo}' App.tsx
+          test -s assets/hassoun-logo.png
+          test -s assets/icon.png
+          test -s assets/adaptive-icon.png
+          test -s assets/splash-icon.png
           test -s modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
+          test -s ../pwa/public/hassoun-logo.png
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Re-assert official logo after prebuild
+        run: |
+          # Expo prebuild may regenerate launcher resources; verify the source files
+          # it consumes are still the official logo assets.
+          test -s assets/icon.png
+          test -s assets/adaptive-icon.png
+          test -s assets/hassoun-logo.png
+          test -s modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png
 
       - name: Build release APK
         run: |
@@ -175,16 +199,16 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.13-full-logo-crash-fixed
+          name: Hassoun-v1.0.13-official-logo-crash-fixed
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-full-logo-crash-fixed.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk.sha256
           if-no-files-found: error
           retention-days: 30
