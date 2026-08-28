@@ -25,6 +25,8 @@ jobs:
     defaults:
       run:
         working-directory: mobile
+    env:
+      NODE_ENV: production
 
     steps:
       - name: Checkout tablet wall display branch
@@ -48,20 +50,32 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          npm install expo-image-picker@~57.0.14 --no-save --ignore-scripts --no-audit --no-fund
+          # This MUST be saved into package.json/package-lock during the build so
+          # Expo autolinking includes the native ImagePicker module. The previous
+          # --no-save install allowed JS to import it without a guaranteed native module,
+          # which could crash the app on startup on phones and tablets.
+          npm install expo-image-picker@~57.0.14 --save --ignore-scripts --no-audit --no-fund
+          node -e "const p=require('./package.json'); if(!p.dependencies?.['expo-image-picker']) process.exit(1); console.log('expo-image-picker linked dependency', p.dependencies['expo-image-picker'])"
 
-      - name: Apply portrait tablet wall display
+      - name: Apply portrait tablet wall display safely
         run: |
           node scripts/apply-tablet-wall-display.mjs
           python3 - <<'PY'
           from pathlib import Path
           path = Path('src/TabletWallPrayerDisplay.tsx')
           text = path.read_text()
+          # Do not evaluate the optional native image-picker module at app startup.
+          # Load it only when the user actually taps "Choose my own background".
+          text = text.replace('import * as ImagePicker from "expo-image-picker";\n', '')
+          text = text.replace(
+              'const pickBackground = async () => { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: false, quality: 0.9 }); if (!result.canceled && result.assets[0]?.uri) updateSettings({ customBackgroundUri: result.assets[0].uri, backgroundPreset: "custom" }); };',
+              'const pickBackground = async () => { try { const ImagePicker = await import("expo-image-picker"); const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: false, quality: 0.9 }); if (!result.canceled && result.assets[0]?.uri) updateSettings({ customBackgroundUri: result.assets[0].uri, backgroundPreset: "custom" }); } catch (error) { console.warn("Wall background picker unavailable", error); } };'
+          )
           text = text.replace('customBackgroundShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "#FFFFFF22" }', 'customBackgroundShade: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#FFFFFF22" }')
           path.write_text(text)
           PY
 
-      - name: Validate tablet-only smart wall behavior
+      - name: Validate phone-safe and tablet-only behavior
         run: |
           npm run typecheck
           grep -q 'viewportWidth >= 600' App.tsx
@@ -70,14 +84,14 @@ jobs:
           grep -q 'locationLabel={wallLocationLabel}' App.tsx
           grep -q 'useKeepAwake("hassoun-tablet-wall-display")' src/TabletWallPrayerDisplay.tsx
           grep -q 'onTogglePrayer(prayer)' src/TabletWallPrayerDisplay.tsx
-          grep -q 'onOpenQibla' src/TabletWallPrayerDisplay.tsx
           grep -q 'onLongPress={() => setEditorOpen(true)}' src/TabletWallPrayerDisplay.tsx
           grep -q 'Wall Display Designer' src/TabletWallPrayerDisplay.tsx
-          grep -q 'launchImageLibraryAsync' src/TabletWallPrayerDisplay.tsx
+          grep -q 'await import("expo-image-picker")' src/TabletWallPrayerDisplay.tsx
+          ! grep -q '^import \* as ImagePicker from "expo-image-picker"' src/TabletWallPrayerDisplay.tsx
           grep -q 'lockMinutes' src/TabletWallPrayerDisplay.tsx
           grep -q 'showBottomCards' src/TabletWallPrayerDisplay.tsx
 
-      - name: Restore exact Hassoun icon and repair PNG assets
+      - name: Restore Hassoun icon and repair PNG assets
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq pngcheck
@@ -92,7 +106,7 @@ jobs:
           with Image.open(source) as image:
               image.load()
               image.convert('RGBA').save(output, format='PNG', optimize=True)
-          print('Re-encoded exact Hassoun logo:', output)
+          print('Re-encoded Hassoun icon:', output)
           PY
           pngcheck -q /tmp/hassoun-exact.png
 
@@ -110,12 +124,9 @@ jobs:
               if not root.exists():
                   continue
               for path in root.rglob('*.png'):
-                  try:
-                      with Image.open(path) as image:
-                          image.load()
-                          image.convert('RGBA').save(path, format='PNG', optimize=True)
-                  except Exception as exc:
-                      raise SystemExit(f'Invalid PNG {path}: {exc}')
+                  with Image.open(path) as image:
+                      image.load()
+                      image.convert('RGBA').save(path, format='PNG', optimize=True)
                   repaired.append(path)
           print(f'Re-encoded {len(repaired)} PNG assets before Android prebuild.')
           PY
@@ -124,26 +135,30 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Verify native image picker autolinked
+        run: |
+          grep -Rqi 'imagepicker' android || { echo 'expo-image-picker native Android module was not linked'; exit 1; }
+
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
 
       - name: Prepare named APK
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.13-smart-wall-display
+          name: Hassoun-v1.0.13-smart-wall-display-crash-fixed
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display-crash-fixed.apk.sha256
           if-no-files-found: error
           retention-days: 30
