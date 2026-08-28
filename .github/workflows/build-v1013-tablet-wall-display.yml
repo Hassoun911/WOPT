@@ -63,8 +63,16 @@ jobs:
       - name: Repair PNG assets before Android prebuild
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq pngcheck
+          sudo apt-get install -y -qq pngcheck librsvg2-bin
           python3 -m pip install --quiet Pillow
+
+          # The legacy icon PNG blob is CRC-damaged. Rebuild all copies from
+          # the checked-in Hassoun vector source before Expo/Jimp reads them.
+          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/hassoun-icon.png
+          for target in assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png; do
+            cp /tmp/hassoun-icon.png "$target"
+          done
+
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image
