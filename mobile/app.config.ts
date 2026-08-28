@@ -24,6 +24,10 @@ const config: ExpoConfig = {
     package: "ca.wopt.windsorprayertimes",
     versionCode: 49,
     icon: "./assets/icon.png",
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#003D33"
+    },
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
       "android.permission.RECEIVE_BOOT_COMPLETED",
