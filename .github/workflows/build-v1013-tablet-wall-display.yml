@@ -25,8 +25,6 @@ jobs:
     defaults:
       run:
         working-directory: mobile
-    env:
-      NODE_ENV: production
 
     steps:
       - name: Checkout tablet wall display branch
@@ -50,10 +48,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          # This MUST be saved into package.json/package-lock during the build so
-          # Expo autolinking includes the native ImagePicker module. The previous
-          # --no-save install allowed JS to import it without a guaranteed native module,
-          # which could crash the app on startup on phones and tablets.
           npm install expo-image-picker@~57.0.14 --save --ignore-scripts --no-audit --no-fund
           node -e "const p=require('./package.json'); if(!p.dependencies?.['expo-image-picker']) process.exit(1); console.log('expo-image-picker linked dependency', p.dependencies['expo-image-picker'])"
 
@@ -64,8 +58,6 @@ jobs:
           from pathlib import Path
           path = Path('src/TabletWallPrayerDisplay.tsx')
           text = path.read_text()
-          # Do not evaluate the optional native image-picker module at app startup.
-          # Load it only when the user actually taps "Choose my own background".
           text = text.replace('import * as ImagePicker from "expo-image-picker";\n', '')
           text = text.replace(
               'const pickBackground = async () => { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: false, quality: 0.9 }); if (!result.canceled && result.assets[0]?.uri) updateSettings({ customBackgroundUri: result.assets[0].uri, backgroundPreset: "custom" }); };',
@@ -143,7 +135,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean assembleRelease --no-daemon --stacktrace
+          NODE_ENV=production ./gradlew clean assembleRelease --no-daemon --stacktrace
 
       - name: Prepare named APK
         run: |
