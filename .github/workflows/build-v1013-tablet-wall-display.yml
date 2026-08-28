@@ -1,0 +1,85 @@
+name: Build Hassoun v1.0.13 tablet wall display
+
+on:
+  push:
+    branches:
+      - release/v1.0.13-tablet-wall-display
+    paths:
+      - 'mobile/src/TabletWallPrayerDisplay.tsx'
+      - 'mobile/scripts/apply-tablet-wall-display.mjs'
+      - '.github/workflows/build-v1013-tablet-wall-display.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v1013-tablet-wall-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout tablet wall display branch
+        uses: actions/checkout@v6
+        with:
+          ref: release/v1.0.13-tablet-wall-display
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply portrait tablet wall display
+        run: node scripts/apply-tablet-wall-display.mjs
+
+      - name: Validate tablet-only behavior
+        run: |
+          npm run typecheck
+          grep -q 'viewportWidth >= 600' App.tsx
+          grep -q 'viewportHeight > viewportWidth' App.tsx
+          grep -q 'TabletWallPrayerDisplay' App.tsx
+          grep -q 'useKeepAwake("hassoun-tablet-wall-display")' src/TabletWallPrayerDisplay.tsx
+          grep -q 'onTogglePrayer(prayer)' src/TabletWallPrayerDisplay.tsx
+          grep -q 'onOpenQibla' src/TabletWallPrayerDisplay.tsx
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Prepare named APK
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.13-tablet-wall-display
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+          if-no-files-found: error
+          retention-days: 14
