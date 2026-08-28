@@ -25,8 +25,14 @@ replaceOnce(
 
 replaceOnce(
   '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);\n',
-  '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);\n  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();\n  const isPortraitWallTablet = activeTab === "home" && viewportWidth >= 600 && viewportHeight > viewportWidth;\n',
-  "tablet portrait detection"
+  '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);\n  const [wallLocationLabel, setWallLocationLabel] = useState(CITY_LABEL);\n  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();\n  const isPortraitWallTablet = activeTab === "home" && viewportWidth >= 600 && viewportHeight > viewportWidth;\n',
+  "tablet portrait detection and location state"
+);
+
+replaceOnce(
+  '      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);\n',
+  '      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);\n      setWallLocationLabel(loaded.location?.label || CITY_LABEL);\n',
+  "live wall location label"
 );
 
 replaceOnce(
@@ -37,9 +43,9 @@ replaceOnce(
 
 replaceOnce(
   '\n  const alertsScreen = (\n',
-  `\n  const homeScreen = isPortraitWallTablet ? (\n    <TabletWallPrayerDisplay\n      locale={locale}\n      now={now}\n      shortDate={shortDate}\n      hijriDate={hijriDate}\n      today={today}\n      next={next}\n      preferences={phoneAlertPreferences}\n      onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}\n      onOpenQibla={() => setActiveTab("qibla")}\n    />\n  ) : phoneHomeScreen;\n\n  const alertsScreen = (\n`,
+  `\n  const homeScreen = isPortraitWallTablet ? (\n    <TabletWallPrayerDisplay\n      locale={locale}\n      now={now}\n      shortDate={shortDate}\n      hijriDate={hijriDate}\n      locationLabel={wallLocationLabel}\n      today={today}\n      next={next}\n      preferences={phoneAlertPreferences}\n      onTogglePrayer={(prayer) => void togglePrayerAudio(prayer)}\n      onOpenQibla={() => setActiveTab("qibla")}\n    />\n  ) : phoneHomeScreen;\n\n  const alertsScreen = (\n`,
   "tablet wall home selection"
 );
 
 fs.writeFileSync(appPath, source);
-console.log("Applied portrait tablet wall Adhan display");
+console.log("Applied portrait tablet wall Adhan display with live location label");
