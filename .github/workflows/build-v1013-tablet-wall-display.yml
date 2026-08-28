@@ -7,6 +7,7 @@ on:
     paths:
       - 'mobile/src/TabletWallPrayerDisplay.tsx'
       - 'mobile/scripts/apply-tablet-wall-display.mjs'
+      - '.github/logo-exact/**'
       - '.github/workflows/build-v1013-tablet-wall-display.yml'
   workflow_dispatch:
 
@@ -45,32 +46,42 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm install expo-image-picker@~57.0.14 --no-save --ignore-scripts --no-audit --no-fund
 
       - name: Apply portrait tablet wall display
         run: node scripts/apply-tablet-wall-display.mjs
 
-      - name: Validate tablet-only behavior
+      - name: Validate tablet-only smart wall behavior
         run: |
           npm run typecheck
           grep -q 'viewportWidth >= 600' App.tsx
           grep -q 'viewportHeight > viewportWidth' App.tsx
           grep -q 'TabletWallPrayerDisplay' App.tsx
+          grep -q 'locationLabel={wallLocationLabel}' App.tsx
           grep -q 'useKeepAwake("hassoun-tablet-wall-display")' src/TabletWallPrayerDisplay.tsx
           grep -q 'onTogglePrayer(prayer)' src/TabletWallPrayerDisplay.tsx
           grep -q 'onOpenQibla' src/TabletWallPrayerDisplay.tsx
+          grep -q 'onLongPress={() => setEditorOpen(true)}' src/TabletWallPrayerDisplay.tsx
+          grep -q 'Wall Display Designer' src/TabletWallPrayerDisplay.tsx
+          grep -q 'launchImageLibraryAsync' src/TabletWallPrayerDisplay.tsx
+          grep -q 'lockMinutes' src/TabletWallPrayerDisplay.tsx
+          grep -q 'showBottomCards' src/TabletWallPrayerDisplay.tsx
 
-      - name: Repair PNG assets before Android prebuild
+      - name: Restore exact Hassoun icon and repair PNG assets
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq pngcheck librsvg2-bin
+          sudo apt-get install -y -qq pngcheck
           python3 -m pip install --quiet Pillow
 
-          # The legacy icon PNG blob is CRC-damaged. Rebuild all copies from
-          # the checked-in Hassoun vector source before Expo/Jimp reads them.
-          rsvg-convert -w 1024 -h 1024 assets/hassoun-app-icon.svg -o /tmp/hassoun-icon.png
+          # Reconstruct the exact user-approved Hassoun logo stored in the repo.
+          cat ../.github/logo-exact/part*.b64 | tr -d '\n\r ' | base64 --decode > /tmp/hassoun-exact.png
+          pngcheck -q /tmp/hassoun-exact.png
+
+          # Use the exact approved logo everywhere Android/Expo can source an app icon.
           for target in assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png; do
-            cp /tmp/hassoun-icon.png "$target"
+            cp /tmp/hassoun-exact.png "$target"
           done
 
           python3 - <<'PY'
@@ -107,16 +118,16 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.13-tablet-wall-display
+          name: Hassoun-v1.0.13-smart-wall-display
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-smart-wall-display.apk.sha256
           if-no-files-found: error
           retention-days: 30
