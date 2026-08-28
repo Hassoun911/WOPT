@@ -60,6 +60,32 @@ jobs:
           grep -q 'onTogglePrayer(prayer)' src/TabletWallPrayerDisplay.tsx
           grep -q 'onOpenQibla' src/TabletWallPrayerDisplay.tsx
 
+      - name: Repair PNG assets before Android prebuild
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pngcheck
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          roots = [Path('assets'), Path('src')]
+          repaired = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob('*.png'):
+                  try:
+                      with Image.open(path) as image:
+                          image.load()
+                          image.convert('RGBA').save(path, format='PNG', optimize=True)
+                  except Exception as exc:
+                      raise SystemExit(f'Invalid PNG {path}: {exc}')
+                  repaired.append(path)
+          print(f'Re-encoded {len(repaired)} PNG assets before Android prebuild.')
+          PY
+          find assets src -type f -iname '*.png' -print0 | xargs -0 -r -n1 pngcheck -q
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
 
@@ -74,12 +100,15 @@ jobs:
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
           cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk.sha256
           ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Hassoun-v1.0.13-tablet-wall-display
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-tablet-wall-display.apk.sha256
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
