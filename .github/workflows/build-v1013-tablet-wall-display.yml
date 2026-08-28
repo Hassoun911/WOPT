@@ -51,7 +51,15 @@ jobs:
           npm install expo-image-picker@~57.0.14 --no-save --ignore-scripts --no-audit --no-fund
 
       - name: Apply portrait tablet wall display
-        run: node scripts/apply-tablet-wall-display.mjs
+        run: |
+          node scripts/apply-tablet-wall-display.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/TabletWallPrayerDisplay.tsx')
+          text = path.read_text()
+          text = text.replace('customBackgroundShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "#FFFFFF22" }', 'customBackgroundShade: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#FFFFFF22" }')
+          path.write_text(text)
+          PY
 
       - name: Validate tablet-only smart wall behavior
         run: |
@@ -75,11 +83,8 @@ jobs:
           sudo apt-get install -y -qq pngcheck
           python3 -m pip install --quiet Pillow
 
-          # Reconstruct the exact user-approved Hassoun logo stored in the repo.
           cat ../.github/logo-exact/part*.b64 | tr -d '\n\r ' | base64 --decode > /tmp/hassoun-exact.png
           pngcheck -q /tmp/hassoun-exact.png
-
-          # Use the exact approved logo everywhere Android/Expo can source an app icon.
           for target in assets/hassoun-logo.png assets/icon.png assets/adaptive-icon.png assets/splash-logo.png; do
             cp /tmp/hassoun-exact.png "$target"
           done
@@ -87,7 +92,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image
-
           roots = [Path('assets'), Path('src')]
           repaired = []
           for root in roots:
