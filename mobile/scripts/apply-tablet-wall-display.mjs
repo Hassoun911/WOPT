@@ -91,4 +91,4 @@ replaceWall('nextPillText: { color: "#F0CC72", fontWeight: "900", fontSize: 16, 
 replaceWall('mosqueGlow: { position: "absolute", left: "10%", right: "10%", bottom: 96, height: 290, borderWidth: 2, borderRadius: 180 }', 'mosqueGlow: { position: "absolute", left: "3%", right: "3%", bottom: 94, height: 390, borderWidth: 2, borderRadius: 210 }');
 
 fs.writeFileSync(wallPath, wall);
-console.log("Applied approved full-screen portrait tablet wall Adhan display with larger couch-readable layout");
+console.log("Applied approved full-screen portrait tablet wall Adhan display with larger couch-readable layout and city-label refresh");
