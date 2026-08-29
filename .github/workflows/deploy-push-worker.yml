@@ -1,10 +1,10 @@
-# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, and Admin CRM
+# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, Admin CRM, and Wall Remote
 name: Deploy Hassoun Push Worker
 
 on:
   workflow_dispatch:
   push:
-    branches: [work/hassoun-1.0-store-admin]
+    branches: [work/hassoun-1.0-store-admin, release/v1.0.13-tablet-wall-display]
     paths:
       - "push-server/**"
       - ".github/workflows/deploy-push-worker.yml"
@@ -38,10 +38,15 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Apply smart wall remote routes
+        run: node scripts/apply-wall-remote.mjs
+
       - name: Validate Worker
         run: |
           npm run typecheck
           npm test
+          grep -q '/wall/display/register' src/index.ts
+          grep -q '/wall/controller/pair' src/index.ts
 
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply wopt-prayer-push --remote
@@ -111,7 +116,7 @@ jobs:
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
 
-      - name: Smoke test Worker, GPS prayer API, activity, CRM runtime, and multiplayer
+      - name: Smoke test Worker, wall remote, GPS prayer API, activity, CRM runtime, and multiplayer
         run: |
           set -euo pipefail
 
@@ -123,6 +128,25 @@ jobs:
             test "$attempt" -lt 15
             sleep 2
           done
+
+          wall_installation="wallsmoke$(date +%s)$RANDOM"
+          curl -fsS -X POST "${PUSH_WORKER_URL}/wall/display/register" \
+            -H 'Content-Type: application/json' \
+            --data "{\"installationId\":\"${wall_installation}\",\"name\":\"Smoke Wall\",\"settings\":{\"ramadanMode\":true}}" \
+            -o /tmp/wall-register.json
+          jq -e '.ok == true and (.deviceToken | length == 64) and (.pairingCode | length == 6)' /tmp/wall-register.json >/dev/null
+          wall_pair="$(jq -r '.pairingCode' /tmp/wall-register.json)"
+          controller_installation="controllersmoke$(date +%s)$RANDOM"
+          curl -fsS -X POST "${PUSH_WORKER_URL}/wall/controller/pair" \
+            -H 'Content-Type: application/json' \
+            --data "{\"pairingCode\":\"${wall_pair}\",\"controllerInstallationId\":\"${controller_installation}\",\"controllerName\":\"Smoke Controller\"}" \
+            -o /tmp/wall-pair.json
+          jq -e '.ok == true and (.controllerToken | length == 64)' /tmp/wall-pair.json >/dev/null
+          controller_token="$(jq -r '.controllerToken' /tmp/wall-pair.json)"
+          curl -fsS "${PUSH_WORKER_URL}/wall/controller/state" \
+            -H "Authorization: Bearer ${controller_token}" \
+            -o /tmp/wall-state.json
+          jq -e '.ok == true and .display.settings.ramadanMode == true' /tmp/wall-state.json >/dev/null
 
           curl -fsS "${PUSH_WORKER_URL}/prayer-times?lat=42.3149&lng=-83.0364&timezone=America%2FToronto&year=2026&month=8" -o /tmp/windsor-prayers.json
           jq -e '.source == "windsor_islamic_association" and (.prayer_times | type == "object") and (.prayer_times | length > 0)' /tmp/windsor-prayers.json >/dev/null
@@ -160,7 +184,7 @@ jobs:
             sleep 2
           done
 
-          echo "Worker, GPS prayer API, activity API, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
+          echo "Worker, secure wall remote, GPS prayer API, activity API, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
 
       - name: Record backend verification on current branch
         working-directory: .
@@ -172,6 +196,7 @@ jobs:
           crm_runtime=ready
           gps_prayer_api=ready
           activity_api=ready
+          wall_remote=ready
           worker=https://wopt-prayer-push.wopt-windsor.workers.dev
           backend_version=${backend_version}
           verified_room_code=${code}
