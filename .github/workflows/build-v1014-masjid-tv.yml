@@ -12,7 +12,6 @@ on:
       - 'mobile/scripts/apply-wall-shell-for-masjid.mjs'
       - 'mobile/scripts/apply-masjid-tv.mjs'
       - 'mobile/scripts/apply-masjid-remote.mjs'
-      - 'mobile/scripts/apply-masjid-schedule-upload.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/workflows/build-v1014-masjid-tv.yml'
@@ -59,11 +58,10 @@ jobs:
       - name: Apply shared wall shell
         run: node scripts/apply-wall-shell-for-masjid.mjs
 
-      - name: Apply Masjid TV mode
+      - name: Apply Masjid TV routing and paired admin remote
         run: |
           node scripts/apply-masjid-tv.mjs
           node scripts/apply-masjid-remote.mjs
-          node scripts/apply-masjid-schedule-upload.mjs
 
       - name: Validate TypeScript and Masjid features
         run: |
@@ -108,11 +106,7 @@ jobs:
               if activity.attrib.get(f'{{{android}}}name', '').endswith('MainActivity'):
                   main = activity; break
           if main is None: raise SystemExit('MainActivity not found')
-          leanback_exists = False
-          for filt in main.findall('intent-filter'):
-              cats = [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')]
-              if 'android.intent.category.LEANBACK_LAUNCHER' in cats: leanback_exists = True
-          if not leanback_exists:
+          if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
               filt = ET.SubElement(main, 'intent-filter')
               ET.SubElement(filt, 'action', {f'{{{android}}}name':'android.intent.action.MAIN'})
               ET.SubElement(filt, 'category', {f'{{{android}}}name':'android.intent.category.LEANBACK_LAUNCHER'})
