@@ -11,6 +11,7 @@ on:
       - 'mobile/scripts/apply-tablet-wall-display.mjs'
       - 'mobile/scripts/prepare-wall-remote-main-patch.mjs'
       - 'mobile/scripts/apply-wall-remote-visual-editor.mjs'
+      - 'mobile/scripts/fix-wall-alert-engine.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/logo-official/hassoun-official-256.jpg.b64'
@@ -61,6 +62,9 @@ jobs:
 
       - name: Apply smart portrait wall mode and phone remote
         run: node scripts/apply-tablet-wall-display.mjs
+
+      - name: Fix real wall prayer alert engine
+        run: node scripts/fix-wall-alert-engine.mjs
 
       - name: Apply visual tap-to-edit wall remote
         run: node scripts/apply-wall-remote-visual-editor.mjs
@@ -154,6 +158,8 @@ jobs:
           grep -q 'Wall Displays' src/SettingsHub.tsx
           grep -q 'Live wall preview' src/WallRemoteController.tsx
           grep -q 'Changes apply automatically' src/WallRemoteController.tsx
+          grep -q 'turningOn = !phoneAlertPreferences\[prayer\].athan' App.tsx
+          grep -q 'schedulePrayerNotifications(prayerTimes, locale, nextPreferences)' App.tsx
           grep -q 'locationLabel={wallLocationLabel}' App.tsx
           grep -q 'useKeepAwake("hassoun-tablet-wall-display")' src/TabletWallPrayerDisplay.tsx
           grep -q 'Wall Display Designer' src/TabletWallPrayerDisplay.tsx
