@@ -25,3 +25,4 @@ replaceOnce(
 
 fs.writeFileSync(path, source);
 console.log('Added live tap-to-edit wall preview');
+await import('./apply-wall-remote-advanced-color.mjs');
