@@ -47,5 +47,23 @@ replaceOnce(
   "tablet wall home selection"
 );
 
+replaceOnce(
+  '<StatusBar style="dark" /><View style={styles.flex}>{body}</View>',
+  '<StatusBar hidden={isPortraitWallTablet} style="dark" /><View style={styles.flex}>{body}</View>',
+  "hide status bar in portrait wall mode"
+);
+
+replaceOnce(
+  '{(activeTab !== "quran" || !quranOwnsAudioSurface) && globalQuranAudio.state !== "idle"',
+  '{!isPortraitWallTablet && (activeTab !== "quran" || !quranOwnsAudioSurface) && globalQuranAudio.state !== "idle"',
+  "hide global Quran audio bar in portrait wall mode"
+);
+
+replaceOnce(
+  '{activeTab !== "qibla" && (activeTab !== "quran" || quranAppNavVisible) ? <View style={styles.bottomNav}>',
+  '{!isPortraitWallTablet && activeTab !== "qibla" && (activeTab !== "quran" || quranAppNavVisible) ? <View style={styles.bottomNav}>',
+  "hide normal app navigation in portrait wall mode"
+);
+
 fs.writeFileSync(appPath, source);
-console.log("Applied portrait tablet wall Adhan display with live location label");
+console.log("Applied approved full-screen portrait tablet wall Adhan display with live location label");
