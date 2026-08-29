@@ -66,4 +66,13 @@ replaceOnce(
 );
 
 fs.writeFileSync(appPath, source);
+
+const wallPath = new URL("../src/TabletWallPrayerDisplay.tsx", import.meta.url);
+let wall = fs.readFileSync(wallPath, "utf8");
+wall = wall.replace(
+  'backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,249,235,0.70)" }',
+  'backgroundVeil: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(255,249,235,0.70)" }'
+);
+fs.writeFileSync(wallPath, wall);
+
 console.log("Applied approved full-screen portrait tablet wall Adhan display with live location label");
