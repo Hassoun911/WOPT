@@ -47,6 +47,19 @@ class PrayerAudioModule : Module() {
       mapOf("exact" to exact)
     }
 
+    Function("setRamadanMaghribMode") { enabled: Boolean ->
+      context.getSharedPreferences(PrayerAudioService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean(PrayerAudioService.KEY_RAMADAN_MAGHRIB, enabled)
+        .apply()
+      enabled
+    }
+
+    Function("getRamadanMaghribMode") {
+      context.getSharedPreferences(PrayerAudioService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+        .getBoolean(PrayerAudioService.KEY_RAMADAN_MAGHRIB, false)
+    }
+
     AsyncFunction("getCurrentDeviceLocation") { promise: Promise ->
       resolveCurrentLocation(promise)
     }
