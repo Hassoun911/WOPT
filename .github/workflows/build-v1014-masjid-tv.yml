@@ -12,6 +12,7 @@ on:
       - 'mobile/scripts/apply-wall-shell-for-masjid.mjs'
       - 'mobile/scripts/apply-masjid-tv.mjs'
       - 'mobile/scripts/apply-masjid-remote.mjs'
+      - 'mobile/scripts/apply-masjid-typefix.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/workflows/build-v1014-masjid-tv.yml'
@@ -36,33 +37,28 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: release/v1.0.14-masjid-tv
-
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker --npm
-
       - name: Apply shared wall shell
         run: node scripts/apply-wall-shell-for-masjid.mjs
-
       - name: Apply Masjid TV routing and paired admin remote
         run: |
           node scripts/apply-masjid-tv.mjs
           node scripts/apply-masjid-remote.mjs
-
+          node scripts/apply-masjid-typefix.mjs
       - name: Validate TypeScript and Masjid features
         run: |
           npm run typecheck
@@ -78,10 +74,8 @@ jobs:
           grep -q 'open_masjid_admin' src/WallRemoteController.tsx
           grep -q 'Ramadan Mode' src/TabletWallPrayerDisplay.tsx
           grep -q 'playRamadanIntro(3)' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
-
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
-
       - name: Enable Android TV launcher and remote-friendly manifest
         run: |
           python3 - <<'PY'
@@ -101,10 +95,7 @@ jobs:
           app = root.find('application')
           if app is None: raise SystemExit('application not found')
           app.set(f'{{{android}}}banner', '@drawable/hassoun_widget_logo')
-          main = None
-          for activity in app.findall('activity'):
-              if activity.attrib.get(f'{{{android}}}name', '').endswith('MainActivity'):
-                  main = activity; break
+          main = next((a for a in app.findall('activity') if a.attrib.get(f'{{{android}}}name', '').endswith('MainActivity')), None)
           if main is None: raise SystemExit('MainActivity not found')
           if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
               filt = ET.SubElement(main, 'intent-filter')
@@ -115,21 +106,17 @@ jobs:
           grep -q 'LEANBACK_LAUNCHER' android/app/src/main/AndroidManifest.xml
           grep -q 'android.software.leanback' android/app/src/main/AndroidManifest.xml
           grep -q 'android.hardware.touchscreen' android/app/src/main/AndroidManifest.xml
-
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
           NODE_ENV=production ./gradlew clean assembleRelease --no-daemon --stacktrace
-
       - name: Prepare named APK
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
           cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk
           sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
