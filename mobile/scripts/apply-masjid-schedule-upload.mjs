@@ -2,12 +2,10 @@ import fs from "node:fs";
 const path = new URL("../src/MasjidTvDisplay.tsx", import.meta.url);
 let source = fs.readFileSync(path, "utf8");
 
-const start = source.indexOf('  else if (landscape) body = ');
-const endMarker = '\n  else if (layout === "lobby")';
-const end = source.indexOf(endMarker, start);
-if (start < 0 || end < 0) throw new Error("Could not locate Grand Masjid landscape block");
 const grandBlock = `  else if (landscape) body = (\n    <View style={styles.fill}>\n      <View style={styles.grandTop}>\n        <View>\n          <Text style={styles.mosqueName}>{settings.mosqueName}</Text>\n          <Text style={styles.location}>⌖ {props.locationLabel}</Text>\n        </View>\n        <Text style={styles.bigClock}>{clock(props.now, settings.showSeconds)}</Text>\n        <View style={styles.dateBlock}>\n          <Text style={styles.date}>{props.shortDate}</Text>\n          {settings.showHijri ? <Text style={styles.hijri}>{props.hijriDate}</Text> : null}\n        </View>\n      </View>\n      <View style={styles.grandCenter}>\n        <View style={styles.nextCard}>\n          <View>\n            <Text style={styles.nextKicker}>NEXT PRAYER</Text>\n            <Text style={styles.nextArabic}>{NAMES[nextPrayer].ar}</Text>\n            <Text style={styles.nextEnglish}>{NAMES[nextPrayer].en}</Text>\n          </View>\n          <View style={styles.nextRight}>\n            <Text style={styles.nextTime}>{formatPrayerTime(nextTime)}</Text>\n            {props.next ? <Text style={styles.countdown}>{countdown(props.next.secondsRemaining)} left</Text> : null}\n            <Text style={styles.nextIqama}>Iqama {nextIqama === "—" ? "—" : formatPrayerTime(nextIqama)}</Text>\n          </View>\n        </View>\n        <View style={styles.grandSide}>\n          <JumuahPanel />\n          <AnnouncementPanel />\n        </View>\n      </View>\n      <PrayerCards />\n    </View>\n  );`;
-source = source.slice(0, start) + grandBlock + source.slice(end);
+const grandPattern = /  else if \(landscape\) body = [\s\S]*?\n  else if \(layout === "lobby"\)/;
+if (!grandPattern.test(source)) throw new Error("Could not locate Grand Masjid landscape block");
+source = source.replace(grandPattern, grandBlock + '\n  else if (layout === "lobby")');
 
 const returnMarker = "\n\n  return <View style={[styles.screen, theme]}>";
 if (!source.includes(returnMarker)) throw new Error("Missing Masjid TV return marker");
