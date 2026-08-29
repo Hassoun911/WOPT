@@ -16,17 +16,26 @@ app = app.replace(
   '        loadInitialPrayerTimes(),\n        loadQuizStats()'
 );
 const startupTail = `      setPhoneAlertPreferences(savedPhoneAlertPreferences);\n      setBusy(false);\n      if (savedAlerts === "on") {\n        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);\n        setScheduledCount(result.count);\n        await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);\n        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }`;
-const fastStartupTail = `      setPhoneAlertPreferences(savedPhoneAlertPreferences);\n      setBusy(false);\n\n      // Keep cached/bundled prayer data visible immediately. GPS/network refresh runs after the screen is already usable.\n      void loadPrayerTimes().then(async (fresh) => {\n        setPrayerTimes(fresh.prayerTimes);\n        setLive(fresh.live);\n        setWallLocationLabel(fresh.location?.label && fresh.location.label !== "Current location" ? fresh.location.label : CITY_LABEL);\n        if (savedAlerts === "on") {\n          const result = await schedulePrayerNotifications(fresh.prayerTimes, chosenLocale, savedPhoneAlertPreferences);\n          setScheduledCount(result.count);\n          await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);\n          void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n        }\n      }).catch(() => undefined);`;
+const fastStartupTail = `      setPhoneAlertPreferences(savedPhoneAlertPreferences);\n      setBusy(false);\n\n      // Keep cached/bundled prayer data visible immediately. GPS/network refresh runs after the screen is already usable.\n      void loadPrayerTimes().then(async (fresh) => {\n        setPrayerTimes(fresh.prayerTimes);\n        setLive(fresh.live);\n        setWallLocationLabel(fresh.location?.label && fresh.location.label !== \"Current location\" ? fresh.location.label : \"Current location\");\n        if (savedAlerts === \"on\") {\n          const result = await schedulePrayerNotifications(fresh.prayerTimes, chosenLocale, savedPhoneAlertPreferences);\n          setScheduledCount(result.count);\n          await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);\n          void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n        }\n      }).catch(() => undefined);`;
 if (app.includes(startupTail)) app = app.replace(startupTail, fastStartupTail);
 else if (!app.includes('Keep cached/bundled prayer data visible immediately')) throw new Error('Could not patch fast startup');
 fs.writeFileSync(appPath, app);
 
 const prayerPath = new URL("../src/prayerData.ts", import.meta.url);
 let prayerData = fs.readFileSync(prayerPath, "utf8");
-const cachedBlock = `  if (cached) {\n    return {\n      prayerTimes: cached.prayerTimes,\n      live: false,\n      location: { ...cached.location, source: "saved" }\n    };\n  }`;
-const normalizedCachedBlock = `  if (cached) {\n    const label = isUsefulLabel(cached.location.label)\n      ? cached.location.label\n      : isNearWindsor(cached.location.latitude, cached.location.longitude)\n        ? CITY_LABEL\n        : CITY_LABEL;\n    return {\n      prayerTimes: cached.prayerTimes,\n      live: false,\n      location: { ...cached.location, label, source: "saved" }\n    };\n  }`;
+const cachedBlock = `  if (cached) {\n    return {\n      prayerTimes: cached.prayerTimes,\n      live: false,\n      location: { ...cached.location, source: \"saved\" }\n    };\n  }`;
+const normalizedCachedBlock = `  if (cached) {\n    const label = isUsefulLabel(cached.location.label) ? cached.location.label : \"Current location\";\n    return {\n      prayerTimes: cached.prayerTimes,\n      live: false,\n      location: { ...cached.location, label, source: \"saved\" }\n    };\n  }`;
 if (prayerData.includes(cachedBlock)) prayerData = prayerData.replace(cachedBlock, normalizedCachedBlock);
 else if (!prayerData.includes('const label = isUsefulLabel(cached.location.label)')) throw new Error('Could not normalize cached city label');
+
+prayerData = prayerData.replace(
+  `    const fallbackLabel = isUsefulLabel(reverseLabel)\n      ? reverseLabel\n      : isNearWindsor(latitude, longitude)\n        ? CITY_LABEL\n        : isUsefulLabel(fallback.location.label)\n          ? fallback.location.label\n          : \"Current location\";`,
+  `    const fallbackLabel = isUsefulLabel(reverseLabel)\n      ? reverseLabel\n      : isUsefulLabel(fallback.location.label)\n        ? fallback.location.label\n        : \"Current location\";`
+);
+prayerData = prayerData.replace(
+  '      label: current.source === "windsor_islamic_association" ? CITY_LABEL : fallbackLabel,',
+  '      label: fallbackLabel,'
+);
 fs.writeFileSync(prayerPath, prayerData);
 
 const wallPath = new URL("../src/TabletWallPrayerDisplay.tsx", import.meta.url);
@@ -35,4 +44,4 @@ wall = wall.replace(/preferences\[visiblePrayer\]\.athan \? \"Adhan On\" : \"Adh
 wall = wall.replace(/preferences\[prayer\]\.athan \? \"Adhan On\" : \"Adhan Off\"/g, '(alertsEnabled && preferences[prayer].athan) ? "Adhan On" : "Adhan Off"');
 fs.writeFileSync(wallPath, wall);
 
-console.log("Fixed real wall alert state, reliable city label, and fast cached startup/resume.");
+console.log("Fixed real wall alert state, dynamic city label, and fast cached startup/resume.");
