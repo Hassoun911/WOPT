@@ -15,6 +15,7 @@ on:
       - 'mobile/scripts/apply-masjid-typefix.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
+      - '.github/logo-official/hassoun-official-256.jpg.b64'
       - '.github/workflows/build-v1014-masjid-tv.yml'
   workflow_dispatch:
 
@@ -74,6 +75,27 @@ jobs:
           grep -q 'open_masjid_admin' src/WallRemoteController.tsx
           grep -q 'Ramadan Mode' src/TabletWallPrayerDisplay.tsx
           grep -q 'playRamadanIntro(3)' modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt
+      - name: Restore verified Hassoun image assets
+        run: |
+          python3 -m pip install --quiet Pillow
+          tr -d '\n\r ' < ../.github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-official.jpg
+          echo 'a233f3a8e323499df9643a29280d5f53d2c18468414107b034863f6d82517e75  /tmp/hassoun-official.jpg' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source = Image.open('/tmp/hassoun-official.jpg').convert('RGB')
+          full = ImageOps.fit(source, (1024, 1024), method=Image.Resampling.LANCZOS).convert('RGBA')
+          launcher = Image.new('RGBA', (1024, 1024), (7,43,37,255))
+          safe = full.resize((720,720), Image.Resampling.LANCZOS)
+          launcher.alpha_composite(safe, ((1024-720)//2,(1024-720)//2))
+          for target in ['assets/hassoun-logo.png','assets/splash-logo.png','assets/splash-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True); full.save(target, 'PNG', optimize=True)
+          for target in ['assets/icon.png','assets/adaptive-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True); launcher.save(target, 'PNG', optimize=True)
+          widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
+          widget.parent.mkdir(parents=True, exist_ok=True)
+          full.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
+          PY
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
       - name: Enable Android TV launcher and remote-friendly manifest
