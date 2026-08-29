@@ -9,6 +9,8 @@ on:
       - 'mobile/src/WallRemoteController.tsx'
       - 'mobile/src/wallRemote.ts'
       - 'mobile/scripts/apply-tablet-wall-display.mjs'
+      - 'mobile/scripts/prepare-wall-remote-main-patch.mjs'
+      - 'mobile/scripts/apply-wall-remote-visual-editor.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/logo-official/hassoun-official-256.jpg.b64'
@@ -54,8 +56,14 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npx expo install expo-image-picker expo-file-system expo-battery expo-brightness --npm
 
+      - name: Prepare live remote editor patch
+        run: node scripts/prepare-wall-remote-main-patch.mjs
+
       - name: Apply smart portrait wall mode and phone remote
         run: node scripts/apply-tablet-wall-display.mjs
+
+      - name: Apply visual tap-to-edit wall remote
+        run: node scripts/apply-wall-remote-visual-editor.mjs
 
       - name: Apply official user-provided Hassoun logo everywhere
         run: |
@@ -142,6 +150,10 @@ jobs:
           grep -q 'viewportWidth >= 600' App.tsx
           grep -q 'viewportHeight > viewportWidth' App.tsx
           grep -q 'WallRemoteController' App.tsx
+          grep -q 'onOpenWallDisplays' App.tsx
+          grep -q 'Wall Displays' src/SettingsHub.tsx
+          grep -q 'Live wall preview' src/WallRemoteController.tsx
+          grep -q 'Changes apply automatically' src/WallRemoteController.tsx
           grep -q 'locationLabel={wallLocationLabel}' App.tsx
           grep -q 'useKeepAwake("hassoun-tablet-wall-display")' src/TabletWallPrayerDisplay.tsx
           grep -q 'Wall Display Designer' src/TabletWallPrayerDisplay.tsx
