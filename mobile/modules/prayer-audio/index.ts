@@ -25,6 +25,8 @@ export type PrayerAudioNativeModule = {
   scheduleExactPrayerAlarms(eventsJson: string): Promise<PrayerAudioScheduleResult>;
   restoreExactPrayerAlarms(): Promise<{ exact: boolean }>;
   scheduleTestPrayerAlarm(prayer: string, delaySeconds: number): Promise<PrayerAudioTestResult>;
+  setRamadanMaghribMode(enabled: boolean): boolean;
+  getRamadanMaghribMode(): boolean;
   getCurrentDeviceLocation(): Promise<NativeDeviceLocation | null>;
   cancelExactPrayerAlarms(): Promise<void>;
   openExactAlarmSettings(): void;
