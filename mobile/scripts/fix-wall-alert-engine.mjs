@@ -42,6 +42,26 @@ const wallPath = new URL("../src/TabletWallPrayerDisplay.tsx", import.meta.url);
 let wall = fs.readFileSync(wallPath, "utf8");
 wall = wall.replace(/preferences\[visiblePrayer\]\.athan \? \"Adhan On\" : \"Adhan Off\"/g, '(alertsEnabled && preferences[visiblePrayer].athan) ? "Adhan On" : "Adhan Off"');
 wall = wall.replace(/preferences\[prayer\]\.athan \? \"Adhan On\" : \"Adhan Off\"/g, '(alertsEnabled && preferences[prayer].athan) ? "Adhan On" : "Adhan Off"');
+
+const transitionLine = '  const transition = useRef(new Animated.Value(1)).current; const previousIndex = useRef(visibleIndex); const applyingRemote = useRef(false);';
+const heartbeatLine = '  const transition = useRef(new Animated.Value(1)).current; const heartbeat = useRef(new Animated.Value(1)).current; const previousIndex = useRef(visibleIndex); const applyingRemote = useRef(false);';
+if (wall.includes(transitionLine)) wall = wall.replace(transitionLine, heartbeatLine);
+else if (!wall.includes('const heartbeat = useRef(new Animated.Value(1)).current')) throw new Error('Could not add heartbeat animation value');
+
+const contentMarker = '\n\n  const content = <View style=';
+const heartbeatEffect = `\n  useEffect(() => {\n    if (displayStage !== \"five\") { heartbeat.stopAnimation(); heartbeat.setValue(1); return; }\n    const animation = Animated.loop(Animated.sequence([\n      Animated.timing(heartbeat, { toValue: 1.07, duration: 170, useNativeDriver: true }),\n      Animated.timing(heartbeat, { toValue: 1, duration: 170, useNativeDriver: true }),\n      Animated.delay(90),\n      Animated.timing(heartbeat, { toValue: 1.04, duration: 130, useNativeDriver: true }),\n      Animated.timing(heartbeat, { toValue: 1, duration: 150, useNativeDriver: true }),\n      Animated.delay(650)\n    ]));\n    animation.start();\n    return () => { animation.stop(); heartbeat.setValue(1); };\n  }, [displayStage, heartbeat]);\n  const heartbeatStyle = displayStage === \"five\" ? { transform: [{ scale: heartbeat }] } : undefined;`;
+if (!wall.includes('const heartbeatStyle = displayStage === "five"')) {
+  if (!wall.includes(contentMarker)) throw new Error('Could not find wall content marker for heartbeat');
+  wall = wall.replace(contentMarker, `${heartbeatEffect}${contentMarker}`);
+}
+
+wall = wall.replace('<Text style={[styles.nextPillText, displayStage === "adhan" && styles.adhanNowPillText]}>', '<Animated.Text style={[styles.nextPillText, displayStage === "adhan" && styles.adhanNowPillText, heartbeatStyle]}>');
+wall = wall.replace('</Text></View><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.56} style={[styles.prayerArabic, textStyle("arabic")]}>{NAMES[prayer].ar}</Text>', '</Animated.Text></View><Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.56} style={[styles.prayerArabic, textStyle("arabic"), heartbeatStyle]}>{NAMES[prayer].ar}</Animated.Text>');
+wall = wall.replace('{settings.showEnglish ? <Text style={[styles.prayerEnglish, textStyle("english")]}>{NAMES[prayer].en}</Text> : null}', '{settings.showEnglish ? <Animated.Text style={[styles.prayerEnglish, textStyle("english"), heartbeatStyle]}>{NAMES[prayer].en}</Animated.Text> : null}');
+wall = wall.replace('<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} style={[styles.prayerTime, textStyle("prayerTime")]}>{prayerTime ? formatPrayerTime(prayerTime, locale) : "--:--"}</Text>', '<Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55} style={[styles.prayerTime, textStyle("prayerTime"), heartbeatStyle]}>{prayerTime ? formatPrayerTime(prayerTime, locale) : "--:--"}</Animated.Text>');
+wall = wall.replace('<Text style={[styles.countdown, textStyle("countdown")]}>{displayStage === "five" ? "◷  " : ""}{remainingLabel(next.secondsRemaining, locale)}</Text>', '<Animated.Text style={[styles.countdown, textStyle("countdown"), heartbeatStyle]}>{displayStage === "five" ? "◷  " : ""}{remainingLabel(next.secondsRemaining, locale)}</Animated.Text>');
+
+if (!wall.includes('heartbeatStyle') || !wall.includes('Animated.loop(Animated.sequence')) throw new Error('Heartbeat pulse patch did not apply');
 fs.writeFileSync(wallPath, wall);
 
-console.log("Fixed real wall alert state, dynamic city label, and fast cached startup/resume.");
+console.log("Fixed wall alerts, dynamic city, fast resume, and heartbeat pulse for the final five minutes.");
