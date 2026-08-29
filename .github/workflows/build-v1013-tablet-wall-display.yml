@@ -64,6 +64,7 @@ jobs:
               'const pickBackground = async () => { try { const ImagePicker = await import("expo-image-picker"); const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: false, quality: 0.9 }); if (!result.canceled && result.assets[0]?.uri) updateSettings({ customBackgroundUri: result.assets[0].uri, backgroundPreset: "custom" }); } catch (error) { console.warn("Wall background picker unavailable", error); } };'
           )
           text = text.replace('customBackgroundShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "#FFFFFF22" }', 'customBackgroundShade: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#FFFFFF22" }')
+          text = text.replace('backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,249,235,0.70)" }', 'backgroundVeil: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(255,249,235,0.70)" }')
           path.write_text(text)
           PY
 
@@ -85,35 +86,28 @@ jobs:
           full = source.convert('RGBA')
           full.save('/tmp/hassoun-full.png', format='PNG', optimize=True)
 
-          # Android launchers mask icons into different shapes. Keep the complete
-          # user-provided logo safely inside the mask on Samsung and other launchers.
           launcher = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
           safe = full.resize((720, 720), Image.Resampling.LANCZOS)
           launcher.alpha_composite(safe, ((1024 - 720) // 2, (1024 - 720) // 2))
           launcher.save('/tmp/hassoun-launcher.png', format='PNG', optimize=True)
 
-          # Full official artwork everywhere inside Hassoun.
           for target in ['assets/hassoun-logo.png', 'assets/splash-logo.png', 'assets/splash-icon.png']:
               Path(target).parent.mkdir(parents=True, exist_ok=True)
               full.save(target, format='PNG', optimize=True)
 
-          # Same official artwork with launcher-only safe padding.
           for target in ['assets/icon.png', 'assets/adaptive-icon.png']:
               Path(target).parent.mkdir(parents=True, exist_ok=True)
               launcher.save(target, format='PNG', optimize=True)
 
-          # Widget uses the exact full logo, not the launcher-padded copy.
           widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
           widget.parent.mkdir(parents=True, exist_ok=True)
           full.resize((512, 512), Image.Resampling.LANCZOS).save(widget, format='PNG', optimize=True)
 
-          # Keep the web/PWA brand source synchronized too.
           web = Path('../pwa/public/hassoun-logo.png')
           web.parent.mkdir(parents=True, exist_ok=True)
           full.save(web, format='PNG', optimize=True)
           PY
 
-          # React Native brand images must contain the full artwork.
           python3 - <<'PY'
           from pathlib import Path
           for path in Path('.').rglob('*.tsx'):
@@ -124,7 +118,6 @@ jobs:
               path.write_text(text)
           PY
 
-          # Widget ImageViews must center/contain, never centerCrop.
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
@@ -187,16 +180,16 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.13-official-logo-crash-fixed
+          name: Hassoun-v1.0.13-wall-designer-sound-test
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-official-logo-crash-fixed.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-wall-designer-sound-test.apk.sha256
           if-no-files-found: error
           retention-days: 30
