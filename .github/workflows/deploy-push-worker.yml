@@ -61,19 +61,13 @@ jobs:
             echo "Workers subdomain already configured: ${current}.workers.dev"
             exit 0
           fi
-
           for candidate in wopt-windsor wopt-f8834317 windsor-prayer-f8834317; do
-            response="$(curl -sS -X PUT \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              --data "{\"subdomain\":\"${candidate}\"}" \
-              "$api")"
+            response="$(curl -sS -X PUT -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" --data "{\"subdomain\":\"${candidate}\"}" "$api")"
             if [ "$(printf '%s' "$response" | jq -r '.success // false')" = "true" ]; then
               echo "Workers subdomain created: ${candidate}.workers.dev"
               exit 0
             fi
           done
-
           echo "Unable to create a workers.dev subdomain"
           exit 1
 
@@ -90,25 +84,8 @@ jobs:
           EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-
-          put_required_secret() {
-            name="$1"
-            value="$2"
-            test -n "$value"
-            printf '%s' "$value" | npx wrangler secret put "$name"
-          }
-
-          put_optional_secret() {
-            name="$1"
-            value="$2"
-            if [ -n "$value" ]; then
-              printf '%s' "$value" | npx wrangler secret put "$name"
-              echo "Installed optional Worker secret: $name"
-            else
-              echo "Optional Worker secret not configured: $name"
-            fi
-          }
-
+          put_required_secret() { name="$1"; value="$2"; test -n "$value"; printf '%s' "$value" | npx wrangler secret put "$name"; }
+          put_optional_secret() { name="$1"; value="$2"; if [ -n "$value" ]; then printf '%s' "$value" | npx wrangler secret put "$name"; echo "Installed optional Worker secret: $name"; else echo "Optional Worker secret not configured: $name"; fi; }
           put_required_secret VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
           put_optional_secret RESEND_API_KEY "$RESEND_API_KEY"
           put_optional_secret EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
@@ -121,69 +98,54 @@ jobs:
           set -euo pipefail
 
           for attempt in $(seq 1 15); do
-            if curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json \
-              && jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null; then
-              break
-            fi
+            if curl -fsS "${PUSH_WORKER_URL}/health" -o /tmp/health.json && jq -e '.ok == true and .service == "wopt-prayer-push"' /tmp/health.json >/dev/null; then break; fi
             test "$attempt" -lt 15
             sleep 2
           done
 
           wall_installation="wallsmoke$(date +%s)$RANDOM"
-          curl -fsS -X POST "${PUSH_WORKER_URL}/wall/display/register" \
-            -H 'Content-Type: application/json' \
-            --data "{\"installationId\":\"${wall_installation}\",\"name\":\"Smoke Wall\",\"settings\":{\"ramadanMode\":true}}" \
-            -o /tmp/wall-register.json
-          jq -e '.ok == true and (.deviceToken | length == 64) and (.pairingCode | length == 6)' /tmp/wall-register.json >/dev/null
+          wall_ready=false
+          for attempt in $(seq 1 20); do
+            http_code="$(curl -sS -o /tmp/wall-register.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/wall/display/register" -H 'Content-Type: application/json' --data "{\"installationId\":\"${wall_installation}\",\"name\":\"Smoke Wall\",\"settings\":{\"ramadanMode\":true}}")"
+            if [ "$http_code" = "200" ] && jq -e '.ok == true and (.deviceToken | length == 64) and (.pairingCode | length == 6)' /tmp/wall-register.json >/dev/null; then
+              wall_ready=true
+              break
+            fi
+            echo "Wall remote route not ready yet (attempt ${attempt}, HTTP ${http_code})"
+            sleep 2
+          done
+          test "$wall_ready" = "true"
+
           wall_pair="$(jq -r '.pairingCode' /tmp/wall-register.json)"
           controller_installation="controllersmoke$(date +%s)$RANDOM"
-          curl -fsS -X POST "${PUSH_WORKER_URL}/wall/controller/pair" \
-            -H 'Content-Type: application/json' \
-            --data "{\"pairingCode\":\"${wall_pair}\",\"controllerInstallationId\":\"${controller_installation}\",\"controllerName\":\"Smoke Controller\"}" \
-            -o /tmp/wall-pair.json
+          curl -fsS -X POST "${PUSH_WORKER_URL}/wall/controller/pair" -H 'Content-Type: application/json' --data "{\"pairingCode\":\"${wall_pair}\",\"controllerInstallationId\":\"${controller_installation}\",\"controllerName\":\"Smoke Controller\"}" -o /tmp/wall-pair.json
           jq -e '.ok == true and (.controllerToken | length == 64)' /tmp/wall-pair.json >/dev/null
           controller_token="$(jq -r '.controllerToken' /tmp/wall-pair.json)"
-          curl -fsS "${PUSH_WORKER_URL}/wall/controller/state" \
-            -H "Authorization: Bearer ${controller_token}" \
-            -o /tmp/wall-state.json
+          curl -fsS "${PUSH_WORKER_URL}/wall/controller/state" -H "Authorization: Bearer ${controller_token}" -o /tmp/wall-state.json
           jq -e '.ok == true and .display.settings.ramadanMode == true' /tmp/wall-state.json >/dev/null
 
           curl -fsS "${PUSH_WORKER_URL}/prayer-times?lat=42.3149&lng=-83.0364&timezone=America%2FToronto&year=2026&month=8" -o /tmp/windsor-prayers.json
           jq -e '.source == "windsor_islamic_association" and (.prayer_times | type == "object") and (.prayer_times | length > 0)' /tmp/windsor-prayers.json >/dev/null
-
           curl -fsS "${PUSH_WORKER_URL}/prayer-times?lat=43.6532&lng=-79.3832&timezone=America%2FToronto&year=2026&month=8" -o /tmp/global-prayers.json
           jq -e '.source == "aladhan" and (.prayer_times | type == "object") and (.prayer_times | length > 0)' /tmp/global-prayers.json >/dev/null
 
           activity_installation="smokeactivity$(date +%s)$RANDOM"
-          curl -fsS -X POST "${PUSH_WORKER_URL}/activity" \
-            -H 'Content-Type: application/json' \
-            --data "{\"installationId\":\"${activity_installation}\",\"activity\":\"app_open\",\"platform\":\"smoke\"}" \
-            -o /tmp/activity.json
+          curl -fsS -X POST "${PUSH_WORKER_URL}/activity" -H 'Content-Type: application/json' --data "{\"installationId\":\"${activity_installation}\",\"activity\":\"app_open\",\"platform\":\"smoke\"}" -o /tmp/activity.json
           jq -e '.ok == true' /tmp/activity.json >/dev/null
 
           for attempt in $(seq 1 15); do
-            if curl -fsS "${PUSH_WORKER_URL}/app/runtime" -o /tmp/runtime.json \
-              && jq -e '.ok == true and (.settings | type == "object")' /tmp/runtime.json >/dev/null; then
-              break
-            fi
+            if curl -fsS "${PUSH_WORKER_URL}/app/runtime" -o /tmp/runtime.json && jq -e '.ok == true and (.settings | type == "object")' /tmp/runtime.json >/dev/null; then break; fi
             test "$attempt" -lt 15
             sleep 2
           done
 
           player_id="smoke_$(date +%s)_$RANDOM"
           for attempt in $(seq 1 10); do
-            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' \
-              -X POST "${PUSH_WORKER_URL}/games/rooms" \
-              -H 'Content-Type: application/json' \
-              --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
-            if [ "$http_code" = "200" ] \
-              && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null; then
-              break
-            fi
+            http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/games/rooms" -H 'Content-Type: application/json' --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"trivia\",\"category\":\"islamic\"}")"
+            if [ "$http_code" = "200" ] && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null; then break; fi
             test "$attempt" -lt 10
             sleep 2
           done
-
           echo "Worker, secure wall remote, GPS prayer API, activity API, Admin CRM runtime, D1 migrations, and multiplayer endpoint passed."
 
       - name: Record backend verification on current branch
