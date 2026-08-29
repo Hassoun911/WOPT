@@ -2,9 +2,12 @@ import fs from "node:fs";
 const path = new URL("../src/MasjidTvDisplay.tsx", import.meta.url);
 let source = fs.readFileSync(path, "utf8");
 
+source = source.replace('else if (landscape) body = <><View style={styles.grandTop}>', 'else if (landscape) body = <View style={styles.fill}><View style={styles.grandTop}>');
 const brokenGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards />;';
-const fixedGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards /></>;';
-if (source.includes(brokenGrand)) source = source.replace(brokenGrand, fixedGrand);
+const fragmentGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards /></>;';
+const wrappedGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards /></View>;';
+if (source.includes(brokenGrand)) source = source.replace(brokenGrand, wrappedGrand);
+if (source.includes(fragmentGrand)) source = source.replace(fragmentGrand, wrappedGrand);
 
 const returnMarker = "\n\n  return <View style={[styles.screen, theme]}>";
 if (!source.includes(returnMarker)) throw new Error("Missing Masjid TV return marker");
@@ -16,4 +19,4 @@ if (!source.includes(uiMarker)) throw new Error("Missing schedule import button"
 source = source.replace(uiMarker, '<Pressable onPress={() => void importScheduleFile()} style={styles.primary}><Text style={styles.primaryText}>Choose CSV / JSON Schedule File</Text></Pressable><Pressable onPress={importSchedule} style={styles.primary}><Text style={styles.primaryText}>Import Pasted Schedule</Text></Pressable>');
 
 fs.writeFileSync(path, source);
-console.log("Fixed grand layout and added mosque CSV/JSON schedule file upload");
+console.log("Wrapped Grand Masjid layout and added mosque CSV/JSON schedule upload");
