@@ -34,16 +34,21 @@ class PrayerAudioService : Service() {
     } ?: "Prayer"
 
     val isFajr = prayer.equals("Fajr", ignoreCase = true)
+    val isMaghrib = prayer.equals("Maghrib", ignoreCase = true)
+    val ramadanMode = isMaghrib && isRamadanMaghribEnabled()
+
     createNotificationChannel()
-    startForeground(NOTIFICATION_ID, playbackNotification(prayer, includesDua = !isFajr))
+    startForeground(
+      NOTIFICATION_ID,
+      playbackNotification(prayer, includesDua = !isFajr, ramadanMode = ramadanMode)
+    )
     acquireWakeLock()
     requestAudioFocus()
-    if (isFajr) {
-      playResource(R.raw.fajr_adhan) { finishPlayback() }
-    } else {
-      playResource(R.raw.azan9) {
-        playResource(R.raw.dua_after_azan) { finishPlayback() }
-      }
+
+    when {
+      isFajr -> playResource(R.raw.fajr_adhan) { finishPlayback() }
+      ramadanMode -> playRamadanIntro(3) { playNormalAdhanAndDua() }
+      else -> playNormalAdhanAndDua()
     }
     return START_NOT_STICKY
   }
@@ -54,6 +59,27 @@ class PrayerAudioService : Service() {
     wakeLock?.let { if (it.isHeld) it.release() }
     wakeLock = null
     super.onDestroy()
+  }
+
+  private fun isRamadanMaghribEnabled(): Boolean {
+    return getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+      .getBoolean(KEY_RAMADAN_MAGHRIB, false)
+  }
+
+  private fun playRamadanIntro(remaining: Int, onComplete: () -> Unit) {
+    if (remaining <= 0) {
+      onComplete()
+      return
+    }
+    playResource(R.raw.ramadan_maghrib) {
+      playRamadanIntro(remaining - 1, onComplete)
+    }
+  }
+
+  private fun playNormalAdhanAndDua() {
+    playResource(R.raw.azan9) {
+      playResource(R.raw.dua_after_azan) { finishPlayback() }
+    }
   }
 
   private fun playResource(resourceId: Int, onComplete: () -> Unit) {
@@ -93,7 +119,7 @@ class PrayerAudioService : Service() {
     wakeLock = powerManager.newWakeLock(
       PowerManager.PARTIAL_WAKE_LOCK,
       "Hassoun:PrayerAudio"
-    ).apply { acquire(6 * 60 * 1000L) }
+    ).apply { acquire(8 * 60 * 1000L) }
   }
 
   private fun requestAudioFocus() {
@@ -138,7 +164,7 @@ class PrayerAudioService : Service() {
     )
   }
 
-  private fun playbackNotification(prayer: String, includesDua: Boolean): Notification {
+  private fun playbackNotification(prayer: String, includesDua: Boolean, ramadanMode: Boolean): Notification {
     val stopIntent = Intent(this, PrayerAudioService::class.java).apply { action = ACTION_STOP }
     val stopPendingIntent = PendingIntent.getService(
       this,
@@ -152,15 +178,18 @@ class PrayerAudioService : Service() {
       @Suppress("DEPRECATION")
       Notification.Builder(this)
     }
+    val detail = when {
+      ramadanMode -> "Ramadan Maghrib intro ×3, then Adhan and dua"
+      includesDua -> "Playing the Adhan, followed by the dua"
+      else -> "Playing the Fajr Adhan"
+    }
     return builder
       .setSmallIcon(
         resources.getIdentifier("notification_icon", "drawable", packageName)
           .takeIf { it != 0 } ?: applicationInfo.icon
       )
       .setContentTitle("Hassoun • $prayer Adhan")
-      .setContentText(
-        if (includesDua) "Playing the Adhan, followed by the dua" else "Playing the Fajr Adhan"
-      )
+      .setContentText(detail)
       .setOngoing(true)
       .setCategory(Notification.CATEGORY_ALARM)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -176,6 +205,8 @@ class PrayerAudioService : Service() {
   companion object {
     const val ACTION_PLAY = "ca.wopt.prayeraudio.PLAY"
     const val ACTION_STOP = "ca.wopt.prayeraudio.STOP"
+    const val SETTINGS_PREFS = "hassoun_prayer_audio_settings_v1"
+    const val KEY_RAMADAN_MAGHRIB = "ramadan_maghrib_enabled"
     private const val CHANNEL_ID = "prayer-playback-v1"
     private const val NOTIFICATION_ID = 7861
   }
