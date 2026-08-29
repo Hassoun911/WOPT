@@ -2,12 +2,12 @@ import fs from "node:fs";
 const path = new URL("../src/MasjidTvDisplay.tsx", import.meta.url);
 let source = fs.readFileSync(path, "utf8");
 
-source = source.replace('else if (landscape) body = <><View style={styles.grandTop}>', 'else if (landscape) body = <View style={styles.fill}><View style={styles.grandTop}>');
-const brokenGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards />;';
-const fragmentGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards /></>;';
-const wrappedGrand = '<View style={styles.grandSide}><JumuahPanel /><AnnouncementPanel /></View></View><PrayerCards /></View>;';
-if (source.includes(brokenGrand)) source = source.replace(brokenGrand, wrappedGrand);
-if (source.includes(fragmentGrand)) source = source.replace(fragmentGrand, wrappedGrand);
+const start = source.indexOf('  else if (landscape) body = ');
+const endMarker = '\n  else if (layout === "lobby")';
+const end = source.indexOf(endMarker, start);
+if (start < 0 || end < 0) throw new Error("Could not locate Grand Masjid landscape block");
+const grandBlock = `  else if (landscape) body = (\n    <View style={styles.fill}>\n      <View style={styles.grandTop}>\n        <View>\n          <Text style={styles.mosqueName}>{settings.mosqueName}</Text>\n          <Text style={styles.location}>⌖ {props.locationLabel}</Text>\n        </View>\n        <Text style={styles.bigClock}>{clock(props.now, settings.showSeconds)}</Text>\n        <View style={styles.dateBlock}>\n          <Text style={styles.date}>{props.shortDate}</Text>\n          {settings.showHijri ? <Text style={styles.hijri}>{props.hijriDate}</Text> : null}\n        </View>\n      </View>\n      <View style={styles.grandCenter}>\n        <View style={styles.nextCard}>\n          <View>\n            <Text style={styles.nextKicker}>NEXT PRAYER</Text>\n            <Text style={styles.nextArabic}>{NAMES[nextPrayer].ar}</Text>\n            <Text style={styles.nextEnglish}>{NAMES[nextPrayer].en}</Text>\n          </View>\n          <View style={styles.nextRight}>\n            <Text style={styles.nextTime}>{formatPrayerTime(nextTime)}</Text>\n            {props.next ? <Text style={styles.countdown}>{countdown(props.next.secondsRemaining)} left</Text> : null}\n            <Text style={styles.nextIqama}>Iqama {nextIqama === "—" ? "—" : formatPrayerTime(nextIqama)}</Text>\n          </View>\n        </View>\n        <View style={styles.grandSide}>\n          <JumuahPanel />\n          <AnnouncementPanel />\n        </View>\n      </View>\n      <PrayerCards />\n    </View>\n  );`;
+source = source.slice(0, start) + grandBlock + source.slice(end);
 
 const returnMarker = "\n\n  return <View style={[styles.screen, theme]}>";
 if (!source.includes(returnMarker)) throw new Error("Missing Masjid TV return marker");
@@ -19,4 +19,4 @@ if (!source.includes(uiMarker)) throw new Error("Missing schedule import button"
 source = source.replace(uiMarker, '<Pressable onPress={() => void importScheduleFile()} style={styles.primary}><Text style={styles.primaryText}>Choose CSV / JSON Schedule File</Text></Pressable><Pressable onPress={importSchedule} style={styles.primary}><Text style={styles.primaryText}>Import Pasted Schedule</Text></Pressable>');
 
 fs.writeFileSync(path, source);
-console.log("Wrapped Grand Masjid layout and added mosque CSV/JSON schedule upload");
+console.log("Rebuilt Grand Masjid JSX and added mosque CSV/JSON schedule upload");
