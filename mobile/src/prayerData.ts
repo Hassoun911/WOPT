@@ -50,12 +50,22 @@ function monthPair(timezone: string) {
   return [{ year, month }, { year: nextYear, month: nextMonth }];
 }
 
+function isUsefulLabel(value?: string | null) {
+  return Boolean(value && value.trim() && value.trim().toLowerCase() !== "current location");
+}
+
+function isNearWindsor(latitude: number, longitude: number) {
+  return Math.abs(latitude - 42.3149) < 0.6 && Math.abs(longitude - (-83.0364)) < 0.7;
+}
+
 async function locationLabel(latitude: number, longitude: number) {
   try {
     const places = await Location.reverseGeocodeAsync({ latitude, longitude });
     const place = places[0];
-    const parts = [place?.city || place?.subregion, place?.region, place?.country].filter(Boolean);
-    return parts.length ? parts.join(", ") : "Current location";
+    const parts = [place?.city || place?.subregion, place?.region].filter(Boolean);
+    if (parts.length) return parts.join(", ");
+    const countryParts = [place?.city || place?.subregion, place?.country].filter(Boolean);
+    return countryParts.length ? countryParts.join(", ") : "Current location";
   } catch {
     return "Current location";
   }
@@ -138,13 +148,29 @@ export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {
     const months = monthPair(timezone);
     const [current, next] = await Promise.all(months.map(({ year, month }) => fetchMonth(latitude, longitude, timezone, year, month)));
     const prayerTimes = mergePrayerTimes(current.prayer_times || {}, next.prayer_times || {});
-    const apiLabel = current.location?.label && current.location.label !== "Current location" ? current.location.label : null;
-    const label = apiLabel || await locationLabel(latitude, longitude);
+
+    const apiParts = [current.location?.city, current.location?.region].filter(Boolean) as string[];
+    const apiLabel = isUsefulLabel(current.location?.label)
+      ? current.location!.label!
+      : apiParts.length
+        ? apiParts.join(", ")
+        : isUsefulLabel(current.sourceLabel)
+          ? current.sourceLabel!
+          : null;
+    const reverseLabel = apiLabel || await locationLabel(latitude, longitude);
+    const fallbackLabel = isUsefulLabel(reverseLabel)
+      ? reverseLabel
+      : isNearWindsor(latitude, longitude)
+        ? CITY_LABEL
+        : isUsefulLabel(fallback.location.label)
+          ? fallback.location.label
+          : "Current location";
+
     const location: PrayerLocation = {
       latitude,
       longitude,
       timezone,
-      label: current.source === "windsor_islamic_association" ? CITY_LABEL : label,
+      label: current.source === "windsor_islamic_association" ? CITY_LABEL : fallbackLabel,
       source: current.source || "aladhan"
     };
     await AsyncStorage.setItem(STORAGE_KEYS.locationSchedule, JSON.stringify({ prayerTimes, location, savedAt: new Date().toISOString() } satisfies CachedLocationPayload));
