@@ -72,4 +72,61 @@ replaceOnce(
 );
 
 fs.writeFileSync(appPath, source);
-console.log("Applied smart portrait wall mode and full paired phone remote controller");
+
+// Keep remote commands/status live without restarting the wall sync effect.
+// The sync loop intentionally starts once, so every mutable value it reports or acts on
+// must be read through a ref rather than from the first-render closure.
+const wallPath = new URL("../src/TabletWallPrayerDisplay.tsx", import.meta.url);
+let wall = fs.readFileSync(wallPath, "utf8");
+const wallReplaceOnce = (from, to, label) => {
+  if (!wall.includes(from)) {
+    if (wall.includes(to)) return;
+    throw new Error(`Missing expected wall source for ${label}`);
+  }
+  wall = wall.replace(from, to);
+};
+
+wallReplaceOnce(
+  '  const transition = useRef(new Animated.Value(1)).current; const previousIndex = useRef(visibleIndex); const applyingRemote = useRef(false);\n',
+  '  const transition = useRef(new Animated.Value(1)).current; const previousIndex = useRef(visibleIndex); const applyingRemote = useRef(false);\n  const liveRef = useRef({ next, today, locationLabel, alertsEnabled, batteryLevel, charging, onTestNotification, onTestAdhan, onEnableAlerts, onRefreshPrayers });\n  liveRef.current = { next, today, locationLabel, alertsEnabled, batteryLevel, charging, onTestNotification, onTestAdhan, onEnableAlerts, onRefreshPrayers };\n',
+  "live remote status ref"
+);
+
+wallReplaceOnce(
+  'if (command === "test_notification") onTestNotification?.();',
+  'if (command === "test_notification") liveRef.current.onTestNotification?.();',
+  "live notification test command"
+);
+wallReplaceOnce(
+  'if (command === "test_adhan") onTestAdhan?.();',
+  'if (command === "test_adhan") liveRef.current.onTestAdhan?.();',
+  "live adhan test command"
+);
+wallReplaceOnce(
+  'if (command === "enable_alerts") onEnableAlerts?.();',
+  'if (command === "enable_alerts") liveRef.current.onEnableAlerts?.();',
+  "live alert enable command"
+);
+wallReplaceOnce(
+  'if (command === "refresh_prayers") onRefreshPrayers?.();',
+  'if (command === "refresh_prayers") liveRef.current.onRefreshPrayers?.();',
+  "live prayer refresh command"
+);
+wallReplaceOnce(
+  'if (command === "show_next_prayer" && next && !next.isTomorrow) setVisibleIndex(Math.max(0, PRAYER_KEYS.indexOf(next.prayer)));',
+  'if (command === "show_next_prayer") { const liveNext = liveRef.current.next; if (liveNext && !liveNext.isTomorrow) setVisibleIndex(Math.max(0, PRAYER_KEYS.indexOf(liveNext.prayer))); }',
+  "live next prayer command"
+);
+wallReplaceOnce(
+  'nextPrayer: next?.prayer || null, secondsRemaining: next?.secondsRemaining ?? null, location: locationLabel, alertsEnabled,',
+  'nextPrayer: liveRef.current.next?.prayer || null, secondsRemaining: liveRef.current.next?.secondsRemaining ?? null, location: liveRef.current.locationLabel, alertsEnabled: liveRef.current.alertsEnabled,',
+  "live remote core status"
+);
+wallReplaceOnce(
+  'smartStage: stageFor(next, recentPrayer(today, new Date()), settingsRef.current.smartPrayerStages), batteryLevel, charging, designerLocked: settingsRef.current.designerLocked',
+  'smartStage: stageFor(liveRef.current.next, recentPrayer(liveRef.current.today, new Date()), settingsRef.current.smartPrayerStages), batteryLevel: liveRef.current.batteryLevel, charging: liveRef.current.charging, designerLocked: settingsRef.current.designerLocked',
+  "live remote smart and battery status"
+);
+
+fs.writeFileSync(wallPath, wall);
+console.log("Applied smart portrait wall mode, full paired phone remote controller and live remote status fix");
