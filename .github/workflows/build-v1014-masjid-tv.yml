@@ -9,7 +9,7 @@ on:
       - 'mobile/src/TabletWallPrayerDisplay.tsx'
       - 'mobile/src/WallRemoteController.tsx'
       - 'mobile/src/wallRemote.ts'
-      - 'mobile/scripts/apply-tablet-wall-display.mjs'
+      - 'mobile/scripts/apply-wall-shell-for-masjid.mjs'
       - 'mobile/scripts/apply-masjid-tv.mjs'
       - 'mobile/scripts/apply-masjid-remote.mjs'
       - 'mobile/scripts/apply-masjid-schedule-upload.mjs'
@@ -56,8 +56,8 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker --npm
 
-      - name: Apply existing smart wall and remote system
-        run: node scripts/apply-tablet-wall-display.mjs
+      - name: Apply shared wall shell
+        run: node scripts/apply-wall-shell-for-masjid.mjs
 
       - name: Apply Masjid TV mode
         run: |
