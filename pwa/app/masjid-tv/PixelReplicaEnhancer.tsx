@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { PIXEL_REPLICA_BG } from "./PixelReplicaBackground";
 
 const esc = (value: string) =>
   value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
@@ -22,7 +21,7 @@ export default function PixelReplicaEnhancer() {
       if (!root) {
         root = document.createElement("section");
         root.className = "pixel-replica-one";
-        root.style.backgroundImage = `url("${PIXEL_REPLICA_BG}")`;
+        root.style.backgroundImage = 'url("/masjid-tv/reference-replica.webp")';
         shell.appendChild(root);
       }
 
@@ -50,21 +49,24 @@ export default function PixelReplicaEnhancer() {
       const website = text(source.querySelector(".tv-donation strong"));
 
       root.innerHTML = `
-        <div class="px-brand-cover">
+        <div class="px-brand-mask"></div>
+        <div class="px-brand-live">
           ${logo ? `<img src="${esc(logo)}" alt="Masjid logo">` : ""}
           <div><h1>${esc(mosqueName)}</h1><p>${esc(location)}</p></div>
         </div>
 
-        <div class="px-clock-cover">
+        <div class="px-clock-mask"></div>
+        <div class="px-clock-live">
           <button class="px-clock" type="button">${esc(clock)}</button>
           <div class="px-dates"><span>${esc(dates[0] || "")}</span><i></i><span>${esc(dates[1] || "")}</span></div>
         </div>
 
-        <div class="px-verse-cover">${esc(verse || "And establish prayer and give zakah and bow with those who bow.")}</div>
+        <div class="px-verse-mask"></div>
+        <div class="px-verse-live">${esc(verse || "And establish prayer and give zakah and bow with those who bow.")}</div>
 
-        <div class="px-next-name"><small>NEXT PRAYER</small><strong>${esc(nextPrayer)}</strong></div>
-        <div class="px-next-time">${esc(nextTime)}</div>
-        <div class="px-next-iqama"><small>IQAMA</small><strong>${esc(iqamaNext)}</strong></div>
+        <div class="px-next-name-mask"></div><div class="px-next-name"><small>NEXT PRAYER</small><strong>${esc(nextPrayer)}</strong></div>
+        <div class="px-next-time-mask"></div><div class="px-next-time">${esc(nextTime)}</div>
+        <div class="px-next-iqama-mask"></div><div class="px-next-iqama"><small>IQAMA</small><strong>${esc(iqamaNext)}</strong></div>
 
         <div class="px-prayer-values">
           ${prayerRows.map((row, i) => `
@@ -82,7 +84,7 @@ export default function PixelReplicaEnhancer() {
             </div>`).join("")}
         </div>
 
-        ${website ? `<div class="px-website-value">${esc(website)}</div>` : ""}
+        ${website ? `<div class="px-website-mask"></div><div class="px-website-value">${esc(website)}</div>` : ""}
       `;
 
       root.querySelector(".px-clock")?.addEventListener("click", () => {
