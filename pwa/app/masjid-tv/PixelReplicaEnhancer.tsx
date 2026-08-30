@@ -64,10 +64,13 @@ export default function PixelReplicaEnhancer() {
         </defs>
         <rect width="1440" height="790" fill="url(#bg)"/><rect width="1440" height="790" fill="url(#pat)"/>
 
-        <g>
-          <path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/>
-          <path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/>
-          <path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/>
+        <g id="grand-header-art">
+          <g id="grand-default-logo">
+            <path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/>
+            <path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/>
+            <path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/>
+          </g>
+          <g id="grand-custom-logo-slot"></g>
           <text x="72" y="176" class="serif white" font-size="33" font-weight="700">${esc(mosque)}</text>
           <text x="74" y="201" class="sans gold" font-size="13" letter-spacing="3.5">${esc(location.toUpperCase())}</text>
 
