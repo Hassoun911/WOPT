@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { PIXEL_REPLICA_BG } from "./PixelReplicaBackground";
 
 const esc = (value: string) =>
   value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
@@ -24,8 +23,9 @@ export default function PixelReplicaEnhancer() {
         root.className = "pixel-replica-one";
         shell.appendChild(root);
       }
-      // Use the verified reference artwork directly; do not depend on a public file path.
-      root.style.backgroundImage = `url(${JSON.stringify(PIXEL_REPLICA_BG)})`;
+
+      // Real binary artwork committed under pwa/public. No base64 reconstruction.
+      root.style.backgroundImage = 'url("/masjid-tv/grand-reference.webp")';
       root.style.backgroundSize = "100% 100%";
       root.style.backgroundPosition = "center";
       root.style.backgroundRepeat = "no-repeat";
