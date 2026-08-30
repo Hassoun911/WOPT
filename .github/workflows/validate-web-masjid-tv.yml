@@ -1,0 +1,40 @@
+name: Validate Web Masjid TV
+
+on:
+  push:
+    branches:
+      - release/v1.0.14-masjid-tv-fixes
+    paths:
+      - 'pwa/app/masjid-tv/**'
+      - 'pwa/app/WebMasjidTvMenuEnhancer.tsx'
+      - 'pwa/app/layout.tsx'
+      - '.github/workflows/validate-web-masjid-tv.yml'
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: pwa
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: release/v1.0.14-masjid-tv-fixes
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Build website
+        run: npm run build
+      - name: Verify TV route and controls
+        run: |
+          grep -q 'Masjid Display Studio' app/masjid-tv/page.tsx
+          grep -q 'Masjid TV / Big Screen' app/WebMasjidTvMenuEnhancer.tsx
+          grep -q 'WebMasjidTvMenuEnhancer' app/layout.tsx
