@@ -8,6 +8,7 @@ import ActivityTracker from "./ActivityTracker";
 import EmailManageRedirect from "./EmailManageRedirect";
 import LocationPrayerBootstrap from "./LocationPrayerBootstrap";
 import NavEnhancer from "./NavEnhancer";
+import WebMasjidTvMenuEnhancer from "./WebMasjidTvMenuEnhancer";
 import PrayerAlertAudioEnhancer from "./PrayerAlertAudioEnhancer";
 import PrayerCardInteractionEnhancer from "./PrayerCardInteractionEnhancer";
 import RuntimeControlOverlay from "./RuntimeControlOverlay";
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <RuntimeControlOverlay />
         <EmailManageRedirect />
         <NavEnhancer />
+        <WebMasjidTvMenuEnhancer />
         <PrayerAlertAudioEnhancer />
         <PrayerCardInteractionEnhancer />
         <ServiceWorkerRegistration />
