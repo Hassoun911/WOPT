@@ -36,7 +36,7 @@ replaceOnce(
 );
 replaceOnce(
   '  const { width, height } = useWindowDimensions();\n  const landscape = width >= height;\n  const [settings, setSettings] = useState<MasjidSettings>(DEFAULTS);\n',
-  '  const { width, height } = useWindowDimensions();\n  const [settings, setSettings] = useState<MasjidSettings>(DEFAULTS);\n  const physicalLandscape = width >= height;\n  const landscape = settings.orientationMode === "landscape" ? true : settings.orientationMode === "portrait" ? false : physicalLandscape;\n  const displayLocationLabel = settings.mosqueLocationLabel.trim() || props.locationLabel || "Mosque location";\n',
+  '  const { width, height } = useWindowDimensions();\n  const [settings, setSettings] = useState<MasjidSettings>(DEFAULTS);\n  const physicalLandscape = width >= height;\n  const landscape = settings.orientationMode === "landscape" ? true : settings.orientationMode === "portrait" ? false : physicalLandscape;\n  const displayLocationLabel = settings.mosqueLocationLabel.trim() || "Mosque location not set";\n',
   "orientation and mosque location routing"
 );
 replaceOnce(
@@ -45,8 +45,8 @@ replaceOnce(
   "orientation effect"
 );
 source = source.replace(/props\.locationLabel/g, 'displayLocationLabel');
-// Repair the displayLocationLabel initializer after the global replacement.
-source = source.replace('settings.mosqueLocationLabel.trim() || displayLocationLabel || "Mosque location"', 'settings.mosqueLocationLabel.trim() || props.locationLabel || "Mosque location"');
+// Masjid TV must never fall back to the phone/device GPS label.
+source = source.replace('settings.mosqueLocationLabel.trim() || displayLocationLabel || "Mosque location"', 'settings.mosqueLocationLabel.trim() || "Mosque location not set"');
 
 replaceOnce(
   '<Text style={styles.adminLabel}>Footer / subtitle</Text><TextInput value={settings.mosqueSubtitle} onChangeText={(mosqueSubtitle) => update({ mosqueSubtitle })} style={styles.input} />\n              <Text style={styles.adminSection}>Landscape layouts</Text>',
