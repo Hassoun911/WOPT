@@ -42,6 +42,8 @@ const config: ExpoConfig = {
     ]
   },
   plugins: [
+    "expo-screen-orientation",
+    "expo-video",
     [
       "expo-notifications",
       {
