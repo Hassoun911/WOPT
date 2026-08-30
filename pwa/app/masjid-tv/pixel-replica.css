@@ -21,6 +21,10 @@
   user-select:none;
 }
 
+/* Never leave TV mode as a blank green screen if the artwork fails to load. */
+.pixel-replica-one.art-load-error{display:none!important}
+.layout-grand:has(.pixel-replica-one.art-load-error) .template-grand{display:flex!important}
+
 /* These were the dark green blocks hiding the real reference artwork. */
 .px-brand-mask,
 .px-brand-live,
@@ -41,9 +45,7 @@
   display:none!important;
 }
 
-/* Keep an invisible setup hotspot over the reference clock. */
-.pixel-replica-one::after{
-  content:"";
+.px-clock-hotspot{
   position:absolute;
   left:31%;
   top:2%;
@@ -51,6 +53,9 @@
   height:22%;
   z-index:5;
   cursor:pointer;
+  border:0;
+  padding:0;
+  background:transparent;
 }
 
 @media(max-aspect-ratio:4/3){
