@@ -22,66 +22,17 @@ export default function PixelReplicaEnhancer() {
         shell.appendChild(root);
       }
 
-      const brand = source.querySelector(".tv-brand");
-      const logo = brand?.querySelector("img")?.getAttribute("src") || "";
-      const mosqueName = text(brand?.querySelector("strong") || null) || "Your Masjid Name";
-      const location = text(brand?.querySelector("small") || null) || "Mosque location not set";
       const clock = text(source.querySelector(".tv-clock"));
-      const dates = Array.from(source.querySelectorAll(".tv-dates span")).map(text);
-      const verse = text(source.querySelector(".header-verse"));
-      const nextPrayer = text(source.querySelector(".next-name strong")) || "—";
-      const nextTime = text(source.querySelector(".next-time > b")) || "—";
-      const iqamaNext = text(source.querySelector(".next-time small")).replace(/^Iqama\s*/i, "") || "—";
-      const prayerRows = Array.from(source.querySelectorAll(".table-row")).slice(0, 5).map((row) => ({
-        name: text(row.querySelector("strong")).replace(/[☼☀◒☾◉]/g, "").trim(),
-        adhan: text(row.querySelector(":scope > b:not(.iqama)")),
-        iqama: text(row.querySelector(".iqama")) || "—",
-      }));
-      const anns = Array.from(source.querySelectorAll(".tv-announcements article")).slice(0, 4).map((row) => ({
-        title: text(row.querySelector("strong")),
-        body: text(row.querySelector("p")),
-      }));
-      const website = text(source.querySelector(".tv-donation strong"));
 
       root.innerHTML = `
-        <img class="px-reference-art" src="/masjid-tv/grand-reference.webp?v=6" alt="Grand Masjid display artwork" />
-
-        <div class="px-brand-mask"></div>
-        <div class="px-brand-live">
-          ${logo ? `<img src="${esc(logo)}" alt="Masjid logo">` : ""}
-          <div><h1>${esc(mosqueName)}</h1><p>${esc(location)}</p></div>
-        </div>
-
-        <div class="px-clock-mask"></div>
-        <div class="px-clock-live">
-          <button class="px-clock" type="button">${esc(clock)}</button>
-          <div class="px-dates"><span>${esc(dates[0] || "")}</span><i></i><span>${esc(dates[1] || "")}</span></div>
-        </div>
-
-        <div class="px-verse-mask"></div>
-        <div class="px-verse-live">${esc(verse || "And establish prayer and give zakah and bow with those who bow.")}</div>
-
-        <div class="px-next-name-mask"></div>
-        <div class="px-next-name"><small>NEXT PRAYER</small><strong>${esc(nextPrayer)}</strong></div>
-        <div class="px-next-time-mask"></div>
-        <div class="px-next-time">${esc(nextTime)}</div>
-        <div class="px-next-iqama-mask"></div>
-        <div class="px-next-iqama"><small>IQAMA</small><strong>${esc(iqamaNext)}</strong></div>
-
-        <div class="px-prayer-values">
-          ${prayerRows.map((row, i) => `<div class="px-row px-row-${i}"><span class="px-pname">${esc(row.name)}</span><span class="px-adhan">${esc(row.adhan)}</span><span class="px-iqama">${esc(row.iqama)}</span></div>`).join("")}
-        </div>
-
-        <div class="px-ann-values">
-          ${(anns.length ? anns : [{ title: "Announcements", body: "Add announcements from Masjid Display Studio." }]).map((a, i) => `<div class="px-ann px-ann-${i}"><strong>${esc(a.title)}</strong><span>${esc(a.body)}</span></div>`).join("")}
-        </div>
-
-        ${website ? `<div class="px-website-mask"></div><div class="px-website-value">${esc(website)}</div>` : ""}
+        <img class="px-reference-art" src="/masjid-tv/grand-reference.webp?v=7" alt="Grand Masjid display artwork" />
+        <button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio"></button>
       `;
 
-      root.querySelector(".px-clock")?.addEventListener("click", () => {
+      root.querySelector(".px-clock-hotspot")?.addEventListener("click", () => {
         (source.querySelector(".tv-clock") as HTMLButtonElement | null)?.click();
       });
+      root.setAttribute("data-clock", clock);
     };
 
     draw();
