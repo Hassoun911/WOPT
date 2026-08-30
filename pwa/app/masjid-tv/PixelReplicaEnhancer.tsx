@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 
-const esc = (value: string) => value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
 const text = (el: Element | null) => (el?.textContent || "").trim();
 
 export default function PixelReplicaEnhancer() {
@@ -25,7 +24,7 @@ export default function PixelReplicaEnhancer() {
       const clock = text(source.querySelector(".tv-clock"));
 
       root.innerHTML = `
-        <img class="px-reference-art" src="/masjid-tv/grand-reference.webp?v=7" alt="Grand Masjid display artwork" />
+        <img class="px-reference-art" src="/masjid-tv/grand-reference.webp?v=8" alt="Grand Masjid display artwork" />
         <button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio"></button>
       `;
 
