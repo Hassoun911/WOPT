@@ -53,7 +53,7 @@ export default function PixelReplicaEnhancer() {
         return `<line x1="684" y1="${y+46}" x2="1144" y2="${y+46}" class="line"/><circle cx="708" cy="${y-8}" r="24" class="iconCircle"/><text x="708" y="${y-1}" text-anchor="middle" class="gold annIcon">${icon}</text><text x="758" y="${y-13}" class="annTitle">${esc(a.title || "Announcement")}</text><text x="758" y="${y+14}" class="annBody">${esc(a.body || "")}</text>`;
       }).join("");
 
-      root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 790" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 790" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#012f29"/><stop offset=".55" stop-color="#064b3d"/><stop offset="1" stop-color="#022e28"/></linearGradient>
           <pattern id="pat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity=".22"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity=".16"/></pattern>
@@ -63,7 +63,6 @@ export default function PixelReplicaEnhancer() {
         </defs>
         <rect width="1440" height="790" fill="url(#bg)"/><rect width="1440" height="790" fill="url(#pat)"/>
 
-        <!-- Header: logo/brand, clock/date, verse -->
         <g>
           <path d="M82 150V79c0-31 24-54 51-54s51 23 51 54v71" fill="none" stroke="#d7b873" stroke-width="4"/>
           <path d="M100 150V103h66v47" fill="none" stroke="#d7b873" stroke-width="4"/>
@@ -79,18 +78,15 @@ export default function PixelReplicaEnhancer() {
           <text x="1368" y="132" text-anchor="end" class="sans white" font-size="17">${esc(verse.length > 58 ? verse.slice(58,116) : "")}</text>
         </g>
 
-        <!-- Next prayer bar -->
         <rect x="60" y="220" width="1320" height="92" rx="18" class="box"/>
         <circle cx="294" cy="266" r="30" class="iconCircle"/><text x="294" y="276" text-anchor="middle" class="gold" font-size="28">◷</text>
         <text x="350" y="250" class="sans gold" font-size="17">NEXT PRAYER</text><text x="350" y="283" class="sans white" font-size="31" font-weight="700">${esc(nextEn)}</text>
         <text x="720" y="279" text-anchor="middle" class="serif gold" font-size="50">${esc(nextTime)}</text>
         <line x1="880" y1="237" x2="880" y2="295" stroke="#a58a4c"/><circle cx="1010" cy="266" r="30" class="iconCircle"/><text x="1010" y="276" text-anchor="middle" class="gold" font-size="24">♙</text><text x="1062" y="252" class="sans gold" font-size="16">IQAMA</text><text x="1062" y="285" class="sans white" font-size="30">${esc(nextIqama)}</text>
 
-        <!-- Lower left prayer table -->
         <rect x="60" y="326" width="590" height="390" rx="18" class="box"/>
         <text x="90" y="365" class="sans gold" font-size="18" font-weight="700">SALAH</text><text x="350" y="365" class="sans gold" font-size="18" font-weight="700">AZAN</text><text x="518" y="365" class="sans gold" font-size="18" font-weight="700">IQAMA</text>${rowSvg}
 
-        <!-- Lower center announcements + right donation -->
         <rect x="665" y="326" width="715" height="390" rx="18" class="box"/>
         <text x="712" y="365" class="sans gold" font-size="20" font-weight="700">ANNOUNCEMENTS</text>${annSvg}
         <line x1="1170" y1="346" x2="1170" y2="695" stroke="#a58a4c"/>
