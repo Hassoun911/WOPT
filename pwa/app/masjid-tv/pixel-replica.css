@@ -1,4 +1,4 @@
-/* Grand Replica 1 — approved artwork first, with no legacy boxes covering it. */
+/* Grand Replica 1 — smart-scale landscape replica with portrait fallback. */
 .layout-grand .template-grand{display:none!important}
 .pixel-replica-one{
   position:absolute;
@@ -6,26 +6,28 @@
   z-index:50;
   overflow:hidden;
   background:#003f31;
+  display:grid;
+  place-items:center;
 }
 .pixel-replica-one *{box-sizing:border-box}
 
+/* Preserve the 1440x790 reference proportions on every landscape display.
+   Wider/taller screens get safe centered margins instead of stretching. */
 .px-reference-art{
   position:absolute;
   inset:0;
   width:100%;
   height:100%;
-  object-fit:fill;
   display:block;
   z-index:0;
   pointer-events:none;
   user-select:none;
 }
 
-/* Never leave TV mode as a blank green screen if the artwork fails to load. */
+/* Never leave TV mode blank if the replica ever fails. */
 .pixel-replica-one.art-load-error{display:none!important}
 .layout-grand:has(.pixel-replica-one.art-load-error) .template-grand{display:flex!important}
 
-/* These were the dark green blocks hiding the real reference artwork. */
 .px-brand-mask,
 .px-brand-live,
 .px-clock-mask,
@@ -45,12 +47,13 @@
   display:none!important;
 }
 
+/* Clock remains the hidden setup hotspot. */
 .px-clock-hotspot{
   position:absolute;
   left:31%;
-  top:2%;
+  top:3%;
   width:38%;
-  height:22%;
+  height:21%;
   z-index:5;
   cursor:pointer;
   border:0;
@@ -58,7 +61,23 @@
   background:transparent;
 }
 
-@media(max-aspect-ratio:4/3){
+/* Portrait / near-portrait TVs use the native responsive Grand template
+   rather than squeezing the landscape replica. */
+@media (orientation:portrait), (max-aspect-ratio:4/3){
   .pixel-replica-one{display:none!important}
-  .layout-grand .template-grand{display:flex!important}
+  .layout-grand .template-grand{
+    display:flex!important;
+    width:100%!important;
+    min-height:100%!important;
+    overflow:hidden!important;
+  }
+}
+
+/* Ultra-wide displays keep the artwork centered with safe side space. */
+@media (min-aspect-ratio:2/1){
+  .pixel-replica-one{background:#012f29}
+  .px-clock-hotspot{
+    left:36%;
+    width:28%;
+  }
 }
