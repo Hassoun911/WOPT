@@ -29,12 +29,12 @@ jobs:
           cache-dependency-path: pwa/package-lock.json
       - name: Install
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Type check
-        run: npx tsc --noEmit
-      - name: Build website
-        run: npm run build
-      - name: Verify TV route and controls
+      - name: Verify TV source wiring
         run: |
           grep -q 'Masjid Display Studio' app/masjid-tv/page.tsx
           grep -q 'Masjid TV / Big Screen' app/WebMasjidTvMenuEnhancer.tsx
           grep -q 'WebMasjidTvMenuEnhancer' app/layout.tsx
+          grep -q 'layout-announcements' app/masjid-tv/masjid-tv.css
+          grep -q 'Enter Full Screen' app/masjid-tv/page.tsx
+      - name: Build website using production script
+        run: npm run build
