@@ -1,11 +1,12 @@
-name: Build Hassoun v1.0.14 Masjid TV
+name: Build Hassoun v1.0.14 Masjid TV Fixed
 
 on:
   push:
     branches:
-      - release/v1.0.14-masjid-tv
+      - release/v1.0.14-masjid-tv-fixes
     paths:
       - 'mobile/src/MasjidTvDisplay.tsx'
+      - 'mobile/src/MasjidVideoBackground.tsx'
       - 'mobile/src/TabletWallPrayerDisplay.tsx'
       - 'mobile/src/WallRemoteController.tsx'
       - 'mobile/src/wallRemote.ts'
@@ -13,6 +14,7 @@ on:
       - 'mobile/scripts/apply-masjid-tv.mjs'
       - 'mobile/scripts/apply-masjid-remote.mjs'
       - 'mobile/scripts/apply-masjid-typefix.mjs'
+      - 'mobile/scripts/apply-masjid-tv-fixes.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/logo-official/hassoun-official-256.jpg.b64'
@@ -23,7 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-v1014-masjid-tv-${{ github.ref }}
+  group: hassoun-v1014-masjid-tv-fixed-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,10 +36,10 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - name: Checkout Masjid TV branch
+      - name: Checkout Masjid TV fixes branch
         uses: actions/checkout@v6
         with:
-          ref: release/v1.0.14-masjid-tv
+          ref: release/v1.0.14-masjid-tv-fixes
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -52,19 +54,24 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker --npm
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video --npm
       - name: Apply shared wall shell
         run: node scripts/apply-wall-shell-for-masjid.mjs
-      - name: Apply Masjid TV routing and paired admin remote
+      - name: Apply Masjid TV routing remote and fixes
         run: |
           node scripts/apply-masjid-tv.mjs
           node scripts/apply-masjid-remote.mjs
           node scripts/apply-masjid-typefix.mjs
+          node scripts/apply-masjid-tv-fixes.mjs
       - name: Validate TypeScript and Masjid features
         run: |
           npm run typecheck
           grep -q 'Platform.isTV' App.tsx
           grep -q 'MasjidTvDisplay' App.tsx
+          grep -q 'orientationMode' src/MasjidTvDisplay.tsx
+          grep -q 'mosqueLocationLabel' src/MasjidTvDisplay.tsx
+          grep -q 'backgroundVideoUrl' src/MasjidTvDisplay.tsx
+          grep -q 'MasjidVideoBackground' src/MasjidTvDisplay.tsx
           grep -q 'landscapeLayout' src/MasjidTvDisplay.tsx
           grep -q 'portraitLayout' src/MasjidTvDisplay.tsx
           grep -q 'Jumu.ah sessions' src/MasjidTvDisplay.tsx
@@ -98,7 +105,7 @@ jobs:
           PY
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --no-install
-      - name: Enable Android TV launcher and full-screen TV orientation
+      - name: Enable Android TV launcher and flexible full-screen orientation
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -126,8 +133,8 @@ jobs:
           if main is None:
               raise SystemExit('MainActivity not found')
 
-          # Expo's app config is portrait for phones. Remove the manifest-level portrait lock
-          # and let MainActivity choose landscape only when Android reports a television.
+          # Phones remain portrait through Expo. TV removes the portrait manifest lock;
+          # the Masjid screen can then use Auto / Landscape / Portrait via expo-screen-orientation.
           main.set(f'{{{android}}}screenOrientation', 'unspecified')
 
           if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
@@ -135,27 +142,11 @@ jobs:
               ET.SubElement(filt, 'action', {f'{{{android}}}name':'android.intent.action.MAIN'})
               ET.SubElement(filt, 'category', {f'{{{android}}}name':'android.intent.category.LEANBACK_LAUNCHER'})
           tree.write(manifest, encoding='utf-8', xml_declaration=True)
-
-          activity = next(Path('android/app/src/main/java').rglob('MainActivity.kt'), None)
-          if activity is None:
-              raise SystemExit('MainActivity.kt not found')
-          text = activity.read_text()
-          if 'android.content.pm.ActivityInfo' not in text:
-              package_end = text.find('\n', text.find('package '))
-              text = text[:package_end+1] + 'import android.content.pm.ActivityInfo\nimport android.content.res.Configuration\n' + text[package_end+1:]
-          marker = 'super.onCreate(null)'
-          if 'UI_MODE_TYPE_TELEVISION' not in text:
-              if marker not in text:
-                  raise SystemExit('MainActivity onCreate marker not found')
-              conditional = '''val deviceType = resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK\n    requestedOrientation = if (deviceType == Configuration.UI_MODE_TYPE_TELEVISION) {\n      ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE\n    } else {\n      ActivityInfo.SCREEN_ORIENTATION_PORTRAIT\n    }\n    super.onCreate(null)'''
-              text = text.replace(marker, conditional, 1)
-          activity.write_text(text)
-          print(f'Patched TV orientation in {activity}')
           PY
           grep -q 'LEANBACK_LAUNCHER' android/app/src/main/AndroidManifest.xml
           grep -q 'android.software.leanback' android/app/src/main/AndroidManifest.xml
           grep -q 'android.hardware.touchscreen' android/app/src/main/AndroidManifest.xml
-          grep -R -q 'UI_MODE_TYPE_TELEVISION' android/app/src/main/java
+          grep -q 'screenOrientation="unspecified"' android/app/src/main/AndroidManifest.xml
       - name: Build release APK
         run: |
           cd android
@@ -165,14 +156,14 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk.sha256
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk.sha256
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.14-masjid-tv
+          name: Hassoun-v1.0.14-masjid-tv-fixed
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk.sha256
           if-no-files-found: error
           retention-days: 30
