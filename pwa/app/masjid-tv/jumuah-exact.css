@@ -1,0 +1,320 @@
+/* Exact-reference pass for the approved cream/green Jumu'ah TV design. */
+
+@media (min-aspect-ratio: 4/3) {
+  .layout-jumuah{background:#f2ead8!important}
+  .layout-jumuah .webtv-overlay{display:none!important}
+
+  .template-jumuah{
+    padding:0!important;
+    gap:0!important;
+    background:linear-gradient(180deg,#087047 0 19%,#f3eddf 19% 86%,#08623e 86% 100%)!important;
+    color:#143b31!important;
+  }
+
+  .template-jumuah>header{
+    height:19vh!important;
+    min-height:19vh!important;
+    padding:1.4vh 2.2vw!important;
+    grid-template-columns:1.15fr 1fr 1.15fr!important;
+    gap:1.8vw!important;
+    color:#fff!important;
+    border:0!important;
+  }
+
+  .template-jumuah .tv-brand{align-items:center!important}
+  .template-jumuah .tv-brand img{width:11vh!important;height:11vh!important;object-fit:contain!important;border-radius:0!important}
+  .template-jumuah .tv-brand strong{
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(30px,2.8vw,54px)!important;
+    font-weight:700!important;
+    letter-spacing:.015em!important;
+    color:#fff!important;
+  }
+  .template-jumuah .tv-brand small{
+    margin-top:.65vh!important;
+    color:#f3c75f!important;
+    font-size:clamp(11px,.9vw,17px)!important;
+    text-transform:uppercase!important;
+    letter-spacing:.09em!important;
+  }
+
+  .template-jumuah .tv-clock-block{align-self:center!important}
+  .template-jumuah .tv-clock{
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(72px,8.8vw,154px)!important;
+    font-weight:500!important;
+    letter-spacing:-.04em!important;
+    line-height:.82!important;
+    color:#fff!important;
+  }
+  .template-jumuah .tv-dates{display:none!important}
+
+  .template-jumuah .community-date{
+    justify-self:end!important;
+    text-align:right!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(18px,1.55vw,30px)!important;
+    line-height:1.25!important;
+    color:#fff!important;
+  }
+  .template-jumuah .community-date small{
+    display:block!important;
+    margin-top:1.1vh!important;
+    font-size:clamp(17px,1.4vw,27px)!important;
+    color:#f2c75f!important;
+  }
+
+  .template-jumuah .jumuah-main{
+    height:43vh!important;
+    min-height:43vh!important;
+    flex:none!important;
+    display:grid!important;
+    grid-template-columns:1.02fr .86fr 1.05fr!important;
+    gap:1vw!important;
+    padding:1.1vh 1.8vw .7vh!important;
+    background:#f3eddf!important;
+  }
+
+  .template-jumuah .tv-next.light,
+  .template-jumuah .tv-jumuah.light,
+  .template-jumuah .tv-announcements.light{
+    height:100%!important;
+    min-height:0!important;
+    border:1px solid #caa24f!important;
+    border-radius:14px!important;
+    box-shadow:none!important;
+  }
+
+  .template-jumuah .tv-next.light{
+    position:relative!important;
+    background:#075d3f!important;
+    color:#fff!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    text-align:center!important;
+    padding:1.7vh 1.5vw!important;
+  }
+  .template-jumuah .tv-next .eyebrow{
+    display:inline-block!important;
+    margin:0 auto 1.2vh!important;
+    padding:.55vh 2vw!important;
+    border:1px solid #d7b35c!important;
+    border-radius:999px!important;
+    background:#0a6d48!important;
+    color:#fff!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(13px,1.05vw,20px)!important;
+    letter-spacing:.08em!important;
+  }
+  .template-jumuah .tv-next .next-name b{
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(54px,5.8vw,104px)!important;
+    line-height:.92!important;
+    color:#fff!important;
+  }
+  .template-jumuah .tv-next .next-name strong{
+    display:block!important;
+    margin-top:.5vh!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(32px,2.8vw,50px)!important;
+    color:#f1c65d!important;
+  }
+  .template-jumuah .tv-next .next-time{
+    margin-top:1.2vh!important;
+    text-align:center!important;
+  }
+  .template-jumuah .tv-next .next-time>span{
+    display:none!important;
+  }
+  .template-jumuah .tv-next .next-time>b{
+    display:block!important;
+    margin:0!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(42px,4.4vw,80px)!important;
+    font-weight:500!important;
+    color:#fff!important;
+    line-height:1!important;
+  }
+  .template-jumuah .tv-next .next-time>em{
+    margin-top:.45vh!important;
+    font-size:clamp(12px,1vw,19px)!important;
+    color:#f1c65d!important;
+  }
+  .template-jumuah .tv-next .next-time>small{
+    margin-top:1vh!important;
+    color:#fff!important;
+    font-size:clamp(12px,1vw,19px)!important;
+  }
+
+  .template-jumuah .tv-jumuah.light{
+    background:#fffaf0!important;
+    color:#143b31!important;
+    display:flex!important;
+    flex-direction:column!important;
+    justify-content:flex-start!important;
+    padding:1.45vh 1.25vw!important;
+  }
+  .template-jumuah .tv-jumuah h2,
+  .template-jumuah .tv-announcements h2{
+    margin:0 0 1vh!important;
+    padding:.55vh 1vw!important;
+    border-radius:999px!important;
+    background:#087047!important;
+    color:#fff!important;
+    text-align:center!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(18px,1.6vw,30px)!important;
+    font-weight:600!important;
+    letter-spacing:.05em!important;
+  }
+  .template-jumuah .tv-jumuah .jumuah-mark{
+    margin:.4vh auto .9vh!important;
+    font-size:8vh!important;
+    line-height:1!important;
+    color:#0a6b47!important;
+  }
+  .template-jumuah .jumuah-times{width:100%!important}
+  .template-jumuah .jumuah-times>div{
+    display:grid!important;
+    grid-template-columns:1fr auto!important;
+    align-items:center!important;
+    gap:1vw!important;
+    padding:1.2vh .3vw!important;
+    border-top:1px solid #dfcfaa!important;
+    font-size:clamp(13px,1.05vw,20px)!important;
+  }
+  .template-jumuah .jumuah-times b{
+    color:#8f6017!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(25px,2.1vw,40px)!important;
+    font-weight:500!important;
+  }
+
+  .template-jumuah .tv-announcements.light{
+    background:#fffaf0!important;
+    color:#143b31!important;
+    padding:1.45vh 1.2vw!important;
+  }
+  .template-jumuah .announcement-list{gap:0!important}
+  .template-jumuah .tv-announcements article{
+    display:grid!important;
+    grid-template-columns:5.2vh 1fr!important;
+    align-items:center!important;
+    gap:.9vw!important;
+    padding:1.05vh .15vw!important;
+    border-top:1px solid #dfcfaa!important;
+    background:transparent!important;
+    color:#143b31!important;
+  }
+  .template-jumuah .announcement-icon{
+    width:4.7vh!important;height:4.7vh!important;
+    border:0!important;
+    background:#0b6947!important;
+    color:#fff!important;
+    font-size:2vh!important;
+  }
+  .template-jumuah .tv-announcements article strong{
+    display:block!important;
+    font-size:clamp(14px,1.15vw,22px)!important;
+    line-height:1.05!important;
+  }
+  .template-jumuah .tv-announcements article p{
+    margin:.25vh 0 0!important;
+    font-size:clamp(11px,.9vw,17px)!important;
+    line-height:1.25!important;
+    color:#345c51!important;
+    opacity:1!important;
+  }
+
+  .template-jumuah>.tv-prayer-strip{
+    height:20vh!important;
+    min-height:20vh!important;
+    display:grid!important;
+    grid-template-columns:repeat(5,1fr)!important;
+    gap:.65vw!important;
+    padding:.6vh 1.8vw 1vh!important;
+    background:#f3eddf!important;
+  }
+  .template-jumuah .tv-prayer-card.light{
+    height:100%!important;
+    min-width:0!important;
+    padding:0!important;
+    overflow:hidden!important;
+    background:#fffaf0!important;
+    border:1px solid #caa24f!important;
+    border-radius:11px!important;
+    color:#143b31!important;
+  }
+  .template-jumuah .prayer-head{
+    min-height:7vh!important;
+    padding:.85vh .45vw!important;
+    border-radius:10px 10px 0 0!important;
+    background:#087047!important;
+    color:#fff!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(15px,1.28vw,24px)!important;
+    font-weight:700!important;
+  }
+  .template-jumuah .prayer-head b{color:#f2c75f!important}
+  .template-jumuah .prayer-times{
+    height:calc(100% - 7vh)!important;
+    padding:1.1vh .45vw .8vh!important;
+    align-items:center!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:.3vw!important;
+  }
+  .template-jumuah .prayer-times span+span{border-left:1px solid #ddcfaf!important}
+  .template-jumuah .prayer-times small{
+    color:#0b6042!important;
+    font-size:clamp(10px,.78vw,14px)!important;
+    letter-spacing:.04em!important;
+  }
+  .template-jumuah .prayer-times b{
+    margin-top:.55vh!important;
+    color:#162f29!important;
+    font-family:Georgia,"Times New Roman",serif!important;
+    font-size:clamp(22px,1.85vw,34px)!important;
+    font-weight:500!important;
+    white-space:nowrap!important;
+  }
+
+  .template-jumuah>.tv-verse{
+    height:5vh!important;
+    margin:0 1.8vw .45vh!important;
+    padding:.65vh 1vw!important;
+    justify-content:center!important;
+    border:1px solid #caa24f!important;
+    border-radius:10px!important;
+    background:#fff8e9!important;
+    color:#173b31!important;
+    font-size:clamp(10px,.83vw,16px)!important;
+  }
+  .template-jumuah>.tv-verse strong{color:#0b6042!important}
+
+  .template-jumuah>.tv-footer{
+    height:12vh!important;
+    min-height:12vh!important;
+    margin:0!important;
+    padding:1.4vh 2vw!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    background:#08623e!important;
+    color:#fff!important;
+    border:0!important;
+    opacity:1!important;
+    font-size:clamp(11px,.9vw,17px)!important;
+  }
+}
+
+/* TV mode must never show the regular website floating menu/chrome. */
+html.masjid-tv-route-active body>.floating-menu,
+html.masjid-tv-route-active .floating-menu,
+html.masjid-tv-route-active .menu-fab,
+html.masjid-tv-route-active .site-header,
+html.masjid-tv-route-active .mobile-menu,
+html.masjid-tv-route-active .header-actions{
+  display:none!important;
+}
