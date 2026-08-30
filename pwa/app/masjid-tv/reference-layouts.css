@@ -1,0 +1,163 @@
+/* Reference-matched Masjid TV layouts. Loaded after base TV styles. */
+
+/* Shared 16:9 polish */
+@media (min-aspect-ratio: 4/3) {
+  .template{padding:1.35vh 1.35vw .75vh;gap:.8vh}
+  .template header{min-height:10.5vh}
+  .tv-clock{font-size:clamp(58px,7.4vw,132px)}
+  .tv-brand strong{font-size:clamp(24px,2.3vw,46px)}
+  .tv-brand small{font-size:clamp(10px,.78vw,15px)}
+  .tv-next{min-height:14vh;border-radius:18px;padding:1.2vh 1.5vw}
+  .tv-next.compact{min-height:11.5vh}
+  .next-name b{font-size:clamp(34px,3.7vw,68px)}
+  .next-name strong{font-size:clamp(22px,2vw,38px)}
+  .next-time>b{font-size:clamp(34px,3.65vw,68px);white-space:nowrap}
+  .tv-prayer-card{border-radius:16px;padding:1.05vh .65vw}
+  .prayer-times b{white-space:nowrap}
+  .tv-announcements,.tv-jumuah,.tv-donation,.tv-prayer-table{border-radius:18px}
+}
+
+/* 1 — GRAND: green/gold formal board, mirroring the first approved reference. */
+.layout-grand{background:#06452f!important}
+.layout-grand .webtv-overlay{background:radial-gradient(circle at 50% 0,rgba(28,116,79,.38),transparent 42%),linear-gradient(180deg,rgba(0,0,0,.03),rgba(0,0,0,.13))}
+.template-grand{gap:.8vh}
+.template-grand header{grid-template-columns:1.05fr 1.5fr 1.05fr;border-bottom:1px solid rgba(231,189,89,.65);padding-bottom:.75vh}
+.template-grand .tv-brand img{width:10vh;height:10vh;border-radius:0}
+.template-grand .tv-brand strong{font-family:Georgia,serif;letter-spacing:.03em;color:#fff}
+.template-grand .tv-brand small{color:#e7bd59;text-transform:uppercase;letter-spacing:.12em}
+.template-grand .tv-clock{font-family:Georgia,serif;font-weight:500;letter-spacing:-.035em}
+.template-grand .tv-dates{font-size:clamp(11px,1vw,19px)}
+.template-grand .header-verse{font-family:Georgia,serif;line-height:1.45;color:#f5ead0;max-width:24vw;font-size:clamp(11px,.95vw,18px)}
+.template-grand .tv-next{display:grid;grid-template-columns:1.1fr .95fr .95fr;min-height:11vh;background:rgba(5,85,56,.8);border:1px solid #c99c4b;padding:1vh 2vw}
+.template-grand .tv-next .eyebrow{grid-column:1;grid-row:1;color:#e7bd59}
+.template-grand .tv-next .next-name{grid-column:1;grid-row:2;display:flex;align-items:baseline;gap:1vw}
+.template-grand .tv-next .next-name b{font-size:clamp(28px,2.8vw,50px)}
+.template-grand .tv-next .next-name strong{font-size:clamp(22px,2vw,38px)}
+.template-grand .tv-next .next-time{grid-column:2/4;grid-row:1/3;display:grid;grid-template-columns:1fr 1fr;align-items:center;text-align:left;border-left:1px solid rgba(231,189,89,.6);padding-left:2vw}
+.template-grand .tv-next .next-time>span{grid-column:1;color:#e7bd59}
+.template-grand .tv-next .next-time>b{grid-column:1;grid-row:2;font-family:Georgia,serif;color:#e7bd59}
+.template-grand .tv-next .next-time>em{grid-column:1;grid-row:3}
+.template-grand .tv-next .next-time>small{grid-column:2;grid-row:1/4;align-self:center;font-size:clamp(14px,1.3vw,24px);color:#fff}
+.template-grand .grand-body{grid-template-columns:.9fr 1.42fr;gap:.9vw}
+.template-grand .tv-prayer-table{padding:.9vh 1.1vw;background:rgba(1,64,44,.72);border:1px solid #b88d43}
+.template-grand .table-head{font-size:clamp(12px,.9vw,17px);padding:.8vh .5vw}
+.template-grand .table-row{padding:1.15vh .55vw}
+.template-grand .table-row>strong{font-family:Georgia,serif;font-size:clamp(17px,1.55vw,29px)}
+.template-grand .table-row>b{font-size:clamp(18px,1.5vw,29px)}
+.template-grand .grand-community{grid-template-columns:1fr .42fr;gap:.8vw}
+.template-grand .tv-announcements{background:rgba(2,70,48,.72);border:1px solid #b88d43;padding:1.15vh 1.1vw}
+.template-grand .tv-announcements h2{font-family:Georgia,serif;font-weight:500}
+.template-grand .tv-announcements article{padding:1.05vh .3vw}
+.template-grand .tv-donation{background:rgba(2,70,48,.72);border:1px solid #b88d43;display:flex;flex-direction:column;justify-content:center;padding:1vh .7vw}
+.template-grand .donation-mark{width:9vh;height:9vh;background:#fff;border:6px solid #eee;font-size:5vh}
+.template-grand .tv-footer{border-top:1px solid rgba(231,189,89,.45);padding-top:.55vh;justify-content:center}
+
+/* 2 — JUMU'AH: cream/green Friday board, matching the second reference. */
+.layout-jumuah{background:#efe7d5!important}
+.layout-jumuah .webtv-overlay{background:none}
+.template-jumuah{color:#123b2f;background:linear-gradient(180deg,#087047 0 19%,#f3eddf 19% 88%,#07613d 88% 100%);padding:0 1vw}
+.template-jumuah header{color:#fff;min-height:18vh;padding:1.1vh 2vw;grid-template-columns:1.15fr 1fr 1.15fr}
+.template-jumuah .tv-brand strong{font-family:Georgia,serif;font-size:clamp(28px,2.5vw,50px);color:#fff}
+.template-jumuah .tv-brand small{color:#f0c45f;text-transform:uppercase}
+.template-jumuah .tv-clock{font-family:Georgia,serif;font-weight:500}
+.template-jumuah .community-date{font-size:clamp(14px,1.2vw,23px);font-weight:700}
+.template-jumuah .community-date small{font-size:clamp(12px,1vw,19px);color:#f0c45f}
+.template-jumuah .jumuah-main{grid-template-columns:1fr .9fr 1.1fr;gap:1vw;min-height:45vh;padding:1vh 0}
+.template-jumuah .tv-next.light,.template-jumuah .tv-jumuah.light,.template-jumuah .tv-announcements.light{height:100%;border:1px solid #c9a354;border-radius:14px;box-shadow:none}
+.template-jumuah .tv-next.light{background:#075b3d;color:#fff;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:2vh 1.3vw}
+.template-jumuah .tv-next .eyebrow{background:#0d6a47;border:1px solid #d6b25e;border-radius:999px;padding:.5vh 1.5vw;margin:0 auto 1.2vh}
+.template-jumuah .tv-next .next-name b{font-family:Georgia,serif;font-size:clamp(48px,5vw,92px)}
+.template-jumuah .tv-next .next-name strong{font-family:Georgia,serif;color:#f0c45f}
+.template-jumuah .tv-next .next-time{text-align:center;margin-top:1vh}
+.template-jumuah .tv-next .next-time>b{font-family:Georgia,serif;color:#fff}
+.template-jumuah .tv-jumuah.light{background:#fffaf0;display:flex;flex-direction:column;justify-content:center;padding:2vh 1.3vw}
+.template-jumuah .tv-jumuah h2{text-align:center;background:#087047;color:#fff;border-radius:999px;padding:.6vh 1vw;font-family:Georgia,serif;letter-spacing:.08em}
+.template-jumuah .tv-jumuah .jumuah-mark{font-size:8vh;text-align:center;color:#0b6a47}
+.template-jumuah .jumuah-times>div{border-top:1px solid #dfcfac;padding:1.25vh .4vw}
+.template-jumuah .jumuah-times b{color:#8f5f17;font-family:Georgia,serif;font-size:clamp(24px,2vw,38px)}
+.template-jumuah .tv-announcements.light{background:#fffaf0;padding:1.6vh 1.2vw}
+.template-jumuah .tv-announcements h2{text-align:center;background:#087047;color:#fff;border-radius:999px;padding:.55vh 1vw;font-family:Georgia,serif;letter-spacing:.08em}
+.template-jumuah .tv-announcements article{border-top:1px solid #dfcfac;padding:1.1vh .2vw}
+.template-jumuah .tv-announcements article strong{font-size:clamp(14px,1.15vw,22px)}
+.template-jumuah .tv-prayer-strip{gap:.7vw;padding:.7vh 0 1vh}
+.template-jumuah .tv-prayer-card.light{background:#fffaf0;border:1px solid #c9a354;color:#133d32;border-radius:12px;padding:0}
+.template-jumuah .prayer-head{background:#077047;color:#fff;border-radius:11px 11px 0 0;padding:.85vh .5vw;font-family:Georgia,serif;font-size:clamp(14px,1.2vw,22px)}
+.template-jumuah .prayer-head b{color:#f1c967}
+.template-jumuah .prayer-times{padding:.75vh .45vw 1vh}
+.template-jumuah .prayer-times small{color:#0b6042}
+.template-jumuah .prayer-times b{font-family:Georgia,serif;font-size:clamp(18px,1.45vw,28px)}
+.template-jumuah>.tv-verse{margin:.3vh 0 .5vh;background:#fff8e9;border-color:#c9a354}
+.template-jumuah>.tv-footer{margin:0 -1vw;padding:.8vh 2vw;background:#07613d;color:#fff;opacity:1}
+
+/* 3 — CINEMATIC: Kaaba/photo background glass design, matching the third reference. */
+.layout-cinematic{background:#10171b!important}
+.layout-cinematic .webtv-overlay{background:linear-gradient(90deg,rgba(7,14,18,.88) 0 30%,rgba(7,14,18,.24) 47% 62%,rgba(7,14,18,.86) 78% 100%)}
+.template-cinematic{padding:2vh 2vw 1vh;gap:1vh}
+.template-cinematic header{grid-template-columns:1fr 1.05fr 1fr;min-height:14vh}
+.template-cinematic .tv-brand strong{font-family:Georgia,serif;color:#f2f2f2;font-size:clamp(28px,2.6vw,52px)}
+.template-cinematic .tv-brand small{color:#d6a34e;text-transform:uppercase;letter-spacing:.1em}
+.template-cinematic .tv-clock{font-family:Georgia,serif;font-weight:500;font-size:clamp(68px,8vw,146px)}
+.template-cinematic .cinematic-date{font-family:Georgia,serif;font-size:clamp(16px,1.3vw,25px)}
+.template-cinematic .cinematic-date small{font-size:clamp(14px,1.15vw,22px);color:#d9a343}
+.template-cinematic .cinematic-main{grid-template-columns:.95fr .95fr;gap:1.4vw;min-height:53vh}
+.template-cinematic .tv-next{height:100%;background:rgba(5,15,20,.73);border:1px solid #9f7433;border-radius:24px;display:flex;flex-direction:column;justify-content:center;text-align:center}
+.template-cinematic .tv-next .eyebrow{background:#d3a046;color:#12171a;border-radius:999px;padding:.55vh 1.7vw;font-family:Georgia,serif;letter-spacing:.08em}
+.template-cinematic .tv-next .next-name b{font-family:Georgia,serif;font-size:clamp(64px,7vw,130px)}
+.template-cinematic .tv-next .next-name strong{font-family:Georgia,serif;font-size:clamp(34px,3vw,56px);color:#d6a34e;letter-spacing:.08em}
+.template-cinematic .tv-next .next-time{text-align:center;margin-top:1.5vh}
+.template-cinematic .tv-next .next-time>b{font-family:Georgia,serif;font-size:clamp(48px,5vw,92px)}
+.template-cinematic .cinematic-side{grid-template-rows:1.05fr .78fr;gap:1vh}
+.template-cinematic .tv-announcements,.template-cinematic .tv-jumuah{background:rgba(5,15,20,.76);border:1px solid #9f7433;border-radius:18px;padding:1.2vh 1.25vw}
+.template-cinematic .tv-announcements h2,.template-cinematic .tv-jumuah h2{font-family:Georgia,serif;color:#d6a34e;letter-spacing:.06em}
+.template-cinematic .tv-announcements article{padding:1.05vh .2vw}
+.template-cinematic .tv-prayer-strip{gap:.45vw}
+.template-cinematic .tv-prayer-card{background:rgba(5,15,20,.8);border:1px solid #8c672f;border-radius:0;padding:.85vh .6vw}
+.template-cinematic .prayer-head{font-family:Georgia,serif;font-size:clamp(15px,1.25vw,23px)}
+.template-cinematic .prayer-times b{font-family:Georgia,serif;font-size:clamp(17px,1.35vw,26px)}
+.template-cinematic .cinematic-status{border-top:1px solid rgba(214,163,78,.45);padding-top:.55vh}
+
+/* 4 — COMMUNITY: teal/gold smart dashboard, matching the fourth reference. */
+.layout-community{background:linear-gradient(120deg,#053f43,#006168)!important}
+.layout-community .webtv-overlay{background:radial-gradient(circle at 50% 0,rgba(0,130,130,.25),transparent 48%)}
+.template-community.light-theme{background:transparent;color:#fff;padding:1.2vh 1.4vw .7vh}
+.template-community.light-theme:before{display:none}
+.template-community header{color:#fff;grid-template-columns:1fr 1fr 1fr;min-height:16vh;border-bottom:1px solid rgba(230,184,76,.38)}
+.template-community .tv-brand strong{color:#fff;font-size:clamp(28px,2.5vw,50px)}
+.template-community .tv-brand small{color:#e7bd59;text-transform:uppercase;letter-spacing:.08em}
+.template-community .tv-clock{font-size:clamp(64px,7.5vw,138px)}
+.template-community .community-date{font-size:clamp(15px,1.25vw,24px);font-weight:700}
+.template-community .community-date small{font-size:clamp(14px,1.1vw,21px);color:#e7bd59}
+.template-community .community-main{grid-template-columns:1.25fr .62fr .95fr;gap:.85vw;min-height:48vh;padding:.8vh 0}
+.template-community .tv-next.light{height:100%;background:linear-gradient(135deg,rgba(2,89,86,.95),rgba(1,71,77,.94));color:#fff;border:1px solid #d6aa4e;border-radius:18px;display:grid;grid-template-columns:1fr 1fr;padding:1.7vh 1.6vw;text-align:left}
+.template-community .tv-next .eyebrow{grid-column:1/-1;align-self:start}
+.template-community .tv-next .next-name{align-self:center}
+.template-community .tv-next .next-name b{font-size:clamp(58px,6vw,112px)}
+.template-community .tv-next .next-name strong{color:#e7bd59;font-size:clamp(34px,3vw,56px)}
+.template-community .tv-next .next-time{align-self:center;text-align:center;border-left:1px solid rgba(231,189,89,.45);padding-left:1vw}
+.template-community .tv-next .next-time>b{font-size:clamp(48px,5vw,94px)}
+.template-community .tv-jumuah.light{background:rgba(3,67,72,.95);color:#fff;border:1px solid #d6aa4e;display:flex;flex-direction:column;justify-content:center}
+.template-community .tv-jumuah h2{font-size:clamp(20px,1.8vw,34px);color:#e7bd59}
+.template-community .tv-jumuah .jumuah-mark{font-size:7vh}
+.template-community .tv-announcements.light{background:rgba(3,67,72,.96);color:#fff;border:1px solid #d6aa4e;padding:1.2vh .95vw}
+.template-community .tv-announcements h2{font-size:clamp(20px,1.8vw,34px);color:#fff;text-align:center}
+.template-community .tv-announcements article{background:#f1f3ed;color:#133b3b;border:0;border-radius:12px;padding:1vh .7vw;margin:.65vh 0}
+.template-community .tv-announcements article strong{font-size:clamp(14px,1.15vw,22px)}
+.template-community .tv-prayer-strip{gap:.45vw;min-height:18vh}
+.template-community .tv-prayer-card.light{background:rgba(3,67,72,.96);color:#fff;border:1px solid #d6aa4e;border-radius:14px;padding:1vh .6vw}
+.template-community .tv-prayer-card.active{box-shadow:inset 0 0 0 2px #e7bd59}
+.template-community .prayer-head{font-size:clamp(14px,1.2vw,22px)}
+.template-community .prayer-times small{color:#64d6cb}
+.template-community .prayer-times b{font-size:clamp(18px,1.45vw,28px)}
+.template-community .community-footer{margin:.3vh 0 0;padding:.75vh 1vw;background:rgba(3,67,72,.95);border:1px solid #d6aa4e;border-radius:14px;grid-template-columns:1fr auto auto;color:#fff}
+.template-community .community-footer .tv-verse{background:transparent;border:0;padding:0}
+
+/* Local logo upload UI */
+.masjid-logo-upload-box{grid-column:1/-1;margin-top:-4px;padding:10px 12px;border:1px solid #d4ddd8;background:#f0f6f2;border-radius:12px}
+.masjid-logo-upload-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.masjid-logo-upload-button,.masjid-logo-remove-button{margin:0!important;border:1px solid #b9ccc2;border-radius:999px;padding:9px 13px;background:#fff;color:#174438;font-size:11px!important;font-weight:800;cursor:pointer}
+.masjid-logo-upload-button{display:inline-flex!important;align-items:center}
+.masjid-logo-remove-button{color:#8b3434}
+.masjid-logo-upload-preview{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #d2ddd7}
+.masjid-logo-upload-preview img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:10px;border:1px solid #d2ddd7}
+.masjid-logo-upload-preview span{font-size:11px;font-weight:800;color:#365d52}
+.masjid-logo-upload-box>small{display:block;margin-top:8px;color:#71827c;font-size:10px}
