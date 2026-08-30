@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { PIXEL_REPLICA_BG } from "./PixelReplicaBackground";
 
 const esc = (value: string) =>
   value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
@@ -21,9 +22,13 @@ export default function PixelReplicaEnhancer() {
       if (!root) {
         root = document.createElement("section");
         root.className = "pixel-replica-one";
-        root.style.backgroundImage = 'url("/masjid-tv/reference-replica.webp")';
         shell.appendChild(root);
       }
+      // Use the verified reference artwork directly; do not depend on a public file path.
+      root.style.backgroundImage = `url(${JSON.stringify(PIXEL_REPLICA_BG)})`;
+      root.style.backgroundSize = "100% 100%";
+      root.style.backgroundPosition = "center";
+      root.style.backgroundRepeat = "no-repeat";
 
       const brand = source.querySelector(".tv-brand");
       const logo = brand?.querySelector("img")?.getAttribute("src") || "";
