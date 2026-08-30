@@ -24,8 +24,8 @@ export default function PixelReplicaEnhancer() {
         shell.appendChild(root);
       }
 
-      // Real binary artwork committed under pwa/public. No base64 reconstruction.
-      root.style.backgroundImage = 'url("/masjid-tv/grand-reference.webp")';
+      // Verified cache-busted artwork built directly from the supplied reference image.
+      root.style.backgroundImage = 'url("/masjid-tv/grand-reference-fixed-v4.webp")';
       root.style.backgroundSize = "100% 100%";
       root.style.backgroundPosition = "center";
       root.style.backgroundRepeat = "no-repeat";
