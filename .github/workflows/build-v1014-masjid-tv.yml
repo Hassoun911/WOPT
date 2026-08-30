@@ -15,6 +15,8 @@ on:
       - 'mobile/scripts/apply-masjid-remote.mjs'
       - 'mobile/scripts/apply-masjid-typefix.mjs'
       - 'mobile/scripts/apply-masjid-tv-fixes.mjs'
+      - 'mobile/scripts/apply-masjid-clock-click-branding.mjs'
+      - 'mobile/scripts/apply-masjid-logo.mjs'
       - 'mobile/modules/prayer-audio/**'
       - 'mobile/app.config.ts'
       - '.github/logo-official/hassoun-official-256.jpg.b64'
@@ -57,12 +59,14 @@ jobs:
           npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video --npm
       - name: Apply shared wall shell
         run: node scripts/apply-wall-shell-for-masjid.mjs
-      - name: Apply Masjid TV routing remote and fixes
+      - name: Apply all Masjid TV routing remote and latest fixes
         run: |
           node scripts/apply-masjid-tv.mjs
           node scripts/apply-masjid-remote.mjs
           node scripts/apply-masjid-typefix.mjs
           node scripts/apply-masjid-tv-fixes.mjs
+          node scripts/apply-masjid-clock-click-branding.mjs
+          node scripts/apply-masjid-logo.mjs
       - name: Validate TypeScript and Masjid features
         run: |
           npm run typecheck
@@ -70,10 +74,16 @@ jobs:
           grep -q 'MasjidTvDisplay' App.tsx
           grep -q 'orientationMode' src/MasjidTvDisplay.tsx
           grep -q 'mosqueLocationLabel' src/MasjidTvDisplay.tsx
+          grep -q 'Mosque location not set' src/MasjidTvDisplay.tsx
           grep -q 'backgroundVideoUrl' src/MasjidTvDisplay.tsx
           grep -q 'MasjidVideoBackground' src/MasjidTvDisplay.tsx
           grep -q 'landscapeLayout' src/MasjidTvDisplay.tsx
           grep -q 'portraitLayout' src/MasjidTvDisplay.tsx
+          grep -q 'Your Masjid Name' src/MasjidTvDisplay.tsx
+          grep -q '© Hassoun' src/MasjidTvDisplay.tsx
+          grep -q 'mosqueLogoUri' src/MasjidTvDisplay.tsx
+          grep -q 'Upload Masjid Logo' src/MasjidTvDisplay.tsx
+          grep -q 'accessibilityLabel="Open masjid setup"' src/MasjidTvDisplay.tsx
           grep -q 'Jumu.ah sessions' src/MasjidTvDisplay.tsx
           grep -q 'Announcements & activities' src/MasjidTvDisplay.tsx
           grep -q 'Choose CSV / JSON Schedule File' src/MasjidTvDisplay.tsx
@@ -133,8 +143,6 @@ jobs:
           if main is None:
               raise SystemExit('MainActivity not found')
 
-          # Phones remain portrait through Expo. TV removes the portrait manifest lock;
-          # the Masjid screen can then use Auto / Landscape / Portrait via expo-screen-orientation.
           main.set(f'{{{android}}}screenOrientation', 'unspecified')
 
           if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
@@ -156,14 +164,14 @@ jobs:
         run: |
           APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           test -n "$APK"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk.sha256
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-final.apk
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-final.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-final.apk.sha256
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.14-masjid-tv-fixed
+          name: Hassoun-v1.0.14-masjid-tv-final
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-fixed.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-final.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.14-masjid-tv-final.apk.sha256
           if-no-files-found: error
           retention-days: 30
