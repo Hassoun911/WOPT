@@ -66,3 +66,5 @@ replaceOnce(
 
 fs.writeFileSync(path, source);
 console.log("Applied Masjid TV full-screen orientation, saved location, and Kaaba video background fixes");
+
+await import("./apply-masjid-clock-click-branding.mjs");
