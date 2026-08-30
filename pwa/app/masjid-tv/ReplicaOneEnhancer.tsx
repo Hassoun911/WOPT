@@ -53,12 +53,11 @@ export default function ReplicaOneEnhancer() {
 
       const prayerIcons = ["☼", "☀", "☀", "◒", "☾"];
       const announcementIcons = ["▣", "◉", "▦", "♡"];
-
-      replica.innerHTML = `
+      const html = `
         <div class="replica-one-pattern"></div>
         <header class="replica-one-header">
           <div class="replica-one-brand">
-            ${logo ? `<img src="${logo}" alt="Masjid logo" />` : `<div class="replica-one-logo-mark">◢</div>`}
+            ${logo ? `<img src="${logo}" alt="Masjid logo" />` : ""}
             <div><h1>${mosqueName}</h1>${location ? `<p>${location}</p>` : ""}</div>
           </div>
           <div class="replica-one-time-wrap">
@@ -67,7 +66,6 @@ export default function ReplicaOneEnhancer() {
           </div>
           <div class="replica-one-verse">${verse || "And establish prayer and give zakah and bow with those who bow."}</div>
         </header>
-
         <section class="replica-one-nextbar">
           <div class="replica-next-icon">◷</div>
           <div class="replica-next-label"><small>NEXT PRAYER</small><strong>${nextPrayer || "—"}</strong></div>
@@ -76,45 +74,41 @@ export default function ReplicaOneEnhancer() {
           <div class="replica-iqama-icon">♙</div>
           <div class="replica-next-label"><small>IQAMA</small><strong>${iqamaNext || "—"}</strong></div>
         </section>
-
         <section class="replica-one-main">
           <div class="replica-prayer-table">
             <div class="replica-table-head"><span>SALAH</span><span>AZAN</span><span>IQAMA</span></div>
             ${prayerRows.map((row, index) => `<div class="replica-table-row"><span class="replica-prayer-name"><b>${prayerIcons[index] || "◉"}</b>${row.name}</span><strong>${row.adhan}</strong><strong class="replica-iqama-value">${row.iqama || "—"}</strong></div>`).join("")}
           </div>
-
           <div class="replica-announcements">
             <div class="replica-section-title"><span>◉</span> ANNOUNCEMENTS</div>
             ${announcements.map((item, index) => `<article><span class="replica-ann-icon">${announcementIcons[index] || "◉"}</span><div><strong>${item.title}</strong><p>${item.body}</p></div></article>`).join("") || `<article><span class="replica-ann-icon">▣</span><div><strong>Announcements</strong><p>Add announcements from Masjid Display Studio.</p></div></article>`}
           </div>
-
           <aside class="replica-donation">
             <h3>${donationTitle}</h3>
             <p>${donationBody}</p>
-            <div class="replica-qr" aria-label="Donation QR placeholder"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="replica-qr" aria-label="Donation QR placeholder">${Array.from({length:16}).map(() => "<i></i>").join("")}</div>
             <div class="replica-or">OR</div>
             <div class="replica-website"><span>◎</span><div>Visit our website<strong>${website || "Add website in setup"}</strong></div></div>
           </aside>
         </section>
-
         <footer class="replica-one-footer">
           <div><span>◉</span><strong>Prayer • Community • Connection</strong></div>
           <div>Powered by Hassoun</div>
-        </footer>
-      `;
+        </footer>`;
 
-      replica.querySelector(".replica-one-clock")?.addEventListener("click", () => {
-        (source.querySelector(".tv-clock") as HTMLButtonElement | null)?.click();
-      });
+      if (replica.dataset.renderedHtml !== html) {
+        replica.innerHTML = html;
+        replica.dataset.renderedHtml = html;
+        replica.querySelector(".replica-one-clock")?.addEventListener("click", () => {
+          (source.querySelector(".tv-clock") as HTMLButtonElement | null)?.click();
+        });
+      }
     };
 
     render();
     timer = window.setInterval(render, 1000);
-    const observer = new MutationObserver(render);
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
     return () => {
       window.clearInterval(timer);
-      observer.disconnect();
       document.querySelector(".reference-replica-one")?.remove();
     };
   }, []);
