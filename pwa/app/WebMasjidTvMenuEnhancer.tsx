@@ -19,9 +19,9 @@ export default function WebMasjidTvMenuEnhancer() {
       const anchor = document.createElement("a");
       anchor.href = href;
       anchor.dataset.hassounMasjidTvLink = "1";
-      anchor.className = "hassoun-masjid-tv-menu-link";
       anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
-      anchor.innerHTML = '<span aria-hidden="true" style="font-size:20px">▣</span><span><strong>Masjid TV / Big Screen</strong><small>Full-screen smart mosque display</small></span><span aria-hidden="true" style="margin-left:auto">›</span>';
+      anchor.innerHTML = '<span aria-hidden="true" style="font-size:20px">▣</span><span><strong style="display:block;font-size:13px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:2px;color:#71827c;font-size:10px">Full-screen smart mosque display</small></span><span aria-hidden="true" style="margin-left:auto">›</span>';
+      Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "13px 14px", border: "1px solid #d6dfda", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none" });
       container.appendChild(anchor);
     };
 
@@ -32,15 +32,14 @@ export default function WebMasjidTvMenuEnhancer() {
         if (text.includes("setting") || text.includes("qur") || text.includes("install") || text.includes("alert") || text.includes("menu")) addLink(el);
       });
 
-      // Desktop header fallback so TV mode is always reachable even if no slide menu is open.
       const header = document.querySelector(".header-actions");
       if (header && !header.querySelector('[data-hassoun-masjid-tv-link="1"]')) {
         const a = document.createElement("a");
         a.href = href;
         a.dataset.hassounMasjidTvLink = "1";
-        a.className = "hassoun-tv-header-button";
         a.textContent = "TV";
         a.title = "Masjid TV / Big Screen Mode";
+        Object.assign(a.style, { height: "42px", minWidth: "48px", padding: "0 13px", display: "grid", placeItems: "center", borderRadius: "999px", background: "#0b5b47", color: "#fff", fontWeight: "900", fontSize: "12px", textDecoration: "none" });
         header.prepend(a);
       }
     };
