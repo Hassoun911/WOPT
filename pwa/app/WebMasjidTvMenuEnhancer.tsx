@@ -5,8 +5,34 @@ import { usePathname } from "next/navigation";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path: string) => `${BASE_PATH}${path}`;
-const TV_MODE_KEY = "hassoun-web-masjid-tv-mode-v3";
-const OLD_KEYS = ["hassoun-web-masjid-tv-mode", "hassoun-web-masjid-tv-mode-v2"];
+const TV_MODE_KEY = "hassoun-web-masjid-tv-mode-v4";
+const WEB_SESSION_KEY = "hassoun-web-force-website-session";
+const OLD_KEYS = [
+  "hassoun-web-masjid-tv-mode",
+  "hassoun-web-masjid-tv-mode-v2",
+  "hassoun-web-masjid-tv-mode-v3",
+];
+
+const detectSmartTv = () => {
+  const ua = `${navigator.userAgent || ""} ${(navigator as Navigator & { vendor?: string }).vendor || ""}`.toLowerCase();
+  const explicitTvUa = /smart[- ]?tv|smarttv|hbbtv|netcast|web0s|webos|tizen|vidaa|hisense|viera|aquos|bravia|googletv|google tv|android tv|aftb|aftm|aftt|crkey|roku|tv safari/.test(ua);
+  if (explicitTvUa) return true;
+
+  // Many TV browsers report a generic Linux/Chrome UA. Detect those using
+  // remote-style input, but never classify obvious desktop OS browsers this way.
+  const desktopOs = /windows nt|macintosh|mac os x|x11;/.test(ua);
+  if (desktopOs) return false;
+
+  const largeDisplay = window.innerWidth >= 1000 && window.innerHeight >= 560;
+  const noHover = window.matchMedia?.("(hover: none)").matches ?? false;
+  const anyHover = window.matchMedia?.("(any-hover: hover)").matches ?? false;
+  const anyFinePointer = window.matchMedia?.("(any-pointer: fine)").matches ?? false;
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const anyCoarsePointer = window.matchMedia?.("(any-pointer: coarse)").matches ?? false;
+  const remoteStyle = noHover && !anyHover && !anyFinePointer && (coarsePointer || anyCoarsePointer || true);
+
+  return largeDisplay && remoteStyle;
+};
 
 export default function WebMasjidTvMenuEnhancer() {
   const pathname = usePathname();
@@ -15,40 +41,70 @@ export default function WebMasjidTvMenuEnhancer() {
     const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
     const displayHref = appPath("/masjid-tv/?mode=tv");
     const activationHref = appPath("/masjid-tv/?mode=tv&activate=1");
+    const websiteHref = appPath("/?mode=web");
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
 
-    // Always retire the previous experimental detector flags. They caused
-    // desktops to be mistaken for TVs and must never influence v3 behavior.
     try { OLD_KEYS.forEach(key => window.localStorage.removeItem(key)); } catch {}
 
-    // Visiting the display route by itself does NOT mark a device as a TV.
-    // Only the explicit activation URL/button does. This prevents a computer
-    // that was previously redirected here from becoming permanently trapped.
+    // Website Mode is an explicit temporary override. It lets an admin test
+    // the normal site on a TV (or after testing Masjid Mode on a computer)
+    // without permanently disabling TV auto-detection for future sessions.
+    if (requestedMode === "web") {
+      try { window.sessionStorage.setItem(WEB_SESSION_KEY, "1"); } catch {}
+    }
+    const forceWebsite = requestedMode === "web" || (() => {
+      try { return window.sessionStorage.getItem(WEB_SESSION_KEY) === "1"; } catch { return false; }
+    })();
+
     if (localPath.startsWith("/masjid-tv")) {
       try {
-        const params = new URLSearchParams(window.location.search);
         if (params.get("activate") === "1") {
           window.localStorage.setItem(TV_MODE_KEY, "enabled");
           params.delete("activate");
           const cleanQuery = params.toString();
-          const cleanUrl = `${appPath("/masjid-tv/")}${cleanQuery ? `?${cleanQuery}` : ""}`;
-          window.history.replaceState({}, "", cleanUrl);
+          window.history.replaceState({}, "", `${appPath("/masjid-tv/")}${cleanQuery ? `?${cleanQuery}` : ""}`);
         }
       } catch {}
-      return;
+
+      // Keep a small explicit escape hatch for testing. TV mode itself remains
+      // full-screen/kiosk-like; this button only switches this browser session
+      // back to the normal website.
+      if (!document.querySelector('[data-hassoun-website-mode="1"]')) {
+        const exit = document.createElement("a");
+        exit.href = websiteHref;
+        exit.dataset.hassounWebsiteMode = "1";
+        exit.textContent = "Website Mode";
+        exit.setAttribute("aria-label", "Open normal Hassoun website mode");
+        Object.assign(exit.style, {
+          position: "fixed", right: "14px", top: "14px", zIndex: "100000",
+          padding: "9px 13px", borderRadius: "999px", background: "rgba(0,0,0,.48)",
+          color: "#fff", textDecoration: "none", fontWeight: "800", fontSize: "12px",
+          backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.28)"
+        });
+        exit.addEventListener("click", () => {
+          try { window.sessionStorage.setItem(WEB_SESSION_KEY, "1"); } catch {}
+        });
+        document.body.appendChild(exit);
+      }
+      return () => document.querySelector('[data-hassoun-website-mode="1"]')?.remove();
     }
 
-    // No UA/screen/pointer guessing. The normal website redirects only if
-    // THIS exact browser was explicitly activated as a Masjid TV before.
-    try {
-      if (window.localStorage.getItem(TV_MODE_KEY) === "enabled") {
+    if (!forceWebsite) {
+      let explicitlyEnabled = false;
+      try { explicitlyEnabled = window.localStorage.getItem(TV_MODE_KEY) === "enabled"; } catch {}
+      if (detectSmartTv() || explicitlyEnabled) {
         window.location.replace(displayHref);
         return;
       }
-    } catch {}
+    }
 
     const activateTvMode = async (event: Event) => {
       event.preventDefault();
-      try { window.localStorage.setItem(TV_MODE_KEY, "enabled"); } catch {}
+      try {
+        window.sessionStorage.removeItem(WEB_SESSION_KEY);
+        window.localStorage.setItem(TV_MODE_KEY, "enabled");
+      } catch {}
       try {
         if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
           await document.documentElement.requestFullscreen();
@@ -68,8 +124,8 @@ export default function WebMasjidTvMenuEnhancer() {
       const anchor = document.createElement("a");
       anchor.href = activationHref;
       anchor.dataset.hassounMasjidTvLink = "1";
-      anchor.setAttribute("aria-label", "Activate Masjid TV / Big Screen Mode on this device");
-      anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">Activate this screen once and it will remember</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
+      anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
+      anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">TVs auto-detect; use this to test manually</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
       Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "15px 16px", border: "1px solid #c8d8d0", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none", boxShadow: "0 8px 24px rgba(11,91,71,.08)" });
       wire(anchor);
       container.appendChild(anchor);
@@ -88,22 +144,19 @@ export default function WebMasjidTvMenuEnhancer() {
         a.href = activationHref;
         a.dataset.hassounMasjidTvLink = "1";
         a.innerHTML = '<span aria-hidden="true">▣</span><span>Masjid TV</span>';
-        a.title = "Activate Masjid TV / Big Screen Mode on this device";
+        a.title = "Masjid TV / Big Screen Mode";
         Object.assign(a.style, { height: "42px", minWidth: "108px", padding: "0 15px", display: "flex", gap: "7px", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "#0b5b47", color: "#fff", fontWeight: "900", fontSize: "12px", textDecoration: "none", whiteSpace: "nowrap" });
         wire(a);
         header.prepend(a);
       }
 
-      // Always expose a reliable activation control on the normal website.
-      // This is intentionally explicit because many TV browsers impersonate
-      // desktop Chrome and cannot be distinguished safely from a real PC.
       if (!document.querySelector('[data-hassoun-tv-corner="1"]')) {
         const corner = document.createElement("a");
         corner.href = activationHref;
         corner.dataset.hassounTvCorner = "1";
-        corner.textContent = "▣  ENTER MASJID TV";
-        corner.setAttribute("aria-label", "Activate Masjid TV / Big Screen Mode on this device");
-        Object.assign(corner.style, { position: "fixed", right: "18px", bottom: "18px", zIndex: "99999", padding: "14px 20px", borderRadius: "999px", background: "#0b5b47", color: "#fff", textDecoration: "none", fontWeight: "900", fontSize: "14px", letterSpacing: ".02em", boxShadow: "0 10px 32px rgba(0,0,0,.28)" });
+        corner.textContent = "▣  MASJID TV";
+        corner.setAttribute("aria-label", "Enter Masjid TV / Big Screen Mode");
+        Object.assign(corner.style, { position: "fixed", right: "18px", bottom: "18px", zIndex: "99999", padding: "12px 18px", borderRadius: "999px", background: "#0b5b47", color: "#fff", textDecoration: "none", fontWeight: "900", fontSize: "13px", boxShadow: "0 10px 32px rgba(0,0,0,.28)" });
         wire(corner);
         document.body.appendChild(corner);
       }
