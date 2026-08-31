@@ -3,6 +3,7 @@ import LogoUploadEnhancer from "./LogoUploadEnhancer";
 import TvModeChromeSuppressor from "./TvModeChromeSuppressor";
 import PixelReplicaEnhancer from "./PixelReplicaEnhancer";
 import StudioPreviewEnhancer from "./StudioPreviewEnhancer";
+import MasjidTvWakeLock from "./MasjidTvWakeLock";
 import "./masjid-tv-polish.css";
 import "./reference-layouts.css";
 import "./jumuah-exact.css";
@@ -10,5 +11,5 @@ import "./pixel-replica.css";
 import "./studio-previews.css";
 
 export default function MasjidTvLayout({ children }: { children: ReactNode }) {
-  return <>{children}<LogoUploadEnhancer /><TvModeChromeSuppressor /><PixelReplicaEnhancer /><StudioPreviewEnhancer /></>;
+  return <>{children}<MasjidTvWakeLock /><LogoUploadEnhancer /><TvModeChromeSuppressor /><PixelReplicaEnhancer /><StudioPreviewEnhancer /></>;
 }
