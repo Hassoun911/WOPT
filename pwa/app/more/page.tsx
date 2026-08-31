@@ -9,6 +9,8 @@ const items = [
   { icon:"🕌", title:"Ask the Sheikh", text:"Ask an Islamic question and review Qur’an and Sunnah references.", href:"/ask-sheikh/" },
   { icon:"🔔", title:"Prayer alerts", text:"Manage prayer reminders and browser notifications.", href:"/?open=alerts" },
   { icon:"⚙️", title:"Settings", text:"Language, appearance, prayer schedule and app preferences.", href:"/?open=settings" },
+  { icon:"🔗", title:"Connect Display", text:"Enter the 6-digit code shown on a Masjid TV, tablet or computer display.", href:"/masjid-tv/pair/" },
+  { icon:"▤", title:"My Displays", text:"Manage paired TVs, tablets, iPads and computer screens.", href:"/masjid-tv/devices/" },
   { icon:"🕋", title:"Qibla", text:"Use location and compass direction to face the Kaaba.", href:"/qibla/" },
   { icon:"🌙", title:"Islamic events", text:"Hijri dates, Ramadan, Eid, Arafah and other important events.", href:"/events/" },
   { icon:"🎮", title:"Islamic games", text:"Practice Islamic knowledge with saved quiz progress.", href:"/games/" },
