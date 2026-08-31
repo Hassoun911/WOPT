@@ -4,39 +4,71 @@ import { useEffect } from "react";
 
 function isLogoSource(value:string){return /^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/i.test(value)||/^https?:\/\//i.test(value)}
 
+function fieldByLabel(label:string){
+  const labels=Array.from(document.querySelectorAll<HTMLLabelElement>("label"));
+  const hit=labels.find(l=>(l.textContent||"").trim().toLowerCase().startsWith(label.toLowerCase()));
+  return hit?.querySelector<HTMLInputElement>("input,textarea")||null;
+}
+
+function findIdentityButton(mosqueName:string,location:string){
+  const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+  return buttons.find(b=>{
+    const text=(b.textContent||"").trim();
+    if(!text)return false;
+    if(mosqueName&&text.includes(mosqueName))return true;
+    if(location&&text.includes(location))return true;
+    return text.includes("Your Masjid Name")||text.includes("Mosque location not set");
+  })||null;
+}
+
+function findClockButton(){
+  const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+  return buttons.find(b=>/\b\d{1,2}:\d{2}:\d{2}\s*(AM|PM)\b/i.test(b.textContent||""))||null;
+}
+
 export default function PreviewLogoSync(){
   useEffect(()=>{
     const sync=()=>{
-      const heading=Array.from(document.querySelectorAll("h3")).find(h=>(h.textContent||"").includes("Mosque & display identity"));
-      const panel=heading?.parentElement;
-      const input=panel?Array.from(panel.querySelectorAll("input")).find(i=>((i.previousSibling?.textContent||"")+(i.parentElement?.textContent||"")).includes("Logo URL")) as HTMLInputElement|undefined:undefined;
-      const logoUrl=input?.value?.trim()||"";
-      if(!isLogoSource(logoUrl))return;
+      const logoInput=fieldByLabel("Logo URL");
+      const mosqueInput=fieldByLabel("Mosque name");
+      const locationInput=fieldByLabel("Mosque location");
+      const mosqueName=mosqueInput?.value?.trim()||"";
+      const location=locationInput?.value?.trim()||"";
+      const logoUrl=logoInput?.value?.trim()||"";
 
-      const editorTitle=Array.from(document.querySelectorAll("h2,h3")).find(el=>(el.textContent||"").includes("Live display editor"));
-      const editor=editorTitle?.closest("section,article,div");
-      if(!editor)return;
-
-      const previewButtons=Array.from(editor.querySelectorAll("button"));
-      const identity=previewButtons.find(b=>{
-        const text=(b.textContent||"").trim();
-        return text.includes("Al Hijra")||text.includes("Your Masjid Name")||text.includes("Mosque location")||text.includes("Windsor, ON");
-      });
-      if(!identity)return;
-
-      let img=identity.querySelector<HTMLImageElement>("img[data-uploaded-masjid-logo='1']");
-      if(!img){
-        img=document.createElement("img");
-        img.dataset.uploadedMasjidLogo="1";
-        img.alt="Masjid logo";
-        img.style.cssText="display:block;width:42px;height:42px;max-width:42px;max-height:42px;object-fit:contain;margin:0 0 6px 0;border-radius:6px";
-        identity.insertBefore(img,identity.firstChild);
+      const identity=findIdentityButton(mosqueName,location);
+      if(identity){
+        let img=identity.querySelector<HTMLImageElement>("img[data-live-masjid-logo='1']");
+        if(isLogoSource(logoUrl)){
+          if(!img){
+            img=document.createElement("img");
+            img.dataset.liveMasjidLogo="1";
+            img.alt="Masjid logo";
+            img.style.cssText="display:block;width:46px;height:46px;max-width:46px;max-height:46px;object-fit:contain;margin:0 0 6px 0;border-radius:7px;background:transparent";
+            identity.insertBefore(img,identity.firstChild);
+          }
+          if(img.getAttribute("src")!==logoUrl)img.setAttribute("src",logoUrl);
+          Array.from(identity.children).forEach(child=>{
+            if(child!==img&&child instanceof HTMLElement&&(child.textContent||"").trim()==="☪")child.style.display="none";
+          });
+        }else{
+          img?.remove();
+          Array.from(identity.children).forEach(child=>{
+            if(child instanceof HTMLElement&&(child.textContent||"").trim()==="☪")child.style.display="";
+          });
+        }
       }
-      if(img.src!==logoUrl)img.src=logoUrl;
 
-      Array.from(identity.children).forEach(child=>{
-        if(child!==img && child instanceof HTMLElement && (child.textContent||"").trim()==="☪")child.style.display="none";
-      });
+      const clock=findClockButton();
+      if(clock){
+        const now=new Date();
+        const time=now.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"});
+        const date=now.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric",year:"numeric"});
+        const strong=clock.querySelector("strong");
+        const small=clock.querySelector("small");
+        if(strong)strong.textContent=time;
+        if(small)small.textContent=date;
+      }
     };
 
     sync();
