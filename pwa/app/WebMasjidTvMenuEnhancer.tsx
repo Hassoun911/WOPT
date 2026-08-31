@@ -133,16 +133,32 @@ export default function WebMasjidTvMenuEnhancer() {
       row.insertAdjacentElement("afterend", connect);
     };
 
+    const settingsCard = (href: string, title: string, subtitle: string, icon: string, attr: string) => {
+      const a = document.createElement("a");
+      a.href = href;
+      a.setAttribute(attr, "1");
+      a.innerHTML = `<span aria-hidden="true" style="font-size:22px;width:34px;text-align:center">${icon}</span><span><strong style="display:block;font-size:14px">${title}</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">${subtitle}</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>`;
+      Object.assign(a.style, { display:"flex",alignItems:"center",gap:"12px",margin:"10px 0 0",padding:"15px 16px",border:"1px solid #c8d8d0",borderRadius:"15px",background:"#edf5f1",color:"#17362e",textDecoration:"none",boxShadow:"0 8px 24px rgba(11,91,71,.06)" });
+      return a;
+    };
+
     const addLink = (container: Element) => {
-      if (container.querySelector('[data-hassoun-masjid-tv-link="1"]')) return;
-      const anchor = document.createElement("a");
-      anchor.href = activationHref;
-      anchor.dataset.hassounMasjidTvLink = "1";
-      anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
-      anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">TVs auto-detect; use this to test manually</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
-      Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "15px 16px", border: "1px solid #c8d8d0", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none", boxShadow: "0 8px 24px rgba(11,91,71,.08)" });
-      wire(anchor);
-      container.appendChild(anchor);
+      if (!container.querySelector('[data-hassoun-masjid-tv-link="1"]')) {
+        const anchor = document.createElement("a");
+        anchor.href = activationHref;
+        anchor.dataset.hassounMasjidTvLink = "1";
+        anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
+        anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">TVs auto-detect; use this to test manually</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
+        Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "15px 16px", border: "1px solid #c8d8d0", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none", boxShadow: "0 8px 24px rgba(11,91,71,.08)" });
+        wire(anchor);
+        container.appendChild(anchor);
+      }
+      if (!container.querySelector('[data-hassoun-settings-connect-display="1"]')) {
+        container.appendChild(settingsCard(pairHref, "Connect Display", "Enter the 6-digit code shown on your TV or display", "🔗", "data-hassoun-settings-connect-display"));
+      }
+      if (!container.querySelector('[data-hassoun-settings-my-displays="1"]')) {
+        container.appendChild(settingsCard(devicesHref, "My Displays", "Manage paired TVs, tablets, iPads and computer screens", "▤", "data-hassoun-settings-my-displays"));
+      }
     };
 
     const enhance = () => {
@@ -150,7 +166,7 @@ export default function WebMasjidTvMenuEnhancer() {
       const candidates = Array.from(document.querySelectorAll(".sheet-panel, aside, [role=dialog], [class*=drawer], [class*=sidebar], [class*=menu-panel], [class*=slide-menu]"));
       candidates.forEach((el) => {
         const value = (el.textContent || "").toLowerCase();
-        if (value.includes("setting") || value.includes("qur") || value.includes("install") || value.includes("alert") || value.includes("menu")) addLink(el);
+        if (value.includes("app settings") || value.includes("setting") || value.includes("qur") || value.includes("install") || value.includes("alert") || value.includes("menu")) addLink(el);
       });
 
       const header = document.querySelector(".header-actions");
