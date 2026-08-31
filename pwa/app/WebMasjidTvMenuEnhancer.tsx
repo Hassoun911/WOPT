@@ -39,7 +39,6 @@ export default function WebMasjidTvMenuEnhancer() {
     const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
     const displayHref = appPath("/masjid-tv/?mode=tv");
     const activationHref = appPath("/masjid-tv/?mode=tv&activate=1");
-    const websiteHref = appPath("/?mode=web");
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
 
@@ -61,25 +60,9 @@ export default function WebMasjidTvMenuEnhancer() {
           window.history.replaceState({}, "", `${appPath("/masjid-tv/")}${cleanQuery ? `?${cleanQuery}` : ""}`);
         }
       } catch {}
-
-      if (!document.querySelector('[data-hassoun-website-mode="1"]')) {
-        const exit = document.createElement("a");
-        exit.href = websiteHref;
-        exit.dataset.hassounWebsiteMode = "1";
-        exit.textContent = "Website Mode";
-        exit.setAttribute("aria-label", "Open normal Hassoun website mode");
-        Object.assign(exit.style, {
-          position: "fixed", right: "14px", top: "14px", zIndex: "100000",
-          padding: "9px 13px", borderRadius: "999px", background: "rgba(0,0,0,.48)",
-          color: "#fff", textDecoration: "none", fontWeight: "800", fontSize: "12px",
-          backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.28)"
-        });
-        exit.addEventListener("click", () => {
-          try { window.sessionStorage.setItem(WEB_SESSION_KEY, "1"); } catch {}
-        });
-        document.body.appendChild(exit);
-      }
-      return () => document.querySelector('[data-hassoun-website-mode="1"]')?.remove();
+      document.querySelector('[data-hassoun-website-mode="1"]')?.remove();
+      document.querySelector('[data-hassoun-tv-corner="1"]')?.remove();
+      return;
     }
 
     if (!forceWebsite) {
@@ -123,35 +106,19 @@ export default function WebMasjidTvMenuEnhancer() {
       container.appendChild(anchor);
     };
 
+    const removeNonMenuEntries = () => {
+      document.querySelector('[data-hassoun-tv-corner="1"]')?.remove();
+      const header = document.querySelector(".header-actions");
+      header?.querySelectorAll('[data-hassoun-masjid-tv-link="1"]').forEach(el => el.remove());
+    };
+
     const enhance = () => {
+      removeNonMenuEntries();
       const candidates = Array.from(document.querySelectorAll(".sheet-panel, aside, [role=dialog], [class*=drawer], [class*=sidebar], [class*=menu-panel], [class*=slide-menu]"));
       candidates.forEach((el) => {
         const value = (el.textContent || "").toLowerCase();
         if (value.includes("setting") || value.includes("qur") || value.includes("install") || value.includes("alert") || value.includes("menu")) addLink(el);
       });
-
-      const header = document.querySelector(".header-actions");
-      if (header && !header.querySelector('[data-hassoun-masjid-tv-link="1"]')) {
-        const a = document.createElement("a");
-        a.href = activationHref;
-        a.dataset.hassounMasjidTvLink = "1";
-        a.innerHTML = '<span aria-hidden="true">▣</span><span>Masjid TV</span>';
-        a.title = "Masjid TV / Big Screen Mode";
-        Object.assign(a.style, { height: "42px", minWidth: "108px", padding: "0 15px", display: "flex", gap: "7px", alignItems: "center", justifyContent: "center", borderRadius: "999px", background: "#0b5b47", color: "#fff", fontWeight: "900", fontSize: "12px", textDecoration: "none", whiteSpace: "nowrap" });
-        wire(a);
-        header.prepend(a);
-      }
-
-      if (!document.querySelector('[data-hassoun-tv-corner="1"]')) {
-        const corner = document.createElement("a");
-        corner.href = activationHref;
-        corner.dataset.hassounTvCorner = "1";
-        corner.textContent = "▣  MASJID TV";
-        corner.setAttribute("aria-label", "Enter Masjid TV / Big Screen Mode");
-        Object.assign(corner.style, { position: "fixed", right: "18px", bottom: "18px", zIndex: "99999", padding: "12px 18px", borderRadius: "999px", background: "#0b5b47", color: "#fff", textDecoration: "none", fontWeight: "900", fontSize: "13px", boxShadow: "0 10px 32px rgba(0,0,0,.28)" });
-        wire(corner);
-        document.body.appendChild(corner);
-      }
     };
 
     enhance();
@@ -159,7 +126,7 @@ export default function WebMasjidTvMenuEnhancer() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
-      document.querySelector('[data-hassoun-tv-corner="1"]')?.remove();
+      removeNonMenuEntries();
     };
   }, [pathname]);
 
