@@ -22,7 +22,9 @@ export default function PixelReplicaEnhancer() {
       if (!root) {
         root = document.createElement("section");
         root.className = "pixel-replica-one";
-        root.setAttribute("data-grand-version", "20260830-hardfill1");
+        root.setAttribute("data-grand-version", "20260830-html1");
+        root.style.background = "#012f29";
+        root.style.overflow = "hidden";
         shell.appendChild(root);
         root.addEventListener("click", (e) => {
           const target = e.target as Element;
@@ -35,9 +37,9 @@ export default function PixelReplicaEnhancer() {
       const sourceLogo = source.querySelector<HTMLImageElement>(".tv-brand img")?.src || "";
       const clock = text(source.querySelector(".tv-clock"));
       const dates = [...source.querySelectorAll(".tv-dates span")].map(text);
-      const verse = text(source.querySelector(".header-verse")) || "And establish prayer and give zakah and bow with those who bow.";
-      const nextEn = text(source.querySelector(".next-name strong"));
-      const nextTime = text(source.querySelector(".next-time b"));
+      const verse = text(source.querySelector(".header-verse")) || "Indeed, in the remembrance of Allah do hearts find rest.";
+      const nextEn = text(source.querySelector(".next-name strong")) || "Fajr";
+      const nextTime = text(source.querySelector(".next-time b")) || "—";
       const nextIqama = text(source.querySelector(".next-time small")).replace(/^Iqama\s*/i, "") || "—";
       const rows = [...source.querySelectorAll(".tv-prayer-table .table-row")].slice(0,5).map(r => ({
         name: text(r.querySelector("strong")).replace(/[☾☀◉◒☽]/g, "").trim(),
@@ -49,66 +51,77 @@ export default function PixelReplicaEnhancer() {
       const website = !websiteRaw || /Add donation|website link in setup/i.test(websiteRaw) ? "Add link in Studio" : websiteRaw;
 
       const dataKey = JSON.stringify({mosque, location, sourceLogo, dates, verse, nextEn, nextTime, nextIqama, rows, anns, website});
-      if (dataKey === lastDataKey && root.querySelector("#grand-live-clock")) {
-        const clockNode = root.querySelector<SVGTextElement>("#grand-live-clock");
+      if (dataKey === lastDataKey) {
+        const clockNode = root.querySelector<HTMLElement>("#grand-live-clock");
         if (clockNode && clockNode.textContent !== clock) clockNode.textContent = clock;
         return;
       }
       lastDataKey = dataKey;
 
-      const rowSvg = rows.map((r,i) => {
-        const y = 402 + i*57;
+      const rowHtml = rows.map((r,i) => {
         const icon = ["☀","☀","☀","◒","☾"][i];
-        return `<line x1="78" y1="${y+30}" x2="630" y2="${y+30}" stroke="#917a45" stroke-width="1" opacity="0.38"/><text x="92" y="${y}" fill="#d9b36b" font-family="Arial" font-size="27">${icon}</text><text x="142" y="${y}" fill="#f7f4eb" font-family="Arial" font-size="24" font-weight="600">${esc(r.name)}</text><text x="356" y="${y}" fill="#f7f4eb" font-family="Arial" font-size="22" font-weight="600">${esc(r.adhan)}</text><text x="524" y="${y}" fill="#70c88e" font-family="Arial" font-size="22" font-weight="600">${esc(r.iqama)}</text>`;
+        return `<div style="height:18%;border-top:1px solid rgba(165,138,76,.34);position:relative;color:#f7f4eb;font-family:Arial,Helvetica,sans-serif">
+          <span style="position:absolute;left:3%;top:29%;color:#d9b36b;font-size:1.45vw">${icon}</span>
+          <strong style="position:absolute;left:10%;top:28%;font-size:1.45vw;font-weight:700">${esc(r.name)}</strong>
+          <span style="position:absolute;left:50%;top:29%;font-size:1.35vw;font-weight:600">${esc(r.adhan)}</span>
+          <span style="position:absolute;left:78%;top:29%;font-size:1.35vw;font-weight:700;color:#70c88e">${esc(r.iqama)}</span>
+        </div>`;
       }).join("");
-      const annSvg = anns.map((a,i) => {
-        const y = 420 + i*83;
-        const icon = ["▣","◯","▦","♡"][i];
-        return `<line x1="684" y1="${y+46}" x2="1168" y2="${y+46}" stroke="#917a45" stroke-width="1" opacity="0.38"/><circle cx="708" cy="${y-8}" r="24" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="708" y="${y-1}" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="19">${icon}</text><text x="758" y="${y-13}" fill="#f7f4eb" font-family="Arial" font-size="18" font-weight="600">${esc(a.title || "Announcement")}</text><text x="758" y="${y+14}" fill="#c8d5cf" font-family="Arial" font-size="15">${esc(a.body || "")}</text>`;
-      }).join("");
 
-      const logoMarkup = sourceLogo
-        ? `<image id="grand-live-logo" x="66" y="22" width="138" height="126" preserveAspectRatio="xMidYMid meet" href="${esc(sourceLogo)}"/>`
-        : `<g id="grand-default-logo"><path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/></g>`;
+      const annHtml = anns.map((a,i) => `<div style="position:relative;height:23%;border-top:${i===0?'0':'1px solid rgba(165,138,76,.28)'};font-family:Arial,Helvetica,sans-serif">
+        <div style="position:absolute;left:2%;top:22%;width:3.1vw;height:3.1vw;border:1px solid #a58a4c;border-radius:50%;color:#d9b36b;text-align:center;line-height:3.1vw;font-size:1.1vw">${["▣","◯","▦","♡"][i] || "•"}</div>
+        <strong style="position:absolute;left:12%;top:23%;color:#f7f4eb;font-size:1.15vw">${esc(a.title || "Announcement")}</strong>
+        <span style="position:absolute;left:12%;top:52%;color:#c8d5cf;font-size:.92vw">${esc(a.body || "")}</span>
+      </div>`).join("");
 
-      root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 810" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="grandBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#002b25"/><stop offset="0.55" stop-color="#043f35"/><stop offset="1" stop-color="#012a25"/></linearGradient>
-          <pattern id="grandPat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity="0.18"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity="0.12"/></pattern>
-        </defs>
-        <rect width="1440" height="810" fill="url(#grandBg)"/><rect width="1440" height="810" fill="url(#grandPat)"/>
+      const logoHtml = sourceLogo
+        ? `<img src="${esc(sourceLogo)}" alt="Masjid logo" style="position:absolute;left:2.8%;top:2.7%;width:9.2%;height:15.5%;object-fit:contain">`
+        : `<div style="position:absolute;left:4.1%;top:4%;width:6.2%;height:11.5%;border:3px solid #d7b873;border-bottom:0;border-radius:42px 42px 0 0"></div><div style="position:absolute;left:5.2%;top:8.5%;width:4.1%;height:6.5%;border:3px solid #d7b873"></div>`;
 
-        <g id="grand-header-art">
-          ${logoMarkup}
-          <text x="72" y="176" fill="#f7f4eb" font-family="Georgia, Times New Roman, serif" font-size="33" font-weight="700">${esc(mosque)}</text>
-          <text x="74" y="201" fill="#d9b36b" font-family="Arial" font-size="13" letter-spacing="3.5">${esc(location.toUpperCase())}</text>
-          <text id="grand-live-clock" x="715" y="104" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="80" font-weight="500" letter-spacing="-2">${esc(clock)}</text>
-          <text x="715" y="146" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="17">${esc((dates[0] || "") + (dates[1] ? "   |   " + dates[1] : ""))}</text>
-          <text x="1362" y="63" text-anchor="end" fill="#d9b36b" font-family="Georgia, Times New Roman, serif" font-size="25">وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ</text>
-          <text x="1362" y="99" text-anchor="end" fill="#f7f4eb" font-family="Arial" font-size="15">${esc(verse.slice(0,52))}</text>
-          <text x="1362" y="123" text-anchor="end" fill="#f7f4eb" font-family="Arial" font-size="15">${esc(verse.length > 52 ? verse.slice(52,104) : "")}</text>
-        </g>
+      root.innerHTML = `<div style="position:absolute;inset:0;background:#012f29;color:#f7f4eb;font-family:Arial,Helvetica,sans-serif;overflow:hidden">
+        <div style="position:absolute;inset:0;opacity:.18;background-image:linear-gradient(45deg,rgba(11,101,83,.35) 25%,transparent 25%),linear-gradient(-45deg,rgba(11,101,83,.35) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(11,101,83,.35) 75%),linear-gradient(-45deg,transparent 75%,rgba(11,101,83,.35) 75%);background-size:54px 54px;background-position:0 0,0 27px,27px -27px,-27px 0"></div>
+        ${logoHtml}
+        <div style="position:absolute;left:4.7%;top:18.2%;font-family:Georgia,'Times New Roman',serif;font-size:2.2vw;font-weight:700;white-space:nowrap">${esc(mosque)}</div>
+        <div style="position:absolute;left:4.8%;top:22.1%;color:#d9b36b;font-size:.84vw;letter-spacing:.24em;text-transform:uppercase;white-space:nowrap">${esc(location)}</div>
 
-        <rect x="60" y="212" width="1320" height="88" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
-        <circle cx="294" cy="256" r="28" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="294" y="266" text-anchor="middle" fill="#d9b36b" font-size="27">◷</text>
-        <text x="350" y="243" fill="#d9b36b" font-family="Arial" font-size="16">NEXT PRAYER</text><text x="350" y="276" fill="#f7f4eb" font-family="Arial" font-size="29" font-weight="700">${esc(nextEn)}</text>
-        <text x="720" y="269" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="48" font-weight="500">${esc(nextTime)}</text>
-        <line x1="880" y1="229" x2="880" y2="283" stroke="#a58a4c"/><circle cx="1010" cy="256" r="28" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="1010" y="266" text-anchor="middle" fill="#d9b36b" font-size="23">♙</text><text x="1062" y="243" fill="#d9b36b" font-family="Arial" font-size="15">IQAMA</text><text x="1062" y="276" fill="#f7f4eb" font-family="Arial" font-size="28">${esc(nextIqama)}</text>
+        <div id="grand-live-clock" style="position:absolute;left:31%;top:4%;width:38%;text-align:center;font-size:5.35vw;line-height:1;font-weight:500;letter-spacing:-.04em;white-space:nowrap">${esc(clock)}</div>
+        <div style="position:absolute;left:31%;top:16.9%;width:38%;text-align:center;font-size:1.1vw;white-space:nowrap">${esc((dates[0] || "") + (dates[1] ? " | " + dates[1] : ""))}</div>
 
-        <rect x="60" y="316" width="590" height="400" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
-        <text x="90" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">SALAH</text><text x="350" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">AZAN</text><text x="518" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">IQAMA</text>${rowSvg}
+        <div style="position:absolute;right:4.3%;top:5%;width:27%;text-align:right;color:#d9b36b;font-family:Georgia,'Times New Roman',serif;font-size:1.55vw">وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ</div>
+        <div style="position:absolute;right:4.3%;top:10.7%;width:29%;text-align:right;color:#f7f4eb;font-size:.98vw;line-height:1.4">${esc(verse)}</div>
 
-        <rect x="665" y="316" width="715" height="400" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
-        <text x="712" y="355" fill="#d9b36b" font-family="Arial" font-size="20" font-weight="700">ANNOUNCEMENTS</text>${annSvg}
-        <line x1="1192" y1="336" x2="1192" y2="695" stroke="#a58a4c"/>
-        <text x="1285" y="374" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="15" font-weight="700">SUPPORT YOUR MASJID</text>
-        <text x="1285" y="405" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">Every contribution makes</text><text x="1285" y="424" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">a lasting impact.</text>
-        <rect x="1238" y="460" width="94" height="94" rx="8" fill="#f8f5eb"/>
-        <g fill="#111"><rect x="1249" y="471" width="22" height="22"/><rect x="1299" y="471" width="22" height="22"/><rect x="1249" y="521" width="22" height="22"/><rect x="1279" y="499" width="11" height="11"/><rect x="1295" y="513" width="11" height="11"/><rect x="1276" y="530" width="14" height="13"/></g>
-        <text x="1285" y="594" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="16">OR</text><text x="1285" y="624" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">Visit our website</text><text x="1285" y="650" text-anchor="middle" fill="#6ec793" font-family="Arial" font-size="13" font-weight="700">${esc(website.slice(0,24))}</text>
+        <div style="position:absolute;left:4%;top:26%;width:92%;height:11.5%;background:#033a31;border:1px solid #a58a4c;border-radius:18px">
+          <div style="position:absolute;left:17%;top:27%;width:3.5vw;height:3.5vw;border:1px solid #a58a4c;border-radius:50%;color:#d9b36b;text-align:center;line-height:3.5vw;font-size:1.6vw">◷</div>
+          <div style="position:absolute;left:23%;top:20%;color:#d9b36b;font-size:1vw">NEXT PRAYER</div>
+          <div style="position:absolute;left:23%;top:51%;font-size:1.8vw;font-weight:700">${esc(nextEn)}</div>
+          <div style="position:absolute;left:44%;top:22%;width:22%;text-align:center;color:#d9b36b;font-size:3.1vw;font-weight:500">${esc(nextTime)}</div>
+          <div style="position:absolute;left:66%;top:18%;width:1px;height:64%;background:#a58a4c"></div>
+          <div style="position:absolute;left:73%;top:27%;width:3.5vw;height:3.5vw;border:1px solid #a58a4c;border-radius:50%;color:#d9b36b;text-align:center;line-height:3.5vw;font-size:1.4vw">♙</div>
+          <div style="position:absolute;left:79%;top:20%;color:#d9b36b;font-size:1vw">IQAMA</div>
+          <div style="position:absolute;left:79%;top:51%;font-size:1.8vw">${esc(nextIqama)}</div>
+        </div>
 
-        <rect y="735" width="1440" height="75" fill="#073b32"/><rect y="735" width="1440" height="75" fill="url(#grandPat)"/><text x="720" y="781" text-anchor="middle" fill="#bccbc3" font-family="Arial" font-size="16">Powered by Hassoun</text>
-      </svg><button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio"></button>`;
+        <div style="position:absolute;left:4%;top:39.5%;width:41%;height:49%;background:#033a31;border:1px solid #a58a4c;border-radius:18px;overflow:hidden">
+          <div style="height:10%;position:relative;color:#d9b36b;font-size:1.1vw;font-weight:700">
+            <span style="position:absolute;left:5%;top:34%">SALAH</span><span style="position:absolute;left:50%;top:34%">AZAN</span><span style="position:absolute;left:78%;top:34%">IQAMA</span>
+          </div>${rowHtml}
+        </div>
+
+        <div style="position:absolute;left:46.2%;top:39.5%;width:49.8%;height:49%;background:#033a31;border:1px solid #a58a4c;border-radius:18px;overflow:hidden">
+          <div style="position:absolute;left:4%;top:4%;color:#d9b36b;font-size:1.25vw;font-weight:700">ANNOUNCEMENTS</div>
+          <div style="position:absolute;left:3%;top:13%;width:67%;height:78%">${annHtml}</div>
+          <div style="position:absolute;left:72%;top:5%;width:1px;height:88%;background:#a58a4c"></div>
+          <div style="position:absolute;left:75%;top:11%;width:22%;text-align:center;color:#d9b36b;font-size:1vw;font-weight:700">SUPPORT YOUR MASJID</div>
+          <div style="position:absolute;left:75%;top:22%;width:22%;text-align:center;color:#f7f4eb;font-size:.82vw;line-height:1.35">Every contribution makes<br>a lasting impact.</div>
+          <div style="position:absolute;left:80%;top:42%;width:6.4vw;height:6.4vw;background:#f8f5eb;border-radius:8px;color:#111;text-align:center;line-height:6.4vw;font-size:3.5vw">▦</div>
+          <div style="position:absolute;left:75%;top:73%;width:22%;text-align:center;color:#d9b36b;font-size:1vw">OR</div>
+          <div style="position:absolute;left:75%;top:80%;width:22%;text-align:center;color:#f7f4eb;font-size:.82vw">Visit our website</div>
+          <div style="position:absolute;left:75%;top:87%;width:22%;text-align:center;color:#70c88e;font-size:.82vw;font-weight:700">${esc(website.slice(0,24))}</div>
+        </div>
+
+        <div style="position:absolute;left:0;bottom:0;width:100%;height:7%;background:#073b32;border-top:1px solid rgba(165,138,76,.45);text-align:center;color:#bccbc3;font-size:1vw;line-height:5.5vh">Powered by Hassoun</div>
+        <button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio" style="position:absolute;left:31%;top:2%;width:38%;height:22%;border:0;background:transparent;cursor:pointer"></button>
+      </div>`;
     };
 
     sync();
