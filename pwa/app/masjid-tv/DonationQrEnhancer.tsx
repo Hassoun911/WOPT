@@ -99,9 +99,28 @@ function syncReplicaOne(){
   });
 }
 
+function syncPixelReplica(){
+  const target=settingsTarget();
+  if(!target)return;
+  document.querySelectorAll<HTMLElement>(".pixel-replica-one").forEach(root=>{
+    const placeholders=Array.from(root.querySelectorAll<HTMLElement>("div")).filter(x=>(x.textContent||"").trim()==="▦");
+    placeholders.forEach(host=>{
+      host.style.lineHeight="normal";
+      host.style.display="flex";
+      host.style.alignItems="center";
+      host.style.justifyContent="center";
+      host.style.padding=".35vw";
+      host.style.boxSizing="border-box";
+      putQr(host,target,false);
+      const img=host.querySelector<HTMLImageElement>("img[data-hassoun-donation-qr='1']");
+      if(img)img.style.cssText="display:block;width:100%;height:100%;object-fit:contain;background:#fff;padding:.25vw;border-radius:.45vw;box-sizing:border-box;margin:0";
+    });
+  });
+}
+
 export default function DonationQrEnhancer(){
   useEffect(()=>{
-    const sync=()=>{syncSourceTv();syncReplicaPreview();syncReplicaOne()};
+    const sync=()=>{syncSourceTv();syncReplicaPreview();syncReplicaOne();syncPixelReplica()};
     sync();
     const timer=window.setInterval(sync,500);
     const observer=new MutationObserver(sync);
