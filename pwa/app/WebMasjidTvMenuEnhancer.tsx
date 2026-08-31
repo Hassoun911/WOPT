@@ -9,7 +9,20 @@ const TV_MODE_KEY = "hassoun-web-masjid-tv-mode";
 
 const looksLikeSmartTv = () => {
   const ua = `${navigator.userAgent || ""} ${(navigator as Navigator & { vendor?: string }).vendor || ""}`.toLowerCase();
-  return /smart[- ]?tv|smarttv|hbbtv|netcast|web0s|webos|tizen|vidaa|hisense|viera|aquos|bravia|googletv|google tv|android tv|aftb|aftm|aftt|crkey|roku|tv safari/.test(ua);
+  const uaLooksLikeTv = /smart[- ]?tv|smarttv|hbbtv|netcast|web0s|webos|tizen|vidaa|hisense|viera|aquos|bravia|googletv|google tv|android tv|aftb|aftm|aftt|crkey|roku|tv safari/.test(ua);
+
+  // Some built-in TV browsers intentionally report a normal desktop Chrome UA.
+  // A large viewport with no hover capability and a coarse/remote-style pointer
+  // is a much better indicator for those televisions than user-agent sniffing.
+  const largeDisplay = window.innerWidth >= 1100 && window.innerHeight >= 600;
+  const noHover = window.matchMedia?.("(hover: none)").matches ?? false;
+  const anyHover = window.matchMedia?.("(any-hover: hover)").matches ?? false;
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const anyCoarsePointer = window.matchMedia?.("(any-pointer: coarse)").matches ?? false;
+  const noFinePointer = !(window.matchMedia?.("(any-pointer: fine)").matches ?? false);
+  const remoteStyleDisplay = largeDisplay && noHover && !anyHover && (coarsePointer || anyCoarsePointer || noFinePointer);
+
+  return uaLooksLikeTv || remoteStyleDisplay;
 };
 
 export default function WebMasjidTvMenuEnhancer() {
