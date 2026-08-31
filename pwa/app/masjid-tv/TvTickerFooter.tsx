@@ -14,10 +14,17 @@ function readTicker() {
   }
 }
 
+function isTvDisplayPath(){
+  const p=window.location.pathname.replace(/\/+$/,"").toLowerCase();
+  return p==="/masjid-tv";
+}
+
 export default function TvTickerFooter() {
   const [ticker, setTicker] = useState("");
+  const [enabled,setEnabled]=useState(false);
 
   useEffect(() => {
+    setEnabled(isTvDisplayPath());
     const sync = () => setTicker(readTicker());
     sync();
     const timer = window.setInterval(sync, 1000);
@@ -28,6 +35,7 @@ export default function TvTickerFooter() {
     };
   }, []);
 
+  if(!enabled)return null;
   return <>
     <style>{`
       @keyframes hassounMasjidTickerMove{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
