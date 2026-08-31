@@ -22,6 +22,7 @@ export default function PixelReplicaEnhancer() {
       if (!root) {
         root = document.createElement("section");
         root.className = "pixel-replica-one";
+        root.setAttribute("data-grand-version", "20260830-hardfill1");
         shell.appendChild(root);
         root.addEventListener("click", (e) => {
           const target = e.target as Element;
@@ -58,60 +59,55 @@ export default function PixelReplicaEnhancer() {
       const rowSvg = rows.map((r,i) => {
         const y = 402 + i*57;
         const icon = ["☀","☀","☀","◒","☾"][i];
-        return `<line x1="78" y1="${y+30}" x2="630" y2="${y+30}" class="grandLine"/><text x="92" y="${y}" class="gold icon">${icon}</text><text x="142" y="${y}" class="prayer">${esc(r.name)}</text><text x="356" y="${y}" class="time">${esc(r.adhan)}</text><text x="524" y="${y}" class="iq">${esc(r.iqama)}</text>`;
+        return `<line x1="78" y1="${y+30}" x2="630" y2="${y+30}" stroke="#917a45" stroke-width="1" opacity="0.38"/><text x="92" y="${y}" fill="#d9b36b" font-family="Arial" font-size="27">${icon}</text><text x="142" y="${y}" fill="#f7f4eb" font-family="Arial" font-size="24" font-weight="600">${esc(r.name)}</text><text x="356" y="${y}" fill="#f7f4eb" font-family="Arial" font-size="22" font-weight="600">${esc(r.adhan)}</text><text x="524" y="${y}" fill="#70c88e" font-family="Arial" font-size="22" font-weight="600">${esc(r.iqama)}</text>`;
       }).join("");
       const annSvg = anns.map((a,i) => {
         const y = 420 + i*83;
         const icon = ["▣","◯","▦","♡"][i];
-        return `<line x1="684" y1="${y+46}" x2="1168" y2="${y+46}" class="grandLine"/><circle cx="708" cy="${y-8}" r="24" class="grandIconCircle"/><text x="708" y="${y-1}" text-anchor="middle" class="gold annIcon">${icon}</text><text x="758" y="${y-13}" class="annTitle">${esc(a.title || "Announcement")}</text><text x="758" y="${y+14}" class="annBody">${esc(a.body || "")}</text>`;
+        return `<line x1="684" y1="${y+46}" x2="1168" y2="${y+46}" stroke="#917a45" stroke-width="1" opacity="0.38"/><circle cx="708" cy="${y-8}" r="24" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="708" y="${y-1}" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="19">${icon}</text><text x="758" y="${y-13}" fill="#f7f4eb" font-family="Arial" font-size="18" font-weight="600">${esc(a.title || "Announcement")}</text><text x="758" y="${y+14}" fill="#c8d5cf" font-family="Arial" font-size="15">${esc(a.body || "")}</text>`;
       }).join("");
 
       const logoMarkup = sourceLogo
         ? `<image id="grand-live-logo" x="66" y="22" width="138" height="126" preserveAspectRatio="xMidYMid meet" href="${esc(sourceLogo)}"/>`
-        : `<g id="grand-default-logo"><path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" style="fill:#d7b873!important"/></g>`;
+        : `<g id="grand-default-logo"><path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/></g>`;
 
       root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 810" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="grandBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#002b25"/><stop offset=".55" stop-color="#043f35"/><stop offset="1" stop-color="#012a25"/></linearGradient>
-          <pattern id="grandPat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity=".18"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity=".12"/></pattern>
-          <style>
-            .serif{font-family:Georgia,'Times New Roman',serif}.sans{font-family:Arial,Helvetica,sans-serif}.gold{fill:#d9b36b!important}.white{fill:#f7f4eb!important}.muted{fill:#bccbc3!important}.grandLine{stroke:#917a45!important;stroke-width:1;opacity:.38}.grandPanel{fill:#033a31!important;fill-opacity:.96!important;stroke:#a58a4c!important;stroke-width:1.2}.grandIconCircle{fill:#07473c!important;stroke:#a58a4c!important;stroke-width:1}.prayer{fill:#f7f4eb!important;font:600 24px Arial}.time{fill:#f7f4eb!important;font:600 22px Arial}.iq{fill:#70c88e!important;font:600 22px Arial}.icon{font:27px Arial}.annIcon{font:19px Arial}.annTitle{fill:#f7f4eb!important;font:600 18px Arial}.annBody{fill:#c8d5cf!important;font:15px Arial}.grandFooter{fill:#073b32!important;opacity:.98!important}
-          </style>
+          <linearGradient id="grandBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#002b25"/><stop offset="0.55" stop-color="#043f35"/><stop offset="1" stop-color="#012a25"/></linearGradient>
+          <pattern id="grandPat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity="0.18"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity="0.12"/></pattern>
         </defs>
-        <rect width="1440" height="810" style="fill:url(#grandBg)!important"/><rect width="1440" height="810" style="fill:url(#grandPat)!important"/>
+        <rect width="1440" height="810" fill="url(#grandBg)"/><rect width="1440" height="810" fill="url(#grandPat)"/>
 
         <g id="grand-header-art">
           ${logoMarkup}
-          <text x="72" y="176" class="serif white" font-size="33" font-weight="700">${esc(mosque)}</text>
-          <text x="74" y="201" class="sans gold" font-size="13" letter-spacing="3.5">${esc(location.toUpperCase())}</text>
-
-          <text id="grand-live-clock" x="715" y="104" text-anchor="middle" class="sans white" font-size="80" font-weight="500" letter-spacing="-2">${esc(clock)}</text>
-          <text x="715" y="146" text-anchor="middle" class="sans white" font-size="17">${esc((dates[0] || "") + (dates[1] ? "   |   " + dates[1] : ""))}</text>
-
-          <text x="1362" y="63" text-anchor="end" class="serif gold" font-size="25">وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ</text>
-          <text x="1362" y="99" text-anchor="end" class="sans white" font-size="15">${esc(verse.slice(0,52))}</text>
-          <text x="1362" y="123" text-anchor="end" class="sans white" font-size="15">${esc(verse.length > 52 ? verse.slice(52,104) : "")}</text>
+          <text x="72" y="176" fill="#f7f4eb" font-family="Georgia, Times New Roman, serif" font-size="33" font-weight="700">${esc(mosque)}</text>
+          <text x="74" y="201" fill="#d9b36b" font-family="Arial" font-size="13" letter-spacing="3.5">${esc(location.toUpperCase())}</text>
+          <text id="grand-live-clock" x="715" y="104" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="80" font-weight="500" letter-spacing="-2">${esc(clock)}</text>
+          <text x="715" y="146" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="17">${esc((dates[0] || "") + (dates[1] ? "   |   " + dates[1] : ""))}</text>
+          <text x="1362" y="63" text-anchor="end" fill="#d9b36b" font-family="Georgia, Times New Roman, serif" font-size="25">وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ</text>
+          <text x="1362" y="99" text-anchor="end" fill="#f7f4eb" font-family="Arial" font-size="15">${esc(verse.slice(0,52))}</text>
+          <text x="1362" y="123" text-anchor="end" fill="#f7f4eb" font-family="Arial" font-size="15">${esc(verse.length > 52 ? verse.slice(52,104) : "")}</text>
         </g>
 
-        <rect x="60" y="212" width="1320" height="88" rx="18" class="grandPanel"/>
-        <circle cx="294" cy="256" r="28" class="grandIconCircle"/><text x="294" y="266" text-anchor="middle" class="gold" font-size="27">◷</text>
-        <text x="350" y="243" class="sans gold" font-size="16">NEXT PRAYER</text><text x="350" y="276" class="sans white" font-size="29" font-weight="700">${esc(nextEn)}</text>
-        <text x="720" y="269" text-anchor="middle" class="sans gold" font-size="48" font-weight="500">${esc(nextTime)}</text>
-        <line x1="880" y1="229" x2="880" y2="283" stroke="#a58a4c"/><circle cx="1010" cy="256" r="28" class="grandIconCircle"/><text x="1010" y="266" text-anchor="middle" class="gold" font-size="23">♙</text><text x="1062" y="243" class="sans gold" font-size="15">IQAMA</text><text x="1062" y="276" class="sans white" font-size="28">${esc(nextIqama)}</text>
+        <rect x="60" y="212" width="1320" height="88" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
+        <circle cx="294" cy="256" r="28" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="294" y="266" text-anchor="middle" fill="#d9b36b" font-size="27">◷</text>
+        <text x="350" y="243" fill="#d9b36b" font-family="Arial" font-size="16">NEXT PRAYER</text><text x="350" y="276" fill="#f7f4eb" font-family="Arial" font-size="29" font-weight="700">${esc(nextEn)}</text>
+        <text x="720" y="269" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="48" font-weight="500">${esc(nextTime)}</text>
+        <line x1="880" y1="229" x2="880" y2="283" stroke="#a58a4c"/><circle cx="1010" cy="256" r="28" fill="#07473c" stroke="#a58a4c" stroke-width="1"/><text x="1010" y="266" text-anchor="middle" fill="#d9b36b" font-size="23">♙</text><text x="1062" y="243" fill="#d9b36b" font-family="Arial" font-size="15">IQAMA</text><text x="1062" y="276" fill="#f7f4eb" font-family="Arial" font-size="28">${esc(nextIqama)}</text>
 
-        <rect x="60" y="316" width="590" height="400" rx="18" class="grandPanel"/>
-        <text x="90" y="355" class="sans gold" font-size="18" font-weight="700">SALAH</text><text x="350" y="355" class="sans gold" font-size="18" font-weight="700">AZAN</text><text x="518" y="355" class="sans gold" font-size="18" font-weight="700">IQAMA</text>${rowSvg}
+        <rect x="60" y="316" width="590" height="400" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
+        <text x="90" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">SALAH</text><text x="350" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">AZAN</text><text x="518" y="355" fill="#d9b36b" font-family="Arial" font-size="18" font-weight="700">IQAMA</text>${rowSvg}
 
-        <rect x="665" y="316" width="715" height="400" rx="18" class="grandPanel"/>
-        <text x="712" y="355" class="sans gold" font-size="20" font-weight="700">ANNOUNCEMENTS</text>${annSvg}
+        <rect x="665" y="316" width="715" height="400" rx="18" fill="#033a31" stroke="#a58a4c" stroke-width="1.2"/>
+        <text x="712" y="355" fill="#d9b36b" font-family="Arial" font-size="20" font-weight="700">ANNOUNCEMENTS</text>${annSvg}
         <line x1="1192" y1="336" x2="1192" y2="695" stroke="#a58a4c"/>
-        <text x="1285" y="374" text-anchor="middle" class="sans gold" font-size="15" font-weight="700">SUPPORT YOUR MASJID</text>
-        <text x="1285" y="405" text-anchor="middle" class="sans white" font-size="13">Every contribution makes</text><text x="1285" y="424" text-anchor="middle" class="sans white" font-size="13">a lasting impact.</text>
-        <rect x="1238" y="460" width="94" height="94" rx="8" style="fill:#f8f5eb!important"/>
-        <g style="fill:#111!important"><rect x="1249" y="471" width="22" height="22"/><rect x="1299" y="471" width="22" height="22"/><rect x="1249" y="521" width="22" height="22"/><rect x="1279" y="499" width="11" height="11"/><rect x="1295" y="513" width="11" height="11"/><rect x="1276" y="530" width="14" height="13"/></g>
-        <text x="1285" y="594" text-anchor="middle" class="sans gold" font-size="16">OR</text><text x="1285" y="624" text-anchor="middle" class="sans white" font-size="13">Visit our website</text><text x="1285" y="650" text-anchor="middle" class="sans" fill="#6ec793" font-size="13" font-weight="700">${esc(website.slice(0,24))}</text>
+        <text x="1285" y="374" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="15" font-weight="700">SUPPORT YOUR MASJID</text>
+        <text x="1285" y="405" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">Every contribution makes</text><text x="1285" y="424" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">a lasting impact.</text>
+        <rect x="1238" y="460" width="94" height="94" rx="8" fill="#f8f5eb"/>
+        <g fill="#111"><rect x="1249" y="471" width="22" height="22"/><rect x="1299" y="471" width="22" height="22"/><rect x="1249" y="521" width="22" height="22"/><rect x="1279" y="499" width="11" height="11"/><rect x="1295" y="513" width="11" height="11"/><rect x="1276" y="530" width="14" height="13"/></g>
+        <text x="1285" y="594" text-anchor="middle" fill="#d9b36b" font-family="Arial" font-size="16">OR</text><text x="1285" y="624" text-anchor="middle" fill="#f7f4eb" font-family="Arial" font-size="13">Visit our website</text><text x="1285" y="650" text-anchor="middle" fill="#6ec793" font-family="Arial" font-size="13" font-weight="700">${esc(website.slice(0,24))}</text>
 
-        <rect y="735" width="1440" height="75" class="grandFooter"/><rect y="735" width="1440" height="75" style="fill:url(#grandPat)!important"/><text x="720" y="781" text-anchor="middle" class="sans muted" font-size="16">Powered by Hassoun</text>
+        <rect y="735" width="1440" height="75" fill="#073b32"/><rect y="735" width="1440" height="75" fill="url(#grandPat)"/><text x="720" y="781" text-anchor="middle" fill="#bccbc3" font-family="Arial" font-size="16">Powered by Hassoun</text>
       </svg><button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio"></button>`;
     };
 
