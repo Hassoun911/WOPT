@@ -61,6 +61,32 @@
   background:transparent;
 }
 
+/* Live Grand footer branding: show only "Powered by" plus the Hassoun app logo. */
+.pixel-replica-one > div > div[style*="bottom:0"][style*="height:6%"]{
+  color:transparent!important;
+  font-size:0!important;
+  line-height:normal!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:.45vw!important;
+}
+.pixel-replica-one > div > div[style*="bottom:0"][style*="height:6%"]::before{
+  content:"Powered by";
+  color:#bccbc3;
+  font-size:.9vw;
+  line-height:1;
+}
+.pixel-replica-one > div > div[style*="bottom:0"][style*="height:6%"]::after{
+  content:"";
+  width:2.25vw;
+  height:2.25vw;
+  min-width:18px;
+  min-height:18px;
+  background:url('/hassoun-brand.svg?v=20260825-exact-5') center/contain no-repeat;
+  display:block;
+}
+
 /* Portrait / near-portrait TVs use the native responsive Grand template
    rather than squeezing the landscape replica. */
 @media (orientation:portrait), (max-aspect-ratio:4/3){
