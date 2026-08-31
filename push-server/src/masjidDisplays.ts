@@ -11,8 +11,28 @@ function randomToken(bytesCount = 24) { const bytes = new Uint8Array(bytesCount)
 function bearer(request: Request) { const value = request.headers.get("Authorization") || ""; const match = /^Bearer\s+([A-Za-z0-9_-]{20,200})$/i.exec(value); return match?.[1] || ""; }
 async function controllerAllowed(request: Request, env: Env, deviceId: string) { const token = bearer(request); if (!token) return false; const row = await env.DB.prepare("SELECT id FROM masjid_display_controllers WHERE device_id=? AND controller_token=?").bind(deviceId, token).first(); if (!row) return false; await env.DB.prepare("UPDATE masjid_display_controllers SET last_seen_at=CURRENT_TIMESTAMP WHERE device_id=? AND controller_token=?").bind(deviceId, token).run(); return true; }
 
+const FALLBACK_VERSES = [
+  {text:"Indeed, in the remembrance of Allah do hearts find rest.",reference:"Qur’an 13:28",topics:"peace anxiety remembrance heart"},
+  {text:"Indeed, Allah is with the patient.",reference:"Qur’an 2:153",topics:"patience hardship difficulty sabr"},
+  {text:"So surely with hardship comes ease.",reference:"Qur’an 94:5",topics:"hardship hope ease difficulty"},
+  {text:"Whoever relies upon Allah — then He is sufficient for him.",reference:"Qur’an 65:3",topics:"trust tawakkul worry reliance"},
+  {text:"Allah does not burden a soul beyond that it can bear.",reference:"Qur’an 2:286",topics:"hardship strength burden hope"},
+  {text:"And whatever you spend of good — it will be fully repaid to you.",reference:"Qur’an 2:272",topics:"charity giving donation generosity"},
+  {text:"And speak to people good words.",reference:"Qur’an 2:83",topics:"kindness speech community manners"},
+  {text:"Indeed, prayer prohibits immorality and wrongdoing.",reference:"Qur’an 29:45",topics:"prayer salah worship guidance"}
+];
+function fallbackSuggestions(topic:string){const words=topic.toLowerCase().split(/\W+/).filter(Boolean);return [...FALLBACK_VERSES].sort((a,b)=>words.filter(w=>b.topics.includes(w)).length-words.filter(w=>a.topics.includes(w)).length).slice(0,4).map(({text,reference})=>({text,reference}));}
+
 export async function handleMasjidDisplays(request: Request, env: Env, url: URL): Promise<Response | null> {
   if (!url.pathname.startsWith("/masjid-displays/")) return null;
+  if (request.method === "POST" && url.pathname === "/masjid-displays/ai/verse") {
+    const data=await body(request),deviceId=clean(data.deviceId,80),topic=clean(data.topic,240);
+    if(!validDeviceId(deviceId)||!(await controllerAllowed(request,env,deviceId)))return json({error:"Not paired"},401);
+    if(topic.length<3)return json({error:"Describe the kind of Qur’an message you want"},400);
+    const ai=(env as Env & {AI?:{run:(model:string,input:unknown)=>Promise<unknown>}}).AI;
+    if(ai){try{const prompt=`You help a mosque administrator choose short Qur'an verses for a public prayer-time display. The admin wants a verse about: ${topic}. Return ONLY valid JSON as an array of 4 objects, each with keys text and reference. Use concise, faithful English translations and exact Qur'an references such as Qur’an 2:153. Do not invent verses or references. Prefer verses short enough for a TV header.`;const result=await ai.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:"Return only JSON. Accuracy of Qur'an references is essential."},{role:"user",content:prompt}],max_tokens:700,temperature:.25}) as {response?:string};const raw=String(result?.response||"").replace(/^```json\s*|```$/g,"").trim();const parsed=JSON.parse(raw) as unknown;if(Array.isArray(parsed)){const options=parsed.map(x=>x&&typeof x==='object'?x as Record<string,unknown>:{}).map(x=>({text:clean(x.text,240),reference:clean(x.reference,50)})).filter(x=>x.text&&/^Qur[’']?an\s+\d{1,3}:\d{1,3}/i.test(x.reference)).slice(0,4);if(options.length>=2)return json({ok:true,source:"ai",options});}}catch(error){console.error("Masjid verse AI failed",error);}}
+    return json({ok:true,source:"curated",options:fallbackSuggestions(topic)});
+  }
   if (request.method === "POST" && url.pathname === "/masjid-displays/register") {
     const data = await body(request);
     if (!validDeviceId(data.deviceId) || !validCode(data.pairCode) || !validSecret(data.deviceSecret)) return json({ error: "Invalid display registration" }, 400);
@@ -21,52 +41,19 @@ export async function handleMasjidDisplays(request: Request, env: Env, url: URL)
     const name = clean(data.name, 40) || "Masjid Display";
     const settings = data.settings && typeof data.settings === "object" ? JSON.stringify(data.settings) : "{}";
     let revision = 1;
-    if (existing) {
-      const changed = existing.settings_json !== settings;
-      revision = existing.revision + (changed ? 1 : 0);
-      await env.DB.prepare("UPDATE masjid_displays SET pair_code=?,name=?,settings_json=?,revision=?,last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE device_id=?").bind(data.pairCode, name, settings, revision, data.deviceId).run();
-    } else {
-      await env.DB.prepare("INSERT INTO masjid_displays (device_id,pair_code,device_secret,name,settings_json,revision) VALUES (?,?,?,?,?,1)").bind(data.deviceId, data.pairCode, data.deviceSecret, name, settings).run();
-    }
+    if (existing) { const changed = existing.settings_json !== settings; revision = existing.revision + (changed ? 1 : 0); await env.DB.prepare("UPDATE masjid_displays SET pair_code=?,name=?,settings_json=?,revision=?,last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE device_id=?").bind(data.pairCode, name, settings, revision, data.deviceId).run(); }
+    else { await env.DB.prepare("INSERT INTO masjid_displays (device_id,pair_code,device_secret,name,settings_json,revision) VALUES (?,?,?,?,?,1)").bind(data.deviceId, data.pairCode, data.deviceSecret, name, settings).run(); }
     return json({ ok: true, deviceId: data.deviceId, pairCode: data.pairCode, name, revision });
   }
   if (request.method === "POST" && url.pathname === "/masjid-displays/pair") {
-    const data = await body(request);
-    if (!validCode(data.code)) return json({ error: "Enter the 6-digit code shown on the display" }, 400);
-    const display = await env.DB.prepare("SELECT device_id,name,settings_json,revision FROM masjid_displays WHERE pair_code=?").bind(data.code).first<{device_id:string;name:string;settings_json:string;revision:number}>();
-    if (!display) return json({ error: "Pairing code not found" }, 404);
-    const token = randomToken(28); const controllerName = clean(data.controllerName, 50) || "Hassoun Browser";
-    await env.DB.prepare("INSERT INTO masjid_display_controllers (device_id,controller_token,controller_name) VALUES (?,?,?)").bind(display.device_id, token, controllerName).run();
-    let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {}
-    return json({ ok: true, deviceId: display.device_id, name: display.name, token, settings, revision: display.revision });
+    const data = await body(request); if (!validCode(data.code)) return json({ error: "Enter the 6-digit code shown on the display" }, 400);
+    const display = await env.DB.prepare("SELECT device_id,name,settings_json,revision FROM masjid_displays WHERE pair_code=?").bind(data.code).first<{device_id:string;name:string;settings_json:string;revision:number}>(); if (!display) return json({ error: "Pairing code not found" }, 404);
+    const token = randomToken(28); const controllerName = clean(data.controllerName, 50) || "Hassoun Browser"; await env.DB.prepare("INSERT INTO masjid_display_controllers (device_id,controller_token,controller_name) VALUES (?,?,?)").bind(display.device_id, token, controllerName).run(); let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {} return json({ ok: true, deviceId: display.device_id, name: display.name, token, settings, revision: display.revision });
   }
   const deviceMatch = /^\/masjid-displays\/device\/([A-Za-z0-9_-]{12,80})$/.exec(url.pathname);
-  if (deviceMatch && request.method === "GET") {
-    const deviceId = deviceMatch[1], secret = url.searchParams.get("secret") || "";
-    const display = await env.DB.prepare("SELECT device_secret,name,settings_json,revision,pair_code FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{device_secret:string;name:string;settings_json:string;revision:number;pair_code:string}>();
-    if (!display || display.device_secret !== secret) return json({ error: "Display not found" }, 404);
-    await env.DB.prepare("UPDATE masjid_displays SET last_seen_at=CURRENT_TIMESTAMP WHERE device_id=?").bind(deviceId).run();
-    let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {}
-    return json({ ok: true, deviceId, name: display.name, settings, revision: display.revision, pairCode: display.pair_code });
-  }
+  if (deviceMatch && request.method === "GET") { const deviceId = deviceMatch[1], secret = url.searchParams.get("secret") || ""; const display = await env.DB.prepare("SELECT device_secret,name,settings_json,revision,pair_code FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{device_secret:string;name:string;settings_json:string;revision:number;pair_code:string}>(); if (!display || display.device_secret !== secret) return json({ error: "Display not found" }, 404); await env.DB.prepare("UPDATE masjid_displays SET last_seen_at=CURRENT_TIMESTAMP WHERE device_id=?").bind(deviceId).run(); let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {} return json({ ok: true, deviceId, name: display.name, settings, revision: display.revision, pairCode: display.pair_code }); }
   const controlMatch = /^\/masjid-displays\/control\/([A-Za-z0-9_-]{12,80})$/.exec(url.pathname);
-  if (controlMatch && request.method === "GET") {
-    const deviceId = controlMatch[1]; if (!(await controllerAllowed(request, env, deviceId))) return json({ error: "Not paired" }, 401);
-    const display = await env.DB.prepare("SELECT name,settings_json,revision,last_seen_at FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{name:string;settings_json:string;revision:number;last_seen_at:string}>();
-    if (!display) return json({ error: "Display not found" }, 404);
-    let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {}
-    return json({ ok: true, deviceId, name: display.name, settings, revision: display.revision, lastSeenAt: display.last_seen_at });
-  }
-  if (controlMatch && request.method === "POST") {
-    const deviceId = controlMatch[1]; if (!(await controllerAllowed(request, env, deviceId))) return json({ error: "Not paired" }, 401);
-    const data = await body(request); const fields: string[] = []; const values: unknown[] = [];
-    if (data.name !== undefined) { fields.push("name=?"); values.push(clean(data.name, 40) || "Masjid Display"); }
-    if (data.settings && typeof data.settings === "object") { fields.push("settings_json=?"); values.push(JSON.stringify(data.settings)); }
-    if (!fields.length) return json({ error: "Nothing to update" }, 400);
-    fields.push("revision=revision+1", "updated_at=CURRENT_TIMESTAMP");
-    await env.DB.prepare(`UPDATE masjid_displays SET ${fields.join(",")} WHERE device_id=?`).bind(...values, deviceId).run();
-    const updated = await env.DB.prepare("SELECT revision FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{revision:number}>();
-    return json({ ok: true, revision: updated?.revision || 0 });
-  }
+  if (controlMatch && request.method === "GET") { const deviceId = controlMatch[1]; if (!(await controllerAllowed(request, env, deviceId))) return json({ error: "Not paired" }, 401); const display = await env.DB.prepare("SELECT name,settings_json,revision,last_seen_at FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{name:string;settings_json:string;revision:number;last_seen_at:string}>(); if (!display) return json({ error: "Display not found" }, 404); let settings: unknown = {}; try { settings = JSON.parse(display.settings_json || "{}"); } catch {} return json({ ok: true, deviceId, name: display.name, settings, revision: display.revision, lastSeenAt: display.last_seen_at }); }
+  if (controlMatch && request.method === "POST") { const deviceId = controlMatch[1]; if (!(await controllerAllowed(request, env, deviceId))) return json({ error: "Not paired" }, 401); const data = await body(request); const fields: string[] = []; const values: unknown[] = []; if (data.name !== undefined) { fields.push("name=?"); values.push(clean(data.name, 40) || "Masjid Display"); } if (data.settings && typeof data.settings === "object") { fields.push("settings_json=?"); values.push(JSON.stringify(data.settings)); } if (!fields.length) return json({ error: "Nothing to update" }, 400); fields.push("revision=revision+1", "updated_at=CURRENT_TIMESTAMP"); await env.DB.prepare(`UPDATE masjid_displays SET ${fields.join(",")} WHERE device_id=?`).bind(...values, deviceId).run(); const updated = await env.DB.prepare("SELECT revision FROM masjid_displays WHERE device_id=?").bind(deviceId).first<{revision:number}>(); return json({ ok: true, revision: updated?.revision || 0 }); }
   return json({ error: "Not found" }, 404);
 }
