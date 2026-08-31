@@ -14,7 +14,7 @@ function findEditorHost(){
   return h?.parentElement?.parentElement || null;
 }
 function activeCode(){
-  const articles=Array.from(document.querySelectorAll<HTMLElement>>("article"));
+  const articles=Array.from(document.querySelectorAll<HTMLElement>("article"));
   const active=articles.find(a=>{const s=a.getAttribute("style")||"";return /efc66c|239\s*,\s*198\s*,\s*108/i.test(s)});
   return active?.textContent?.match(/\b\d{6}\b/)?.[0]||"";
 }
