@@ -14,7 +14,7 @@ function findEditorHost(){
   return h?.parentElement?.parentElement || null;
 }
 function activeCode(){
-  const articles=Array.from(document.querySelectorAll<HTMLElement>("article"));
+  const articles=Array.from(document.querySelectorAll<HTMLElement>>("article"));
   const active=articles.find(a=>{const s=a.getAttribute("style")||"";return /efc66c|239\s*,\s*198\s*,\s*108/i.test(s)});
   return active?.textContent?.match(/\b\d{6}\b/)?.[0]||"";
 }
@@ -75,6 +75,7 @@ export default function TickerControl(){
   const [speed,setSpeed]=useState(18);
   const [color,setColor]=useState("#f3d47e");
   const [effect,setEffect]=useState<Effect>("none");
+  const [optionsOpen,setOptionsOpen]=useState(false);
   const [status,setStatus]=useState("");
   const [host,setHost]=useState<HTMLElement|null>(null);
   const timer=useRef<number|undefined>(undefined);
@@ -112,11 +113,12 @@ export default function TickerControl(){
       <label style={{fontWeight:800}}>Display<select value={selected} onChange={e=>setSelected(e.target.value)} style={{display:"block",width:"100%",marginTop:6,padding:"10px 11px",borderRadius:10,border:"1px solid #56776e",background:"#082b26",color:"#fff"}}>{items.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
       <label style={{fontWeight:800}}>Sliding announcement ticker<input value={text} onChange={e=>setAll({text:e.target.value})} placeholder="Type any announcement and it will scroll across this display footer…" style={{display:"block",width:"100%",marginTop:6,padding:"11px 12px",borderRadius:10,border:"1px solid #56776e",background:"#082b26",color:"#fff",fontSize:16}} /></label>
     </div>
-    <div style={{display:"grid",gridTemplateColumns:"minmax(240px,1fr) minmax(200px,.7fr) minmax(260px,1fr)",gap:16,marginTop:14,alignItems:"end"}}>
-      <div><div style={{fontWeight:800,marginBottom:7}}>Scroll speed · {speed}s per pass</div><input type="range" min="6" max="40" step="1" value={speed} onChange={e=>setAll({speed:Number(e.target.value)})} style={{width:"100%"}}/><div style={{display:"flex",gap:7,marginTop:7}}><button style={btn(speed===28)} onClick={()=>setAll({speed:28})}>Slow</button><button style={btn(speed===18)} onClick={()=>setAll({speed:18})}>Normal</button><button style={btn(speed===10)} onClick={()=>setAll({speed:10})}>Fast</button></div></div>
+    <button type="button" aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(v=>!v)} style={{marginTop:12,padding:"9px 13px",borderRadius:999,border:"1px solid #826f45",background:"#082b26",color:"#f7f5eb",fontWeight:900,cursor:"pointer"}}>{optionsOpen?"Hide ticker options ▲":"Ticker options ▼"}</button>
+    {optionsOpen?<div style={{display:"grid",gridTemplateColumns:"minmax(240px,1fr) minmax(200px,.7fr) minmax(260px,1fr)",gap:16,marginTop:14,alignItems:"end"}}>
+      <div><div style={{fontWeight:800,marginBottom:7}}>Scroll speed · {speed}s per pass</div><input type="range" min="6" max="40" step="1" value={speed} onChange={e=>setAll({speed:Number(e.target.value)})} style={{width:"100%"}}/><div style={{display:"flex",gap:7,marginTop:7}}><button type="button" style={btn(speed===28)} onClick={()=>setAll({speed:28})}>Slow</button><button type="button" style={btn(speed===18)} onClick={()=>setAll({speed:18})}>Normal</button><button type="button" style={btn(speed===10)} onClick={()=>setAll({speed:10})}>Fast</button></div></div>
       <label style={{fontWeight:800}}>Text color<div style={{display:"flex",gap:8,marginTop:7}}><input type="color" value={color} onChange={e=>setAll({color:e.target.value})} style={{width:52,height:42,border:0,background:"transparent"}}/><input value={color} onChange={e=>{const v=e.target.value;if(/^#[0-9a-f]{6}$/i.test(v))setAll({color:v});else setColor(v)}} style={{width:"100%",padding:"9px 10px",borderRadius:9,border:"1px solid #56776e",background:"#082b26",color:"#fff"}}/></div></label>
-      <div><div style={{fontWeight:800,marginBottom:7}}>Text effect</div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button style={btn(effect==="none")} onClick={()=>setAll({effect:"none"})}>None</button><button style={btn(effect==="pulse")} onClick={()=>setAll({effect:"pulse"})}>Pulse</button><button style={btn(effect==="flash")} onClick={()=>setAll({effect:"flash"})}>Flash</button></div></div>
-    </div>
+      <div><div style={{fontWeight:800,marginBottom:7}}>Text effect</div><div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button type="button" style={btn(effect==="none")} onClick={()=>setAll({effect:"none"})}>None</button><button type="button" style={btn(effect==="pulse")} onClick={()=>setAll({effect:"pulse"})}>Pulse</button><button type="button" style={btn(effect==="flash")} onClick={()=>setAll({effect:"flash"})}>Flash</button></div></div>
+    </div>:null}
     <div style={{marginTop:10,fontSize:12,color:status.startsWith("Live")?"#aee5bf":"#d9b36b"}}>{status||"Changes auto-save and normally appear on the selected display within a few seconds."}</div>
   </section>;
   return createPortal(ui,host);
