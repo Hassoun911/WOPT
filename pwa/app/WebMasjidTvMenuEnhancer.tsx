@@ -7,6 +7,11 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const appPath = (path: string) => `${BASE_PATH}${path}`;
 const TV_MODE_KEY = "hassoun-web-masjid-tv-mode";
 
+const looksLikeSmartTv = () => {
+  const ua = `${navigator.userAgent || ""} ${(navigator as Navigator & { vendor?: string }).vendor || ""}`.toLowerCase();
+  return /smart[- ]?tv|smarttv|hbbtv|netcast|web0s|webos|tizen|vidaa|hisense|viera|aquos|bravia|googletv|google tv|android tv|aftb|aftm|aftt|crkey|roku|tv safari/.test(ua);
+};
+
 export default function WebMasjidTvMenuEnhancer() {
   const pathname = usePathname();
 
@@ -14,20 +19,24 @@ export default function WebMasjidTvMenuEnhancer() {
     const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
     const href = appPath("/masjid-tv/?mode=tv");
 
-    // Once a TV/browser has explicitly enabled Masjid TV mode, remember it.
-    // On future visits to the normal website on that same large display, go
-    // straight back to the Masjid TV experience instead of the desktop dashboard.
-    if (!localPath.startsWith("/masjid-tv")) {
-      try {
-        const remembered = window.localStorage.getItem(TV_MODE_KEY) === "1";
-        const largeDisplay = window.innerWidth >= 1100 && window.innerHeight >= 600;
-        if (remembered && largeDisplay) {
-          window.location.replace(href);
-          return;
-        }
-      } catch {}
-    } else {
-      return;
+    if (localPath.startsWith("/masjid-tv")) return;
+
+    // A real Smart TV should behave like the TV app on the very first visit.
+    // Explicitly enabled desktop/browser displays are remembered as well.
+    try {
+      const remembered = window.localStorage.getItem(TV_MODE_KEY) === "1";
+      const largeDisplay = window.innerWidth >= 1100 && window.innerHeight >= 600;
+      const smartTv = looksLikeSmartTv();
+      if (smartTv || (remembered && largeDisplay)) {
+        if (smartTv) window.localStorage.setItem(TV_MODE_KEY, "1");
+        window.location.replace(href);
+        return;
+      }
+    } catch {
+      if (looksLikeSmartTv()) {
+        window.location.replace(href);
+        return;
+      }
     }
 
     const activateTvMode = async (event: Event) => {
@@ -78,9 +87,6 @@ export default function WebMasjidTvMenuEnhancer() {
         header.prepend(a);
       }
 
-      // Some TV browsers render the desktop header differently. On genuinely
-      // large screens, keep one unmistakable entry point visible even if the
-      // normal header/menu markup is absent.
       if (window.innerWidth >= 1200 && !document.querySelector('[data-hassoun-tv-corner="1"]')) {
         const corner = document.createElement("a");
         corner.href = href;
