@@ -17,8 +17,10 @@ const detectSmartTv = () => {
   const ua = `${navigator.userAgent || ""} ${(navigator as Navigator & { vendor?: string }).vendor || ""}`.toLowerCase();
   const explicitTvUa = /smart[- ]?tv|smarttv|hbbtv|netcast|web0s|webos|tizen|vidaa|hisense|viera|aquos|bravia|googletv|google tv|android tv|aftb|aftm|aftt|crkey|roku|tv safari/.test(ua);
   if (explicitTvUa) return true;
+
   const desktopOs = /windows nt|macintosh|mac os x|x11;/.test(ua);
   if (desktopOs) return false;
+
   const largeDisplay = window.innerWidth >= 1000 && window.innerHeight >= 560;
   const noHover = window.matchMedia?.("(hover: none)").matches ?? false;
   const anyHover = window.matchMedia?.("(any-hover: hover)").matches ?? false;
@@ -26,6 +28,7 @@ const detectSmartTv = () => {
   const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
   const anyCoarsePointer = window.matchMedia?.("(any-pointer: coarse)").matches ?? false;
   const remoteStyle = noHover && !anyHover && !anyFinePointer && (coarsePointer || anyCoarsePointer || true);
+
   return largeDisplay && remoteStyle;
 };
 
@@ -36,8 +39,6 @@ export default function WebMasjidTvMenuEnhancer() {
     const localPath = BASE_PATH && pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) || "/" : pathname;
     const displayHref = appPath("/masjid-tv/?mode=tv");
     const activationHref = appPath("/masjid-tv/?mode=tv&activate=1");
-    const pairHref = appPath("/masjid-tv/pair/");
-    const devicesHref = appPath("/masjid-tv/devices/");
     const websiteHref = appPath("/?mode=web");
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
@@ -110,63 +111,23 @@ export default function WebMasjidTvMenuEnhancer() {
       anchor.addEventListener("click", activateTvMode);
     };
 
-    const menuRow = (href: string, title: string, subtitle: string, icon: string, attr: string) => {
-      const a = document.createElement("a");
-      a.href = href;
-      a.setAttribute(attr, "1");
-      a.innerHTML = `<span aria-hidden="true" style="width:34px;text-align:center;font-size:22px;color:#0b5b47">${icon}</span><span style="min-width:0"><strong style="display:block;font-size:15px;color:#17362e">${title}</strong><small style="display:block;margin-top:2px;color:#7c8c87;font-size:11px">${subtitle}</small></span><span aria-hidden="true" style="margin-left:auto;color:#96a39f;font-size:20px">›</span>`;
-      Object.assign(a.style, { display:"flex",alignItems:"center",gap:"12px",padding:"14px 8px",borderBottom:"1px solid #edf1ef",color:"#17362e",textDecoration:"none",background:"transparent" });
-      return a;
-    };
-
-    const addDisplayEntriesNearSettings = () => {
-      if (document.querySelector('[data-hassoun-connect-display="1"]')) return;
-      const nodes = Array.from(document.querySelectorAll<HTMLElement>("a,button,[role=button],li,div"));
-      const label = nodes.find(el => (el.textContent || "").trim() === "Settings");
-      if (!label) return;
-      const row = (label.closest("a,button,[role=button],li") as HTMLElement | null) || label;
-      const parent = row.parentElement;
-      if (!parent) return;
-      const connect = menuRow(pairHref, "Connect Display", "Enter the 6-digit TV pairing code", "▣", "data-hassoun-connect-display");
-      const manage = menuRow(devicesHref, "My Displays", "Manage paired TVs, tablets and screens", "▤", "data-hassoun-my-displays");
-      row.insertAdjacentElement("afterend", manage);
-      row.insertAdjacentElement("afterend", connect);
-    };
-
-    const settingsCard = (href: string, title: string, subtitle: string, icon: string, attr: string) => {
-      const a = document.createElement("a");
-      a.href = href;
-      a.setAttribute(attr, "1");
-      a.innerHTML = `<span aria-hidden="true" style="font-size:22px;width:34px;text-align:center">${icon}</span><span><strong style="display:block;font-size:14px">${title}</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">${subtitle}</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>`;
-      Object.assign(a.style, { display:"flex",alignItems:"center",gap:"12px",margin:"10px 0 0",padding:"15px 16px",border:"1px solid #c8d8d0",borderRadius:"15px",background:"#edf5f1",color:"#17362e",textDecoration:"none",boxShadow:"0 8px 24px rgba(11,91,71,.06)" });
-      return a;
-    };
-
     const addLink = (container: Element) => {
-      if (!container.querySelector('[data-hassoun-masjid-tv-link="1"]')) {
-        const anchor = document.createElement("a");
-        anchor.href = activationHref;
-        anchor.dataset.hassounMasjidTvLink = "1";
-        anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
-        anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">TVs auto-detect; use this to test manually</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
-        Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "15px 16px", border: "1px solid #c8d8d0", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none", boxShadow: "0 8px 24px rgba(11,91,71,.08)" });
-        wire(anchor);
-        container.appendChild(anchor);
-      }
-      if (!container.querySelector('[data-hassoun-settings-connect-display="1"]')) {
-        container.appendChild(settingsCard(pairHref, "Connect Display", "Enter the 6-digit code shown on your TV or display", "🔗", "data-hassoun-settings-connect-display"));
-      }
-      if (!container.querySelector('[data-hassoun-settings-my-displays="1"]')) {
-        container.appendChild(settingsCard(devicesHref, "My Displays", "Manage paired TVs, tablets, iPads and computer screens", "▤", "data-hassoun-settings-my-displays"));
-      }
+      if (container.querySelector('[data-hassoun-masjid-tv-link="1"]')) return;
+      const anchor = document.createElement("a");
+      anchor.href = activationHref;
+      anchor.dataset.hassounMasjidTvLink = "1";
+      anchor.setAttribute("aria-label", "Open Masjid TV / Big Screen Mode");
+      anchor.innerHTML = '<span aria-hidden="true" style="font-size:22px">▣</span><span><strong style="display:block;font-size:14px">Masjid TV / Big Screen</strong><small style="display:block;margin-top:3px;color:#71827c;font-size:11px">TVs auto-detect; use this to test manually</small></span><span aria-hidden="true" style="margin-left:auto;font-size:20px">›</span>';
+      Object.assign(anchor.style, { display: "flex", alignItems: "center", gap: "12px", margin: "12px 0 0", padding: "15px 16px", border: "1px solid #c8d8d0", borderRadius: "15px", background: "#edf5f1", color: "#17362e", textDecoration: "none", boxShadow: "0 8px 24px rgba(11,91,71,.08)" });
+      wire(anchor);
+      container.appendChild(anchor);
     };
 
     const enhance = () => {
-      addDisplayEntriesNearSettings();
       const candidates = Array.from(document.querySelectorAll(".sheet-panel, aside, [role=dialog], [class*=drawer], [class*=sidebar], [class*=menu-panel], [class*=slide-menu]"));
       candidates.forEach((el) => {
         const value = (el.textContent || "").toLowerCase();
-        if (value.includes("app settings") || value.includes("setting") || value.includes("qur") || value.includes("install") || value.includes("alert") || value.includes("menu")) addLink(el);
+        if (value.includes("setting") || value.includes("qur") || value.includes("install") || value.includes("alert") || value.includes("menu")) addLink(el);
       });
 
       const header = document.querySelector(".header-actions");
