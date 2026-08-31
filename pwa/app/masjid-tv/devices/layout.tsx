@@ -5,7 +5,8 @@ import LocalLogoAndScheduleImport from "./LocalLogoAndScheduleImport";
 import PreviewLogoSync from "./PreviewLogoSync";
 import DevicesScrollFix from "./DevicesScrollFix";
 import IslamicCalendarControls from "./IslamicCalendarControls";
+import PreviewFooterSync from "./PreviewFooterSync";
 
 export default function DevicesLayout({children}:{children:ReactNode}){
-  return <><DevicesScrollFix/><TickerControl/>{children}<SmartDisplayEditorEnhancer /><LocalLogoAndScheduleImport /><PreviewLogoSync /><IslamicCalendarControls /></>;
+  return <><DevicesScrollFix/><TickerControl/>{children}<SmartDisplayEditorEnhancer /><LocalLogoAndScheduleImport /><PreviewLogoSync /><IslamicCalendarControls /><PreviewFooterSync /></>;
 }
