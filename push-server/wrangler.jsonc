@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "triggers": { "crons": ["* * * * *"] },
+  "ai": { "binding": "AI" },
   "d1_databases": [
     {
       "binding": "DB",
