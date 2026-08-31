@@ -7,11 +7,14 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;","
 
 export default function PixelReplicaEnhancer() {
   useEffect(() => {
-    const draw = () => {
+    let lastDataKey = "";
+
+    const sync = () => {
       const shell = document.querySelector<HTMLElement>(".webtv-shell.layout-grand");
       const source = document.querySelector<HTMLElement>(".template-grand");
       if (!shell || !source) {
         document.querySelector(".pixel-replica-one")?.remove();
+        lastDataKey = "";
         return;
       }
 
@@ -28,6 +31,7 @@ export default function PixelReplicaEnhancer() {
 
       const mosque = text(source.querySelector(".tv-brand strong")) || "YOUR MASJID NAME";
       const location = text(source.querySelector(".tv-brand small")) || "MOSQUE LOCATION NOT SET";
+      const sourceLogo = source.querySelector<HTMLImageElement>(".tv-brand img")?.src || "";
       const clock = text(source.querySelector(".tv-clock"));
       const dates = [...source.querySelectorAll(".tv-dates span")].map(text);
       const verse = text(source.querySelector(".header-verse")) || "And establish prayer and give zakah and bow with those who bow.";
@@ -43,6 +47,15 @@ export default function PixelReplicaEnhancer() {
       const websiteRaw = text(source.querySelector(".tv-donation strong"));
       const website = !websiteRaw || /Add donation|website link in setup/i.test(websiteRaw) ? "Add link in Studio" : websiteRaw;
 
+      // Clock changes every second; everything else should only trigger a redraw when its data changes.
+      const dataKey = JSON.stringify({mosque, location, sourceLogo, dates, verse, nextEn, nextTime, nextIqama, rows, anns, website});
+      if (dataKey === lastDataKey && root.querySelector("#grand-live-clock")) {
+        const clockNode = root.querySelector<SVGTextElement>("#grand-live-clock");
+        if (clockNode && clockNode.textContent !== clock) clockNode.textContent = clock;
+        return;
+      }
+      lastDataKey = dataKey;
+
       const rowSvg = rows.map((r,i) => {
         const y = 402 + i*57;
         const icon = ["☀","☀","☀","◒","☾"][i];
@@ -54,27 +67,26 @@ export default function PixelReplicaEnhancer() {
         return `<line x1="684" y1="${y+46}" x2="1168" y2="${y+46}" class="line"/><circle cx="708" cy="${y-8}" r="24" class="iconCircle"/><text x="708" y="${y-1}" text-anchor="middle" class="gold annIcon">${icon}</text><text x="758" y="${y-13}" class="annTitle">${esc(a.title || "Announcement")}</text><text x="758" y="${y+14}" class="annBody">${esc(a.body || "")}</text>`;
       }).join("");
 
-      root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 790" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      const logoMarkup = sourceLogo
+        ? `<image id="grand-live-logo" x="66" y="22" width="138" height="126" preserveAspectRatio="xMidYMid meet" href="${esc(sourceLogo)}"/>`
+        : `<g id="grand-default-logo"><path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/><path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/></g>`;
+
+      root.innerHTML = `<svg class="px-reference-art" viewBox="0 0 1440 810" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#012f29"/><stop offset=".55" stop-color="#064b3d"/><stop offset="1" stop-color="#022e28"/></linearGradient>
-          <pattern id="pat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity=".22"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity=".16"/></pattern>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#002b25"/><stop offset=".55" stop-color="#043f35"/><stop offset="1" stop-color="#012a25"/></linearGradient>
+          <pattern id="pat" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M27 1L40 14 53 27 40 40 27 53 14 40 1 27 14 14Z" fill="none" stroke="#0b6553" stroke-width="1" opacity=".18"/><circle cx="27" cy="27" r="8" fill="none" stroke="#0b6553" opacity=".12"/></pattern>
           <style>
-            .serif{font-family:Georgia,'Times New Roman',serif}.sans{font-family:Arial,Helvetica,sans-serif}.gold{fill:#d9b36b}.white{fill:#f7f4eb}.muted{fill:#bccbc3}.line{stroke:#9a8246;stroke-width:1;opacity:.42}.box{fill:#043e34;fill-opacity:.76;stroke:#a58a4c;stroke-width:1.3}.iconCircle{fill:#0c5648;stroke:#a58a4c;stroke-width:1}.prayer{fill:#f7f4eb;font:600 24px Arial}.time{fill:#f7f4eb;font:600 22px Arial}.iq{fill:#70c88e;font:600 22px Arial}.icon{font:27px Arial}.annIcon{font:19px Arial}.annTitle{fill:#f7f4eb;font:600 18px Arial}.annBody{fill:#c8d5cf;font:15px Arial}
+            .serif{font-family:Georgia,'Times New Roman',serif}.sans{font-family:Arial,Helvetica,sans-serif}.gold{fill:#d9b36b}.white{fill:#f7f4eb}.muted{fill:#bccbc3}.line{stroke:#917a45;stroke-width:1;opacity:.38}.box{fill:#033a31;fill-opacity:.91;stroke:#a58a4c;stroke-width:1.2}.iconCircle{fill:#07473c;stroke:#a58a4c;stroke-width:1}.prayer{fill:#f7f4eb;font:600 24px Arial}.time{fill:#f7f4eb;font:600 22px Arial}.iq{fill:#70c88e;font:600 22px Arial}.icon{font:27px Arial}.annIcon{font:19px Arial}.annTitle{fill:#f7f4eb;font:600 18px Arial}.annBody{fill:#c8d5cf;font:15px Arial}
           </style>
         </defs>
-        <rect width="1440" height="790" fill="url(#bg)"/><rect width="1440" height="790" fill="url(#pat)"/>
+        <rect width="1440" height="810" fill="url(#bg)"/><rect width="1440" height="810" fill="url(#pat)"/>
 
         <g id="grand-header-art">
-          <g id="grand-default-logo">
-            <path d="M88 142V82c0-27 21-47 45-47s45 20 45 47v60" fill="none" stroke="#d7b873" stroke-width="4"/>
-            <path d="M104 142V103h58v39" fill="none" stroke="#d7b873" stroke-width="4"/>
-            <path d="M133 103V78" stroke="#d7b873" stroke-width="4"/><circle cx="133" cy="72" r="7" fill="#d7b873"/>
-          </g>
-          <g id="grand-custom-logo-slot"></g>
+          ${logoMarkup}
           <text x="72" y="176" class="serif white" font-size="33" font-weight="700">${esc(mosque)}</text>
           <text x="74" y="201" class="sans gold" font-size="13" letter-spacing="3.5">${esc(location.toUpperCase())}</text>
 
-          <text x="715" y="104" text-anchor="middle" class="serif white" font-size="72">${esc(clock)}</text>
+          <text id="grand-live-clock" x="715" y="104" text-anchor="middle" class="sans white" font-size="80" font-weight="500" letter-spacing="-2">${esc(clock)}</text>
           <text x="715" y="146" text-anchor="middle" class="sans white" font-size="17">${esc((dates[0] || "") + (dates[1] ? "   |   " + dates[1] : ""))}</text>
 
           <text x="1362" y="63" text-anchor="end" class="serif gold" font-size="25">وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ</text>
@@ -85,7 +97,7 @@ export default function PixelReplicaEnhancer() {
         <rect x="60" y="212" width="1320" height="88" rx="18" class="box"/>
         <circle cx="294" cy="256" r="28" class="iconCircle"/><text x="294" y="266" text-anchor="middle" class="gold" font-size="27">◷</text>
         <text x="350" y="243" class="sans gold" font-size="16">NEXT PRAYER</text><text x="350" y="276" class="sans white" font-size="29" font-weight="700">${esc(nextEn)}</text>
-        <text x="720" y="269" text-anchor="middle" class="serif gold" font-size="48">${esc(nextTime)}</text>
+        <text x="720" y="269" text-anchor="middle" class="sans gold" font-size="48" font-weight="500">${esc(nextTime)}</text>
         <line x1="880" y1="229" x2="880" y2="283" stroke="#a58a4c"/><circle cx="1010" cy="256" r="28" class="iconCircle"/><text x="1010" y="266" text-anchor="middle" class="gold" font-size="23">♙</text><text x="1062" y="243" class="sans gold" font-size="15">IQAMA</text><text x="1062" y="276" class="sans white" font-size="28">${esc(nextIqama)}</text>
 
         <rect x="60" y="316" width="590" height="400" rx="18" class="box"/>
@@ -100,12 +112,12 @@ export default function PixelReplicaEnhancer() {
         <g fill="#111"><rect x="1249" y="471" width="22" height="22"/><rect x="1299" y="471" width="22" height="22"/><rect x="1249" y="521" width="22" height="22"/><rect x="1279" y="499" width="11" height="11"/><rect x="1295" y="513" width="11" height="11"/><rect x="1276" y="530" width="14" height="13"/></g>
         <text x="1285" y="594" text-anchor="middle" class="sans gold" font-size="16">OR</text><text x="1285" y="624" text-anchor="middle" class="sans white" font-size="13">Visit our website</text><text x="1285" y="650" text-anchor="middle" class="sans" fill="#6ec793" font-size="13" font-weight="700">${esc(website.slice(0,24))}</text>
 
-        <rect y="735" width="1440" height="55" fill="#073b32" opacity=".94"/><rect y="735" width="1440" height="55" fill="url(#pat)"/><text x="720" y="770" text-anchor="middle" class="sans muted" font-size="16">Powered by Hassoun</text>
+        <rect y="735" width="1440" height="75" fill="#073b32" opacity=".94"/><rect y="735" width="1440" height="75" fill="url(#pat)"/><text x="720" y="781" text-anchor="middle" class="sans muted" font-size="16">Powered by Hassoun</text>
       </svg><button class="px-clock-hotspot" type="button" aria-label="Open Masjid Display Studio"></button>`;
     };
 
-    draw();
-    const timer = window.setInterval(draw, 1000);
+    sync();
+    const timer = window.setInterval(sync, 500);
     return () => { window.clearInterval(timer); document.querySelector(".pixel-replica-one")?.remove(); };
   }, []);
 
