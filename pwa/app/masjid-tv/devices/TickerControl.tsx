@@ -17,6 +17,45 @@ function activeCode(){
   const active=articles.find(a=>{const s=a.getAttribute("style")||"";return /efc66c|239\s*,\s*198\s*,\s*108/i.test(s)});
   return active?.textContent?.match(/\b\d{6}\b/)?.[0]||"";
 }
+function ensureTickerStyle(){
+  if(document.getElementById("hassoun-preview-ticker-style"))return;
+  const style=document.createElement("style");
+  style.id="hassoun-preview-ticker-style";
+  style.textContent="@keyframes hassounPreviewTicker{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}";
+  document.head.appendChild(style);
+}
+function syncPreviewTicker(value:string){
+  ensureTickerStyle();
+  const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+  const footer=buttons.find(b=>{
+    const img=b.querySelector<HTMLImageElement>('img[src*="hassoun-brand"]');
+    return !!img && (b.textContent||"").includes("Powered by");
+  });
+  if(!footer)return;
+  footer.style.justifyContent="flex-end";
+  footer.style.position="relative";
+  footer.style.overflow="hidden";
+  footer.style.paddingLeft="10px";
+  footer.style.paddingRight="10px";
+
+  let ticker=footer.querySelector<HTMLElement>("[data-preview-ticker='1']");
+  if(!ticker){
+    ticker=document.createElement("span");
+    ticker.dataset.previewTicker="1";
+    ticker.style.cssText="position:absolute;left:10px;right:120px;top:0;bottom:0;display:flex;align-items:center;overflow:hidden;pointer-events:none;white-space:nowrap;text-align:left;font-weight:700";
+    const inner=document.createElement("span");
+    inner.dataset.previewTickerInner="1";
+    inner.style.cssText="display:inline-block;min-width:100%;padding-left:100%;will-change:transform;animation:hassounPreviewTicker 14s linear infinite";
+    ticker.appendChild(inner);
+    footer.insertBefore(ticker,footer.firstChild);
+  }
+  const inner=ticker.querySelector<HTMLElement>("[data-preview-ticker-inner='1']");
+  if(inner)inner.textContent=value.trim();
+  ticker.style.display=value.trim()?"flex":"none";
+
+  const brandText=Array.from(footer.children).find(el=>el!==ticker && (el.textContent||"").trim()==="Powered by") as HTMLElement|undefined;
+  if(brandText)brandText.style.marginLeft="auto";
+}
 
 export default function TickerControl(){
   const [items,setItems]=useState<Display[]>([]);
@@ -52,10 +91,16 @@ export default function TickerControl(){
     setStatus("Loading ticker…");
     fetch(`${API}/masjid-displays/control/${encodeURIComponent(current.id)}`,{headers:{Authorization:`Bearer ${current.token}`},cache:"no-store"})
       .then(r=>r.ok?r.json():Promise.reject())
-      .then((d:Remote)=>{if(live){setText(typeof d.settings?.tickerText==="string"?String(d.settings.tickerText):"");setStatus("")}})
+      .then((d:Remote)=>{if(live){const next=typeof d.settings?.tickerText==="string"?String(d.settings.tickerText):"";setText(next);syncPreviewTicker(next);setStatus("")}})
       .catch(()=>{if(live)setStatus("Could not load ticker")});
     return()=>{live=false};
   },[selected]);
+
+  useEffect(()=>{
+    syncPreviewTicker(text);
+    const id=window.setInterval(()=>syncPreviewTicker(text),700);
+    return()=>window.clearInterval(id);
+  },[text]);
 
   const save=(value:string)=>{
     if(!current)return;
@@ -74,6 +119,7 @@ export default function TickerControl(){
 
   const change=(value:string)=>{
     setText(value);
+    syncPreviewTicker(value);
     if(timer.current)window.clearTimeout(timer.current);
     timer.current=window.setTimeout(()=>save(value),350);
   };
