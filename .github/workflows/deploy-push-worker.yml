@@ -50,6 +50,23 @@ jobs:
       - name: Wire finite games v2 and CRM routes
         run: node scripts/apply-games-v2-routing.mjs
 
+      - name: Normalize document bytes for TypeScript Blob compatibility
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'src/masjidDisplays.ts';
+          let s = fs.readFileSync(p, 'utf8');
+          const oldText = 'blob:new Blob([bytes],{type:mimeType||"application/octet-stream"})';
+          const newText = 'blob:new Blob([bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer],{type:mimeType||"application/octet-stream"})';
+          if (s.includes(oldText)) {
+            s = s.replace(oldText, newText);
+            fs.writeFileSync(p, s);
+            console.log('Normalized document Blob bytes for TypeScript.');
+          } else {
+            console.log('Document Blob compatibility source already normalized.');
+          }
+          NODE
+
       - name: Validate Worker
         run: |
           npm run typecheck
@@ -109,7 +126,7 @@ jobs:
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
           put_optional_secret FIREBASE_SERVICE_ACCOUNT_JSON "$FIREBASE_SERVICE_ACCOUNT_JSON"
 
-      - name: Smoke test Worker and multiplayer room creation
+      - name: Smoke test Worker and prayer schedule AI routes
         run: |
           set -euo pipefail
           health_ok=false
@@ -118,6 +135,7 @@ jobs:
             sleep 2
           done
           test "$health_ok" = true
+
           config_ok=false
           for attempt in $(seq 1 15); do
             if curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json && jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json >/dev/null && jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null; then config_ok=true; break; fi
@@ -125,6 +143,15 @@ jobs:
             sleep 2
           done
           test "$config_ok" = true
+
+          # These protected AI routes must exist after deploy. Without auth they should reject,
+          # but they must never return 404 Not found.
+          file_code="$(curl -sS -o /tmp/schedule-file-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-import" -H 'Content-Type: application/json' --data '{}')"
+          text_code="$(curl -sS -o /tmp/schedule-text-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-text" -H 'Content-Type: application/json' --data '{}')"
+          test "$file_code" != "404"
+          test "$text_code" != "404"
+          echo "Schedule AI routes are live: file=${file_code}, text=${text_code}"
+
           player_id="smoke_$(date +%s)_$RANDOM"
           games_ok=false
           for attempt in $(seq 1 10); do
