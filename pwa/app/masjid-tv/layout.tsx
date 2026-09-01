@@ -9,6 +9,7 @@ import TvTickerFooter from "./TvTickerFooter";
 import SmartVerseDisplayEnhancer from "./SmartVerseDisplayEnhancer";
 import TvIslamicCalendarEnhancer from "./TvIslamicCalendarEnhancer";
 import DonationQrEnhancer from "./DonationQrEnhancer";
+import GrandLayoutPolishEnhancer from "./GrandLayoutPolishEnhancer";
 import "./masjid-tv-polish.css";
 import "./reference-layouts.css";
 import "./jumuah-exact.css";
@@ -16,5 +17,5 @@ import "./pixel-replica.css";
 import "./studio-previews.css";
 
 export default function MasjidTvLayout({ children }: { children: ReactNode }) {
-  return <>{children}<MasjidTvWakeLock /><LogoUploadEnhancer /><TvModeChromeSuppressor /><PixelReplicaEnhancer /><StudioPreviewEnhancer /><StudioDevicePairingEnhancer /><TvTickerFooter /><SmartVerseDisplayEnhancer /><TvIslamicCalendarEnhancer /><DonationQrEnhancer /></>;
+  return <>{children}<MasjidTvWakeLock /><LogoUploadEnhancer /><TvModeChromeSuppressor /><PixelReplicaEnhancer /><StudioPreviewEnhancer /><StudioDevicePairingEnhancer /><TvTickerFooter /><SmartVerseDisplayEnhancer /><TvIslamicCalendarEnhancer /><DonationQrEnhancer /><GrandLayoutPolishEnhancer /></>;
 }
