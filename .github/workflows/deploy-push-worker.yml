@@ -53,6 +53,9 @@ jobs:
       - name: Apply smart mosque schedule parser
         run: node scripts/apply-smart-masjid-schedule-parser.mjs
 
+      - name: Apply robust schedule text decoding and fallback
+        run: node scripts/fix-schedule-text-decoding.mjs
+
       - name: Normalize generated TypeScript compatibility
         run: |
           node <<'NODE'
@@ -180,7 +183,7 @@ jobs:
           source_commit=$(git rev-parse HEAD)
           EOF
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+Hassoun911@users.noreply.github.com"
           git add .github/games-backend-status.txt
           git commit -m "Record Hassoun multiplayer backend ready" || true
           git push origin HEAD:main || true
