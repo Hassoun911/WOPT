@@ -50,6 +50,9 @@ jobs:
       - name: Wire finite games v2 and CRM routes
         run: node scripts/apply-games-v2-routing.mjs
 
+      - name: Apply smart mosque schedule parser
+        run: node scripts/apply-smart-masjid-schedule-parser.mjs
+
       - name: Normalize document bytes for TypeScript Blob compatibility
         run: |
           node <<'NODE'
