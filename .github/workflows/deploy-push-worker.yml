@@ -53,21 +53,24 @@ jobs:
       - name: Apply smart mosque schedule parser
         run: node scripts/apply-smart-masjid-schedule-parser.mjs
 
-      - name: Normalize document bytes for TypeScript Blob compatibility
+      - name: Normalize generated TypeScript compatibility
         run: |
           node <<'NODE'
           const fs = require('fs');
           const p = 'src/masjidDisplays.ts';
           let s = fs.readFileSync(p, 'utf8');
-          const oldText = 'blob:new Blob([bytes],{type:mimeType||"application/octet-stream"})';
-          const newText = 'blob:new Blob([bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer],{type:mimeType||"application/octet-stream"})';
-          if (s.includes(oldText)) {
-            s = s.replace(oldText, newText);
-            fs.writeFileSync(p, s);
-            console.log('Normalized document Blob bytes for TypeScript.');
-          } else {
-            console.log('Document Blob compatibility source already normalized.');
-          }
+
+          const oldBlob = 'blob:new Blob([bytes],{type:mimeType||"application/octet-stream"})';
+          const newBlob = 'blob:new Blob([bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer],{type:mimeType||"application/octet-stream"})';
+          if (s.includes(oldBlob)) s = s.replace(oldBlob, newBlob);
+
+          // The loose prayer parser indexes a five-item time array. Make every access
+          // explicitly string-safe so strict TypeScript accepts the generated code.
+          s = s.replace(/prayerClock\(vals\[(\d)\],/g, "prayerClock(vals[$1]||'',");
+          s = s.replace(/\/SUNSET\/i\.test\(vals\[(\d)\]\)/g, "/SUNSET/i.test(vals[$1]||'')");
+
+          fs.writeFileSync(p, s);
+          console.log('Normalized generated Worker TypeScript compatibility.');
           NODE
 
       - name: Validate Worker
