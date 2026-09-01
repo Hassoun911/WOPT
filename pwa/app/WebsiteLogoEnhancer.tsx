@@ -40,6 +40,24 @@ export default function WebsiteLogoEnhancer() {
         }
       });
 
+      // Main website header: replace the old text placeholder with the official Hassoun logo.
+      document.querySelectorAll<HTMLElement>(".brand-mark").forEach((target) => {
+        if (target.dataset.hassounBrandApplied === "true") return;
+        target.dataset.hassounBrandApplied = "true";
+        target.textContent = "";
+        target.style.overflow = "hidden";
+        target.style.padding = "3px";
+        target.style.background = "#0b5b47";
+        target.style.display = "flex";
+        target.style.alignItems = "center";
+        target.style.justifyContent = "center";
+        const logo = makeLogo(48, 12);
+        logo.style.width = "100%";
+        logo.style.height = "100%";
+        logo.style.objectFit = "contain";
+        target.appendChild(logo);
+      });
+
       const pageBrandTargets = [
         "main > .parity-hero > .hero-badge",
         "main.games-web-page > .games-hero:not(.compact) > .hero-badge",
