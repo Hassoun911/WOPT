@@ -55,4 +55,5 @@ export interface Env {
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
   EXPO_ACCESS_TOKEN?: string;
+  FIREBASE_SERVICE_ACCOUNT_JSON?: string;
 }
