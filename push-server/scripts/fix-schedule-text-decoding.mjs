@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+
+const path = 'src/masjidDisplays.ts';
+let source = fs.readFileSync(path, 'utf8');
+
+// Decode text schedule files robustly. Many Windows/Excel exports are UTF-16,
+// which otherwise leaves NUL bytes between every character and defeats parsing.
+if (!source.includes('function decodeScheduleTextBytes(')) {
+  const marker = 'async function documentText(ai:AiBinding,fileName:string,mimeType:string,bytes:Uint8Array)';
+  const helper = `function decodeScheduleTextBytes(bytes:Uint8Array){\n  if(bytes.length>=2&&bytes[0]===0xFF&&bytes[1]===0xFE)return new TextDecoder('utf-16le').decode(bytes.subarray(2));\n  if(bytes.length>=2&&bytes[0]===0xFE&&bytes[1]===0xFF){const copy=new Uint8Array(bytes.length-2);for(let i=2;i+1<bytes.length;i+=2){copy[i-2]=bytes[i+1];copy[i-1]=bytes[i];}return new TextDecoder('utf-16le').decode(copy);}\n  const sample=bytes.subarray(0,Math.min(bytes.length,2048));let oddZero=0,evenZero=0,pairs=0;for(let i=0;i+1<sample.length;i+=2){pairs++;if(sample[i]===0)evenZero++;if(sample[i+1]===0)oddZero++;}\n  if(pairs>8&&oddZero/pairs>.35)return new TextDecoder('utf-16le').decode(bytes);\n  if(pairs>8&&evenZero/pairs>.35){const copy=new Uint8Array(bytes.length);for(let i=0;i+1<bytes.length;i+=2){copy[i]=bytes[i+1];copy[i+1]=bytes[i];}return new TextDecoder('utf-16le').decode(copy);}\n  return new TextDecoder('utf-8').decode(bytes).replace(/\\u0000/g,'');\n}\n`;
+  if (!source.includes(marker)) throw new Error('documentText marker not found');
+  source = source.replace(marker, helper + marker);
+}
+source = source.replace('return new TextDecoder().decode(bytes);', 'return decodeScheduleTextBytes(bytes);');
+
+// When a row starts with both Gregorian day and Hijri day, use the first day
+// number as the Gregorian date. The prior loose parser used the last number.
+source = source.replace('nums[nums.length-1]', 'nums[0]');
+
+// Add an explicit fallback for the very common shape:
+// GREGORIAN_DAY HIJRI_DAY WEEKDAY FAJR SUNRISE DHUHR ASR MAGHRIB ISHA
+// This does not depend on tabs or preserved table columns.
+if (!source.includes('function commonSixTimeRows(')) {
+  const marker = 'function flexibleAiRows(';
+  const helper = `function commonSixTimeRows(text:string){\n  const year=yearFromText(text),month=monthFromText(text);if(!month)return[];const map=new Map<string,Record<string,unknown>>();let inPrayer=false,inIqama=false;\n  for(const raw of text.replace(/\\r/g,'').split('\\n')){const u=raw.toUpperCase();if(/PRAYER\\s+TIM|ADHAN|AZAN|ATHAN/.test(u)&&!(/IQAMA|IQAMAH/.test(u))){inPrayer=true;inIqama=false;continue}if(/IQAMA|IQAMAH|JAMAAT|JAMAAH/.test(u)&&/TIM|SCHEDULE|TABLE/.test(u)){inIqama=true;inPrayer=false;continue}\n    const vals=raw.match(/\\b\\d{1,2}:\\d{2}(?:\\s*[AP]M)?\\b|\\bSUNSET\\b/gi)||[];const prefix=raw.slice(0,Math.max(0,raw.search(/\\b\\d{1,2}:\\d{2}|\\bSUNSET\\b/i)));const dayMatch=/^\\s*(?:[A-Z]{3,9}[,\\s]+)?(\\d{1,2})\\b/i.exec(prefix);if(!dayMatch)continue;const day=Number(dayMatch[1]);const date=dateKeyFor(year,month,day);if(!date)continue;const row=emptyRow(date);\n    if((inPrayer||!inIqama)&&vals.length>=6){row.fajr=prayerClock(vals[0]||'','fajr');row.dhuhr=prayerClock(vals[2]||'','dhuhr');row.asr=prayerClock(vals[3]||'','asr');row.maghrib=prayerClock(vals[4]||'','maghrib');row.isha=prayerClock(vals[5]||'','isha');row.confidence=.99;mergeRow(map,row);continue}\n    if(inIqama&&vals.length>=5){row.fajrIqama=prayerClock(vals[0]||'','fajr');row.dhuhrIqama=prayerClock(vals[1]||'','dhuhr');row.asrIqama=prayerClock(vals[2]||'','asr');row.maghribIqama=/SUNSET/i.test(vals[3]||'')?'SUNSET':prayerClock(vals[3]||'','maghrib');row.ishaIqama=prayerClock(vals[4]||'','isha');row.confidence=.98;mergeRow(map,row);}\n  }\n  return[...map.values()].sort((a,b)=>String(a.date).localeCompare(String(b.date)));\n}\n`;
+  if (!source.includes(marker)) throw new Error('flexibleAiRows marker not found');
+  source = source.replace(marker, helper + marker);
+}
+source = source.replace('for(const row of looseScheduleScan(text))mergeRow(map,row);', 'for(const row of looseScheduleScan(text))mergeRow(map,row);for(const row of commonSixTimeRows(text))mergeRow(map,row);');
+
+fs.writeFileSync(path, source);
+console.log('Applied robust text decoding and common six-time mosque timetable fallback.');
