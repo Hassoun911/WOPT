@@ -3,20 +3,9 @@
 import { useEffect } from "react";
 
 const STORAGE="hassoun:web-masjid-tv:v2";
-const PRAYERS=["fajr","dhuhr","asr","maghrib","isha"] as const;
 const HIJRI_MONTHS=["Muharram","Safar","Rabi’ al-Awwal","Rabi’ al-Thani","Jumada al-Awwal","Jumada al-Thani","Rajab","Sha’ban","Ramadan","Shawwal","Dhul Qa’dah","Dhul Hijjah"];
 
 function read(){try{return JSON.parse(localStorage.getItem(STORAGE)||"{}") as Record<string,any>}catch{return {}}}
-function dateKey(now=new Date()){return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`}
-function effectiveIqama(settings:Record<string,any>,now=new Date()){
-  const fallback={...(settings.iqama||{})} as Record<string,string>;
-  const schedule=settings.prayerSchedule&&typeof settings.prayerSchedule==="object"?settings.prayerSchedule as Record<string,any>:{};
-  const today=dateKey(now);const keys=Object.keys(schedule).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)&&k<=today).sort();
-  const out={...fallback};
-  for(const k of keys){const row=schedule[k];for(const p of PRAYERS){let v=String(row?.iqama?.[p]||"").trim();if(p==="maghrib"&&/^sunset$/i.test(v))v=String(row?.adhan?.maghrib||out[p]||"").trim();if(v)out[p]=v}}
-  return out;
-}
-function sameIqama(a:Record<string,any>,b:Record<string,any>){return PRAYERS.every(p=>String(a?.[p]||"")===String(b?.[p]||""))}
 function islamicInfo(now=new Date()){
   try{
     const parts=new Intl.DateTimeFormat("en-u-ca-islamic",{day:"numeric",month:"numeric",year:"numeric"}).formatToParts(now);
@@ -39,20 +28,14 @@ export default function TvIslamicCalendarEnhancer(){
   useEffect(()=>{
     const sync=()=>{
       if(location.pathname.includes("/devices")||location.pathname.includes("/pair"))return;
-      const s=read();
-      const datedIqama=effectiveIqama(s);
-      if(Object.keys(s.prayerSchedule||{}).length&&!sameIqama(datedIqama,s.iqama||{})){
-        try{localStorage.setItem(STORAGE,JSON.stringify({...s,iqama:datedIqama}));location.reload();return}catch{}
-      }
-      const showHijri=s.showHijriDate!==false;const showEvents=s.showIslamicEvents!==false;const {hijri,event}=islamicInfo();
-      document.querySelectorAll<HTMLElement>(".tv-dates").forEach(box=>{
-        const spans=box.querySelectorAll<HTMLElement>("span");if(!spans[0])return;
-        let secondary=spans[1];if(!secondary){secondary=document.createElement("span");box.appendChild(secondary)}
-        const bits:string[]=[];if(showHijri&&hijri)bits.push(hijri);if(showEvents&&event)bits.push(event);secondary.textContent=bits.join(" • ");secondary.style.display=bits.length?"":"none";
-      });
-      document.querySelectorAll<HTMLElement>(".community-date small,.cinematic-date small,.board-date small").forEach(node=>{const bits:string[]=[];if(showHijri&&hijri)bits.push(hijri);if(showEvents&&event)bits.push(event);node.textContent=bits.join(" • ");node.style.display=bits.length?"":"none"});
+      const s=read();const {hijri,event}=islamicInfo();
+      document.documentElement.dataset.hassounHijri=s.showHijriDate===false?"":hijri;
+      document.documentElement.dataset.hassounIslamicEvent=s.showIslamicEvents===false?"":event;
+      // Important: do not rewrite the rendered TV date here. The active layout renderer
+      // owns the visible date so two timers cannot fight and cause flicker.
     };
-    sync();const timer=window.setInterval(sync,1000);window.addEventListener("storage",sync);return()=>{window.clearInterval(timer);window.removeEventListener("storage",sync)};
+    sync();const timer=window.setInterval(sync,60000);window.addEventListener("storage",sync);
+    return()=>{window.clearInterval(timer);window.removeEventListener("storage",sync)};
   },[]);
   return null;
 }
