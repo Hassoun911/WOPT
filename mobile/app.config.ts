@@ -8,11 +8,6 @@ const config: ExpoConfig = {
   version: "1.0.16",
   orientation: "portrait",
   icon: "./assets/icon.png",
-  splash: {
-    image: "./assets/splash-logo.png",
-    resizeMode: "contain",
-    backgroundColor: "#072B25"
-  },
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: true,
@@ -47,6 +42,19 @@ const config: ExpoConfig = {
     ]
   },
   plugins: [
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash-logo.png",
+        imageWidth: 340,
+        resizeMode: "contain",
+        backgroundColor: "#072B25",
+        dark: {
+          image: "./assets/splash-logo.png",
+          backgroundColor: "#072B25"
+        }
+      }
+    ],
     "expo-screen-orientation",
     "expo-video",
     [
