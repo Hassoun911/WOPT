@@ -5,6 +5,7 @@ type Props = { onFinished: () => void };
 
 export default function HassounSplashAnimation({ onFinished }: Props) {
   const { width, height } = useWindowDimensions();
+  const onFinishedRef = useRef(onFinished);
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.92)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -13,6 +14,10 @@ export default function HassounSplashAnimation({ onFinished }: Props) {
   const rootOpacity = useRef(new Animated.Value(1)).current;
 
   const logoSize = useMemo(() => Math.min(width * 0.82, height * 0.64, 520), [width, height]);
+
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   useEffect(() => {
     const reveal = Animated.parallel([
@@ -42,14 +47,14 @@ export default function HassounSplashAnimation({ onFinished }: Props) {
     const fadeTimer = setTimeout(() => {
       Animated.timing(rootOpacity, { toValue: 0, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     }, 2100);
-    const finishTimer = setTimeout(onFinished, 2400);
+    const finishTimer = setTimeout(() => onFinishedRef.current(), 2400);
 
     return () => {
       reveal.stop();
       clearTimeout(fadeTimer);
       clearTimeout(finishTimer);
     };
-  }, [glowOpacity, glowScale, logoOpacity, logoScale, onFinished, rootOpacity, shimmer]);
+  }, [glowOpacity, glowScale, logoOpacity, logoScale, rootOpacity, shimmer]);
 
   const shimmerTranslate = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.8, width * 0.8] });
   const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 0.25, 0.7, 1], outputRange: [0, 0.7, 0.25, 0] });
@@ -149,7 +154,6 @@ const styles = StyleSheet.create({
   dome: {
     position: "absolute",
     bottom: 54,
-    alignSelf: "center",
     left: "38%",
     width: "24%",
     height: 72,
