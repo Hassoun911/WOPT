@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "mobile/**"
+      - "scripts/apply-quran-resume-bookmark.py"
       - ".github/workflows/android-debug.yml"
 
 permissions:
@@ -53,6 +54,10 @@ jobs:
           npm ci --include=dev --no-audit --no-fund
           npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
 
+      - name: Apply Qur'an resume bookmark behavior
+        working-directory: .
+        run: python3 scripts/apply-quran-resume-bookmark.py
+
       - name: Verify messaging-enabled source
         run: |
           set -euo pipefail
@@ -60,6 +65,7 @@ jobs:
           grep -q 'versionCode: 53' app.config.ts
           grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
+          grep -q 'setSelectedAyah(from === "bookmarks" ? target : null)' src/quran/QuranV3.tsx
           test -f src/SystemMessageTicker.tsx
           npx tsc --noEmit
 
@@ -105,6 +111,6 @@ jobs:
             gh release create "$TAG" "$APK" \
               --target main \
               --title 'Hassoun v1.0.12 Messaging' \
-              --notes 'Android build with automatic server push registration and CRM-controlled scrolling system messages.' \
+              --notes 'Android build with automatic server push registration, CRM-controlled scrolling system messages, and exact-ayah Qur’an resume bookmarks.' \
               --prerelease
           fi
