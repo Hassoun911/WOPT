@@ -16,6 +16,9 @@ type AdminRow = {
 
 export type AuthenticatedAdmin = Pick<AdminRow, "id" | "public_id" | "username" | "email" | "display_name" | "role" | "must_change_password">;
 
+const CLOUDFLARE_PBKDF2_ITERATIONS = 100_000;
+const CLOUDFLARE_PBKDF2_MAX_ITERATIONS = 100_000;
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -176,7 +179,7 @@ export async function bootstrapAdmin(request: Request, env: Env) {
   }
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  const iterations = CLOUDFLARE_PBKDF2_ITERATIONS;
   const digest = await passwordDigest(password, salt, iterations);
   const publicId = crypto.randomUUID();
   await env.DB.prepare(
@@ -200,6 +203,9 @@ export async function loginAdmin(request: Request, env: Env) {
 
   const admin = await adminByLogin(env, login);
   if (!admin || admin.status !== "active") return json({ error: "Invalid login or password" }, 401);
+  if (admin.password_iterations > CLOUDFLARE_PBKDF2_MAX_ITERATIONS) {
+    return json({ error: "This admin password needs a security migration. Use Forgot password to set a new password." }, 409);
+  }
   const digest = await passwordDigest(password, admin.password_salt, admin.password_iterations);
   if (!constantTimeEqual(digest, admin.password_hash)) return json({ error: "Invalid login or password" }, 401);
 
@@ -235,7 +241,7 @@ export async function changeAdminPassword(request: Request, env: Env) {
   if (!password) return json({ error: "Password must be at least 10 characters" }, 400);
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  const iterations = CLOUDFLARE_PBKDF2_ITERATIONS;
   const digest = await passwordDigest(password, salt, iterations);
   await env.DB.prepare(
     `UPDATE admin_users SET password_hash = ?, password_salt = ?, password_iterations = ?,
