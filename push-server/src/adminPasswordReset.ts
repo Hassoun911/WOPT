@@ -8,6 +8,8 @@ type AdminResetRow = {
   expires_at: string;
 };
 
+const CLOUDFLARE_PBKDF2_ITERATIONS = 100_000;
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -131,13 +133,11 @@ export async function resetAdminPassword(request: Request, env: Env) {
   if (!reset) return json({ error: "This password reset link is invalid or expired" }, 403);
 
   const salt = randomToken(24);
-  const iterations = 210_000;
+  // Cloudflare Workers' WebCrypto runtime rejects PBKDF2 iteration counts above
+  // 100,000. Store the iteration count with the hash so verification remains exact.
+  const iterations = CLOUDFLARE_PBKDF2_ITERATIONS;
   const digest = await passwordDigest(password, salt, iterations);
 
-  // D1 has intermittently rejected the reset's multi-statement batch in production
-  // even though each statement is valid. Use the same proven sequential update model
-  // as the authenticated change-password flow. Consume the one-time token first with
-  // a guarded update, then change the password and revoke every old session.
   const consumed = await env.DB.prepare(
     `UPDATE admin_password_resets
      SET consumed_at = CURRENT_TIMESTAMP
@@ -159,9 +159,6 @@ export async function resetAdminPassword(request: Request, env: Env) {
       "UPDATE admin_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE admin_user_id = ? AND revoked_at IS NULL"
     ).bind(reset.admin_user_id).run();
   } catch (error) {
-    // The token is deliberately left consumed if the password write fails. This
-    // prevents replay against a partially failed security operation; the admin can
-    // safely request a fresh reset link.
     console.error("Admin password reset write failed after token consumption", {
       resetId: reset.id,
       adminUserId: reset.admin_user_id,
