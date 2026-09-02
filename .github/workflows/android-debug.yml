@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.12 APK
+name: Build Hassoun v1.0.13 Android Release
 
 on:
   workflow_dispatch:
@@ -7,19 +7,21 @@ on:
     paths:
       - "mobile/**"
       - "scripts/apply-quran-resume-bookmark.py"
+      - "scripts/apply-v1013-final.py"
+      - ".github/scripts/fix-quran-reader-v1013.py"
       - ".github/workflows/android-debug.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v1012-apk
+  group: hassoun-v1013-android
   cancel-in-progress: true
 
 jobs:
-  build-apk:
+  build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     env:
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
@@ -54,18 +56,29 @@ jobs:
           npm ci --include=dev --no-audit --no-fund
           npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
 
-      - name: Apply Qur'an resume bookmark behavior
+      - name: Apply v1.0.13 Quran and display fixes
         working-directory: .
-        run: python3 scripts/apply-quran-resume-bookmark.py
-
-      - name: Verify messaging-enabled source
         run: |
           set -euo pipefail
-          grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.12"' app.config.ts
-          grep -q 'versionCode: 53' app.config.ts
+          python3 .github/scripts/fix-quran-reader-v1013.py
+          python3 scripts/apply-quran-resume-bookmark.py
+          python3 scripts/apply-v1013-final.py
+
+      - name: Verify store-ready source
+        run: |
+          set -euo pipefail
+          grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.13"' app.config.ts
+          grep -q 'versionCode: 54' app.config.ts
           grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
           grep -q 'setSelectedAyah(from === "bookmarks" ? target : null)' src/quran/QuranV3.tsx
+          grep -q 'Previous page' src/quran/QuranV3.tsx
+          grep -q 'paddingBottom: 104' src/quran/QuranV3.tsx
+          grep -q 'Preparing Qur’an audio' src/quran/QuranV3.tsx
+          grep -q 'Preparing continuous Qur’an' src/quran/QuranV3.tsx
+          grep -q 'ConnectDisplayPage' src/SettingsHub.tsx
+          grep -q 'Connect Display' src/SettingsHub.tsx
+          test -f src/ConnectDisplayPage.tsx
           test -f src/SystemMessageTicker.tsx
           npx tsc --noEmit
 
@@ -75,42 +88,49 @@ jobs:
           rm -rf android
           npx expo prebuild --platform android --clean --no-install
 
-      - name: Build release APK
+      - name: Build release APK and AAB
         working-directory: mobile/android
-        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
 
-      - name: Verify and rename APK
+      - name: Verify and rename release files
         run: |
           set -euo pipefail
           APK='android/app/build/outputs/apk/release/app-release.apk'
+          AAB='android/app/build/outputs/bundle/release/app-release.aab'
           test -s "$APK"
-          unzip -l "$APK" > /tmp/hassoun-v1012.txt
-          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v1012.txt
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
+          test -s "$AAB"
+          unzip -l "$APK" > /tmp/hassoun-v1013.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/hassoun-v1013.txt
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.13-store-fixes.apk
+          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.13-store-fixes.aab
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.13-store-fixes.apk
+          ls -lh android/app/build/outputs/bundle/release/Hassoun-v1.0.13-store-fixes.aab
 
-      - name: Upload APK artifact
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.12-messaging-APK
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk
+          name: Hassoun-v1.0.13-Android-Release
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-store-fixes.apk
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.13-store-fixes.aab
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish prerelease APK
+      - name: Publish prerelease files
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.12-messaging.apk'
-          TAG='v1.0.12-messaging'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.13-store-fixes.apk'
+          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.13-store-fixes.aab'
+          TAG='v1.0.13-store-fixes'
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" --clobber
+            gh release upload "$TAG" "$APK" "$AAB" --clobber
           else
-            gh release create "$TAG" "$APK" \
+            gh release create "$TAG" "$APK" "$AAB" \
               --target main \
-              --title 'Hassoun v1.0.12 Messaging' \
-              --notes 'Android build with automatic server push registration, CRM-controlled scrolling system messages, and exact-ayah Qur’an resume bookmarks.' \
+              --title 'Hassoun v1.0.13 Store Fixes' \
+              --notes 'Android release with Google Play Quran control responsiveness fixes, protected Quran reader bottom spacing, explicit page navigation, exact-ayah resume bookmarks, native 6-digit Connect Display pairing, and v54 store versioning.' \
               --prerelease
           fi
