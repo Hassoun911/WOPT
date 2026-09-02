@@ -9,7 +9,6 @@ import TvDisplayVisibilityGuard from "./TvDisplayVisibilityGuard";
 import TvClockSettingsBridge from "./TvClockSettingsBridge";
 import PrayerSourceResolverEnhancer from "./PrayerSourceResolverEnhancer";
 import DirectTvAdvancedSettingsEnhancer from "./DirectTvAdvancedSettingsEnhancer";
-import RemoteAdminSelectionEnhancer from "./RemoteAdminSelectionEnhancer";
 import StudioPreviewEnhancer from "./StudioPreviewEnhancer";
 import StudioDevicePairingEnhancer from "./StudioDevicePairingEnhancer";
 import MasjidTvWakeLock from "./MasjidTvWakeLock";
@@ -24,5 +23,5 @@ import "./pixel-replica.css";
 import "./studio-previews.css";
 
 export default function MasjidTvLayout({ children }: { children: ReactNode }) {
-  return <>{children}<MasjidTvWakeLock /><LogoUploadEnhancer /><DisplayArtSettingsEnhancer /><SmartMasjidSettingsEnhancer /><TvModeChromeSuppressor /><TvDisplayVisibilityGuard /><PrayerSourceResolverEnhancer /><SmartGrandV2Enhancer /><TvClockSettingsBridge /><DirectTvAdvancedSettingsEnhancer /><RemoteAdminSelectionEnhancer /><AdminPreviewStabilityEnhancer /><StudioPreviewEnhancer /><StudioDevicePairingEnhancer /><TvTickerFooter /><SmartVerseDisplayEnhancer /><TvIslamicCalendarEnhancer /><DonationQrEnhancer /></>;
+  return <>{children}<MasjidTvWakeLock /><LogoUploadEnhancer /><DisplayArtSettingsEnhancer /><SmartMasjidSettingsEnhancer /><TvModeChromeSuppressor /><TvDisplayVisibilityGuard /><PrayerSourceResolverEnhancer /><SmartGrandV2Enhancer /><TvClockSettingsBridge /><DirectTvAdvancedSettingsEnhancer /><AdminPreviewStabilityEnhancer /><StudioPreviewEnhancer /><StudioDevicePairingEnhancer /><TvTickerFooter /><SmartVerseDisplayEnhancer /><TvIslamicCalendarEnhancer /><DonationQrEnhancer /></>;
 }
