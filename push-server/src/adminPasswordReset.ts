@@ -133,18 +133,42 @@ export async function resetAdminPassword(request: Request, env: Env) {
   const salt = randomToken(24);
   const iterations = 210_000;
   const digest = await passwordDigest(password, salt, iterations);
-  await env.DB.batch([
-    env.DB.prepare(
+
+  // D1 has intermittently rejected the reset's multi-statement batch in production
+  // even though each statement is valid. Use the same proven sequential update model
+  // as the authenticated change-password flow. Consume the one-time token first with
+  // a guarded update, then change the password and revoke every old session.
+  const consumed = await env.DB.prepare(
+    `UPDATE admin_password_resets
+     SET consumed_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP`
+  ).bind(reset.id).run();
+  if ((consumed.meta.changes ?? 0) !== 1) {
+    return json({ error: "This password reset link is invalid or expired" }, 403);
+  }
+
+  try {
+    const changed = await env.DB.prepare(
       `UPDATE admin_users SET password_hash = ?, password_salt = ?, password_iterations = ?,
-       must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-    ).bind(digest, salt, iterations, reset.admin_user_id),
-    env.DB.prepare(
-      "UPDATE admin_password_resets SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?"
-    ).bind(reset.id),
-    env.DB.prepare(
+       must_change_password = 0, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = 'active'`
+    ).bind(digest, salt, iterations, reset.admin_user_id).run();
+    if ((changed.meta.changes ?? 0) !== 1) throw new Error("Admin account is no longer active");
+
+    await env.DB.prepare(
       "UPDATE admin_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE admin_user_id = ? AND revoked_at IS NULL"
-    ).bind(reset.admin_user_id)
-  ]);
+    ).bind(reset.admin_user_id).run();
+  } catch (error) {
+    // The token is deliberately left consumed if the password write fails. This
+    // prevents replay against a partially failed security operation; the admin can
+    // safely request a fresh reset link.
+    console.error("Admin password reset write failed after token consumption", {
+      resetId: reset.id,
+      adminUserId: reset.admin_user_id,
+      error
+    });
+    return json({ error: "Password reset could not be completed. Please request a new reset link and try again." }, 500);
+  }
 
   return json({ ok: true, signInAgain: true });
 }
