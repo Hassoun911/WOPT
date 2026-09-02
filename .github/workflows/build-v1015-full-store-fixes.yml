@@ -62,7 +62,6 @@ jobs:
           node scripts/apply-masjid-typefix.mjs
           node scripts/apply-masjid-tv-fixes.mjs
           node scripts/apply-masjid-clock-click-branding.mjs
-          node scripts/apply-masjid-logo.mjs
 
       - name: Apply Google Play Quran and display fixes
         working-directory: .
