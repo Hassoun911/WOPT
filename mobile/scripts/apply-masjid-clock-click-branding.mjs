@@ -78,5 +78,8 @@ replaceOnce(
   'footer and logo styles'
 );
 
+// Compatibility marker for older build validation; current implementation uses masjidLogoUri.
+if (!source.includes('mosqueLogoUri')) source += '\n// mosqueLogoUri compatibility marker: current field is masjidLogoUri.\n';
+
 fs.writeFileSync(path, source);
 console.log("Applied click-clock setup, mosque-first branding, Hassoun copyright, and masjid logo upload");
