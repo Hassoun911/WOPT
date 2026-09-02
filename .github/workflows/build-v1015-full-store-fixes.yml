@@ -9,6 +9,7 @@ on:
       - 'mobile/**'
       - 'scripts/apply-v1015-full-store-fixes.py'
       - 'scripts/apply-v1017-quran-word-swipe-fixes.py'
+      - 'scripts/fix-v1017-quran-word-styles.py'
       - '.github/logo-official/**'
       - '.github/workflows/build-v1015-full-store-fixes.yml'
 
@@ -72,6 +73,10 @@ jobs:
         working-directory: .
         run: python3 scripts/apply-v1017-quran-word-swipe-fixes.py
 
+      - name: Apply v1.0.17 Quran word control styles
+        working-directory: .
+        run: python3 scripts/fix-v1017-quran-word-styles.py
+
       - name: Generate Hassoun logo icon and splash assets
         run: |
           set -euo pipefail
@@ -125,6 +130,7 @@ jobs:
             'word audio CDN': ('src/quran/QuranV3.tsx', 'https://audio.qurancdn.com/'),
             'word audio menu': ('src/quran/QuranV3.tsx', 'Tap a word to hear only that word'),
             'phrase playback': ('src/quran/QuranV3.tsx', 'Ayah / phrase'),
+            'word audio styles': ('src/quran/QuranV3.tsx', 'wordAudioChip:'),
             'tap player visibility': ('src/quran/QuranV3.tsx', 'setPlayerVisible((visible) => !visible)'),
             'Connect Display settings': ('src/SettingsHub.tsx', 'ConnectDisplayPage'),
             'six digit display pairing': ('src/ConnectDisplayPage.tsx', '/masjid-displays/pair'),
