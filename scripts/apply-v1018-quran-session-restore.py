@@ -1,4 +1,5 @@
 from pathlib import Path
+import runpy
 
 qpath = Path('mobile/src/quran/QuranV3.tsx')
 q = qpath.read_text(encoding='utf-8')
@@ -26,7 +27,6 @@ if persist_anchor not in q:
     raise SystemExit('Could not find persistence insertion anchor')
 q = q.replace(persist_anchor, persist_effect + persist_anchor, 1)
 
-# Hard guarantees.
 required = [
     'session: "wopt:quran:session:v1"',
     'AsyncStorage.getItem(KEYS.session)',
@@ -39,3 +39,7 @@ for marker in required:
 
 qpath.write_text(q, encoding='utf-8')
 print('Applied v1.0.18 Quran background/process session restore.')
+
+# Reader Settings is horizontal Arabic-book paging only. This also migrates old
+# saved vertical settings so up/down can never return as a page-navigation mode.
+runpy.run_path('scripts/apply-v1018-horizontal-only-reader-settings.py', run_name='__main__')
