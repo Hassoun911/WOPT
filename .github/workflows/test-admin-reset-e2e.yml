@@ -1,0 +1,59 @@
+name: Test Admin Reset E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-admin-reset-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PUSH_WORKER_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Create disposable reset fixture, call live endpoint, clean up
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date +%s)$RANDOM"
+          username="reset_fixture_${stamp}"
+          email="reset_fixture_${stamp}@example.invalid"
+          public_id="reset-fixture-${stamp}"
+          token="fixture-token-${stamp}-$(openssl rand -hex 16)"
+          token_hash="$(printf '%s' "$token" | sha256sum | awk '{print $1}')"
+          new_password="FixtureOnly-${stamp}-Aa9!"
+
+          cleanup() {
+            npx wrangler d1 execute wopt-prayer-push --remote --command "DELETE FROM admin_users WHERE username='${username}';" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT INTO admin_users (public_id,username,email,password_hash,password_salt,password_iterations,must_change_password,role,status) VALUES ('${public_id}','${username}','${email}','fixture','fixture',1,1,'editor','active');"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "INSERT INTO admin_password_resets (admin_user_id,token_hash,expires_at) SELECT id,'${token_hash}',datetime('now','+1 hour') FROM admin_users WHERE username='${username}';"
+
+          code="$(curl -sS -o /tmp/reset-e2e.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/admin/password/reset" -H 'Content-Type: application/json' --data "{\"token\":\"${token}\",\"password\":\"${new_password}\"}")"
+          echo "Live reset endpoint HTTP ${code}"
+          cat /tmp/reset-e2e.json
+          test "$code" = "200"
+          jq -e '.ok == true and .signInAgain == true' /tmp/reset-e2e.json >/dev/null
+
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT CASE WHEN password_hash <> 'fixture' AND must_change_password=0 THEN 1 ELSE 0 END AS password_changed FROM admin_users WHERE username='${username}';"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT CASE WHEN consumed_at IS NOT NULL THEN 1 ELSE 0 END AS token_consumed FROM admin_password_resets WHERE admin_user_id=(SELECT id FROM admin_users WHERE username='${username}') ORDER BY id DESC LIMIT 1;"
