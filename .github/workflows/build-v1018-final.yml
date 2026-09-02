@@ -1,0 +1,226 @@
+name: Build Hassoun v1.0.18 Final Reader + Icon + Resume Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.0.15-full-store-fixes
+    paths:
+      - '.github/workflows/build-v1018-final.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v1018-final
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout full feature release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.15-full-store-fixes
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen --npm
+
+      - name: Apply full Masjid TV feature stack
+        run: |
+          set -euo pipefail
+          node scripts/apply-wall-shell-for-masjid.mjs
+          node scripts/apply-masjid-tv.mjs
+          node scripts/apply-masjid-remote.mjs
+          node scripts/apply-masjid-typefix.mjs
+          node scripts/apply-masjid-tv-fixes.mjs
+          node scripts/apply-masjid-clock-click-branding.mjs
+
+      - name: Apply Quran store audio swipe and resume fixes
+        working-directory: .
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-v1015-full-store-fixes.py
+          python3 scripts/apply-v1017-quran-word-swipe-fixes.py
+          python3 scripts/fix-v1017-quran-word-styles.py
+          python3 scripts/apply-v1018-reader-gesture-hardfix.py
+          python3 scripts/apply-v1018-quran-session-restore.py
+
+      - name: Generate approved Hassoun branding with launcher safe area
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet Pillow
+          tr -d '\n\r ' < ../.github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-approved.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source = Image.open('/tmp/hassoun-approved.jpg').convert('RGB')
+          if source.width < 100 or source.height < 100:
+              raise SystemExit(f'Approved Hassoun artwork invalid: {source.size}')
+
+          # In-app logo and splash keep the approved artwork itself.
+          full = source.resize((1024, 1024), Image.Resampling.LANCZOS).convert('RGBA')
+          full.save('assets/hassoun-logo.png', 'PNG', optimize=True)
+          full.save('assets/splash-logo.png', 'PNG', optimize=True)
+          full.save('assets/splash-icon.png', 'PNG', optimize=True)
+
+          # Launcher icon needs an Android/Samsung-safe margin so masks do not crop Hassoun.
+          bg = (7, 43, 37, 255)
+          legacy = Image.new('RGBA', (1024, 1024), bg)
+          safe_art = ImageOps.contain(source, (770, 770), Image.Resampling.LANCZOS).convert('RGBA')
+          legacy.alpha_composite(safe_art, ((1024-safe_art.width)//2, (1024-safe_art.height)//2))
+          legacy.save('assets/icon.png', 'PNG', optimize=True)
+
+          adaptive = Image.new('RGBA', (1024, 1024), (0,0,0,0))
+          adaptive_art = ImageOps.contain(source, (700, 700), Image.Resampling.LANCZOS).convert('RGBA')
+          adaptive.alpha_composite(adaptive_art, ((1024-adaptive_art.width)//2, (1024-adaptive_art.height)//2))
+          adaptive.save('assets/adaptive-icon.png', 'PNG', optimize=True)
+
+          widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
+          widget.parent.mkdir(parents=True, exist_ok=True)
+          full.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
+          print('Branding generated:', source.size, 'launcher safe art:', safe_art.size, 'adaptive:', adaptive_art.size)
+          PY
+
+      - name: Verify v1.0.18 required behavior
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path('app.config.ts').read_text(encoding='utf-8')
+          if 'version: "1.0.18"' not in app or 'versionCode: 58' not in app:
+              raise SystemExit('Wrong Android version')
+          q = Path('src/quran/QuranV3.tsx').read_text(encoding='utf-8')
+          required = [
+            'gestureState.dx <= -42) turnReaderPage(1)',
+            'gestureState.dx >= 42) turnReaderPage(-1)',
+            'const handleVerticalTouchEnd = (_event',
+            'session: "wopt:quran:session:v1"',
+            'AsyncStorage.getItem(KEYS.session)',
+            'if (session.screen === "reader"',
+            'AsyncStorage.setItem(KEYS.session',
+            'Tap a word to hear only that word',
+            'Ayah / phrase',
+            'setSelectedAyah(from === "bookmarks" ? target : null)',
+          ]
+          for marker in required:
+              if marker not in q:
+                  raise SystemExit('Missing required Quran behavior: ' + marker)
+          forbidden = [
+            'turnReaderPage(gestureState.dx > 0 ? 1 : -1)',
+            'turnReaderPage(gestureState.dx < 0 ? -1 : 1)',
+            'if (dy < 0 && (readerAtBottom.current || contentFits)) turnReaderPage(1)',
+            'else if (dy > 0 && (readerAtTop.current || contentFits)) turnReaderPage(-1)',
+            'readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)',
+            'styles.readerPageNav',
+          ]
+          for marker in forbidden:
+              if marker in q:
+                  raise SystemExit('Forbidden old Quran behavior remains: ' + marker)
+          for asset in ['assets/hassoun-logo.png','assets/icon.png','assets/adaptive-icon.png','assets/splash-logo.png']:
+              p=Path(asset)
+              if not p.exists() or p.stat().st_size < 10000:
+                  raise SystemExit('Missing branding asset: '+asset)
+              print('OK',asset,p.stat().st_size)
+          PY
+          npm run typecheck
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Enable Android TV launcher and flexible orientation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          manifest=Path('android/app/src/main/AndroidManifest.xml')
+          android='http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android',android)
+          tree=ET.parse(manifest); root=tree.getroot()
+          def has_feature(name):
+              return any(el.tag=='uses-feature' and el.attrib.get(f'{{{android}}}name')==name for el in root)
+          if not has_feature('android.software.leanback'):
+              ET.SubElement(root,'uses-feature',{f'{{{android}}}name':'android.software.leanback',f'{{{android}}}required':'false'})
+          if not has_feature('android.hardware.touchscreen'):
+              ET.SubElement(root,'uses-feature',{f'{{{android}}}name':'android.hardware.touchscreen',f'{{{android}}}required':'false'})
+          app=root.find('application')
+          if app is None: raise SystemExit('application missing')
+          app.set(f'{{{android}}}banner','@drawable/hassoun_widget_logo')
+          main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{android}}}name','').endswith('MainActivity')),None)
+          if main is None: raise SystemExit('MainActivity missing')
+          main.set(f'{{{android}}}screenOrientation','unspecified')
+          if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
+              filt=ET.SubElement(main,'intent-filter')
+              ET.SubElement(filt,'action',{f'{{{android}}}name':'android.intent.action.MAIN'})
+              ET.SubElement(filt,'category',{f'{{{android}}}name':'android.intent.category.LEANBACK_LAUNCHER'})
+          tree.write(manifest,encoding='utf-8',xml_declaration=True)
+          PY
+
+      - name: Build release APK and AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          NODE_ENV=production ./gradlew clean assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name v1.0.18 files
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' | head -n 1)"
+          test -s "$APK"; test -s "$AAB"
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk
+          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk.sha256
+          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab
+
+      - name: Upload v1.0.18 Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.18-Final
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk.sha256
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish v1.0.18 prerelease
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.18-final.apk'
+          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.18-final.aab'
+          TAG='v1.0.18-final'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$AAB" --clobber
+          else
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.18 Final' --notes 'Full v1.0.14+ feature line. Quran paging hard-fixed to horizontal only: swipe left next, swipe right previous, vertical up/down never changes pages. Quran reader session persists across Android background/process recreation. Launcher/adaptive icon uses a safe-area composition to prevent Samsung/Android masks from cropping Hassoun. Preserves word/ayah/surah audio, exact bookmark resume, Connect Display, Masjid TV and Google Play functionality fixes.' --prerelease
+          fi
