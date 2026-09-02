@@ -8,6 +8,11 @@ const config: ExpoConfig = {
   version: "1.0.16",
   orientation: "portrait",
   icon: "./assets/icon.png",
+  splash: {
+    image: "./assets/splash-logo.png",
+    resizeMode: "contain",
+    backgroundColor: "#072B25"
+  },
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: true,
@@ -26,7 +31,7 @@ const config: ExpoConfig = {
     icon: "./assets/icon.png",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#003D33"
+      backgroundColor: "#072B25"
     },
     permissions: [
       "android.permission.POST_NOTIFICATIONS",
