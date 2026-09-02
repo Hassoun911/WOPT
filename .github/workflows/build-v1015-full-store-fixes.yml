@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.16 Arabic Mushaf Reader
+name: Build Hassoun v1.0.17 Quran Word Audio + Swipe Fix
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
     paths:
       - 'mobile/**'
       - 'scripts/apply-v1015-full-store-fixes.py'
+      - 'scripts/apply-v1017-quran-word-swipe-fixes.py'
       - '.github/logo-official/**'
       - '.github/workflows/build-v1015-full-store-fixes.yml'
 
@@ -15,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v1016-arabic-reader
+  group: hassoun-v1017-quran-word-swipe
   cancel-in-progress: true
 
 jobs:
@@ -63,9 +64,13 @@ jobs:
           node scripts/apply-masjid-tv-fixes.mjs
           node scripts/apply-masjid-clock-click-branding.mjs
 
-      - name: Apply Quran, Google Play and display fixes
+      - name: Apply Quran store display and bookmark fixes
         working-directory: .
         run: python3 scripts/apply-v1015-full-store-fixes.py
+
+      - name: Apply v1.0.17 Quran word audio and swipe fixes
+        working-directory: .
+        run: python3 scripts/apply-v1017-quran-word-swipe-fixes.py
 
       - name: Generate Hassoun logo icon and splash assets
         run: |
@@ -102,10 +107,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           checks = {
-            'v1.0.16 version': ('app.config.ts', 'version: "1.0.16"'),
-            'Android code 56': ('app.config.ts', 'versionCode: 56'),
+            'v1.0.17 version': ('app.config.ts', 'version: "1.0.17"'),
+            'Android code 57': ('app.config.ts', 'versionCode: 57'),
             'splash plugin': ('app.config.ts', 'expo-splash-screen'),
-            'splash image': ('app.config.ts', 'image: "./assets/splash-logo.png"'),
             'TV routing': ('App.tsx', 'MasjidTvDisplay'),
             'Masjid display component': ('src/MasjidTvDisplay.tsx', 'orientationMode'),
             'Masjid video background': ('src/MasjidTvDisplay.tsx', 'backgroundVideoUrl'),
@@ -116,7 +120,11 @@ jobs:
             'exact bookmark resume': ('src/quran/QuranV3.tsx', 'setSelectedAyah(from === "bookmarks" ? target : null)'),
             'responsive Quran audio': ('src/quran/QuranV3.tsx', 'Preparing Qur’an audio'),
             'no vertical auto-turn': ('src/quran/QuranV3.tsx', 'const handleVerticalTouchEnd = (_event'),
-            'Arabic horizontal paging': ('src/quran/QuranV3.tsx', 'gestureState.dx < 0 ? 1 : -1'),
+            'left swipe next': ('src/quran/QuranV3.tsx', 'gestureState.dx <= -42) turnReaderPage(1)'),
+            'right swipe previous': ('src/quran/QuranV3.tsx', 'gestureState.dx >= 42) turnReaderPage(-1)'),
+            'word audio CDN': ('src/quran/QuranV3.tsx', 'https://audio.qurancdn.com/'),
+            'word audio menu': ('src/quran/QuranV3.tsx', 'Tap a word to hear only that word'),
+            'phrase playback': ('src/quran/QuranV3.tsx', 'Ayah / phrase'),
             'tap player visibility': ('src/quran/QuranV3.tsx', 'setPlayerVisible((visible) => !visible)'),
             'Connect Display settings': ('src/SettingsHub.tsx', 'ConnectDisplayPage'),
             'six digit display pairing': ('src/ConnectDisplayPage.tsx', '/masjid-displays/pair'),
@@ -127,8 +135,14 @@ jobs:
                   raise SystemExit(f'Missing required feature: {label} ({path})')
               print(f'OK: {label}')
           quran = Path('src/quran/QuranV3.tsx').read_text(encoding='utf-8')
-          if 'styles.readerPageNav' in quran:
-              raise SystemExit('Large Previous/Next reader navigation is still present')
+          forbidden = [
+              'turnReaderPage(gestureState.dx > 0 ? 1 : -1)',
+              'styles.readerPageNav',
+              'if (dy < 0 && (readerAtBottom.current || contentFits)) turnReaderPage(1)',
+          ]
+          for marker in forbidden:
+              if marker in quran:
+                  raise SystemExit(f'Forbidden old reader behavior still present: {marker}')
           for asset in ['assets/hassoun-logo.png','assets/icon.png','assets/adaptive-icon.png','assets/splash-logo.png']:
               p = Path(asset)
               if not p.exists() or p.stat().st_size < 10000:
@@ -183,21 +197,21 @@ jobs:
           AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' | head -n 1)"
           test -s "$APK"
           test -s "$AAB"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk
-          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk.sha256
-          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk
+          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk.sha256
+          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab
 
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.16-Arabic-Reader
+          name: Hassoun-v1.0.17-Quran-Word-Swipe
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk.sha256
-            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
-            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk.sha256
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -207,11 +221,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk'
-          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab'
-          TAG='v1.0.16-arabic-reader'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.17-quran-word-swipe.apk'
+          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.17-quran-word-swipe.aab'
+          TAG='v1.0.17-quran-word-swipe'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$AAB" --clobber
           else
-            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.16 Arabic Mushaf Reader' --notes 'Full v1.0.14+ Masjid/TV feature line with Google Play fixes. Qur’an pages change only by Arabic-book horizontal swipe: left for next and right for previous. Vertical scrolling never changes pages. Large Previous/Next controls removed. Reader player is hidden by default and toggled by tapping the page. Hassoun branding is regenerated with safe margins for in-app logo, Android launcher/adaptive icon, splash screen and widget. Exact ayah bookmark resume and six-digit Connect Display are preserved.' --prerelease
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.17 Quran Word Audio + Swipe Fix' --notes 'Preserves the full v1.0.14+ Masjid/TV feature line and v1.0.16 branding/store fixes. Quran Mushaf paging is horizontal only: swipe left for next page and swipe right for previous page. Vertical scrolling never changes pages. Selected ayah controls now provide individual Quran Foundation word-audio playback, ayah/phrase playback, and full-Surah playback.' --prerelease
           fi
