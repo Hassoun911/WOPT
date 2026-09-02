@@ -1,6 +1,8 @@
 import { requireAdmin } from "./adminAuth";
 import type { Env } from "./types";
 
+const CLOUDFLARE_PBKDF2_ITERATIONS = 100_000;
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -49,7 +51,7 @@ export async function createAdminTeamMember(request: Request, env: Env) {
   if (duplicate) return json({ error: "Username or email is already in use" }, 409);
 
   const salt = randomToken();
-  const iterations = 210_000;
+  const iterations = CLOUDFLARE_PBKDF2_ITERATIONS;
   const digest = await passwordDigest(password, salt, iterations);
   const publicId = crypto.randomUUID();
   await env.DB.prepare(
