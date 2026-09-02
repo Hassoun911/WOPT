@@ -9,7 +9,10 @@ new = '''  const openReader = (surah: number, ayah = 1, from: Screen = screen) =
 if old in q:
     q = q.replace(old, new, 1)
 
-# Google Play: audio controls may not silently ignore presses.
+# Player is hidden while reading until the user taps the page.
+q = q.replace('const [playerVisible, setPlayerVisible] = useState(true);', 'const [playerVisible, setPlayerVisible] = useState(false);', 1)
+
+# Google Play: audio controls must never silently ignore a press.
 old = '''  const playNativeAyah = (ayah: QuranAyah, reciterId = audioPrefs.reciter) => {\n    if (!QuranAudio) return;\n    completionRef.current = null;\n    QuranAudio.playQueue(nativeQueuePayload([ayah], reciterId), 0, false, audioPrefs.speed);\n  };'''
 new = '''  const playNativeAyah = (ayah: QuranAyah, reciterId = audioPrefs.reciter) => {\n    if (!QuranAudio) {\n      Alert.alert(tr("Audio unavailable", "الصوت غير متاح"), tr("Qur’an audio could not start on this device. Please restart Hassoun and try again.", "تعذر بدء صوت القرآن على هذا الجهاز. أعد تشغيل حسّون وحاول مرة أخرى."));\n      return;\n    }\n    setAudioStatus((previous) => ({ ...previous, available: true, state: "loading" }));\n    completionRef.current = null;\n    try { QuranAudio.playQueue(nativeQueuePayload([ayah], reciterId), 0, false, audioPrefs.speed); }\n    catch (error) { Alert.alert(tr("Playback failed", "فشل التشغيل"), error instanceof Error ? error.message : tr("Please try again.", "يرجى المحاولة مرة أخرى.")); }\n  };'''
 if old in q:
@@ -20,34 +23,56 @@ new = '''  const playQueue = (queue: QuranAyah[], repeat = false) => {\n    cons
 if old in q:
     q = q.replace(old, new, 1)
 
-# Never turn Mushaf pages from vertical scrolling/swiping. Horizontal browse mode still uses intentional horizontal swipes.
-old = '''        if (appearance.browseMode !== "vertical") return false;\n        if (vertical < 12 || vertical <= horizontal * 1.05) return false;\n\n        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n        if (gestureState.dy < 0) return readerAtBottom.current || contentFits;\n        if (gestureState.dy > 0) return readerAtTop.current || readerLastScrollY.current <= 8 || contentFits;\n        return false;'''
-if old in q:
-    q = q.replace(old, '        return false;', 1)
+# Arabic Mushaf behavior: page changes are horizontal only.
+# Swipe LEFT = next page. Swipe RIGHT = previous page.
+start = q.find('  const readerPanResponder = useMemo(')
+end = q.find('\n\n  const handleVerticalTouchStart', start)
+if start >= 0 and end > start:
+    q = q[:start] + '''  const readerPanResponder = useMemo(\n    () => PanResponder.create({\n      onStartShouldSetPanResponder: () => false,\n      onMoveShouldSetPanResponderCapture: (_event, gestureState) => {\n        const horizontal = Math.abs(gestureState.dx);\n        const vertical = Math.abs(gestureState.dy);\n        return horizontal >= 24 && horizontal > vertical * 1.35;\n      },\n      onPanResponderRelease: (_event, gestureState) => {\n        if (Math.abs(gestureState.dx) < 42) return;\n        turnReaderPage(gestureState.dx < 0 ? 1 : -1);\n      },\n      onPanResponderTerminate: () => {\n        verticalGestureStartY.current = null;\n      }\n    }),\n    [currentPage, spreadMode]\n  );''' + q[end:]
 
-old = '''        if (appearance.browseMode !== "vertical" || Math.abs(gestureState.dy) < 26) return;\n        const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n        if (gestureState.dy < 0 && (readerAtBottom.current || contentFits)) {\n          turnReaderPage(1);\n        } else if (gestureState.dy > 0 && (readerAtTop.current || readerLastScrollY.current <= 8 || contentFits)) {\n          turnReaderPage(-1);\n        }'''
-if old in q:
-    q = q.replace(old, '        return;', 1)
-
+# Vertical scrolling is reading only; never a page command.
+start = q.find('  const handleVerticalTouchStart = (event: { nativeEvent: { pageY: number } }) => {')
+end = q.find('\n\n  const handleVerticalTouchEnd', start)
+if start >= 0 and end > start:
+    q = q[:start] + '''  const handleVerticalTouchStart = (_event: { nativeEvent: { pageY: number } }) => {\n    verticalGestureStartY.current = null;\n  };''' + q[end:]
 start = q.find('  const handleVerticalTouchEnd = (event: { nativeEvent: { pageY: number } }) => {')
+if start < 0:
+    start = q.find('  const handleVerticalTouchEnd = (_event: { nativeEvent: { pageY: number } }) => {')
 end = q.find('\n\n\n  const handleReaderSurfaceTouchStart', start)
 if start >= 0 and end > start:
     q = q[:start] + '''  const handleVerticalTouchEnd = (_event: { nativeEvent: { pageY: number } }) => {\n    verticalGestureStartY.current = null;\n  };''' + q[end:]
 
-old = '''            onScrollEndDrag={() => {\n              const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n              if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) {\n                turnReaderPage(1);\n              } else if (readerScrollDirection.current === "up" && (readerAtTop.current || contentFits)) {\n                turnReaderPage(-1);\n              }\n              readerScrollDirection.current = null;\n            }}'''
+# Do not auto-turn at scroll end.
+old = '''            onScrollEndDrag={() => {\n              const contentFits = readerContentHeight.current <= readerViewportHeight.current + 12;\n              if (readerScrollDirection.current === "down" && (readerAtBottom.current || contentFits)) {\n                turnReaderPage(1);\n              } else if (readerScrollDirection.current === "up" && (readerAtTop.current || readerLastScrollY.current <= 8 || contentFits)) {\n                turnReaderPage(-1);\n              }\n              readerScrollDirection.current = null;\n            }}'''
 if old in q:
     q = q.replace(old, '''            onScrollEndDrag={() => {\n              readerScrollDirection.current = null;\n            }}''', 1)
 
-# Add protected bottom space + explicit page controls.
-page_anchor = '            {spreadMode ? <View style={styles.bookSpread}>{spreadLeftPage ? <View style={styles.bookPageSlot}>{renderMushafPage(spreadLeftPage)}</View> : <View style={[styles.bookPageSlot, styles.blankBookPage]} /> }<View style={styles.bookGutter} /><View style={styles.bookPageSlot}>{renderMushafPage(spreadRightPage)}</View></View> : renderMushafPage(currentPage)}\n'
-if page_anchor in q and 'styles.readerPageNav' not in q:
-    q = q.replace(page_anchor, page_anchor + '''            <View style={styles.readerPageNav}>\n              <Pressable disabled={currentPage <= 1} onPress={() => turnReaderPage(-1)} style={[styles.readerPageNavButton, currentPage <= 1 && styles.readerPageNavDisabled]}><Text style={styles.readerPageNavText}>{tr("‹ Previous page", "الصفحة السابقة ›")}</Text></Pressable>\n              <View style={styles.readerPageNumberPill}><Text style={styles.readerPageNumberText}>{tr(`Page ${currentPage}`, `صفحة ${num(currentPage)}`)}</Text></View>\n              <Pressable disabled={currentPage >= 604} onPress={() => turnReaderPage(1)} style={[styles.readerPageNavButton, currentPage >= 604 && styles.readerPageNavDisabled]}><Text style={styles.readerPageNavText}>{tr("Next page ›", "‹ الصفحة التالية")}</Text></Pressable>\n            </View>\n''', 1)
+# Remove the large Previous / Page / Next navigation row from older patch builds if present.
+nav_start = q.find('            <View style={styles.readerPageNav}>')
+if nav_start >= 0:
+    nav_end = q.find('            </View>\n', nav_start)
+    # Three nested items are all on one line in the generated patch; find the next ScrollView close boundary safely.
+    scroll_close = q.find('          </ScrollView>', nav_start)
+    if scroll_close > nav_start:
+        block = q[nav_start:scroll_close]
+        if 'readerPageNav' in block:
+            q = q[:nav_start] + q[scroll_close:]
 
-q = q.replace('bookCanvas: { padding: 8, paddingBottom: 12 }', 'bookCanvas: { padding: 8, paddingBottom: 118 }', 1)
-style_anchor = '  readerBody: { flex: 1, backgroundColor: "#e9e5dc" },'
-if style_anchor in q and 'readerPageNav:' not in q:
-    styles = '''  readerPageNav: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 10 },\n  readerPageNavButton: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: "#edf5f1", borderWidth: 1, borderColor: "#d8e5df", alignItems: "center", justifyContent: "center", paddingHorizontal: 7 },\n  readerPageNavDisabled: { opacity: .35 },\n  readerPageNavText: { color: "#0b654f", fontSize: 10, fontWeight: "900", textAlign: "center" },\n  readerPageNumberPill: { minWidth: 72, minHeight: 48, borderRadius: 16, backgroundColor: "#103f35", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },\n  readerPageNumberText: { color: "#fff", fontSize: 10, fontWeight: "900" },\n'''
-    q = q.replace(style_anchor, styles + style_anchor, 1)
+# Keep the Mushaf page using the screen; only a small safety gap is needed because the player floats above content.
+q = q.replace('bookCanvas: { padding: 8, paddingBottom: 118 }', 'bookCanvas: { padding: 8, paddingBottom: 18 }', 1)
+q = q.replace('bookCanvas: { padding: 8, paddingBottom: 12 }', 'bookCanvas: { padding: 8, paddingBottom: 18 }', 1)
+
+# Compact floating audio controls; they overlay below the full page and disappear on tap.
+q = q.replace('miniPlayer: { position: "absolute", left: 48, right: 48, bottom: 18, minHeight: 56,', 'miniPlayer: { position: "absolute", left: 70, right: 70, bottom: 8, minHeight: 48,', 1)
+q = q.replace('floatingPlayerWrap: { position: "absolute", left: 0, right: 0, bottom: 18,', 'floatingPlayerWrap: { position: "absolute", left: 0, right: 0, bottom: 8,', 1)
+
+# Remove stale nav styles if they exist from an already-patched source.
+for style_name in ['readerPageNav:', 'readerPageNavButton:', 'readerPageNavDisabled:', 'readerPageNavText:', 'readerPageNumberPill:', 'readerPageNumberText:']:
+    while style_name in q:
+        line_start = q.rfind('\n', 0, q.find(style_name)) + 1
+        line_end = q.find('\n', q.find(style_name))
+        if line_end < 0: break
+        q = q[:line_start] + q[line_end + 1:]
 
 qpath.write_text(q, encoding='utf-8')
 
@@ -65,16 +90,18 @@ if root in s and 'page === "display"' not in s:
     s = s.replace(root, root + '  if (page === "display") return <ConnectDisplayPage locale={locale} onBack={() => setPage("root")} />;\n\n', 1)
 spath.write_text(s, encoding='utf-8')
 
-# Required assertions: fail build rather than silently producing another rollback.
 required = {
-    'Quran bookmark resume': 'setSelectedAyah(from === "bookmarks" ? target : null)',
-    'Quran responsive audio': 'Preparing Qur’an audio',
-    'No vertical scroll page turn': 'const handleVerticalTouchEnd = (_event',
-    'Explicit page navigation': 'readerPageNav',
-    'Connect Display setting': 'page === "display"',
+    'bookmark resume': 'setSelectedAyah(from === "bookmarks" ? target : null)',
+    'responsive audio': 'Preparing Qur’an audio',
+    'Arabic horizontal next-page swipe': 'gestureState.dx < 0 ? 1 : -1',
+    'no vertical page turn': 'const handleVerticalTouchEnd = (_event',
+    'tap player toggle': 'setPlayerVisible((visible) => !visible)',
+    'Connect Display': 'page === "display"',
 }
 combined = q + s
 for label, marker in required.items():
     if marker not in combined:
-        raise SystemExit(f'Missing required v1.0.15 fix: {label}')
-print('Applied and verified v1.0.15 full store fixes.')
+        raise SystemExit(f'Missing required v1.0.16 fix: {label}')
+if 'styles.readerPageNav' in q:
+    raise SystemExit('Large reader page navigation buttons are still present')
+print('Applied and verified v1.0.16 Quran reader/store fixes.')
