@@ -60,7 +60,7 @@ jobs:
           node scripts/apply-masjid-tv-fixes.mjs
           node scripts/apply-masjid-clock-click-branding.mjs
 
-      - name: Apply Quran store audio swipe and resume fixes
+      - name: Apply Quran store audio swipe resume and horizontal-only settings fixes
         working-directory: .
         run: |
           set -euo pipefail
@@ -81,25 +81,19 @@ jobs:
           source = Image.open('/tmp/hassoun-approved.jpg').convert('RGB')
           if source.width < 100 or source.height < 100:
               raise SystemExit(f'Approved Hassoun artwork invalid: {source.size}')
-
-          # In-app logo and splash keep the approved artwork itself.
           full = source.resize((1024, 1024), Image.Resampling.LANCZOS).convert('RGBA')
           full.save('assets/hassoun-logo.png', 'PNG', optimize=True)
           full.save('assets/splash-logo.png', 'PNG', optimize=True)
           full.save('assets/splash-icon.png', 'PNG', optimize=True)
-
-          # Launcher icon needs an Android/Samsung-safe margin so masks do not crop Hassoun.
           bg = (7, 43, 37, 255)
           legacy = Image.new('RGBA', (1024, 1024), bg)
           safe_art = ImageOps.contain(source, (770, 770), Image.Resampling.LANCZOS).convert('RGBA')
           legacy.alpha_composite(safe_art, ((1024-safe_art.width)//2, (1024-safe_art.height)//2))
           legacy.save('assets/icon.png', 'PNG', optimize=True)
-
           adaptive = Image.new('RGBA', (1024, 1024), (0,0,0,0))
           adaptive_art = ImageOps.contain(source, (700, 700), Image.Resampling.LANCZOS).convert('RGBA')
           adaptive.alpha_composite(adaptive_art, ((1024-adaptive_art.width)//2, (1024-adaptive_art.height)//2))
           adaptive.save('assets/adaptive-icon.png', 'PNG', optimize=True)
-
           widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
           widget.parent.mkdir(parents=True, exist_ok=True)
           full.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
@@ -115,6 +109,7 @@ jobs:
           if 'version: "1.0.18"' not in app or 'versionCode: 58' not in app:
               raise SystemExit('Wrong Android version')
           q = Path('src/quran/QuranV3.tsx').read_text(encoding='utf-8')
+          rendering = Path('src/quran/quranRendering.tsx').read_text(encoding='utf-8')
           required = [
             'gestureState.dx <= -42) turnReaderPage(1)',
             'gestureState.dx >= 42) turnReaderPage(-1)',
@@ -130,6 +125,15 @@ jobs:
           for marker in required:
               if marker not in q:
                   raise SystemExit('Missing required Quran behavior: ' + marker)
+          settings_required = [
+            'export type QuranBrowseMode = "horizontal";',
+            'browseMode: "horizontal"',
+            'Arabic book paging',
+            'Swipe left for the next page and right for the previous page. Up/down is reading scroll only.',
+          ]
+          for marker in settings_required:
+              if marker not in rendering:
+                  raise SystemExit('Missing horizontal-only Reader Settings behavior: ' + marker)
           forbidden = [
             'turnReaderPage(gestureState.dx > 0 ? 1 : -1)',
             'turnReaderPage(gestureState.dx < 0 ? -1 : 1)',
@@ -141,6 +145,14 @@ jobs:
           for marker in forbidden:
               if marker in q:
                   raise SystemExit('Forbidden old Quran behavior remains: ' + marker)
+          settings_forbidden = [
+            '["vertical", "↕"',
+            'Scroll up/down. At the page edge, keep swiping to turn the page.',
+            'browseMode: "vertical"',
+          ]
+          for marker in settings_forbidden:
+              if marker in rendering:
+                  raise SystemExit('Forbidden vertical Reader Settings option remains: ' + marker)
           for asset in ['assets/hassoun-logo.png','assets/icon.png','assets/adaptive-icon.png','assets/splash-logo.png']:
               p=Path(asset)
               if not p.exists() or p.stat().st_size < 10000:
@@ -222,5 +234,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$AAB" --clobber
           else
-            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.18 Final' --notes 'Full v1.0.14+ feature line. Quran paging hard-fixed to horizontal only: swipe left next, swipe right previous, vertical up/down never changes pages. Quran reader session persists across Android background/process recreation. Launcher/adaptive icon uses a safe-area composition to prevent Samsung/Android masks from cropping Hassoun. Preserves word/ayah/surah audio, exact bookmark resume, Connect Display, Masjid TV and Google Play functionality fixes.' --prerelease
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.18 Final' --notes 'Full v1.0.14+ feature line. Quran paging is horizontal Arabic-book style only: swipe left next, swipe right previous, vertical up/down never changes pages and the Reader Settings vertical option is removed/migrated. Quran reader session persists across Android background/process recreation. Launcher/adaptive icon uses a safe-area composition to prevent Samsung/Android masks from cropping Hassoun. Preserves word/ayah/surah audio, exact bookmark resume, Connect Display, Masjid TV and Google Play functionality fixes.' --prerelease
           fi
