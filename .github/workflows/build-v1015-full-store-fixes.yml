@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.15 Full Store Fixes
+name: Build Hassoun v1.0.16 Arabic Mushaf Reader
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hassoun-v1015-full-store-fixes
+  group: hassoun-v1016-arabic-reader
   cancel-in-progress: true
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - name: Checkout full v1.0.15 release branch
+      - name: Checkout full feature release branch
         uses: actions/checkout@v4
         with:
           ref: release/v1.0.15-full-store-fixes
@@ -63,11 +63,11 @@ jobs:
           node scripts/apply-masjid-tv-fixes.mjs
           node scripts/apply-masjid-clock-click-branding.mjs
 
-      - name: Apply Google Play Quran and display fixes
+      - name: Apply Quran, Google Play and display fixes
         working-directory: .
         run: python3 scripts/apply-v1015-full-store-fixes.py
 
-      - name: Restore verified current Hassoun logo with safe margins
+      - name: Generate Hassoun logo icon and splash assets
         run: |
           set -euo pipefail
           python3 -m pip install --quiet Pillow
@@ -77,41 +77,57 @@ jobs:
           from pathlib import Path
           from PIL import Image, ImageOps
           source = Image.open('/tmp/hassoun-official.jpg').convert('RGB')
-          full = ImageOps.contain(source, (900,900), Image.Resampling.LANCZOS).convert('RGBA')
-          canvas = Image.new('RGBA', (1024,1024), (0,0,0,0))
-          canvas.alpha_composite(full, ((1024-full.width)//2,(1024-full.height)//2))
-          launcher = Image.new('RGBA', (1024,1024), (7,43,37,255))
-          safe = canvas.resize((760,760), Image.Resampling.LANCZOS)
-          launcher.alpha_composite(safe, ((1024-760)//2,(1024-760)//2))
-          for target in ['assets/hassoun-logo.png','assets/splash-logo.png','assets/splash-icon.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True); canvas.save(target, 'PNG', optimize=True)
-          for target in ['assets/icon.png','assets/adaptive-icon.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True); launcher.save(target, 'PNG', optimize=True)
+
+          # Full in-app artwork: keep every edge visible.
+          art = ImageOps.contain(source, (900, 900), Image.Resampling.LANCZOS).convert('RGBA')
+          transparent = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
+          transparent.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
+
+          # Launcher/adaptive icon: extra safe margin for Android masks.
+          launcher = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
+          icon_art = ImageOps.contain(source, (720, 720), Image.Resampling.LANCZOS).convert('RGBA')
+          launcher.alpha_composite(icon_art, ((1024-icon_art.width)//2, (1024-icon_art.height)//2))
+
+          # Splash: larger than launcher icon but still never cropped.
+          splash = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
+          splash_art = ImageOps.contain(source, (840, 840), Image.Resampling.LANCZOS).convert('RGBA')
+          splash.alpha_composite(splash_art, ((1024-splash_art.width)//2, (1024-splash_art.height)//2))
+
+          for target in ['assets/hassoun-logo.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              transparent.save(target, 'PNG', optimize=True)
+          for target in ['assets/icon.png', 'assets/adaptive-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              launcher.save(target, 'PNG', optimize=True)
+          for target in ['assets/splash-logo.png', 'assets/splash-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True)
+              splash.save(target, 'PNG', optimize=True)
           widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
           widget.parent.mkdir(parents=True, exist_ok=True)
-          canvas.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
+          transparent.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
           PY
 
-      - name: Verify full feature baseline and fixes
+      - name: Verify full feature baseline reader branding and store fixes
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           checks = {
-            'v1.0.15 version': ('app.config.ts', 'version: "1.0.15"'),
-            'Android code 55': ('app.config.ts', 'versionCode: 55'),
+            'v1.0.16 version': ('app.config.ts', 'version: "1.0.16"'),
+            'Android code 56': ('app.config.ts', 'versionCode: 56'),
+            'splash asset config': ('app.config.ts', 'image: "./assets/splash-logo.png"'),
             'TV routing': ('App.tsx', 'MasjidTvDisplay'),
             'Masjid display component': ('src/MasjidTvDisplay.tsx', 'orientationMode'),
             'Masjid video background': ('src/MasjidTvDisplay.tsx', 'backgroundVideoUrl'),
             'landscape TV layout': ('src/MasjidTvDisplay.tsx', 'landscapeLayout'),
             'portrait TV layout': ('src/MasjidTvDisplay.tsx', 'portraitLayout'),
-            'mosque logo support': ('src/MasjidTvDisplay.tsx', 'mosqueLogoUri'),
             'remote Masjid controller': ('src/WallRemoteController.tsx', 'Masjid administration'),
             'tablet wall display': ('src/TabletWallPrayerDisplay.tsx', 'Ramadan'),
             'exact bookmark resume': ('src/quran/QuranV3.tsx', 'setSelectedAyah(from === "bookmarks" ? target : null)'),
             'responsive Quran audio': ('src/quran/QuranV3.tsx', 'Preparing Qur’an audio'),
             'no vertical auto-turn': ('src/quran/QuranV3.tsx', 'const handleVerticalTouchEnd = (_event'),
-            'explicit Quran page navigation': ('src/quran/QuranV3.tsx', 'readerPageNav'),
+            'Arabic horizontal paging': ('src/quran/QuranV3.tsx', 'gestureState.dx < 0 ? 1 : -1'),
+            'tap player visibility': ('src/quran/QuranV3.tsx', 'setPlayerVisible((visible) => !visible)'),
             'Connect Display settings': ('src/SettingsHub.tsx', 'ConnectDisplayPage'),
             'six digit display pairing': ('src/ConnectDisplayPage.tsx', '/masjid-displays/pair'),
           }
@@ -120,6 +136,14 @@ jobs:
               if marker not in text:
                   raise SystemExit(f'Missing required feature: {label} ({path})')
               print(f'OK: {label}')
+          quran = Path('src/quran/QuranV3.tsx').read_text(encoding='utf-8')
+          if 'styles.readerPageNav' in quran:
+              raise SystemExit('Large Previous/Next reader navigation is still present')
+          for asset in ['assets/hassoun-logo.png','assets/icon.png','assets/adaptive-icon.png','assets/splash-logo.png']:
+              p = Path(asset)
+              if not p.exists() or p.stat().st_size < 10000:
+                  raise SystemExit(f'Missing/invalid branding asset: {asset}')
+              print(f'OK: {asset} ({p.stat().st_size} bytes)')
           PY
           npm run typecheck
 
@@ -155,7 +179,6 @@ jobs:
           tree.write(manifest, encoding='utf-8', xml_declaration=True)
           PY
           grep -q 'LEANBACK_LAUNCHER' android/app/src/main/AndroidManifest.xml
-          grep -q 'screenOrientation="unspecified"' android/app/src/main/AndroidManifest.xml
 
       - name: Build release APK and AAB
         run: |
@@ -170,21 +193,21 @@ jobs:
           AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' | head -n 1)"
           test -s "$APK"
           test -s "$AAB"
-          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk
-          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
-          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk.sha256
-          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab.sha256
-          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk
+          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk.sha256
+          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
 
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.15-Full-Store-Fixes
+          name: Hassoun-v1.0.16-Arabic-Reader
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk.sha256
-            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
-            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk.sha256
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -194,11 +217,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk'
-          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab'
-          TAG='v1.0.15-full-store-fixes'
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.16-arabic-reader.apk'
+          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.16-arabic-reader.aab'
+          TAG='v1.0.16-arabic-reader'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$AAB" --clobber
           else
-            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.15 Full Store Fixes' --notes 'Built forward from the full v1.0.14 Masjid TV line. Preserves TV/tablet/Masjid features and verified Hassoun branding while adding Google Play Quran responsiveness, protected reader spacing, explicit page navigation, no vertical scroll-driven page turns, exact-ayah bookmark resume, native 6-digit display pairing, APK and AAB.' --prerelease
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.16 Arabic Mushaf Reader' --notes 'Full v1.0.14+ Masjid/TV feature line with Google Play fixes. Qur’an pages now change only by Arabic-book horizontal swipe: left for next, right for previous. Vertical scrolling never changes pages. Large Previous/Next controls removed. Reader player is hidden by default and toggled by tapping the page. Hassoun logo is regenerated with safe margins for in-app branding, Android launcher/adaptive icon, splash screen and widget. Exact ayah bookmark resume and six-digit Connect Display are preserved.' --prerelease
           fi
