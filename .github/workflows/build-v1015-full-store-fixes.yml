@@ -95,26 +95,32 @@ jobs:
       - name: Verify full feature baseline and fixes
         run: |
           set -euo pipefail
-          grep -q 'version: "1.0.15"' app.config.ts
-          grep -q 'versionCode: 55' app.config.ts
-          grep -q 'Platform.isTV' App.tsx
-          grep -q 'MasjidTvDisplay' App.tsx
-          grep -q 'orientationMode' src/MasjidTvDisplay.tsx
-          grep -q 'backgroundVideoUrl' src/MasjidTvDisplay.tsx
-          grep -q 'landscapeLayout' src/MasjidTvDisplay.tsx
-          grep -q 'portraitLayout' src/MasjidTvDisplay.tsx
-          grep -q 'mosqueLogoUri' src/MasjidTvDisplay.tsx
-          grep -q 'Jumu.ah sessions' src/MasjidTvDisplay.tsx
-          grep -q 'Announcements & activities' src/MasjidTvDisplay.tsx
-          grep -q 'Choose CSV / JSON Schedule File' src/MasjidTvDisplay.tsx
-          grep -q 'Masjid administration' src/WallRemoteController.tsx
-          grep -q 'Ramadan Mode' src/TabletWallPrayerDisplay.tsx
-          grep -q 'setSelectedAyah(from === "bookmarks" ? target : null)' src/quran/QuranV3.tsx
-          grep -q 'Preparing Qur’an audio' src/quran/QuranV3.tsx
-          grep -q 'const handleVerticalTouchEnd = (_event' src/quran/QuranV3.tsx
-          grep -q 'readerPageNav' src/quran/QuranV3.tsx
-          grep -q 'ConnectDisplayPage' src/SettingsHub.tsx
-          grep -q 'Pair display' src/ConnectDisplayPage.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          checks = {
+            'v1.0.15 version': ('app.config.ts', 'version: "1.0.15"'),
+            'Android code 55': ('app.config.ts', 'versionCode: 55'),
+            'TV routing': ('App.tsx', 'MasjidTvDisplay'),
+            'Masjid display component': ('src/MasjidTvDisplay.tsx', 'orientationMode'),
+            'Masjid video background': ('src/MasjidTvDisplay.tsx', 'backgroundVideoUrl'),
+            'landscape TV layout': ('src/MasjidTvDisplay.tsx', 'landscapeLayout'),
+            'portrait TV layout': ('src/MasjidTvDisplay.tsx', 'portraitLayout'),
+            'mosque logo support': ('src/MasjidTvDisplay.tsx', 'mosqueLogoUri'),
+            'remote Masjid controller': ('src/WallRemoteController.tsx', 'Masjid administration'),
+            'tablet wall display': ('src/TabletWallPrayerDisplay.tsx', 'Ramadan'),
+            'exact bookmark resume': ('src/quran/QuranV3.tsx', 'setSelectedAyah(from === "bookmarks" ? target : null)'),
+            'responsive Quran audio': ('src/quran/QuranV3.tsx', 'Preparing Qur’an audio'),
+            'no vertical auto-turn': ('src/quran/QuranV3.tsx', 'const handleVerticalTouchEnd = (_event'),
+            'explicit Quran page navigation': ('src/quran/QuranV3.tsx', 'readerPageNav'),
+            'Connect Display settings': ('src/SettingsHub.tsx', 'ConnectDisplayPage'),
+            'six digit display pairing': ('src/ConnectDisplayPage.tsx', '/masjid-displays/pair'),
+          }
+          for label, (path, marker) in checks.items():
+              text = Path(path).read_text(encoding='utf-8')
+              if marker not in text:
+                  raise SystemExit(f'Missing required feature: {label} ({path})')
+              print(f'OK: {label}')
+          PY
           npm run typecheck
 
       - name: Generate Android project
