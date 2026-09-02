@@ -5,12 +5,12 @@ const config: ExpoConfig = {
   slug: "wopt",
   owner: "hassoun911",
   scheme: "windsorprayer",
-  version: "1.0.8",
+  version: "1.0.15",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   ios: {
-    supportsTablet: false,
+    supportsTablet: true,
     bundleIdentifier: "ca.wopt.windsorprayertimes",
     buildNumber: "3",
     infoPlist: {
@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "ca.wopt.windsorprayertimes",
-    versionCode: 49,
+    versionCode: 55,
     icon: "./assets/icon.png",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
