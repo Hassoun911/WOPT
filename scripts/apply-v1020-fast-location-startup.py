@@ -25,19 +25,24 @@ if old not in s:
     raise SystemExit('startup Promise.all block not found')
 s = s.replace(old, new, 1)
 
-s = s.replace(
-    '      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);',
-    '      setPrayerTimes(initial.prayerTimes);\n      setLive(initial.live);\n      setPrayerLocation(initial.location);',
-    1
-)
-s = s.replace(
-    '        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);',
-    '        const result = await schedulePrayerNotifications(initial.prayerTimes, chosenLocale, savedPhoneAlertPreferences);',
-    1
-)
+# Robustly migrate every old loaded.* reference inside the initial startup effect.
+startup_start = s.find('  useEffect(() => {\n    const timer = setInterval(() => setNow(new Date()), 1_000);')
+if startup_start < 0:
+    raise SystemExit('startup effect start not found')
+startup_end = s.find('\n  }, []);', startup_start)
+if startup_end < 0:
+    raise SystemExit('startup effect end not found')
+startup_block = s[startup_start:startup_end]
+startup_block = startup_block.replace('loaded.prayerTimes', 'initial.prayerTimes').replace('loaded.live', 'initial.live').replace('loaded.location', 'initial.location')
+s = s[:startup_start] + startup_block + s[startup_end:]
+
+# Ensure the initial schedule/location is applied before the background refresh.
+needle = '      setPrayerTimes(initial.prayerTimes);\n      setLive(initial.live);'
+if needle not in s:
+    raise SystemExit('initial prayer state assignment not found')
+s = s.replace(needle, needle + '\n      setPrayerLocation(initial.location);', 1)
 
 # Insert background location/network refresh only inside the initial startup effect.
-# The same registerDeviceForServerPush line appears in other callbacks, so replace ONCE.
 anchor = '''        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }\n    })();'''
 replacement = '''        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }\n\n      // Refresh GPS + network prayer data only after Home is already usable.\n      // This keeps startup instant and updates Windsor/Montreal/other cities in the background.\n      void loadPrayerTimes().then(async (refreshed) => {\n        setPrayerTimes(refreshed.prayerTimes);\n        setPrayerLocation(refreshed.location);\n        setLive(refreshed.live);\n        if (savedAlerts === "on") {\n          const result = await schedulePrayerNotifications(refreshed.prayerTimes, chosenLocale, savedPhoneAlertPreferences);\n          setScheduledCount(result.count);\n        }\n      }).catch(() => undefined);\n    })();'''
 if anchor not in s:
@@ -66,5 +71,11 @@ if 'Loading Windsor prayer times…' in s:
 if s.count('void loadPrayerTimes().then(async (refreshed)') != 1:
     raise SystemExit('background refresh must exist exactly once')
 
+# No stale loaded.* references may survive in startup after tuple migration.
+check_start = s.find('  useEffect(() => {\n    const timer = setInterval(() => setNow(new Date()), 1_000);')
+check_end = s.find('\n  }, []);', check_start)
+if 'loaded.' in s[check_start:check_end]:
+    raise SystemExit('stale loaded.* reference remains in startup effect')
+
 p.write_text(s, encoding='utf-8')
-print('Applied v1.0.20 fast startup exactly once: cached Home first, GPS refresh second.')
+print('Applied v1.0.20 robust fast startup: cached Home first, GPS refresh second, no stale loaded refs.')
