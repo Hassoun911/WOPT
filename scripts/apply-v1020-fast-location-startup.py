@@ -26,10 +26,10 @@ s = s.replace(
     '      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);',
     '      setPrayerTimes(initial.prayerTimes);\n      setLive(initial.live);\n      setPrayerLocation(initial.location);'
 )
-s = s.replace(
-    '        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);',
-    '        const result = await schedulePrayerNotifications(initial.prayerTimes, chosenLocale, savedPhoneAlertPreferences);'
-)
+# Catch every stale startup reference left by older feature-stack patches.
+s = s.replace('loaded.prayerTimes', 'initial.prayerTimes')
+s = s.replace('loaded.live', 'initial.live')
+s = s.replace('loaded.location', 'initial.location')
 
 anchor = '''        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }\n    })();'''
 replacement = '''        void registerDeviceForServerPush(chosenLocale).catch(() => undefined);\n      }\n\n      // Refresh GPS + network prayer data only after Home is already usable.\n      // This keeps startup instant and updates Windsor/Montreal/other cities in the background.\n      void loadPrayerTimes().then(async (refreshed) => {\n        setPrayerTimes(refreshed.prayerTimes);\n        setPrayerLocation(refreshed.location);\n        setLive(refreshed.live);\n        if (savedAlerts === "on") {\n          const result = await schedulePrayerNotifications(refreshed.prayerTimes, chosenLocale, savedPhoneAlertPreferences);\n          setScheduledCount(result.count);\n        }\n      }).catch(() => undefined);\n    })();'''
@@ -53,8 +53,9 @@ for required in [
 ]:
     if required not in s:
         raise SystemExit('missing fast-start requirement: ' + required)
-if 'Loading Windsor prayer times…' in s:
-    raise SystemExit('blocking Windsor loader still present')
+for forbidden in ['Loading Windsor prayer times…', 'loaded.prayerTimes', 'loaded.live', 'loaded.location']:
+    if forbidden in s:
+        raise SystemExit('stale startup marker remains: ' + forbidden)
 
 p.write_text(s, encoding='utf-8')
 print('Applied v1.0.20 fast cached/location-aware startup: Home first, GPS refresh second.')
