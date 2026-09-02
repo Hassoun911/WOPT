@@ -3,14 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-brand.svg?v=20260825-exact-5";
+const LOGO = "/hassoun-brand-safe.svg?v=20260902-safe-1";
 
 function makeLogo(size = 48, radius = 14) {
   const img = document.createElement("img");
   img.src = LOGO;
   img.alt = "Hassoun";
   img.dataset.hassounBrand = "official";
-  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;background:#0b5b47;border-radius:${radius}px;display:block`;
+  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;object-position:center;background:#003d33;border-radius:${radius}px;display:block;padding:${Math.max(2, Math.round(size * 0.06))}px;box-sizing:border-box`;
   return img;
 }
 
@@ -24,6 +24,7 @@ export default function WebsiteLogoEnhancer() {
         if (
           src.includes("hassoun-logo.png") ||
           src.includes("hassoun-official-logo.jpg") ||
+          src.includes("hassoun-brand.svg") ||
           src.includes("favicon-logo.png") ||
           src.includes("app-icon.svg") ||
           src.includes("icon-192.png") ||
@@ -36,25 +37,26 @@ export default function WebsiteLogoEnhancer() {
         }
         if (img.dataset.hassounBrand === "official") {
           img.style.objectFit = "contain";
-          img.style.background = "#0b5b47";
+          img.style.objectPosition = "center";
+          img.style.background = "#003d33";
+          img.style.padding = img.style.padding || "4px";
+          img.style.boxSizing = "border-box";
         }
       });
 
-      // Main website header: replace the old text placeholder with the official Hassoun logo.
       document.querySelectorAll<HTMLElement>(".brand-mark").forEach((target) => {
         if (target.dataset.hassounBrandApplied === "true") return;
         target.dataset.hassounBrandApplied = "true";
         target.textContent = "";
         target.style.overflow = "hidden";
         target.style.padding = "3px";
-        target.style.background = "#0b5b47";
+        target.style.background = "#003d33";
         target.style.display = "flex";
         target.style.alignItems = "center";
         target.style.justifyContent = "center";
         const logo = makeLogo(48, 12);
         logo.style.width = "100%";
         logo.style.height = "100%";
-        logo.style.objectFit = "contain";
         target.appendChild(logo);
       });
 
@@ -70,14 +72,13 @@ export default function WebsiteLogoEnhancer() {
         target.textContent = "";
         target.style.overflow = "hidden";
         target.style.padding = "8px";
-        target.style.background = "#0b5b47";
+        target.style.background = "#003d33";
         target.style.display = "flex";
         target.style.alignItems = "center";
         target.style.justifyContent = "center";
         const logo = makeLogo(64, 16);
         logo.style.width = "100%";
         logo.style.height = "100%";
-        logo.style.objectFit = "contain";
         target.appendChild(logo);
       });
 
