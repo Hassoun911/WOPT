@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video --npm
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen --npm
 
       - name: Apply full Masjid TV feature stack
         run: |
@@ -77,31 +77,20 @@ jobs:
           from pathlib import Path
           from PIL import Image, ImageOps
           source = Image.open('/tmp/hassoun-official.jpg').convert('RGB')
-
-          # Full in-app artwork: keep every edge visible.
           art = ImageOps.contain(source, (900, 900), Image.Resampling.LANCZOS).convert('RGBA')
           transparent = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
           transparent.alpha_composite(art, ((1024-art.width)//2, (1024-art.height)//2))
-
-          # Launcher/adaptive icon: extra safe margin for Android masks.
           launcher = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
           icon_art = ImageOps.contain(source, (720, 720), Image.Resampling.LANCZOS).convert('RGBA')
           launcher.alpha_composite(icon_art, ((1024-icon_art.width)//2, (1024-icon_art.height)//2))
-
-          # Splash: larger than launcher icon but still never cropped.
           splash = Image.new('RGBA', (1024, 1024), (7, 43, 37, 255))
           splash_art = ImageOps.contain(source, (840, 840), Image.Resampling.LANCZOS).convert('RGBA')
           splash.alpha_composite(splash_art, ((1024-splash_art.width)//2, (1024-splash_art.height)//2))
-
-          for target in ['assets/hassoun-logo.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True)
-              transparent.save(target, 'PNG', optimize=True)
-          for target in ['assets/icon.png', 'assets/adaptive-icon.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True)
-              launcher.save(target, 'PNG', optimize=True)
-          for target in ['assets/splash-logo.png', 'assets/splash-icon.png']:
-              Path(target).parent.mkdir(parents=True, exist_ok=True)
-              splash.save(target, 'PNG', optimize=True)
+          transparent.save('assets/hassoun-logo.png', 'PNG', optimize=True)
+          launcher.save('assets/icon.png', 'PNG', optimize=True)
+          launcher.save('assets/adaptive-icon.png', 'PNG', optimize=True)
+          splash.save('assets/splash-logo.png', 'PNG', optimize=True)
+          splash.save('assets/splash-icon.png', 'PNG', optimize=True)
           widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
           widget.parent.mkdir(parents=True, exist_ok=True)
           transparent.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
@@ -115,7 +104,8 @@ jobs:
           checks = {
             'v1.0.16 version': ('app.config.ts', 'version: "1.0.16"'),
             'Android code 56': ('app.config.ts', 'versionCode: 56'),
-            'splash asset config': ('app.config.ts', 'image: "./assets/splash-logo.png"'),
+            'splash plugin': ('app.config.ts', 'expo-splash-screen'),
+            'splash image': ('app.config.ts', 'image: "./assets/splash-logo.png"'),
             'TV routing': ('App.tsx', 'MasjidTvDisplay'),
             'Masjid display component': ('src/MasjidTvDisplay.tsx', 'orientationMode'),
             'Masjid video background': ('src/MasjidTvDisplay.tsx', 'backgroundVideoUrl'),
@@ -223,5 +213,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$AAB" --clobber
           else
-            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.16 Arabic Mushaf Reader' --notes 'Full v1.0.14+ Masjid/TV feature line with Google Play fixes. Qur’an pages now change only by Arabic-book horizontal swipe: left for next, right for previous. Vertical scrolling never changes pages. Large Previous/Next controls removed. Reader player is hidden by default and toggled by tapping the page. Hassoun logo is regenerated with safe margins for in-app branding, Android launcher/adaptive icon, splash screen and widget. Exact ayah bookmark resume and six-digit Connect Display are preserved.' --prerelease
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.16 Arabic Mushaf Reader' --notes 'Full v1.0.14+ Masjid/TV feature line with Google Play fixes. Qur’an pages change only by Arabic-book horizontal swipe: left for next and right for previous. Vertical scrolling never changes pages. Large Previous/Next controls removed. Reader player is hidden by default and toggled by tapping the page. Hassoun branding is regenerated with safe margins for in-app logo, Android launcher/adaptive icon, splash screen and widget. Exact ayah bookmark resume and six-digit Connect Display are preserved.' --prerelease
           fi
