@@ -1,0 +1,199 @@
+name: Build Hassoun v1.0.15 Full Store Fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.0.15-full-store-fixes
+    paths:
+      - 'mobile/**'
+      - 'scripts/apply-v1015-full-store-fixes.py'
+      - '.github/logo-official/**'
+      - '.github/workflows/build-v1015-full-store-fixes.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hassoun-v1015-full-store-fixes
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout full v1.0.15 release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.15-full-store-fixes
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video --npm
+
+      - name: Apply full Masjid TV feature stack
+        run: |
+          set -euo pipefail
+          node scripts/apply-wall-shell-for-masjid.mjs
+          node scripts/apply-masjid-tv.mjs
+          node scripts/apply-masjid-remote.mjs
+          node scripts/apply-masjid-typefix.mjs
+          node scripts/apply-masjid-tv-fixes.mjs
+          node scripts/apply-masjid-clock-click-branding.mjs
+          node scripts/apply-masjid-logo.mjs
+
+      - name: Apply Google Play Quran and display fixes
+        working-directory: .
+        run: python3 scripts/apply-v1015-full-store-fixes.py
+
+      - name: Restore verified current Hassoun logo with safe margins
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet Pillow
+          tr -d '\n\r ' < ../.github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-official.jpg
+          echo 'a233f3a8e323499df9643a29280d5f53d2c18468414107b034863f6d82517e75  /tmp/hassoun-official.jpg' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source = Image.open('/tmp/hassoun-official.jpg').convert('RGB')
+          full = ImageOps.contain(source, (900,900), Image.Resampling.LANCZOS).convert('RGBA')
+          canvas = Image.new('RGBA', (1024,1024), (0,0,0,0))
+          canvas.alpha_composite(full, ((1024-full.width)//2,(1024-full.height)//2))
+          launcher = Image.new('RGBA', (1024,1024), (7,43,37,255))
+          safe = canvas.resize((760,760), Image.Resampling.LANCZOS)
+          launcher.alpha_composite(safe, ((1024-760)//2,(1024-760)//2))
+          for target in ['assets/hassoun-logo.png','assets/splash-logo.png','assets/splash-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True); canvas.save(target, 'PNG', optimize=True)
+          for target in ['assets/icon.png','assets/adaptive-icon.png']:
+              Path(target).parent.mkdir(parents=True, exist_ok=True); launcher.save(target, 'PNG', optimize=True)
+          widget = Path('modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
+          widget.parent.mkdir(parents=True, exist_ok=True)
+          canvas.resize((512,512), Image.Resampling.LANCZOS).save(widget, 'PNG', optimize=True)
+          PY
+
+      - name: Verify full feature baseline and fixes
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.15"' app.config.ts
+          grep -q 'versionCode: 55' app.config.ts
+          grep -q 'Platform.isTV' App.tsx
+          grep -q 'MasjidTvDisplay' App.tsx
+          grep -q 'orientationMode' src/MasjidTvDisplay.tsx
+          grep -q 'backgroundVideoUrl' src/MasjidTvDisplay.tsx
+          grep -q 'landscapeLayout' src/MasjidTvDisplay.tsx
+          grep -q 'portraitLayout' src/MasjidTvDisplay.tsx
+          grep -q 'mosqueLogoUri' src/MasjidTvDisplay.tsx
+          grep -q 'Jumu.ah sessions' src/MasjidTvDisplay.tsx
+          grep -q 'Announcements & activities' src/MasjidTvDisplay.tsx
+          grep -q 'Choose CSV / JSON Schedule File' src/MasjidTvDisplay.tsx
+          grep -q 'Masjid administration' src/WallRemoteController.tsx
+          grep -q 'Ramadan Mode' src/TabletWallPrayerDisplay.tsx
+          grep -q 'setSelectedAyah(from === "bookmarks" ? target : null)' src/quran/QuranV3.tsx
+          grep -q 'Preparing Qur’an audio' src/quran/QuranV3.tsx
+          grep -q 'const handleVerticalTouchEnd = (_event' src/quran/QuranV3.tsx
+          grep -q 'readerPageNav' src/quran/QuranV3.tsx
+          grep -q 'ConnectDisplayPage' src/SettingsHub.tsx
+          grep -q 'Pair display' src/ConnectDisplayPage.tsx
+          npm run typecheck
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Enable Android TV launcher and flexible orientation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          android = 'http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android', android)
+          tree = ET.parse(manifest)
+          root = tree.getroot()
+          def has_feature(name):
+              return any(el.tag == 'uses-feature' and el.attrib.get(f'{{{android}}}name') == name for el in root)
+          if not has_feature('android.software.leanback'):
+              ET.SubElement(root, 'uses-feature', {f'{{{android}}}name':'android.software.leanback', f'{{{android}}}required':'false'})
+          if not has_feature('android.hardware.touchscreen'):
+              ET.SubElement(root, 'uses-feature', {f'{{{android}}}name':'android.hardware.touchscreen', f'{{{android}}}required':'false'})
+          app = root.find('application')
+          if app is None: raise SystemExit('application not found')
+          app.set(f'{{{android}}}banner', '@drawable/hassoun_widget_logo')
+          main = next((a for a in app.findall('activity') if a.attrib.get(f'{{{android}}}name', '').endswith('MainActivity')), None)
+          if main is None: raise SystemExit('MainActivity not found')
+          main.set(f'{{{android}}}screenOrientation', 'unspecified')
+          if not any('android.intent.category.LEANBACK_LAUNCHER' in [x.attrib.get(f'{{{android}}}name') for x in filt.findall('category')] for filt in main.findall('intent-filter')):
+              filt = ET.SubElement(main, 'intent-filter')
+              ET.SubElement(filt, 'action', {f'{{{android}}}name':'android.intent.action.MAIN'})
+              ET.SubElement(filt, 'category', {f'{{{android}}}name':'android.intent.category.LEANBACK_LAUNCHER'})
+          tree.write(manifest, encoding='utf-8', xml_declaration=True)
+          PY
+          grep -q 'LEANBACK_LAUNCHER' android/app/src/main/AndroidManifest.xml
+          grep -q 'screenOrientation="unspecified"' android/app/src/main/AndroidManifest.xml
+
+      - name: Build release APK and AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          NODE_ENV=production ./gradlew clean assembleRelease bundleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name release files
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
+          AAB="$(find android/app/build/outputs/bundle/release -name '*.aab' | head -n 1)"
+          test -s "$APK"
+          test -s "$AAB"
+          cp "$APK" android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk
+          cp "$AAB" android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
+          sha256sum android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk | tee android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk.sha256
+          sha256sum android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab | tee android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab.sha256
+          ls -lh android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
+
+      - name: Upload Android release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.15-Full-Store-Fixes
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk.sha256
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab
+            mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish prerelease APK and AAB
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.15-full-store-fixes.apk'
+          AAB='mobile/android/app/build/outputs/bundle/release/Hassoun-v1.0.15-full-store-fixes.aab'
+          TAG='v1.0.15-full-store-fixes'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$AAB" --clobber
+          else
+            gh release create "$TAG" "$APK" "$AAB" --target release/v1.0.15-full-store-fixes --title 'Hassoun v1.0.15 Full Store Fixes' --notes 'Built forward from the full v1.0.14 Masjid TV line. Preserves TV/tablet/Masjid features and verified Hassoun branding while adding Google Play Quran responsiveness, protected reader spacing, explicit page navigation, no vertical scroll-driven page turns, exact-ayah bookmark resume, native 6-digit display pairing, APK and AAB.' --prerelease
+          fi
