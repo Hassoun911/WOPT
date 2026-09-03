@@ -1,3 +1,4 @@
+import { processEmailOutbox } from "./emailDelivery";
 import type { Env } from "./types";
 
 type AdminResetRow = {
@@ -111,6 +112,23 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
     JSON.stringify({ resetUrl }),
     `admin-reset:${admin.id}:${tokenHash}`
   ).run();
+
+  // Password reset emails are time-sensitive. Flush the outbox immediately instead
+  // of waiting for the next scheduled Worker run. Keep the public response generic
+  // to avoid exposing whether an admin account exists.
+  try {
+    const delivery = await processEmailOutbox(env);
+    if (!delivery.configured) {
+      console.error("Admin password reset email provider is not configured", {
+        adminUserId: admin.id
+      });
+    }
+  } catch (error) {
+    console.error("Admin password reset immediate email delivery failed", {
+      adminUserId: admin.id,
+      error
+    });
+  }
 
   return accepted;
 }
