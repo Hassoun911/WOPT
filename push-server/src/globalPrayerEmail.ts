@@ -64,7 +64,13 @@ function zonedLocalToInstant(dateKey: string, time: string, timezone: string) {
   }
   return instantMs;
 }
-function sameMinute(leftMs: number, rightMs: number) { return Math.floor(leftMs / 60_000) === Math.floor(rightMs / 60_000); }
+const EMAIL_CATCHUP_MINUTES = 5;
+function dueWithinCatchupWindow(targetMs: number, scheduledTime: number) {
+  const targetMinute = Math.floor(targetMs / 60_000);
+  const scheduledMinute = Math.floor(scheduledTime / 60_000);
+  const ageMinutes = scheduledMinute - targetMinute;
+  return ageMinutes >= 0 && ageMinutes <= EMAIL_CATCHUP_MINUTES;
+}
 function prayerLabel(prayer: PrayerKey, locale: Locale) {
   const labels: Record<PrayerKey, { en: string; ar: string }> = {
     fajr: { en: "Fajr", ar: "الفجر" }, dhuhr: { en: "Dhuhr", ar: "الظهر" }, asr: { en: "Asr", ar: "العصر" }, maghrib: { en: "Maghrib", ar: "المغرب" }, isha: { en: "Isha", ar: "العشاء" }
@@ -170,7 +176,7 @@ async function evaluateDay(env: Env, subscriber: Subscriber, day: CachedPrayerDa
     for (const rule of OFFSETS) {
       if (prefs[rule.field] !== 1) continue;
       const targetMs = prayerInstant + rule.minutes * 60_000;
-      if (!sameMinute(targetMs, scheduledTime)) continue;
+      if (!dueWithinCatchupWindow(targetMs, scheduledTime)) continue;
       if (await queuePrayerEmail(env, subscriber, day, prayer, rule.kind, prayerTime, targetMs)) queued += 1;
     }
   }
