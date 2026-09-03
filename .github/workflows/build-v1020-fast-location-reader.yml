@@ -55,6 +55,8 @@ jobs:
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
           npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen --npm
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+          test -x node_modules/@typescript/typescript-linux-x64/tsc || test -d node_modules/@typescript/typescript-linux-x64
 
       - name: Verify trusted EAS credentials access
         run: |
