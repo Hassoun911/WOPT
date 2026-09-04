@@ -1,6 +1,7 @@
 // Final deployment pass for Hassoun emails.
-// The schema patch builds the bilingual mixed email structure. This step only
-// applies deterministic Arabic fallbacks and centering without rewriting blocks.
+// First create the mixed bilingual centered enhancement blocks, then replace
+// the fragile split-language renderer with one stable production render path.
 import './finalize-email-bilingual-center.mjs';
+import './stabilize-email-render.mjs';
 
-console.log('Applied safe bilingual centered email finalizer.');
+console.log('Applied stable production bilingual centered email renderer.');
