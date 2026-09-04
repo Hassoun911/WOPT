@@ -52,9 +52,27 @@ for (const file of ['src/adminEmail.ts','src/emailDelivery.ts','migrations/0008_
     else if (!after.includes("template_key = 'announcement' LIMIT 1")) {
       throw new Error('Unable to patch global sponsor inheritance in emailDelivery.ts');
     }
+
+    // Sponsor content is intentionally bilingual in every email. The subscriber's
+    // locale still controls the rest of the email, but the sponsor/support block
+    // always shows both the configured English and Arabic messages together.
+    const oldSponsorMessage = `    const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");`;
+    const newSponsorMessage = `    const sponsorMessageEn = profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.";\n    const sponsorMessageAr = profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.";`;
+    if (after.includes(oldSponsorMessage)) after = after.replace(oldSponsorMessage, newSponsorMessage);
+
+    const oldSponsorBlock = `    blocks.push(\`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="\${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:\${ar ? "right" : "left"}">\${logo}<div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">\${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">\${escapeHtml(sponsorMessage)}</div>\${link}</td></tr></table></td></tr>\`);`;
+    const newSponsorBlock = `    blocks.push(\`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td style="padding:14px">\${logo}<div dir="ltr" style="text-align:left;font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">\${escapeHtml(sponsorName)}</div><div dir="ltr" style="text-align:left;font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">\${escapeHtml(sponsorMessageEn)}</div><div style="height:1px;background:#e5dac6;margin:12px 0"></div><div dir="rtl" style="text-align:right;font-size:13px;line-height:1.8;color:#53655f">\${escapeHtml(sponsorMessageAr)}</div>\${link}</td></tr></table></td></tr>\`);`;
+    if (after.includes(oldSponsorBlock)) after = after.replace(oldSponsorBlock, newSponsorBlock);
+    else if (!after.includes('sponsorMessageEn') || !after.includes('sponsorMessageAr')) {
+      throw new Error('Unable to patch bilingual sponsor HTML in emailDelivery.ts');
+    }
+
+    const oldSponsorText = `    if (profile.include_sponsor === 1) textParts.push(profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");`;
+    const newSponsorText = `    if (profile.include_sponsor === 1) textParts.push(\`\${profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing."}\\n\${profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها."}\`);`;
+    if (after.includes(oldSponsorText)) after = after.replace(oldSponsorText, newSponsorText);
   }
 
   if (before !== after) writeFileSync(url, after);
 }
 
-console.log('Email sponsor schema aligned and global sponsor details applied to all enabled sponsor sections.');
+console.log('Email sponsor schema aligned, global sponsor details applied, and sponsor content rendered bilingually.');
