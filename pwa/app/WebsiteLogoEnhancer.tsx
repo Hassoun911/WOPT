@@ -3,14 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-brand-safe.svg?v=20260902-safe-1";
+const LOGO = "/hassoun-logo.png?v=20260904-logo-fix";
 
 function makeLogo(size = 48, radius = 14) {
   const img = document.createElement("img");
   img.src = LOGO;
   img.alt = "Hassoun";
   img.dataset.hassounBrand = "official";
-  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;object-position:center;background:#003d33;border-radius:${radius}px;display:block;padding:${Math.max(2, Math.round(size * 0.06))}px;box-sizing:border-box`;
+  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;object-position:center;border-radius:${radius}px;display:block;padding:0;box-sizing:border-box;background:transparent`;
   return img;
 }
 
@@ -25,6 +25,7 @@ export default function WebsiteLogoEnhancer() {
           src.includes("hassoun-logo.png") ||
           src.includes("hassoun-official-logo.jpg") ||
           src.includes("hassoun-brand.svg") ||
+          src.includes("hassoun-brand-safe.svg") ||
           src.includes("favicon-logo.png") ||
           src.includes("app-icon.svg") ||
           src.includes("icon-192.png") ||
@@ -38,8 +39,8 @@ export default function WebsiteLogoEnhancer() {
         if (img.dataset.hassounBrand === "official") {
           img.style.objectFit = "contain";
           img.style.objectPosition = "center";
-          img.style.background = "#003d33";
-          img.style.padding = img.style.padding || "4px";
+          img.style.background = "transparent";
+          img.style.padding = "0";
           img.style.boxSizing = "border-box";
         }
       });
@@ -49,8 +50,8 @@ export default function WebsiteLogoEnhancer() {
         target.dataset.hassounBrandApplied = "true";
         target.textContent = "";
         target.style.overflow = "hidden";
-        target.style.padding = "3px";
-        target.style.background = "#003d33";
+        target.style.padding = "0";
+        target.style.background = "transparent";
         target.style.display = "flex";
         target.style.alignItems = "center";
         target.style.justifyContent = "center";
@@ -71,8 +72,8 @@ export default function WebsiteLogoEnhancer() {
         target.dataset.hassounBrandApplied = "true";
         target.textContent = "";
         target.style.overflow = "hidden";
-        target.style.padding = "8px";
-        target.style.background = "#003d33";
+        target.style.padding = "0";
+        target.style.background = "transparent";
         target.style.display = "flex";
         target.style.alignItems = "center";
         target.style.justifyContent = "center";
@@ -101,6 +102,7 @@ export default function WebsiteLogoEnhancer() {
             node.dataset.hassounLogoReplaced = "true";
             node.textContent = "";
             node.style.overflow = "hidden";
+            node.style.background = "transparent";
             node.appendChild(makeLogo(Math.max(42, Math.min(72, node.clientWidth || 48)), 14));
           }
         });
