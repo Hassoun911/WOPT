@@ -128,4 +128,27 @@ async function renderEmail(env: Env, row: OutboxRow) {
   if (before !== after) writeFileSync(url, after);
 }
 
-console.log('Email schema aligned, global sponsor inherited, and all email sections rendered in English and Arabic.');
+// Add an owner/admin-only one-click test action for every Email Center template card.
+// Every test always goes to the dedicated Hassoun admin mailbox.
+{
+  const url = new URL('../src/adminEmail.ts', import.meta.url);
+  let source = readFileSync(url, 'utf8');
+  if (!source.includes('processEmailOutbox')) {
+    source = source.replace('import { subscriberManageUrl } from "./subscribers";', 'import { subscriberManageUrl } from "./subscribers";\nimport { processEmailOutbox } from "./emailDelivery";');
+  }
+  if (!source.includes('async function sendTemplateTest(')) {
+    const marker = 'export async function createAdminEmailCampaign(request: Request, env: Env) {';
+    const helper = `const ADMIN_TEST_EMAIL = "windsor.hassoun@gmail.com";\n\nasync function sendTemplateTest(env: Env, adminId: number, body: Record<string, unknown>) {\n  const templateKey = clean(body.templateKey, 120);\n  if (!templateKey) return json({ error: "Template key is required" }, 400);\n  const profile = await env.DB.prepare("SELECT template_key, name FROM email_template_profiles WHERE template_key = ? LIMIT 1").bind(templateKey).first<{ template_key: string; name: string }>();\n  if (!profile) return json({ error: "Template profile not found" }, 404);\n  const kind = templateKey === "prayer_alert" ? "prayer" : templateKey;\n  const now = new Date().toISOString();\n  const testData = {\n    message: \`This is a Hassoun test email for \${profile.name}.\`,\n    verificationUrl: "https://hassoun.app/",\n    manageUrl: "https://hassoun.app/",\n    resetUrl: "https://hassoun.app/admin/",\n    prayer: "fajr", prayerTime: "5:30 AM", locationLabel: "Windsor, Ontario", timezone: "America/Toronto",\n    prayerTimes: { fajr: "5:30 AM", dhuhr: "1:30 PM", asr: "5:00 PM", maghrib: "7:45 PM", isha: "9:00 PM" },\n    upcomingEvent: { emoji: "🌙", nameEn: "Test Islamic Occasion", nameAr: "مناسبة إسلامية تجريبية", descriptionEn: "Test preview of the Islamic occasion section.", descriptionAr: "معاينة تجريبية لقسم المناسبة الإسلامية.", daysLeft: 7 }\n  };\n  await env.DB.prepare(\`INSERT INTO email_outbox (recipient_email, locale, kind, template_key, template_data_json, idempotency_key, scheduled_at) VALUES (?, 'en', ?, ?, ?, ?, CURRENT_TIMESTAMP)\`).bind(ADMIN_TEST_EMAIL, kind, templateKey, JSON.stringify(testData), \`admin-template-test:\${templateKey}:\${crypto.randomUUID()}\`).run();\n  const delivery = await processEmailOutbox(env);\n  await logAdmin(env, adminId, "email_template_test_sent", templateKey, { recipient: ADMIN_TEST_EMAIL, delivery });\n  return json({ ok: true, recipient: ADMIN_TEST_EMAIL, templateKey, delivery });\n}\n\n`;
+    if (!source.includes(marker)) throw new Error('Unable to find admin Email Center action marker');
+    source = source.replace(marker, helper + marker);
+  }
+  const actionMarker = '  if (body.action === "update_template_profile") return updateTemplateProfile(env, auth.admin.id, body);';
+  const testAction = '  if (body.action === "send_template_test") return sendTemplateTest(env, auth.admin.id, body);\n';
+  if (!source.includes('body.action === "send_template_test"')) {
+    if (!source.includes(actionMarker)) throw new Error('Unable to find admin email action switch');
+    source = source.replace(actionMarker, testAction + actionMarker);
+  }
+  writeFileSync(url, source);
+}
+
+console.log('Email schema aligned, bilingual rendering enabled, and admin template test emails wired to windsor.hassoun@gmail.com.');
