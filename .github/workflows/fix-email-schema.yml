@@ -33,3 +33,5 @@ jobs:
           git add push-server/src/adminEmail.ts push-server/src/emailDelivery.ts push-server/migrations/0008_email_template_profiles.sql
           git commit -m "Fix Hassoun admin email schema mismatch"
           git push
+
+# One-time repair workflow: production D1 uses sponsor_logo_base64.
