@@ -76,6 +76,35 @@ function publicAppUrl(env: Env) {
   return (env.PUBLIC_APP_URL || "https://hassoun911.github.io/Hassoun/").replace(/\/$/, "");
 }
 
+async function sendResetEmailDirect(env: Env, recipient: string, resetUrl: string) {
+  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) return false;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: env.EMAIL_FROM,
+      to: [recipient],
+      subject: "Reset your Hassoun admin password",
+      text: `Reset your Hassoun admin password. This secure link expires in one hour: ${resetUrl}`,
+      html: `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#173f35;background:#f6f0e5;padding:24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffdf8;border:1px solid #e3dac9;border-radius:20px"><tr><td style="padding:28px"><p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:1.5px;color:#9a8a70">HASSOUN ADMIN</p><h1 style="margin:0 0 12px;font-size:28px;color:#153f35">Reset your admin password</h1><p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#6f746c">Use the secure link below to create a new admin password.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><a href="${resetUrl.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;")}" style="display:inline-block;background:#0b5b47;color:#fff;text-decoration:none;font-size:15px;font-weight:800;padding:14px 20px;border-radius:12px">Reset password</a></td></tr></table><p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#8a8377">This link expires in one hour.</p></td></tr></table></td></tr></table></body></html>`
+    })
+  });
+
+  if (!response.ok) {
+    console.error("Direct admin reset email failed", {
+      status: response.status,
+      body: await response.text().catch(() => "")
+    });
+    return false;
+  }
+
+  return true;
+}
+
 export async function requestAdminPasswordReset(request: Request, env: Env) {
   const body = await bodyJson(request);
   const email = validEmail(body.email);
@@ -86,9 +115,14 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
   if (!email) return accepted;
 
   const admin = await env.DB.prepare(
-    `SELECT id, email FROM admin_users WHERE email = ? COLLATE NOCASE AND status = 'active' LIMIT 1`
+    `SELECT id, email FROM admin_users
+     WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND status = 'active'
+     LIMIT 1`
   ).bind(email).first<{ id: number; email: string }>();
-  if (!admin) return accepted;
+  if (!admin) {
+    console.warn("Admin password reset requested for non-matching active admin email");
+    return accepted;
+  }
 
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
@@ -103,19 +137,25 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
   ).bind(admin.id, tokenHash).run();
 
   const resetUrl = `${publicAppUrl(env)}/admin/reset/?token=${encodeURIComponent(token)}`;
+  const recipient = admin.email.trim();
+
+  try {
+    const directSent = await sendResetEmailDirect(env, recipient, resetUrl);
+    if (directSent) return accepted;
+  } catch (error) {
+    console.error("Direct admin password reset delivery threw", { adminUserId: admin.id, error });
+  }
+
   await env.DB.prepare(
     `INSERT INTO email_outbox (
        recipient_email, locale, kind, template_key, template_data_json, idempotency_key
      ) VALUES (?, 'en', 'admin_password_reset', 'admin_password_reset', ?, ?)`
   ).bind(
-    admin.email,
+    recipient,
     JSON.stringify({ resetUrl }),
     `admin-reset:${admin.id}:${tokenHash}`
   ).run();
 
-  // Password reset emails are time-sensitive. Flush the outbox immediately instead
-  // of waiting for the next scheduled Worker run. Keep the public response generic
-  // to avoid exposing whether an admin account exists.
   try {
     const delivery = await processEmailOutbox(env);
     if (!delivery.configured) {
@@ -124,7 +164,7 @@ export async function requestAdminPasswordReset(request: Request, env: Env) {
       });
     }
   } catch (error) {
-    console.error("Admin password reset immediate email delivery failed", {
+    console.error("Admin password reset fallback delivery failed", {
       adminUserId: admin.id,
       error
     });
@@ -151,8 +191,6 @@ export async function resetAdminPassword(request: Request, env: Env) {
   if (!reset) return json({ error: "This password reset link is invalid or expired" }, 403);
 
   const salt = randomToken(24);
-  // Cloudflare Workers' WebCrypto runtime rejects PBKDF2 iteration counts above
-  // 100,000. Store the iteration count with the hash so verification remains exact.
   const iterations = CLOUDFLARE_PBKDF2_ITERATIONS;
   const digest = await passwordDigest(password, salt, iterations);
 
