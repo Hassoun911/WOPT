@@ -125,12 +125,12 @@ async function updateTemplateProfile(env: Env, adminId: number, body: Record<str
     `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
             include_daily_surah, include_occasion_countdown, include_motivation,
             include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
-            sponsor_message_en, sponsor_message_ar, sponsor_logo_data, sponsor_logo_mime
+            sponsor_message_en, sponsor_message_ar, sponsor_logo_base64, sponsor_logo_mime
      FROM email_template_profiles WHERE template_key = ? LIMIT 1`
   ).bind(key).first<Record<string, unknown>>();
   if (!existing) return json({ error: "Template profile not found" }, 404);
 
-  let sponsorLogoData = typeof existing.sponsor_logo_data === "string" ? existing.sponsor_logo_data : null;
+  let sponsorLogoData = typeof existing.sponsor_logo_base64 === "string" ? existing.sponsor_logo_base64 : null;
   let sponsorLogoMime = typeof existing.sponsor_logo_mime === "string" ? existing.sponsor_logo_mime : null;
   if (body.clearSponsorLogo === true) {
     sponsorLogoData = null;
@@ -148,7 +148,7 @@ async function updateTemplateProfile(env: Env, adminId: number, body: Record<str
        enabled = ?, include_islamic_occasion = ?, include_daily_hadith = ?,
        include_daily_surah = ?, include_occasion_countdown = ?, include_motivation = ?,
        include_sadaqah_jariyah = ?, include_sponsor = ?, sponsor_name = ?, sponsor_url = ?,
-       sponsor_message_en = ?, sponsor_message_ar = ?, sponsor_logo_data = ?, sponsor_logo_mime = ?,
+       sponsor_message_en = ?, sponsor_message_ar = ?, sponsor_logo_base64 = ?, sponsor_logo_mime = ?,
        updated_at = CURRENT_TIMESTAMP
      WHERE template_key = ?`
   ).bind(
@@ -179,10 +179,10 @@ export async function getSponsorLogo(url: URL, env: Env) {
   try { key = decodeURIComponent(rawKey); } catch { return new Response("Not found", { status: 404 }); }
   if (!key || key.length > 120) return new Response("Not found", { status: 404 });
   const row = await env.DB.prepare(
-    `SELECT sponsor_logo_data, sponsor_logo_mime FROM email_template_profiles WHERE template_key = ? LIMIT 1`
-  ).bind(key).first<{ sponsor_logo_data: string | null; sponsor_logo_mime: string | null }>();
-  if (!row?.sponsor_logo_data || !row.sponsor_logo_mime) return new Response("Not found", { status: 404 });
-  const binary = atob(row.sponsor_logo_data);
+    `SELECT sponsor_logo_base64, sponsor_logo_mime FROM email_template_profiles WHERE template_key = ? LIMIT 1`
+  ).bind(key).first<{ sponsor_logo_base64: string | null; sponsor_logo_mime: string | null }>();
+  if (!row?.sponsor_logo_base64 || !row.sponsor_logo_mime) return new Response("Not found", { status: 404 });
+  const binary = atob(row.sponsor_logo_base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return new Response(bytes, {
@@ -281,7 +281,7 @@ export async function listAdminEmailCampaigns(request: Request, env: Env) {
               include_islamic_occasion, include_daily_hadith, include_daily_surah,
               include_occasion_countdown, include_motivation, include_sadaqah_jariyah,
               include_sponsor, sponsor_name, sponsor_url, sponsor_message_en, sponsor_message_ar,
-              sponsor_logo_mime, CASE WHEN sponsor_logo_data IS NOT NULL AND sponsor_logo_data <> '' THEN 1 ELSE 0 END AS sponsor_logo_present,
+              sponsor_logo_mime, CASE WHEN sponsor_logo_base64 IS NOT NULL AND sponsor_logo_base64 <> '' THEN 1 ELSE 0 END AS sponsor_logo_present,
               updated_at
        FROM email_template_profiles ORDER BY category, name`
     ).all<Record<string, unknown>>(),

@@ -21,7 +21,7 @@ type ProfileRow = {
   template_key: string; enabled: number; include_islamic_occasion: number; include_daily_hadith: number;
   include_daily_surah: number; include_occasion_countdown: number; include_motivation: number;
   include_sadaqah_jariyah: number; include_sponsor: number; sponsor_name: string | null; sponsor_url: string | null;
-  sponsor_message_en: string | null; sponsor_message_ar: string | null; sponsor_logo_data: string | null; sponsor_logo_mime: string | null;
+  sponsor_message_en: string | null; sponsor_message_ar: string | null; sponsor_logo_base64: string | null; sponsor_logo_mime: string | null;
 };
 type ContentRow = { content_type: "hadith" | "surah" | "motivation"; title_en: string; title_ar: string | null; body_en: string; body_ar: string | null; source_ref: string | null };
 
@@ -80,7 +80,7 @@ async function loadProfile(env: Env, row: OutboxRow) {
     `SELECT template_key, enabled, include_islamic_occasion, include_daily_hadith,
             include_daily_surah, include_occasion_countdown, include_motivation,
             include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url,
-            sponsor_message_en, sponsor_message_ar, sponsor_logo_data, sponsor_logo_mime
+            sponsor_message_en, sponsor_message_ar, sponsor_logo_base64, sponsor_logo_mime
      FROM email_template_profiles WHERE template_key = ? LIMIT 1`
   ).bind(profileKey(row)).first<ProfileRow>();
 }
@@ -131,7 +131,7 @@ function enhancementHtml(profile: ProfileRow, content: Map<string, ContentRow>, 
     const sponsorName = profile.sponsor_name || (ar ? "قسم الرعاية والدعم" : "Sponsor & Support");
     const sponsorMessage = ar ? (profile.sponsor_message_ar || "يمكنك دعم هذه الصدقة الجارية والمساهمة في استمرارها.") : (profile.sponsor_message_en || "Support this Sadaqah Jariyah and help keep Hassoun available and growing.");
     const link = profile.sponsor_url ? `<a href="${escapeHtml(profile.sponsor_url)}" style="display:inline-block;margin-top:9px;background:#173f35;color:white;text-decoration:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:900">${escapeHtml(ar ? "زيارة الراعي" : "Sponsor / Support")}</a>` : "";
-    const logo = profile.sponsor_logo_data ? `<div style="margin-bottom:10px"><img src="cid:sponsor-logo" alt="${escapeHtml(sponsorName)}" style="display:block;max-width:180px;max-height:72px;width:auto;height:auto;border:0;object-fit:contain"></div>` : "";
+    const logo = profile.sponsor_logo_base64 ? `<div style="margin-bottom:10px"><img src="cid:sponsor-logo" alt="${escapeHtml(sponsorName)}" style="display:block;max-width:180px;max-height:72px;width:auto;height:auto;border:0;object-fit:contain"></div>` : "";
     blocks.push(`<tr><td style="padding:0 22px 18px"><table role="presentation" width="100%" style="background:#f8f3e9;border:1px solid #e5dac6;border-radius:16px"><tr><td dir="${ar ? "rtl" : "ltr"}" style="padding:14px;text-align:${ar ? "right" : "left"}">${logo}<div style="font-size:10px;letter-spacing:1.2px;color:#9a772c;font-weight:900">${escapeHtml(sponsorName)}</div><div style="font-size:13px;line-height:1.55;color:#53655f;margin-top:5px">${escapeHtml(sponsorMessage)}</div>${link}</td></tr></table></td></tr>`);
   }
   if (!blocks.length) return "";
@@ -151,9 +151,9 @@ function universalFooter(data: Record<string, unknown>, locale: Locale) {
 }
 
 function sponsorAttachment(profile: ProfileRow | null): InlineAttachment[] | undefined {
-  if (!profile || profile.include_sponsor !== 1 || !profile.sponsor_logo_data || !profile.sponsor_logo_mime) return undefined;
+  if (!profile || profile.include_sponsor !== 1 || !profile.sponsor_logo_base64 || !profile.sponsor_logo_mime) return undefined;
   const extension = profile.sponsor_logo_mime === "image/jpeg" ? "jpg" : "png";
-  return [{ content: profile.sponsor_logo_data, filename: `sponsor-logo.${extension}`, content_type: profile.sponsor_logo_mime, content_id: "sponsor-logo" }];
+  return [{ content: profile.sponsor_logo_base64, filename: `sponsor-logo.${extension}`, content_type: profile.sponsor_logo_mime, content_id: "sponsor-logo" }];
 }
 
 function appendEnhancements(rendered: RenderedEmail, extraHtml: string, profile: ProfileRow | null, content: Map<string, ContentRow>, locale: Locale, data: Record<string, unknown>) {
