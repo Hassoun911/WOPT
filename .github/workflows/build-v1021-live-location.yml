@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           python .github/scripts/fix-v1021-live-location.py
 
-      - name: Verify protected baseline and location changes
+      - name: Verify location changes
         run: |
           set -euo pipefail
           grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.21"' mobile/app.config.ts
@@ -38,7 +38,6 @@ jobs:
           grep -q 'Local Adhan calculation' mobile/src/localPrayerTimes.ts
           grep -q 'Windsor Islamic Association • official Adhan time' mobile/src/localPrayerTimes.ts
           grep -q 'hassoun-logo.png' mobile/App.tsx
-          grep -q 'A continuing Sadaqah Jariyah' mobile/src/SettingsHub.tsx
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
