@@ -47,6 +47,9 @@ jobs:
       - name: Align Email Center sponsor-logo schema with production
         run: node scripts/fix-email-logo-column.mjs
 
+      - name: Finalize mixed bilingual email rendering
+        run: node scripts/fix-bilingual-email-mix.mjs
+
       - name: Wire finite games v2 and CRM routes
         run: node scripts/apply-games-v2-routing.mjs
 
