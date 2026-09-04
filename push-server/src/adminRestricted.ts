@@ -25,9 +25,10 @@ async function sendRestrictedTemplateTest(env:Env,templateKey:string){
     renderTemplateKey=`admin_test_${crypto.randomUUID().replace(/-/g,"")}`;
     const titleEn=profile.name;
     const titleAr=TEST_ARABIC_NAMES[kind]||profile.name;
-    const bodyEn=`<div style="font-family:Arial,sans-serif"><h2 style="margin:0 0 10px">${titleEn}</h2><p style="margin:0">This is the message area that recipients will see for this ${titleEn.toLowerCase()} email.</p></div>`;
-    const bodyAr=`<div dir="rtl" style="font-family:Arial,sans-serif;text-align:right"><h2 style="margin:0 0 10px">${titleAr}</h2><p style="margin:0">هذه هي منطقة الرسالة التي سيشاهدها المستلمون في هذا البريد.</p></div>`;
-    await env.DB.prepare("INSERT INTO email_templates (template_key,name,category,subject_en,subject_ar,html_en,html_ar,text_en,text_ar,enabled) VALUES (?,?,?,?,?,?,?,?,?,1)").bind(renderTemplateKey,`Admin test ${profile.name}`,profile.category,titleEn,titleAr,bodyEn,bodyAr,`${titleEn}\nThis is the message area recipients will see.`,`${titleAr}\nهذه هي منطقة الرسالة التي سيشاهدها المستلمون.`).run();
+    const subject=`${titleEn} | ${titleAr}`;
+    const bodyEn=`<div style="font-family:Arial,sans-serif;text-align:center"><h2 style="margin:0 0 8px;text-align:center">${titleEn} • ${titleAr}</h2><p style="margin:0;text-align:center">This is the message area that recipients will see for this ${titleEn.toLowerCase()} email.</p><p dir="rtl" style="margin:8px 0 0;text-align:center">هذه هي منطقة الرسالة التي سيشاهدها المستلمون في هذا البريد.</p></div>`;
+    const bodyAr=bodyEn;
+    await env.DB.prepare("INSERT INTO email_templates (template_key,name,category,subject_en,subject_ar,html_en,html_ar,text_en,text_ar,enabled) VALUES (?,?,?,?,?,?,?,?,?,1)").bind(renderTemplateKey,`Admin test ${profile.name}`,profile.category,subject,subject,bodyEn,bodyAr,`${titleEn}\n${titleAr}\nThis is the message area recipients will see.\nهذه هي منطقة الرسالة التي سيشاهدها المستلمون.`,`${titleEn}\n${titleAr}\nThis is the message area recipients will see.\nهذه هي منطقة الرسالة التي سيشاهدها المستلمون.`).run();
   }
   try{
     if(renderTemplateKey){
