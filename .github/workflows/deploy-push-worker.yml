@@ -47,8 +47,8 @@ jobs:
       - name: Align Email Center sponsor-logo schema with production
         run: node scripts/fix-email-logo-column.mjs
 
-      - name: Finalize mixed bilingual email rendering
-        run: node scripts/fix-bilingual-email-mix.mjs
+      - name: Force mixed bilingual centered email rendering
+        run: node scripts/force-bilingual-centered-email.mjs
 
       - name: Wire finite games v2 and CRM routes
         run: node scripts/apply-games-v2-routing.mjs
@@ -70,8 +70,6 @@ jobs:
           const newBlob = 'blob:new Blob([bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer],{type:mimeType||"application/octet-stream"})';
           if (s.includes(oldBlob)) s = s.replace(oldBlob, newBlob);
 
-          // The loose prayer parser indexes a five-item time array. Make every access
-          // explicitly string-safe so strict TypeScript accepts the generated code.
           s = s.replace(/prayerClock\(vals\[(\d)\],/g, "prayerClock(vals[$1]||'',");
           s = s.replace(/\/SUNSET\/i\.test\(vals\[(\d)\]\)/g, "/SUNSET/i.test(vals[$1]||'')");
 
@@ -156,8 +154,6 @@ jobs:
           done
           test "$config_ok" = true
 
-          # These protected AI routes must exist after deploy. Without auth they should reject,
-          # but they must never return 404 Not found.
           file_code="$(curl -sS -o /tmp/schedule-file-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-import" -H 'Content-Type: application/json' --data '{}')"
           text_code="$(curl -sS -o /tmp/schedule-text-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-text" -H 'Content-Type: application/json' --data '{}')"
           test "$file_code" != "404"
@@ -190,5 +186,3 @@ jobs:
           git add .github/games-backend-status.txt
           git commit -m "Record Hassoun multiplayer backend ready" || true
           git push origin HEAD:main || true
-
-# Redeploy marker: Email Center backend fix must be published to the live Worker.
