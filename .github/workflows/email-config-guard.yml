@@ -1,0 +1,24 @@
+name: Hassoun Email Configuration Guard
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "push-server/**"
+      - ".github/workflows/deploy-push-worker.yml"
+      - ".github/workflows/email-config-guard.yml"
+
+jobs:
+  verify-email-config:
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+    steps:
+      - name: Require Hassoun email credentials
+        run: |
+          set -euo pipefail
+          test -n "$RESEND_API_KEY" || { echo "RESEND_API_KEY is missing"; exit 1; }
+          test -n "$EMAIL_FROM" || { echo "EMAIL_FROM is missing"; exit 1; }
+          echo "Hassoun email credentials are configured."
