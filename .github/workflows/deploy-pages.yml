@@ -108,3 +108,5 @@ jobs:
               description: ok ? 'hassoun.app deployed successfully' : `build=${process.env.BUILD_RESULT}, deploy=${process.env.DEPLOY_RESULT}`,
               target_url: 'https://hassoun.app'
             });
+
+# Redeploy marker: Email Center backend/schema was repaired on 2026-09-04.
