@@ -3,6 +3,9 @@ import { subscriberManageUrl } from "./subscribers";
 import type { Env, Locale, PrayerKey } from "./types";
 
 const PRAYERS: PrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+const WINDSOR_SCHEDULE_URL = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
+const WINDSOR = { latitude: 42.3149, longitude: -83.0364 };
+const WINDSOR_RADIUS_KM = 35;
 const OFFSETS = [
   { kind: "twenty" as const, minutes: -20, field: "email_twenty" as const },
   { kind: "ten" as const, minutes: -10, field: "email_ten" as const },
@@ -22,10 +25,23 @@ type Subscriber = Omit<SubscriberPreferenceRow, "prayer" | "email_twenty" | "ema
 type CachedPrayerDay = { location_key: string; prayer_date: string; fajr: string; dhuhr: string; asr: string; maghrib: string; isha: string };
 type AlAdhanDay = { timings?: Record<string, string>; date?: { gregorian?: { date?: string } } };
 type AlAdhanResponse = { code?: number; data?: AlAdhanDay[] };
+type WindsorPrayerFile = { prayer_times?: Record<string, { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }> };
 
 function methodFor(subscriber: Subscriber) { return subscriber.calculation_method ?? 3; }
 function locationKey(subscriber: Subscriber) {
   return [subscriber.latitude.toFixed(4), subscriber.longitude.toFixed(4), subscriber.timezone, methodFor(subscriber), subscriber.madhab].join("|");
+}
+function radians(value: number) { return value * Math.PI / 180; }
+function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const dLat = radians(lat2 - lat1); const dLon = radians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function usesOfficialWindsorSchedule(subscriber: Subscriber) {
+  if (distanceKm(subscriber.latitude, subscriber.longitude, WINDSOR.latitude, WINDSOR.longitude) <= WINDSOR_RADIUS_KM) return true;
+  const city = String(subscriber.city || "").trim().toLowerCase();
+  const region = String(subscriber.region || "").trim().toLowerCase();
+  return city === "windsor" && (region === "ontario" || region === "on" || !region);
 }
 function parseTiming(value: unknown) {
   if (typeof value !== "string") return null;
@@ -107,6 +123,16 @@ async function cachedDay(env: Env, subscriber: Subscriber, dateKey: string) {
   return env.DB.prepare(`SELECT location_key, prayer_date, fajr, dhuhr, asr, maghrib, isha FROM location_prayer_cache WHERE location_key = ? AND prayer_date = ? LIMIT 1`).bind(locationKey(subscriber), dateKey).first<CachedPrayerDay>();
 }
 
+async function officialWindsorDay(dateKey: string): Promise<CachedPrayerDay> {
+  const response = await fetch(WINDSOR_SCHEDULE_URL, { headers: { Accept: "application/json" }, cf: { cacheEverything: true, cacheTtl: 21_600 } });
+  if (!response.ok) throw new Error(`Windsor official prayer schedule failed: ${response.status}`);
+  const payload = await response.json() as WindsorPrayerFile;
+  const source = payload.prayer_times?.[dateKey];
+  const fajr = parseTiming(source?.fajr); const dhuhr = parseTiming(source?.dhuhr); const asr = parseTiming(source?.asr); const maghrib = parseTiming(source?.maghrib); const isha = parseTiming(source?.isha);
+  if (!fajr || !dhuhr || !asr || !maghrib || !isha) throw new Error(`Windsor official prayer schedule missing ${dateKey}`);
+  return { location_key: "windsor-official", prayer_date: dateKey, fajr, dhuhr, asr, maghrib, isha };
+}
+
 async function fetchPrayerMonth(env: Env, subscriber: Subscriber, dateKey: string) {
   const [yearText, monthText] = dateKey.split("-"); const year = Number(yearText); const month = Number(monthText);
   if (!year || !month) throw new Error(`Invalid date key ${dateKey}`);
@@ -131,6 +157,7 @@ async function fetchPrayerMonth(env: Env, subscriber: Subscriber, dateKey: strin
 }
 
 async function ensureDay(env: Env, subscriber: Subscriber, dateKey: string) {
+  if (usesOfficialWindsorSchedule(subscriber)) return officialWindsorDay(dateKey);
   let day = await cachedDay(env, subscriber, dateKey); if (day) return day;
   await fetchPrayerMonth(env, subscriber, dateKey); day = await cachedDay(env, subscriber, dateKey);
   if (!day) throw new Error(`Prayer calendar missing ${dateKey} after refresh`); return day;
