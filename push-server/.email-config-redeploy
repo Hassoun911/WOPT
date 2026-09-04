@@ -1,0 +1,2 @@
+Hassoun email provider redeploy marker.
+Purpose: trigger the Worker deployment after RESEND_API_KEY was added to repository secrets.
