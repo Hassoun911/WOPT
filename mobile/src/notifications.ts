@@ -3,7 +3,6 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import {
   ATHAN_CHANNEL_ID,
-  CITY_LABEL,
   GENERAL_CHANNEL_ID,
   REMINDER_CHANNEL_ID,
   STORAGE_KEYS
@@ -144,13 +143,13 @@ export async function scheduleIslamicEventReminders(todayKey: string, locale: "e
   return { granted: true, scheduled: true, identifier, eventKey };
 }
 
-function notificationContent(event: PrayerEvent, locale: "en" | "ar") {
+function notificationContent(event: PrayerEvent, locale: "en" | "ar", locationLabel = "Windsor, Ontario") {
   const prayer = NAMES[event.prayer][locale];
   const time = formatPrayerTime(event.prayerTime, locale);
   const common = { data: { eventId: event.id, dateKey: event.dateKey, prayer: event.prayer, kind: event.kind } };
-  if (event.kind === "twenty") return { ...common, title: locale === "ar" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : `${prayer} in 20 minutes`, body: `${time} • ${CITY_LABEL}`, sound: "attention_chime.wav" };
-  if (event.kind === "ten") return { ...common, title: locale === "ar" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `${prayer} in 10 minutes`, body: `${time} • ${CITY_LABEL}`, sound: "attention_chime.wav" };
-  return { ...common, title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`, body: `${time} • ${CITY_LABEL}` };
+  if (event.kind === "twenty") return { ...common, title: locale === "ar" ? `بقي ٢٠ دقيقة على صلاة ${prayer}` : `${prayer} in 20 minutes`, body: `${time} • ${locationLabel}`, sound: "attention_chime.wav" };
+  if (event.kind === "ten") return { ...common, title: locale === "ar" ? `بقي ١٠ دقائق على صلاة ${prayer}` : `${prayer} in 10 minutes`, body: `${time} • ${locationLabel}`, sound: "attention_chime.wav" };
+  return { ...common, title: locale === "ar" ? `حان الآن وقت صلاة ${prayer}` : `It is time for ${prayer}`, body: `${time} • ${locationLabel}` };
 }
 
 function eventEnabled(event: PrayerEvent, preferences: PrayerAlertPreferences) {
@@ -183,25 +182,27 @@ export function cancelPrayerNotifications() { return withNotificationScheduleLoc
 async function schedulePrayerNotificationsUnlocked(
   prayerTimes: PrayerTimes,
   locale: "en" | "ar",
-  suppliedPreferences?: PrayerAlertPreferences
+  suppliedPreferences?: PrayerAlertPreferences,
+  locationLabel = "Windsor, Ontario",
+  timeZone = "America/Toronto"
 ) {
   const granted = await requestNotificationPermission();
   if (!granted) return { granted: false, count: 0 };
   await cancelPrayerNotificationsUnlocked();
   const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();
   const days = Platform.OS === "ios" ? 4 : 14;
-  const events = buildPrayerEvents(prayerTimes, days)
+  const events = buildPrayerEvents(prayerTimes, days, new Date(), timeZone)
     .filter((event) => eventEnabled(event, preferences))
     .filter((event) => Platform.OS !== "android" || event.kind !== "athan");
   const identifiers: string[] = [];
   for (const event of events) {
     const identifier = await Notifications.scheduleNotificationAsync({
-      content: notificationContent(event, locale),
+      content: notificationContent(event, locale, locationLabel),
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: event.scheduledAt, channelId: event.kind === "athan" ? ATHAN_CHANNEL_ID : REMINDER_CHANNEL_ID }
     });
     identifiers.push(identifier);
   }
-  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes, preferences);
+  const androidAudio = await scheduleAndroidPrayerAudio(prayerTimes, preferences, timeZone);
   await Promise.all([
     AsyncStorage.setItem(STORAGE_KEYS.scheduledNotificationIds, JSON.stringify(identifiers)),
     AsyncStorage.setItem(STORAGE_KEYS.alertsEnabled, "on")
@@ -218,9 +219,11 @@ async function schedulePrayerNotificationsUnlocked(
 export function schedulePrayerNotifications(
   prayerTimes: PrayerTimes,
   locale: "en" | "ar",
-  preferences?: PrayerAlertPreferences
+  preferences?: PrayerAlertPreferences,
+  locationLabel = "Windsor, Ontario",
+  timeZone = "America/Toronto"
 ) {
-  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences));
+  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences, locationLabel, timeZone));
 }
 
 export async function disablePrayerNotifications() {

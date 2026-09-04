@@ -62,14 +62,15 @@ export type AndroidPrayerAudioResult = {
 
 export async function scheduleAndroidPrayerAudio(
   prayerTimes: PrayerTimes,
-  suppliedPreferences?: PrayerAlertPreferences
+  suppliedPreferences?: PrayerAlertPreferences,
+  timeZone = "America/Toronto"
 ): Promise<AndroidPrayerAudioResult> {
   if (Platform.OS !== "android" || !PrayerAudio) {
     return { count: 0, exact: false, available: false };
   }
 
   const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();
-  const events = buildPrayerEvents(prayerTimes, 30)
+  const events = buildPrayerEvents(prayerTimes, 30, new Date(), timeZone)
     .filter((event) => event.kind === "athan" && preferences[event.prayer]?.athan === true)
     .map((event) => ({
       id: event.id,

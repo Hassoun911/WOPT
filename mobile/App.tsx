@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +22,7 @@ import HomePrayerPanel from "./src/HomePrayerPanel";
 import QiblaDirectionScreen from "./src/QiblaDirectionScreen";
 import HassounWidget from "./modules/hassoun-widget";
 import QuranAudio, { type QuranAudioStatus } from "./modules/quran-audio";
-import { CITY_LABEL, STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
+import { STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./src/config";
 import {
   DEFAULT_PHONE_PRAYER_ALERTS,
   anyPrayerAlertEnabled,
@@ -35,11 +35,11 @@ import {
 import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";
 import { disablePrayerNotifications, scheduleIslamicEventReminders, schedulePrayerNotifications, scheduleTestReminder } from "./src/notifications";
 import { openExactAlarmSettings, scheduleAndroidTestAdhan } from "./src/prayerAudio";
-import { loadPrayerTimes } from "./src/prayerData";
+import { loadLocationPrayerContext } from "./src/localPrayerTimes";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
-import { addDateDays, formatPrayerTime, windsorDateKey, windsorLocalToDate } from "./src/time";
+import { addDateDays, dateKeyInZone, formatPrayerTime, localToDateInZone } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
 type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";
@@ -64,14 +64,14 @@ const PRAYER_ICONS: Record<PrayerKey, string> = {
   isha: "🌙"
 };
 
-function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date()) {
-  const currentKey = windsorDateKey(now);
+function nextPrayerFor(prayerTimes: PrayerTimes, now = new Date(), timeZone = WINDSOR_TIME_ZONE) {
+  const currentKey = dateKeyInZone(now, timeZone);
   for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
     const dateKey = addDateDays(currentKey, dayOffset);
     const day = prayerTimes[dateKey];
     if (!day) continue;
     for (const prayer of PRAYER_KEYS) {
-      const target = windsorLocalToDate(dateKey, day[prayer]);
+      const target = localToDateInZone(dateKey, day[prayer], timeZone);
       const deltaMs = target.getTime() - now.getTime();
       if (deltaMs <= 0) continue;
       const secondsRemaining = Math.max(1, Math.ceil(deltaMs / 1000));
@@ -88,10 +88,10 @@ function countdownLabel(seconds: number, locale: "en" | "ar") {
   return locale === "ar" ? `${hours ? `${hours} س ` : ""}${minutes} د` : `${hours ? `${hours}h ` : ""}${minutes}m`;
 }
 
-function hijriDateLabel(date: Date, locale: "en" | "ar") {
+function hijriDateLabel(date: Date, locale: "en" | "ar", timeZone = WINDSOR_TIME_ZONE) {
   try {
     return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
-      day: "numeric", month: "long", year: "numeric", timeZone: WINDSOR_TIME_ZONE
+      day: "numeric", month: "long", year: "numeric", timeZone
     }).format(date);
   } catch { return ""; }
 }
@@ -111,15 +111,28 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
   const [phoneAlertPreferences, setPhoneAlertPreferences] = useState<PrayerAlertPreferences>(DEFAULT_PHONE_PRAYER_ALERTS);
   const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);
+  const [locationLabel, setLocationLabel] = useState("Windsor, Ontario");
+  const [prayerTimeZone, setPrayerTimeZone] = useState(WINDSOR_TIME_ZONE);
+  const [sourceLabel, setSourceLabel] = useState("Saved official Windsor schedule");
 
-  const todayKey = windsorDateKey(now);
+  const todayKey = dateKeyInZone(now, prayerTimeZone);
   const today = prayerTimes[todayKey];
-  const next = useMemo(() => nextPrayerFor(prayerTimes, now), [now, prayerTimes]);
+  const next = useMemo(() => nextPrayerFor(prayerTimes, now, prayerTimeZone), [now, prayerTimes, prayerTimeZone]);
   const badge = badgeForWins(quizStats.totalWins);
   const upcomingBadge = nextBadge(quizStats.totalWins);
   const islamicTimeline = useMemo(() => islamicEventTimeline(todayKey), [todayKey]);
   const upcomingIslamicEvent = islamicTimeline.next;
   const upcomingIslamicDays = islamicTimeline.daysUntilNext;
+
+  const refreshPrayerLocation = useCallback(async (force = false) => {
+    const context = await loadLocationPrayerContext(force);
+    setPrayerTimes(context.prayerTimes);
+    setLive(context.live);
+    setLocationLabel(context.locationLabel);
+    setPrayerTimeZone(context.timezone);
+    setSourceLabel(context.sourceLabel);
+    return context;
+  }, []);
 
   useEffect(() => {
     if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);
@@ -132,7 +145,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         AsyncStorage.getItem(STORAGE_KEYS.locale),
         AsyncStorage.getItem(STORAGE_KEYS.alertsEnabled),
         loadPhonePrayerAlertPreferences(),
-        loadPrayerTimes(),
+        loadLocationPrayerContext(false),
         loadQuizStats()
       ]);
       const chosenLocale = savedLocale === "ar" ? "ar" : "en";
@@ -140,13 +153,16 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       setAlertsEnabled(savedAlerts === "on");
       setPrayerTimes(loaded.prayerTimes);
       setLive(loaded.live);
+      setLocationLabel(loaded.locationLabel);
+      setPrayerTimeZone(loaded.timezone);
+      setSourceLabel(loaded.sourceLabel);
       setQuizStats(storedQuizStats);
       setPhoneAlertPreferences(savedPhoneAlertPreferences);
       setBusy(false);
       if (savedAlerts === "on") {
-        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences);
+        const result = await schedulePrayerNotifications(loaded.prayerTimes, chosenLocale, savedPhoneAlertPreferences, loaded.locationLabel, loaded.timezone);
         setScheduledCount(result.count);
-        await scheduleIslamicEventReminders(windsorDateKey(new Date()), chosenLocale).catch(() => undefined);
+        await scheduleIslamicEventReminders(dateKeyInZone(new Date(), loaded.timezone), chosenLocale).catch(() => undefined);
         void registerDeviceForServerPush(chosenLocale).catch(() => undefined);
       }
     })();
@@ -165,21 +181,22 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
       if (state !== "active") return;
       setNow(new Date());
       void loadQuizStats().then(setQuizStats).catch(() => undefined);
-      if (!alertsEnabled || !Object.keys(prayerTimes).length) return;
-      void schedulePrayerNotifications(prayerTimes, locale, phoneAlertPreferences)
-        .then((result) => setScheduledCount(result.count))
-        .catch(() => undefined);
-      void scheduleIslamicEventReminders(windsorDateKey(new Date()), locale).catch(() => undefined);
+      void refreshPrayerLocation(true).then((context) => {
+        if (!alertsEnabled) return;
+        return schedulePrayerNotifications(context.prayerTimes, locale, phoneAlertPreferences, context.locationLabel, context.timezone)
+          .then((result) => setScheduledCount(result.count));
+      }).catch(() => undefined);
+      void scheduleIslamicEventReminders(dateKeyInZone(new Date(), prayerTimeZone), locale).catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [alertsEnabled, locale, prayerTimes, phoneAlertPreferences]);
+  }, [alertsEnabled, locale, phoneAlertPreferences, prayerTimeZone, refreshPrayerLocation]);
 
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
     setLocale(nextLocale);
     await AsyncStorage.setItem(STORAGE_KEYS.locale, nextLocale);
     if (alertsEnabled) {
-      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences);
+      const result = await schedulePrayerNotifications(prayerTimes, nextLocale, phoneAlertPreferences, locationLabel, prayerTimeZone);
       setScheduledCount(result.count);
       await scheduleIslamicEventReminders(todayKey, nextLocale).catch(() => undefined);
     }
@@ -200,7 +217,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         setPhoneAlertPreferences(preferences);
         await savePhonePrayerAlertPreferences(preferences);
       }
-      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences);
+      const result = await schedulePrayerNotifications(prayerTimes, locale, preferences, locationLabel, prayerTimeZone);
       if (!result.granted) {
         Alert.alert("Notifications are off", "Allow notifications in your phone settings to receive prayer alerts.");
         return;
@@ -230,7 +247,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
         setScheduledCount(0);
         return;
       }
-      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences);
+      const result = await schedulePrayerNotifications(prayerTimes, locale, nextPreferences, locationLabel, prayerTimeZone);
       setScheduledCount(result.count);
     } finally {
       setAlertPreferencesBusy(false);
@@ -268,18 +285,18 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   };
 
   if (busy && !today) {
-    return <SafeAreaView style={styles.loading} edges={["top", "bottom", "left", "right"]}><ActivityIndicator color="#0b5b47" size="large" /><Text style={styles.loadingText}>Loading Windsor prayer times…</Text></SafeAreaView>;
+    return <SafeAreaView style={styles.loading} edges={["top", "bottom", "left", "right"]}><ActivityIndicator color="#0b5b47" size="large" /><Text style={styles.loadingText}>Loading local prayer times…</Text></SafeAreaView>;
   }
 
-  const date = windsorLocalToDate(todayKey, "12:00");
+  const date = localToDateInZone(todayKey, "12:00", prayerTimeZone);
   const shortDate = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(date);
-  const hijriDate = hijriDateLabel(date, locale);
+  const hijriDate = hijriDateLabel(date, locale, prayerTimeZone);
 
   const header = (
     <View style={styles.header}>
       <Pressable onPress={() => setActiveTab("more")} style={styles.menuButton}><Text style={styles.menuIcon}>☰</Text></Pressable>
       <Image source={require("./assets/hassoun-logo.png")} style={styles.headerLogo} />
-      <View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text style={styles.subtitle}>{locale === "ar" ? "📍 وندسور، أونتاريو • مواقيت الصلاة" : "📍 Windsor, Ontario • Prayer Times"}</Text></View>
+      <View style={styles.brandText}><Text style={styles.title}>Hassoun</Text><Text numberOfLines={1} style={styles.subtitle}>📍 {locationLabel} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text></View>
       <Pressable onPress={toggleLocale} style={styles.languageButton}><Text style={styles.languageText}>{locale === "en" ? "AR" : "EN"}</Text></Pressable>
     </View>
   );
@@ -287,7 +304,7 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const homeScreen = (
     <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {header}
-      <View style={styles.dateHero}><View style={styles.dateCopy}><Text style={styles.datePrimary}>{shortDate}</Text>{hijriDate ? <Text style={styles.dateHijri}>🌙 {hijriDate}</Text> : null}<View style={styles.syncRow}><View style={[styles.syncDot, !live && styles.syncDotSaved]} /><Text style={styles.syncText}>{live ? (locale === "ar" ? "متزامن عبر Hassoun" : "Synced by Hassoun") : (locale === "ar" ? "الجدول الرسمي محفوظ" : "Saved official schedule")}</Text></View></View><View style={styles.heroLogoShell}><Image source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.heroLogo} /></View></View>
+      <View style={styles.dateHero}><View style={styles.dateCopy}><Text style={styles.datePrimary}>{shortDate}</Text>{hijriDate ? <Text style={styles.dateHijri}>🌙 {hijriDate}</Text> : null}<View style={styles.syncRow}><View style={[styles.syncDot, !live && styles.syncDotSaved]} /><Text style={styles.syncText}>{sourceLabel}</Text></View></View><View style={styles.heroLogoShell}><Image source={require("./assets/hassoun-logo.png")} resizeMode="contain" style={styles.heroLogo} /></View></View>
 
       {upcomingIslamicEvent && upcomingIslamicDays !== null && upcomingIslamicDays <= 15 ? (
         <Pressable onPress={() => setActiveTab("events")} style={styles.eventCountdownCard}>
