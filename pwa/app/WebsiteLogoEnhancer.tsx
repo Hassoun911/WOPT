@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 const LOGO = "/hassoun-logo.png?v=20260904-logo-fix";
+const LOCATION_CACHE_KEY = "hassoun-web-location-prayer-times-v2";
 
 function makeLogo(size = 48, radius = 14) {
   const img = document.createElement("img");
@@ -12,6 +13,35 @@ function makeLogo(size = 48, radius = 14) {
   img.dataset.hassounBrand = "official";
   img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;object-position:center;border-radius:${radius}px;display:block;padding:0;box-sizing:border-box;background:transparent`;
   return img;
+}
+
+function currentPlaceLabel() {
+  try {
+    const raw = window.localStorage.getItem(LOCATION_CACHE_KEY);
+    if (!raw) return "";
+    const parsed = JSON.parse(raw) as { placeLabel?: string };
+    return typeof parsed.placeLabel === "string" ? parsed.placeLabel.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function applyVisibleLocation() {
+  const card = document.querySelector<HTMLElement>(".next-prayer-card");
+  if (!card) return;
+
+  let row = card.querySelector<HTMLElement>("[data-hassoun-current-location]");
+  if (!row) {
+    row = document.createElement("p");
+    row.dataset.hassounCurrentLocation = "true";
+    row.style.cssText = "margin:0 0 14px;font-weight:700;font-size:15px;line-height:1.3;letter-spacing:.01em;color:inherit;opacity:.95;display:flex;align-items:center;gap:6px";
+    const head = card.querySelector<HTMLElement>(".next-card-head");
+    if (head) head.insertAdjacentElement("afterend", row);
+    else card.prepend(row);
+  }
+
+  const label = currentPlaceLabel();
+  row.textContent = label ? `📍 ${label}` : "📍 Current location";
 }
 
 export default function WebsiteLogoEnhancer() {
@@ -82,6 +112,8 @@ export default function WebsiteLogoEnhancer() {
         logo.style.height = "100%";
         target.appendChild(logo);
       });
+
+      if (pathname === "/" || pathname === "") applyVisibleLocation();
 
       if (pathname.includes("/quran")) {
         const brand = document.querySelector<HTMLElement>(".quran-brand");
