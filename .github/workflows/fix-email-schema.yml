@@ -1,0 +1,35 @@
+name: Fix Hassoun Email Schema
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-email-schema.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  align-email-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Align email sponsor logo column with production
+        run: node push-server/scripts/fix-email-logo-column.mjs
+
+      - name: Commit schema alignment
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Email schema already aligned."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add push-server/src/adminEmail.ts push-server/src/emailDelivery.ts push-server/migrations/0008_email_template_profiles.sql
+          git commit -m "Fix Hassoun admin email schema mismatch"
+          git push
