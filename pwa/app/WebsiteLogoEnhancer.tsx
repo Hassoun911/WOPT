@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-const LOGO = "/hassoun-logo.png?v=20260904-logo-fix";
+const LOGO = "/hassoun-app-icon.svg?v=20260904-app-match";
 const LOCATION_CACHE_KEY = "hassoun-web-location-prayer-times-v2";
 
 function makeLogo(size = 48, radius = 14) {
@@ -11,7 +11,7 @@ function makeLogo(size = 48, radius = 14) {
   img.src = LOGO;
   img.alt = "Hassoun";
   img.dataset.hassounBrand = "official";
-  img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;object-position:center;border-radius:${radius}px;display:block;padding:0;box-sizing:border-box;background:transparent`;
+  img.style.cssText = `width:${size}px;height:${size}px;object-fit:cover;object-position:center;border-radius:${radius}px;display:block;padding:0;box-sizing:border-box;background:transparent`;
   return img;
 }
 
@@ -56,6 +56,7 @@ export default function WebsiteLogoEnhancer() {
           src.includes("hassoun-official-logo.jpg") ||
           src.includes("hassoun-brand.svg") ||
           src.includes("hassoun-brand-safe.svg") ||
+          src.includes("hassoun-app-icon.svg") ||
           src.includes("favicon-logo.png") ||
           src.includes("app-icon.svg") ||
           src.includes("icon-192.png") ||
@@ -67,7 +68,7 @@ export default function WebsiteLogoEnhancer() {
           img.dataset.hassounBrand = "official";
         }
         if (img.dataset.hassounBrand === "official") {
-          img.style.objectFit = "contain";
+          img.style.objectFit = "cover";
           img.style.objectPosition = "center";
           img.style.background = "transparent";
           img.style.padding = "0";
