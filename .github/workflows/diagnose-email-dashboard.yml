@@ -1,0 +1,43 @@
+name: Diagnose Hassoun Email Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-email-dashboard.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: push-server
+    env:
+      CLOUDFLARE_ACCOUNT_ID: f883431754898c8aaf1d551a33e7641d
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: push-server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Inspect production Email Center schema
+        run: |
+          npx wrangler d1 execute wopt-prayer-push --remote --command "PRAGMA table_info(email_template_profiles);"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "PRAGMA table_info(email_campaigns);"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "PRAGMA table_info(email_deliveries);"
+      - name: Test Email Center profile query
+        run: |
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT template_key, name, category, enabled, include_islamic_occasion, include_daily_hadith, include_daily_surah, include_occasion_countdown, include_motivation, include_sadaqah_jariyah, include_sponsor, sponsor_name, sponsor_url, sponsor_message_en, sponsor_message_ar, sponsor_logo_mime, CASE WHEN sponsor_logo_base64 IS NOT NULL AND sponsor_logo_base64 <> '' THEN 1 ELSE 0 END AS sponsor_logo_present, updated_at FROM email_template_profiles ORDER BY category, name LIMIT 5;"
+      - name: Test Email Center campaigns query
+        run: |
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT c.public_id, c.name, c.category, c.audience, c.target_locale, c.target_country_code, c.target_city, c.target_timezone, c.status, c.scheduled_at, c.started_at, c.sent_at, c.created_at, t.subject_en, t.subject_ar, SUM(CASE WHEN d.status = 'sent' THEN 1 ELSE 0 END) AS sent_count, SUM(CASE WHEN d.status = 'failed' THEN 1 ELSE 0 END) AS failed_count, SUM(CASE WHEN d.status = 'pending' THEN 1 ELSE 0 END) AS pending_count, COUNT(d.id) AS delivery_count FROM email_campaigns c LEFT JOIN email_templates t ON t.template_key = c.template_key LEFT JOIN email_deliveries d ON d.campaign_id = c.id GROUP BY c.id ORDER BY c.id DESC LIMIT 5;"
+      - name: Test Email Center templates and content queries
+        run: |
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT template_key, name, category, subject_en, subject_ar, enabled, updated_at FROM email_templates ORDER BY id DESC LIMIT 5;"
+          npx wrangler d1 execute wopt-prayer-push --remote --command "SELECT id, content_type, title_en, title_ar, body_en, body_ar, source_ref, enabled, sort_order FROM email_content_library ORDER BY content_type, sort_order, id LIMIT 5;"
