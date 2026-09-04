@@ -1,1 +1,2 @@
 Build Hassoun v1.0.21 from the protected v1.0.20-era interface with live GPS city/prayer-time behavior.
+Retry 2 after validation cleanup.
