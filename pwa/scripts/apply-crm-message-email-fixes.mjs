@@ -44,6 +44,19 @@ const oldLogin='  if (!token || !admin) return <main style={s.page}><form onSubm
 const newLogin='  if (!token || !admin) return <main style={s.page}><div style={s.login}><p style={s.eyebrow}>HASSOUN ADMIN</p><h1 style={s.h1}>Email Center</h1><p style={s.muted}>{error||"Use your existing Owner Control Center session."}</p><a href="../" style={s.primary}>← Return to Owner Control Center</a></div></main>;';
 if(email.includes(oldLogin)) email=email.replace(oldLogin,newLogin);
 else if(!email.includes('Use your existing Owner Control Center session.')) throw new Error('Email login panel marker not found');
+
+if(!email.includes('async function testProfile(profile: Profile)')){
+  const marker='  async function schedule(event: FormEvent) {';
+  const fn=`  async function testProfile(profile: Profile) {\n    if (!token) return; setBusy(true); setError(\"\"); setNotice(\"\");\n    try {\n      await api(\"/admin/email/campaigns\", { method: \"POST\", body: JSON.stringify({ action: \"send_template_test\", templateKey: profile.template_key }) }, token);\n      setNotice(\`Test email for \${profile.name} sent to windsor.hassoun@gmail.com.\`);\n    } catch (cause) { setError(cause instanceof Error ? cause.message : \"Unable to send test email\"); }\n    finally { setBusy(false); }\n  }\n\n`;
+  if(!email.includes(marker)) throw new Error('Email schedule marker not found');
+  email=email.replace(marker,fn+marker);
+}
+
+const oldTitle='<div style={s.titleRow}><div><div style={s.smallCaps}>{profile.category}</div><h2 style={s.h2}>{profile.name}</h2><code style={s.code}>{profile.template_key}</code></div><Toggle on={profile.enabled===1} label="Template" onClick={()=>void toggleProfile(profile,"enabled")}/></div>';
+const newTitle='<div style={s.titleRow}><div><div style={s.smallCaps}>{profile.category}</div><h2 style={s.h2}>{profile.name}</h2><code style={s.code}>{profile.template_key}</code></div><div style={{display:"grid",gap:8,justifyItems:"end"}}><Toggle on={profile.enabled===1} label="Template" onClick={()=>void toggleProfile(profile,"enabled")}/><button type="button" style={s.secondary} disabled={busy} onClick={()=>void testProfile(profile)}>✉ Test email</button><span style={s.small}>to windsor.hassoun@gmail.com</span></div></div>';
+if(email.includes(oldTitle)) email=email.replace(oldTitle,newTitle);
+else if(!email.includes('✉ Test email')) throw new Error('Email card title marker not found');
+
 fs.writeFileSync(emailPath,email);
 
-console.log('Applied CRM push actions and Email Center session fix');
+console.log('Applied CRM push actions, Email Center session fix, and per-template test buttons');
