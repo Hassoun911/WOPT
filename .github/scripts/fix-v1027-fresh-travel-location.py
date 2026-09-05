@@ -40,6 +40,13 @@ new_position = '''    let position: Location.LocationObject;
     try {
       if (options.forceLocation) {
         const startedAt = Date.now();
+        const liveDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+          const toRad = (value: number) => value * Math.PI / 180;
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+          return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
         position = await new Promise<Location.LocationObject>(async (resolve, reject) => {
           let subscription: Location.LocationSubscription | null = null;
           let previous: Location.LocationObject | null = null;
@@ -70,7 +77,7 @@ new_position = '''    let position: Location.LocationObject;
                 if (sample.timestamp < startedAt - 3000 || ageMs > 15000 || accuracy > 1500) return;
 
                 if (previous) {
-                  const confirmedDistanceKm = distanceKm(
+                  const confirmedDistanceKm = liveDistanceKm(
                     previous.coords.latitude,
                     previous.coords.longitude,
                     sample.coords.latitude,
@@ -111,9 +118,6 @@ if old_position not in prayer:
     raise SystemExit("Expected v1.0.24 location block not found")
 prayer = prayer.replace(old_position, new_position, 1)
 
-# Existing location failure copy already covers unavailable/timeout states. Keep the
-# visible message generic because the important change is that stale Windsor is never
-# presented as a successful refresh.
 PRAYER_DATA.write_text(prayer, encoding="utf-8")
 APP.write_text(app, encoding="utf-8")
 
@@ -121,6 +125,7 @@ checks = {
     PRAYER_DATA: [
         'Location.watchPositionAsync',
         'accuracy: Location.Accuracy.High',
+        'liveDistanceKm',
         'confirmedDistanceKm <= 2',
         'LOCATION_FIX_TIMEOUT")), 20000',
         'sample.timestamp < startedAt - 3000',
@@ -133,12 +138,10 @@ for path, needles in checks.items():
         if needle not in text:
             raise SystemExit(f"Missing {needle!r} in {path}")
 
-# Safety assertions: forced refresh must use live updates and must not read last-known
-# until the non-forced startup fallback branch.
 forced_section = prayer[prayer.index('let position: Location.LocationObject;'):prayer.index('const latitude = position.coords.latitude;')]
 if 'Location.watchPositionAsync' not in forced_section:
     raise SystemExit("Live GPS watcher missing from forced refresh")
 if forced_section.index('Location.getLastKnownPositionAsync') < forced_section.index('if (options.forceLocation)'):
     raise SystemExit("Forced refresh can still reach last-known location")
 
-print("Applied confirmed live GPS travel refresh: two fresh consistent samples required")
+print("Applied confirmed live GPS travel refresh with self-contained distance calculation")
