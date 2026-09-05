@@ -12,6 +12,7 @@ on:
       - ".github/scripts/fix-v1021-pull-to-refresh.py"
       - ".github/scripts/fix-v1021-display-pairing-admin.py"
       - ".github/scripts/fix-v1022-first-launch-camera-refresh.py"
+      - ".github/scripts/fix-v1023-adhan-refresh-hardfix-base.py"
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
 
 permissions:
@@ -114,7 +115,7 @@ jobs:
           full.resize((512,512),Image.Resampling.LANCZOS).save(widget,'PNG',optimize=True)
           PY
 
-      - name: Apply v1.0.21 through v1.0.23 fixes
+      - name: Apply canonical Hassoun fixes
         run: |
           set -euo pipefail
           python3 .github/scripts/fix-v1021-no-resume-reload.py
@@ -124,15 +125,15 @@ jobs:
           python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
           python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
 
-      - name: Verify generated v1.0.23 source and typecheck
+      - name: Verify canonical prayer source and typecheck
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           checks = {
             'mobile/src/AboutHassounPage.tsx': ['Abdul Jalil Hassoun', 'Salwa Hassoun', 'A continuing Sadaqah Jariyah'],
-            'mobile/App.tsx': ['const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })', 'Refreshing location & prayer times', 'startupAudioCleared', 'if (!startupAudioCleared) return;', 'REFRESH LOCATION', 'progressViewOffset={96}'],
-            'mobile/src/prayerData.ts': ['Location.reverseGeocodeAsync', 'forceLocation', 'Location.Accuracy.High'],
+            'mobile/App.tsx': ['const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })', 'startupAudioCleared', 'if (!startupAudioCleared) return;', 'progressViewOffset={96}'],
+            'mobile/src/prayerData.ts': ['hassoun:prayer-context:v3', 'Location.reverseGeocodeAsync', 'forceLocation', 'Location.Accuracy.High', 'api.aladhan.com/v1/calendar', 'loadSavedPrayerContext'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
             'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Camera access is ready. Tap Scan QR code again.', '6-DIGIT PAIRING CODE', 'CONNECTED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
             'mobile/src/prayerAudio.ts': ['automatic first-launch exact-alarm setup removed', 'stopAndroidPrayerAudioPlayback'],
@@ -144,6 +145,9 @@ jobs:
               if needle not in text:
                 raise SystemExit(f'Missing {needle!r} in {file}')
             print(f'OK {file}')
+          app = Path('mobile/App.tsx').read_text(encoding='utf-8')
+          if 'REFRESH LOCATION' in app:
+            raise SystemExit('Permanent REFRESH LOCATION button still present; Home must use pull-down refresh only')
           pa = Path('mobile/src/prayerAudio.ts').read_text(encoding='utf-8')
           for forbidden in ('startFirstLaunchExactAlarmSetup()', 'restoreExactPrayerAlarms()'):
             if forbidden in pa:
@@ -152,7 +156,7 @@ jobs:
           for forbidden in ('setPage("masjidDisplay")', 'page === "masjidDisplay"', 'MasjidDisplayPage locale={locale}', 'setPage("display")'):
             if forbidden in settings:
               raise SystemExit(f'Legacy display route still present: {forbidden}')
-          print('Generated v1.0.23 source verification passed')
+          print('Canonical prayer source verification passed')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
             cd mobile
