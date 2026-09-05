@@ -11,6 +11,7 @@ export const GENERAL_CHANNEL_ID = "wopt-general-v1";
 
 export const STORAGE_KEYS = {
   schedule: "wopt:schedule:v1",
+  locationSchedule: "hassoun:location-schedule:v2",
   alertsEnabled: "wopt:alerts-enabled:v1",
   scheduledNotificationIds: "wopt:scheduled-notifications:v1",
   pushToken: "wopt:push-token:v1",
