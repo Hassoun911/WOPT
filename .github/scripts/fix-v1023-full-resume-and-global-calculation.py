@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 HUB = ROOT / "mobile/src/SettingsHub.tsx"
@@ -80,29 +81,27 @@ GAMES.write_text(g, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
 # Multiplayer: persist selected game/category/setup and active room code, then
-# reconnect to that room after a true process recreation.
+# reconnect to that room after a true process recreation. Insert the restore
+# effects immediately after all local state declarations instead of depending
+# on the exact formatting of the identity-loading effect.
 # ---------------------------------------------------------------------------
 m = MULTI.read_text(encoding="utf-8")
 if 'const GAME_SESSION_KEY = "hassoun:multiplayer-session:v3";' not in m:
-    m = m.replace(
-        'const PLAYER_NAME_KEY = "wopt:games:player-name:v1";\n',
-        'const PLAYER_NAME_KEY = "wopt:games:player-name:v1";\nconst GAME_SESSION_KEY = "hassoun:multiplayer-session:v3";\n',
-        1,
-    )
-state_anchor = '  const [now, setNow] = useState(Date.now());\n'
-if state_anchor not in m:
-    raise SystemExit('Multiplayer now-state anchor missing')
-if 'sessionRestoredV3' not in m:
-    state = '''  const [sessionRestoredV3, setSessionRestoredV3] = useState(false);
-  const [restoreRoomCodeV3, setRestoreRoomCodeV3] = useState("");
-'''
-    m = m.replace(state_anchor, state_anchor + state, 1)
+    name_key = re.search(r'const PLAYER_NAME_KEY\s*=\s*"[^"]+";\s*', m)
+    if not name_key:
+        raise SystemExit('Multiplayer player-name key missing')
+    m = m[:name_key.end()] + 'const GAME_SESSION_KEY = "hassoun:multiplayer-session:v3";\n' + m[name_key.end():]
 
-    first_effect = '  useEffect(() => {\n    void (async () => {\n      let id = await AsyncStorage.getItem(PLAYER_ID_KEY);'
-    if first_effect not in m:
-        raise SystemExit('Multiplayer identity effect anchor missing')
-    # Restore session before/alongside identity. Room reconnect waits for playerId.
-    restore_effect = '''  useEffect(() => {
+state_match = re.search(r'(^\s*const \[now,\s*setNow\]\s*=\s*useState\(Date\.now\(\)\);\s*$)', m, re.M)
+if not state_match:
+    raise SystemExit('Multiplayer now-state anchor missing')
+
+if 'sessionRestoredV3' not in m:
+    restore_block = '''
+  const [sessionRestoredV3, setSessionRestoredV3] = useState(false);
+  const [restoreRoomCodeV3, setRestoreRoomCodeV3] = useState("");
+
+  useEffect(() => {
     let alive = true;
     void AsyncStorage.getItem(GAME_SESSION_KEY)
       .then((raw) => {
@@ -139,15 +138,17 @@ if 'sessionRestoredV3' not in m:
       })
       .catch(() => setRestoreRoomCodeV3(""));
   }, [playerId, restoreRoomCodeV3, room, sessionRestoredV3]);
-
 '''
-    m = m.replace(first_effect, restore_effect + first_effect, 1)
+    m = m[:state_match.end()] + restore_block + m[state_match.end():]
 
-    m = m.replace(
-        '  const leaveRoom = () => { setRoom(null); setJoinCode(""); };',
-        '  const leaveRoom = () => { setRoom(null); setJoinCode(""); setRestoreRoomCodeV3(""); void AsyncStorage.removeItem(GAME_SESSION_KEY).catch(() => undefined); };',
-        1,
-    )
+# Clear persisted active-room state only when the user explicitly leaves.
+leave_pattern = re.compile(r'(^\s*const leaveRoom\s*=\s*\(\)\s*=>\s*\{[^\n]*\};)', re.M)
+leave_match = leave_pattern.search(m)
+if leave_match and 'removeItem(GAME_SESSION_KEY)' not in leave_match.group(1):
+    indent = re.match(r'\s*', leave_match.group(1)).group(0)
+    replacement = indent + 'const leaveRoom = () => { setRoom(null); setJoinCode(""); setRestoreRoomCodeV3(""); void AsyncStorage.removeItem(GAME_SESSION_KEY).catch(() => undefined); };'
+    m = m[:leave_match.start()] + replacement + m[leave_match.end():]
+
 MULTI.write_text(m, encoding="utf-8")
 
 for path, needles in {
