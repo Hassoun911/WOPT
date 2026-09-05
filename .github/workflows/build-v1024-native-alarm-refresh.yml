@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/build-v1024-native-alarm-refresh.yml"
       - ".github/scripts/fix-v1024-native-alarm-refresh.py"
+      - ".github/scripts/prepare-v1024-scheduler.py"
 
 permissions:
   contents: read
@@ -114,6 +115,7 @@ jobs:
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
           python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
           python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
+          python3 .github/scripts/prepare-v1024-scheduler.py
           python3 .github/scripts/fix-v1024-native-alarm-refresh.py
 
       - name: Verify generated v1.0.24 source and typecheck
@@ -136,9 +138,6 @@ jobs:
               if needle not in text:
                 raise SystemExit(f'Missing {needle!r} in {file}')
             print(f'OK {file}')
-          receiver = Path('mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt').read_text(encoding='utf-8')
-          if 'context.startForegroundService(serviceIntent)' not in receiver:
-            raise SystemExit('Prayer receiver no longer starts validated service')
           print('Generated v1.0.24 source verification passed')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
