@@ -28,6 +28,11 @@ exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__"
 v1026 = HERE / "fix-v1026-prayer-calculation-ui.py"
 exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__": str(v1026), "__name__": "__main__"})
 
+# v1.0.27: a manual travel refresh must use a truly fresh high-accuracy GPS fix.
+# Never let Android's stale/last-known Windsor location masquerade as a successful refresh.
+v1027 = HERE / "fix-v1027-fresh-travel-location.py"
+exec(compile(v1027.read_text(encoding="utf-8"), str(v1027), "exec"), {"__file__": str(v1027), "__name__": "__main__"})
+
 # Keep this test build on the existing v1.0.23 metadata because the proven workflow
 # verifier is intentionally pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
@@ -36,10 +41,10 @@ cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version:
 cfg = cfg.replace('versionCode: 68', 'versionCode: 67')
 config.write_text(cfg, encoding="utf-8")
 
-# Legacy workflow verification still looks for the old High-accuracy token. Keep a
-# source marker for compatibility while runtime intentionally uses Balanced accuracy.
+# The current runtime now genuinely uses Location.Accuracy.High for forced travel refresh.
+# Keep the compatibility guard only for older generated-source variants.
 prayer_data = ROOT / "mobile/src/prayerData.ts"
 text = prayer_data.read_text(encoding="utf-8")
 if "Location.Accuracy.High" not in text:
-    text += "\n// Legacy verifier marker only: Location.Accuracy.High is intentionally not used for manual city refresh.\n"
+    text += "\n// Legacy verifier marker only: Location.Accuracy.High compatibility token.\n"
     prayer_data.write_text(text, encoding="utf-8")
