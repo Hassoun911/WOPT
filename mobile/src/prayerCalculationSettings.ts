@@ -36,6 +36,8 @@ export const METHOD_OPTIONS = [
   { id: 0, name: "Jafari", note: "Ithna-Ashari" }
 ] as const;
 
+const listeners = new Set<() => void>();
+
 export async function loadPrayerCalculationPreferences(): Promise<PrayerCalculationPreferences> {
   try {
     const raw = await AsyncStorage.getItem(CALCULATION_PREFS_KEY);
@@ -56,6 +58,14 @@ export async function loadPrayerCalculationPreferences(): Promise<PrayerCalculat
 
 export async function savePrayerCalculationPreferences(value: PrayerCalculationPreferences) {
   await AsyncStorage.setItem(CALCULATION_PREFS_KEY, JSON.stringify(value));
+  for (const listener of listeners) {
+    try { listener(); } catch {}
+  }
+}
+
+export function subscribePrayerCalculationChanges(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function smartMethodForLocation(latitude: number, longitude: number) {
