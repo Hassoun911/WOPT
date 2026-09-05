@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 P = ROOT / "mobile/src/SettingsHub.tsx"
@@ -11,12 +12,16 @@ if 'import ConnectDisplayPage from "./ConnectDisplayPage";' not in s:
         raise SystemExit("AboutHassounPage import anchor missing")
     s = s.replace(anchor, anchor + 'import ConnectDisplayPage from "./ConnectDisplayPage";\n', 1)
 
-old_union = 'type SettingsPage = "root" | "about" | "guide" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";'
-new_union = 'type SettingsPage = "root" | "about" | "guide" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets" | "displays" | "connectDisplay";'
-if old_union in s:
-    s = s.replace(old_union, new_union, 1)
-elif '"displays"' not in s or '"connectDisplay"' not in s:
-    raise SystemExit("SettingsPage union did not match expected v1.0.20 source")
+# The exact v1.0.20 recipe can add Settings pages before this patch runs, so do not
+# require one frozen literal union. Extend whatever SettingsPage union the recipe produced.
+m = re.search(r'type SettingsPage = ([^;]+);', s)
+if not m:
+    raise SystemExit("SettingsPage union not found")
+union = m.group(1)
+for page in ('"displays"', '"connectDisplay"'):
+    if page not in union:
+        union += f' | {page}'
+s = s[:m.start(1)] + union + s[m.end(1):]
 
 # One top-level Displays menu. Both pairing and wall/masjid display live inside it.
 widgets_row = '        <Row emoji="🧩" title={t("Widgets", "الويدجت")} text={t("Choose layout and what appears on home and supported lock screens", "اختر التصميم والمعلومات التي تظهر على الشاشة الرئيسية وشاشة القفل المدعومة")} onPress={() => setPage("widgets")} />\n'
