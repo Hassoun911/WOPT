@@ -65,10 +65,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install exact v1.0.20 dependencies
+      - name: Install exact v1.0.20 dependencies and native modules
         run: |
+          set -euo pipefail
           cd mobile
           npm ci --no-audit --no-fund
+          npx expo install expo-splash-screen expo-document-picker expo-video expo-brightness expo-battery expo-image-picker --no-save
 
       - name: Clean Android prebuild
         run: |
