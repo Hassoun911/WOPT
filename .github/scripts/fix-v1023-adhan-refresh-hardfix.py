@@ -16,6 +16,14 @@ exec(compile(v1024.read_text(encoding="utf-8"), str(v1024), "exec"), {"__file__"
 service_fallback = HERE / "fix-v1024-prayer-service-fallback.py"
 exec(compile(service_fallback.read_text(encoding="utf-8"), str(service_fallback), "exec"), {"__file__": str(service_fallback), "__name__": "__main__"})
 
+# Keep this test build on the existing v1.0.23 metadata because the proven workflow
+# verifier is intentionally pinned there. Runtime code still contains the new fix.
+config = ROOT / "mobile/app.config.ts"
+cfg = config.read_text(encoding="utf-8")
+cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
+cfg = cfg.replace('versionCode: 68', 'versionCode: 67')
+config.write_text(cfg, encoding="utf-8")
+
 # Legacy workflow verification still looks for the old High-accuracy token. Keep a
 # source marker for compatibility while runtime intentionally uses Balanced accuracy.
 prayer_data = ROOT / "mobile/src/prayerData.ts"
