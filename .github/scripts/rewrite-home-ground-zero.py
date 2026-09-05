@@ -3,7 +3,6 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "mobile/App.tsx"
-
 app = APP.read_text(encoding="utf-8")
 
 app = app.replace('import HomePrayerPanel from "./src/HomePrayerPanel";\n', '')
@@ -101,7 +100,6 @@ app = re.sub(
     r'\n\s*setPrayerTimes\(loaded\.prayerTimes\);\n(?:\s*setLive\([^\n]+\);\n)?(?:\s*setLocationLabel\([^\n]+\);\n)?(?:\s*setPrayerTimeZone\([^\n]+\);\n)?(?:\s*setSourceLabel\([^\n]+\);)?',
     '\n      setPrayerContext(loaded);', app, count=1
 )
-# Ensure cold-start initialization always loads the canonical context exactly once.
 if 'setPrayerContext(loaded);' not in app:
     startup_anchor = '      setPhoneAlertPreferences(savedPhoneAlertPreferences);'
     if startup_anchor not in app:
@@ -110,7 +108,7 @@ if 'setPrayerContext(loaded);' not in app:
 app = app.replace('loaded.locationLabel, loaded.timezone', 'loaded.location.label, loaded.location.timezone')
 app = app.replace('loaded.timezone), chosenLocale', 'loaded.location.timezone), chosenLocale')
 
-# Any pre-existing AppState listener is removed; resume only updates the clock.
+# Remove any old resume listener that did GPS/network work.
 app = re.sub(
     r'\n\s*useEffect\(\(\) => \{\n\s*const subscription = AppState\.addEventListener\("change", \(state\) => \{.*?\n\s*return \(\) => subscription\.remove\(\);\n\s*\}, \[[^\]]*\]\);\n',
     '\n', app, count=1, flags=re.S
@@ -165,9 +163,19 @@ new_home = '''  const homeScreen = (
 
 '''
 
-home_match = re.search(r'\n\s*const homeScreen\s*=\s*\(.*?\n\s*\);\n', app, flags=re.S)
-if home_match:
-    app = app[:home_match.start()] + '\n' + app[home_match.end():]
+# Any remaining legacy Home declaration is removed as one full top-level declaration.
+for name in ('homeScreen', 'phoneHomeScreen'):
+    marker = f'  const {name} ='
+    while True:
+        start = app.find(marker)
+        if start < 0:
+            break
+        next_decl = app.find('\n  const ', start + len(marker))
+        if next_decl < 0:
+            raise SystemExit(f'could not bound remaining legacy {name}')
+        app = app[:start] + app[next_decl + 1:]
+
+# Insert new Home before the first remaining screen declaration.
 insert_match = re.search(r'\n\s*const [A-Za-z0-9_]+Screen\s*=\s*\(', app)
 if insert_match:
     insert_at = insert_match.start() + 1
@@ -177,28 +185,15 @@ else:
         raise SystemExit('could not find Home insertion point')
 app = app[:insert_at] + new_home + app[insert_at:]
 
-app = re.sub(r'\nfunction nextPrayerFor\(.*?\n\}\n\nfunction countdownLabel', '\nfunction countdownLabel', app, count=1, flags=re.S)
-app = re.sub(r'\nfunction countdownLabel\(.*?\n\}\n\nfunction hijriDateLabel', '\nfunction hijriDateLabel', app, count=1, flags=re.S)
-app = re.sub(r'\nfunction hijriDateLabel\(.*?\n\}\n\nexport default function App', '\nexport default function App', app, count=1, flags=re.S)
-app = re.sub(r'\n\s*const next = useMemo\(.*?;\n', '\n', app, count=1)
-app = re.sub(r'\n\s*const badge = badgeForWins\(.*?;\n', '\n', app, count=1)
-app = re.sub(r'\n\s*const upcomingBadge = nextBadge\(.*?;\n', '\n', app, count=1)
-app = re.sub(r'\n\s*const islamicTimeline = useMemo\(.*?;\n\s*const upcomingIslamicEvent = .*?;\n\s*const upcomingIslamicDays = .*?;\n', '\n', app, count=1)
+# All former phoneHomeScreen usages must now resolve to the one canonical Home.
+app = app.replace('phoneHomeScreen', 'homeScreen')
 
-app = app.replace('import { useCallback, useEffect, useMemo, useState } from "react";', 'import { useCallback, useEffect, useState } from "react";')
-app = app.replace('import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";', 'import { EMPTY_QUIZ_STATS, loadQuizStats, type QuizStats } from "./src/islamicQuiz";')
-
-app = re.sub(
-    r'\n\s*if \(busy && !today\) \{.*?\n\s*\}\n\n\s*const date = .*?\n\s*const shortDate = .*?\n\s*const hijriDate = .*?\n',
-    '\n', app, count=1, flags=re.S
-)
-
-# Ground-zero means obsolete setter calls are not allowed anywhere. Earlier reconstruction
-# scripts can leave passive effects behind; remove those calls after canonical context wiring.
+# Preserve shared date/next-prayer helpers because Masjid TV and other non-Home screens use them.
+# Ground-zero only removes obsolete Home state setters and data paths.
 for setter in ('setPrayerTimes', 'setLive', 'setLocationLabel', 'setPrayerTimeZone', 'setSourceLabel'):
     app = re.sub(rf'(?m)^\s*{setter}\([^\n;]*\);\s*$', '', app)
 
-for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'setLocationLabel(', 'setPrayerTimeZone(', 'setSourceLabel(', 'setPrayerTimes(']:
+for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen', 'setLocationLabel(', 'setPrayerTimeZone(', 'setSourceLabel(', 'setPrayerTimes(']:
     if forbidden in app:
         idx = app.find(forbidden)
         snippet = app[max(0, idx - 220):idx + 320]
@@ -208,4 +203,4 @@ for required in ['HomePrayerPage', 'loadInitialPrayerTimes', 'loadPrayerTimes({ 
         raise SystemExit(f'Ground-zero Home requirement missing: {required}')
 
 APP.write_text(app, encoding="utf-8")
-print('Rebuilt Home from ground zero: canonical PrayerContext, pull-down refresh, subscription area, resume without restart')
+print('Rebuilt Home from ground zero: one phone Home, canonical PrayerContext, pull-down refresh, subscription area, resume without restart')
