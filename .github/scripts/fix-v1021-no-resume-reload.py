@@ -35,6 +35,6 @@ CONFIG.write_text(cfg, encoding="utf-8")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-android-back-navigation.py"), run_name="__main__")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-resume-state.py"), run_name="__main__")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-passive-pull-fallback.py"), run_name="__main__")
-runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-prayer-calculation-settings.py"), run_name="__main__")
+runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-prayer-calculation-settings-v2.py"), run_name="__main__")
 
 print("Applied all v1.0.21 navigation, background-state, refresh, calculation settings, and versionCode fixes")
