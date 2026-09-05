@@ -36,6 +36,9 @@ exec(compile(cleanup.read_text(encoding="utf-8"), str(cleanup), "exec"), {"__fil
 ground_zero = HERE / "rewrite-home-ground-zero.py"
 exec(compile(ground_zero.read_text(encoding="utf-8"), str(ground_zero), "exec"), {"__file__": str(ground_zero), "__name__": "__main__"})
 
+audio_gate = HERE / "ensure-startup-audio-gate.py"
+exec(compile(audio_gate.read_text(encoding="utf-8"), str(audio_gate), "exec"), {"__file__": str(audio_gate), "__name__": "__main__"})
+
 app_config = ROOT / "mobile/app.config.ts"
 cfg = app_config.read_text(encoding="utf-8")
 cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
@@ -62,12 +65,10 @@ for needle in [
 for needle in ['RefreshControl', 'PRAYER SUBSCRIPTION', 'onRefresh={() => { void onRefresh(); }}', 'context?.location.label']:
     if needle not in home:
         raise SystemExit(f"Ground-zero Home missing: {needle}")
-# Shared prayerTimes/prayerLocation state is intentionally retained for Masjid TV and widgets.
-# Only legacy PHONE Home implementations/data paths are forbidden.
 for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen']:
     if forbidden in app:
         raise SystemExit(f"Legacy phone Home code still present: {forbidden}")
-for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);']:
+for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);', 'if (!startupAudioCleared) return;']:
     if needle not in app:
         raise SystemExit(f"Ground-zero App integration missing: {needle}")
 for needle in ['Muslim World League', 'Umm al-Qura, Makkah', 'highLatitude', 'offsets']:
