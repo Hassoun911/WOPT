@@ -72,19 +72,18 @@ jobs:
           npm ci --no-audit --no-fund
           npx expo install expo-splash-screen expo-screen-orientation expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
 
-      - name: Repair legacy PNG CRC metadata without changing artwork
+      - name: Repair legacy configured PNG CRCs without changing artwork
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq pngcrush
-          find mobile/assets -type f -iname '*.png' -print0 | while IFS= read -r -d '' f; do
-            tmp="${f}.fixed.png"
-            if ! pngcrush -q -fix "$f" "$tmp" >/dev/null 2>&1; then
-              echo "pngcrush could not rewrite $f; leaving original"
-              rm -f "$tmp"
-              continue
+          sudo apt-get install -y -qq pngcrush pngcheck
+          for f in mobile/assets/icon.png mobile/assets/adaptive-icon.png mobile/assets/splash-logo.png mobile/assets/notification-icon.png; do
+            test -s "$f"
+            if ! pngcheck -q "$f"; then
+              echo "Repairing PNG CRC metadata: $f"
+              pngcrush -q -fix -ow "$f" >/dev/null 2>&1 || true
             fi
-            mv "$tmp" "$f"
+            pngcheck -q "$f" || { echo "PNG remains invalid: $f"; exit 1; }
           done
 
       - name: Clean Android prebuild
