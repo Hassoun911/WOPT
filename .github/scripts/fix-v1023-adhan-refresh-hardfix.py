@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import subprocess
 
 HERE = Path(__file__).resolve().parent
@@ -14,13 +15,18 @@ v1028 = HERE / "fix-v1028-final-calculation-route.py"
 exec(compile(v1028.read_text(encoding="utf-8"), str(v1028), "exec"), {"__file__": str(v1028), "__name__": "__main__"})
 
 canonical_files = [
+    "mobile/app.config.ts",
     "mobile/src/HomePrayerPage.tsx",
+    "mobile/src/DailyIslamicCards.tsx",
+    "mobile/src/dailyIslamicContent.ts",
+    "mobile/src/PermissionsStatusPage.tsx",
     "mobile/src/prayerData.ts",
     "mobile/src/prayerCalculationSettings.ts",
     "mobile/src/notifications.ts",
     "mobile/src/push.ts",
     "mobile/src/config.ts",
     "mobile/src/emailSignup.ts",
+    "mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt",
 ]
@@ -43,10 +49,13 @@ exec(compile(autoload.read_text(encoding="utf-8"), str(autoload), "exec"), {"__f
 audio_gate = HERE / "ensure-startup-audio-gate.py"
 exec(compile(audio_gate.read_text(encoding="utf-8"), str(audio_gate), "exec"), {"__file__": str(audio_gate), "__name__": "__main__"})
 
+runtime = HERE / "fix-v1023-runtime-permissions-camera-resume.py"
+exec(compile(runtime.read_text(encoding="utf-8"), str(runtime), "exec"), {"__file__": str(runtime), "__name__": "__main__"})
+
 app_config = ROOT / "mobile/app.config.ts"
 cfg = app_config.read_text(encoding="utf-8")
-cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
-cfg = cfg.replace('versionCode: 68', 'versionCode: 67')
+cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"', cfg, count=1)
+cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 67', cfg, count=1)
 app_config.write_text(cfg, encoding="utf-8")
 
 prayer = (ROOT / "mobile/src/prayerData.ts").read_text(encoding="utf-8")
@@ -57,6 +66,9 @@ notifications = (ROOT / "mobile/src/notifications.ts").read_text(encoding="utf-8
 push = (ROOT / "mobile/src/push.ts").read_text(encoding="utf-8")
 email_signup = (ROOT / "mobile/src/emailSignup.ts").read_text(encoding="utf-8")
 config = (ROOT / "mobile/src/config.ts").read_text(encoding="utf-8")
+permissions_page = (ROOT / "mobile/src/PermissionsStatusPage.tsx").read_text(encoding="utf-8")
+daily_cards = (ROOT / "mobile/src/DailyIslamicCards.tsx").read_text(encoding="utf-8")
+manifest = (ROOT / "mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
 scheduler = (ROOT / "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt").read_text(encoding="utf-8")
 receiver = (ROOT / "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt").read_text(encoding="utf-8")
 
@@ -64,16 +76,20 @@ for needle in [
     'hassoun:prayer-context:v3', 'loadPrayerCalculationPreferences', 'smartMethodForLocation',
     'tuneString', 'Location.Accuracy.High', 'forceLocation?: boolean',
     'api.aladhan.com/v1/calendar', 'windsor_islamic_association', 'loadSavedPrayerContext',
+    'latitudeAdjustmentMethod', 'preferences.school', 'tuneString(preferences.offsets)',
 ]:
     if needle not in prayer:
         raise SystemExit(f"Canonical prayer engine missing: {needle}")
-for needle in ['RefreshControl', 'DA’WAH • PRAYER EMAILS', 'onRefresh={() => { void onRefresh(); }}', 'context?.location.label', 'PRAYER_KEYS.map', 'subscribeToDailyPrayerTimes']:
+for needle in ['RefreshControl', 'DA’WAH • PRAYER EMAILS', 'onRefresh={() => { void onRefresh(); }}', 'context?.location.label', 'PRAYER_KEYS.map', 'subscribeToDailyPrayerTimes', 'DailyIslamicCards']:
     if needle not in home:
         raise SystemExit(f"Ground-zero Home missing: {needle}")
 for forbidden in ['PrayerAlertPreferenceGrid', 'scheduled prayer events', 'Prayer alerts for this phone']:
     if forbidden in home:
         raise SystemExit(f"Old oversized alert controls remain on Home: {forbidden}")
-for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);', 'if (!startupAudioCleared) return;', 'HOME_PRAYER_AUTOLOAD_V1']:
+for needle in ['Qur’an verse of the day', 'Hadith of the day', 'dailyIslamicContentForDate']:
+    if needle not in daily_cards:
+        raise SystemExit(f"Daily Islamic cards missing: {needle}")
+for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);', 'if (!startupAudioCleared) return;', 'HOME_PRAYER_AUTOLOAD_V1', 'Allow Alarms & reminders', 'hassoun:last-active-tab:v2', 'subscribePrayerCalculationChanges']:
     if needle not in app:
         raise SystemExit(f"Ground-zero App integration missing: {needle}")
 for needle in ['subscribeToDailyPrayerTimes', 'dailyPrayerSchedule: true', 'prayerAlerts: false']:
@@ -82,7 +98,7 @@ for needle in ['subscribeToDailyPrayerTimes', 'dailyPrayerSchedule: true', 'pray
 for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen']:
     if forbidden in app:
         raise SystemExit(f"Legacy phone Home code still present: {forbidden}")
-for needle in ['Muslim World League', 'Umm al-Qura, Makkah', 'highLatitude', 'offsets']:
+for needle in ['Muslim World League', 'Umm al-Qura, Makkah', 'highLatitude', 'offsets', 'subscribePrayerCalculationChanges']:
     if needle not in settings:
         raise SystemExit(f"Canonical calculation settings missing: {needle}")
 for needle in ['loadSavedPrayerContext', 'registerDeviceForServerPush', 'locationLabel', 'scheduleAndroidPrayerAudio', 'normalizeContext']:
@@ -91,6 +107,11 @@ for needle in ['loadSavedPrayerContext', 'registerDeviceForServerPush', 'locatio
 for needle in ['scheduleTimeZone: prayerContext?.location.timezone', 'locationLabel: prayerContext?.location.label', 'calculationMethod: prayerContext?.calculationMethod']:
     if needle not in push:
         raise SystemExit(f"Canonical push/email sync missing: {needle}")
+for needle in ['Alarms & reminders', 'NOT ENABLED', 'PermissionsAndroid.PERMISSIONS.CAMERA', 'openExactAlarmSettings']:
+    if needle not in permissions_page:
+        raise SystemExit(f"Live Permissions page missing: {needle}")
+if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest or 'android.permission.USE_EXACT_ALARM' in manifest or 'maxSdkVersion="32"' in manifest:
+    raise SystemExit('Exact alarm Android special-access manifest is incorrect')
 if 'locationSchedule' not in config:
     raise SystemExit('Canonical storage key missing: locationSchedule')
 for needle in ['TEST_EVENTS_KEY', 'consumeAuthorizedEvent', 'wopt_prayer_audio_v2']:
@@ -100,4 +121,4 @@ for needle in ['consumeAuthorizedEvent', 'MAX_TRIGGER_DRIFT_MS']:
     if needle not in receiver:
         raise SystemExit(f"Canonical native alarm receiver missing: {needle}")
 
-print("Installed ground-zero phone Home + cold-start autoload + compact prayer email signup")
+print("Installed ground-zero Home + live permissions + safe camera + resume persistence + calculation control + daily Quran/Hadith")
