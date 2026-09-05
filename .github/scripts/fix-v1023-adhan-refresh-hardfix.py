@@ -32,6 +32,11 @@ exec(compile(v1028.read_text(encoding="utf-8"), str(v1028), "exec"), {"__file__"
 v1029 = HERE / "fix-v1029-force-gps-direct-prayer-refresh.py"
 exec(compile(v1029.read_text(encoding="utf-8"), str(v1029), "exec"), {"__file__": str(v1029), "__name__": "__main__"})
 
+# Final notification-label fix: 20-minute, 10-minute and prayer-time alerts must show
+# the resolved city instead of the generic "Current location" label.
+v1030 = HERE / "fix-v1030-notification-city-label.py"
+exec(compile(v1030.read_text(encoding="utf-8"), str(v1030), "exec"), {"__file__": str(v1030), "__name__": "__main__"})
+
 # Keep this test build on the existing v1.0.23 metadata because the proven workflow
 # verifier is intentionally pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
