@@ -5,6 +5,16 @@ ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "mobile/App.tsx"
 app = APP.read_text(encoding="utf-8")
 
+# Pull-to-refresh uses useCallback. The exact v1.0.20 App imports useEffect/useMemo/useState only,
+# so add useCallback without changing any other React imports.
+react_import = re.search(r'import \{([^}]*)\} from "react";', app)
+if not react_import:
+    raise SystemExit("React import not found")
+if "useCallback" not in react_import.group(1):
+    current = react_import.group(1).strip()
+    replacement = 'import { ' + current + ', useCallback } from "react";'
+    app = app[:react_import.start()] + replacement + app[react_import.end():]
+
 # Add RefreshControl import.
 if "RefreshControl" not in app:
     app, count = re.subn(r'(\bPressable,\s*\n\s*)(ScrollView,)', r'\1RefreshControl,\n  \2', app, count=1)
