@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.21 Exact v1.0.20 + Live Location
+name: Build Hassoun v1.0.22 Exact v1.0.20 + Runtime Fixes
 
 on:
   workflow_dispatch:
@@ -13,12 +13,13 @@ on:
       - ".github/scripts/fix-v1021-pull-to-refresh.py"
       - ".github/scripts/fix-v1021-install-camera.py"
       - ".github/scripts/fix-v1021-display-pairing-admin.py"
+      - ".github/scripts/fix-v1022-first-launch-camera-refresh.py"
 
 permissions:
   contents: read
 
 concurrency:
-  group: hassoun-v1021-exact-v1020
+  group: hassoun-v1022-exact-v1020
   cancel-in-progress: true
 
 jobs:
@@ -115,26 +116,28 @@ jobs:
           full.resize((512,512),Image.Resampling.LANCZOS).save(widget,'PNG',optimize=True)
           PY
 
-      - name: Apply v1.0.21 fixes without changing the v1.0.20 UI
+      - name: Apply v1.0.22 fixes without changing the v1.0.20 UI
         run: |
           set -euo pipefail
           python3 .github/scripts/fix-v1021-no-resume-reload.py
           python3 .github/scripts/fix-v1021-native-masjid-display.py
           python3 .github/scripts/fix-v1021-unified-display-menu.py
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
+          python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
 
-      - name: Verify generated v1.0.21 source and typecheck
+      - name: Verify generated v1.0.22 source and typecheck
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           checks = {
             'mobile/src/AboutHassounPage.tsx': ['Abdul Jalil Hassoun', 'Salwa Hassoun', 'A continuing Sadaqah Jariyah'],
-            'mobile/App.tsx': ['prayerLocation.label', 'const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })'],
+            'mobile/App.tsx': ['prayerLocation.label', 'const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })', 'Refreshing location & prayer times', 'hassoun:v1022:first-launch-audio-guard'],
             'mobile/src/prayerData.ts': ['Location.reverseGeocodeAsync', 'forceLocation'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
-            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Scan QR code', '6-DIGIT PAIRING CODE', 'CONNECTED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
-            'mobile/app.config.ts': ['1.0.21', 'versionCode: 65'],
+            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Camera access is ready. Tap Scan QR code again.', '6-DIGIT PAIRING CODE', 'CONNECTED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
+            'mobile/src/prayerAudio.ts': ['stopAndroidPrayerAudioPlayback', 'never auto-run on first launch'],
+            'mobile/app.config.ts': ['1.0.22', 'versionCode: 66'],
           }
           for file, needles in checks.items():
             text = Path(file).read_text(encoding='utf-8')
@@ -197,16 +200,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.22-first-launch-camera-refresh-fixed.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Display-Pairing-Admin-Force-Location-Refresh
+          name: Hassoun-v1.0.22-First-Launch-Camera-Refresh-Fixed
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.22-first-launch-camera-refresh-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.22-first-launch-camera-refresh-fixed.apk.sha256
           if-no-files-found: error
           retention-days: 30
