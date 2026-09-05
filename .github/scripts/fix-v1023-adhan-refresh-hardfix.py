@@ -20,6 +20,7 @@ canonical_files = [
     "mobile/src/notifications.ts",
     "mobile/src/push.ts",
     "mobile/src/config.ts",
+    "mobile/src/emailSignup.ts",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt",
 ]
@@ -36,6 +37,9 @@ exec(compile(cleanup.read_text(encoding="utf-8"), str(cleanup), "exec"), {"__fil
 ground_zero = HERE / "rewrite-home-ground-zero.py"
 exec(compile(ground_zero.read_text(encoding="utf-8"), str(ground_zero), "exec"), {"__file__": str(ground_zero), "__name__": "__main__"})
 
+autoload = HERE / "ensure-home-prayer-autoload.py"
+exec(compile(autoload.read_text(encoding="utf-8"), str(autoload), "exec"), {"__file__": str(autoload), "__name__": "__main__"})
+
 audio_gate = HERE / "ensure-startup-audio-gate.py"
 exec(compile(audio_gate.read_text(encoding="utf-8"), str(audio_gate), "exec"), {"__file__": str(audio_gate), "__name__": "__main__"})
 
@@ -51,6 +55,7 @@ app = (ROOT / "mobile/App.tsx").read_text(encoding="utf-8")
 settings = (ROOT / "mobile/src/prayerCalculationSettings.ts").read_text(encoding="utf-8")
 notifications = (ROOT / "mobile/src/notifications.ts").read_text(encoding="utf-8")
 push = (ROOT / "mobile/src/push.ts").read_text(encoding="utf-8")
+email_signup = (ROOT / "mobile/src/emailSignup.ts").read_text(encoding="utf-8")
 config = (ROOT / "mobile/src/config.ts").read_text(encoding="utf-8")
 scheduler = (ROOT / "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt").read_text(encoding="utf-8")
 receiver = (ROOT / "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt").read_text(encoding="utf-8")
@@ -62,15 +67,21 @@ for needle in [
 ]:
     if needle not in prayer:
         raise SystemExit(f"Canonical prayer engine missing: {needle}")
-for needle in ['RefreshControl', 'PRAYER SUBSCRIPTION', 'onRefresh={() => { void onRefresh(); }}', 'context?.location.label']:
+for needle in ['RefreshControl', 'DA’WAH • PRAYER EMAILS', 'onRefresh={() => { void onRefresh(); }}', 'context?.location.label', 'PRAYER_KEYS.map', 'subscribeToDailyPrayerTimes']:
     if needle not in home:
         raise SystemExit(f"Ground-zero Home missing: {needle}")
+for forbidden in ['PrayerAlertPreferenceGrid', 'scheduled prayer events', 'Prayer alerts for this phone']:
+    if forbidden in home:
+        raise SystemExit(f"Old oversized alert controls remain on Home: {forbidden}")
+for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);', 'if (!startupAudioCleared) return;', 'HOME_PRAYER_AUTOLOAD_V1']:
+    if needle not in app:
+        raise SystemExit(f"Ground-zero App integration missing: {needle}")
+for needle in ['subscribeToDailyPrayerTimes', 'dailyPrayerSchedule: true', 'prayerAlerts: false']:
+    if needle not in email_signup:
+        raise SystemExit(f"Daily prayer email signup missing: {needle}")
 for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen']:
     if forbidden in app:
         raise SystemExit(f"Legacy phone Home code still present: {forbidden}")
-for needle in ['HomePrayerPage', 'loadPrayerTimes({ forceLocation: true })', 'context={prayerContext}', 'setPrayerContext(loaded);', 'if (!startupAudioCleared) return;']:
-    if needle not in app:
-        raise SystemExit(f"Ground-zero App integration missing: {needle}")
 for needle in ['Muslim World League', 'Umm al-Qura, Makkah', 'highLatitude', 'offsets']:
     if needle not in settings:
         raise SystemExit(f"Canonical calculation settings missing: {needle}")
@@ -89,4 +100,4 @@ for needle in ['consumeAuthorizedEvent', 'MAX_TRIGGER_DRIFT_MS']:
     if needle not in receiver:
         raise SystemExit(f"Canonical native alarm receiver missing: {needle}")
 
-print("Installed ground-zero phone Home + canonical prayer engine while preserving Masjid/TV shared state")
+print("Installed ground-zero phone Home + cold-start autoload + compact prayer email signup")
