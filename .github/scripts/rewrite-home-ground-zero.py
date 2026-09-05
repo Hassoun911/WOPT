@@ -6,8 +6,7 @@ APP = ROOT / "mobile/App.tsx"
 
 app = APP.read_text(encoding="utf-8")
 
-# New Home is a standalone source component. Remove the legacy Home renderer and
-# legacy location service integration from App.tsx completely.
+# New Home is a standalone source component. Remove legacy Home renderer/location integration.
 app = app.replace('import HomePrayerPanel from "./src/HomePrayerPanel";\n', '')
 app = app.replace('import { loadLocationPrayerContext } from "./src/localPrayerTimes";\n', '')
 if 'import HomePrayerPage from "./src/HomePrayerPage";' not in app:
@@ -27,17 +26,16 @@ if 'from "./src/prayerData"' not in app:
     line_end = app.find('\n', idx) + 1
     app = app[:line_end] + 'import { loadInitialPrayerTimes, loadPrayerTimes, type LoadedPrayerTimes } from "./src/prayerData";\n' + app[line_end:]
 
-# Replace legacy prayer/location states with one canonical context.
+# Replace the whole legacy top-level state section instead of matching one historical
+# sourceLabel string. Earlier reconstruction scripts legitimately change this block.
 state_start = app.find('  const [now, setNow] = useState(new Date());')
-state_end_anchor = '  const [sourceLabel, setSourceLabel] = useState("Saved official Windsor schedule");'
-state_end = app.find(state_end_anchor)
-if state_start < 0 or state_end < 0:
-    raise SystemExit('legacy prayer state block not found')
-state_end += len(state_end_anchor)
-old_state = app[state_start:state_end]
+derived_start = app.find('  const todayKey =', state_start)
+if state_start < 0 or derived_start < 0:
+    raise SystemExit('could not bound legacy Home state section')
 new_state = '''  const [now, setNow] = useState(new Date());
   const [prayerContext, setPrayerContext] = useState<LoadedPrayerTimes | null>(null);
   const [refreshingHome, setRefreshingHome] = useState(false);
+  const [startupAudioCleared, setStartupAudioCleared] = useState(false);
   const [locale, setLocale] = useState<"en" | "ar">("en");
   const [alertsEnabled, setAlertsEnabled] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -58,17 +56,16 @@ new_state = '''  const [now, setNow] = useState(new Date());
     ? "Windsor Islamic Association • official Adhan time"
     : prayerContext?.location.source === "aladhan"
       ? "Local Adhan calculation • device location"
-      : "Saved prayer schedule";'''
-app = app.replace(old_state, new_state, 1)
+      : "Saved prayer schedule";
 
-# Remove the legacy refreshPrayerLocation callback.
+'''
+app = app[:state_start] + new_state + app[derived_start:]
+
+# Remove all historical refresh callbacks; the new callback below is the only Home refresh.
 app = re.sub(
     r'\n\s*const refreshPrayerLocation = useCallback\(async \(force = false\) => \{.*?\n\s*\}, \[\]\);\n',
     '\n', app, count=1, flags=re.S
 )
-
-# Remove any previously generated refreshHome implementation. The new callback below
-# is the only refresh action and is called solely by HomePrayerPage pull-down refresh.
 app = re.sub(
     r'\n\s*const refreshHome = useCallback\(async \(\) => \{.*?\n\s*\}, \[[^\]]*\]\);\n',
     '\n', app, count=1, flags=re.S
@@ -115,20 +112,22 @@ if first_effect < 0:
     raise SystemExit('first effect missing')
 app = app[:first_effect] + refresh_callback + '\n' + app[first_effect:]
 
-# Main initialization: canonical saved context only; never invoke GPS on resume.
+# Main initialization uses only the canonical saved context. No GPS is requested on resume.
 app = app.replace('loadLocationPrayerContext(false)', 'loadInitialPrayerTimes()')
-app = app.replace('      setPrayerTimes(loaded.prayerTimes);\n      setLive(loaded.live);\n      setLocationLabel(loaded.locationLabel);\n      setPrayerTimeZone(loaded.timezone);\n      setSourceLabel(loaded.sourceLabel);', '      setPrayerContext(loaded);')
+app = re.sub(
+    r'\n\s*setPrayerTimes\(loaded\.prayerTimes\);\n(?:\s*setLive\([^\n]+\);\n)?(?:\s*setLocationLabel\([^\n]+\);\n)?(?:\s*setPrayerTimeZone\([^\n]+\);\n)?(?:\s*setSourceLabel\([^\n]+\);)?',
+    '\n      setPrayerContext(loaded);', app, count=1
+)
 app = app.replace('loaded.locationLabel, loaded.timezone', 'loaded.location.label, loaded.location.timezone')
 app = app.replace('loaded.timezone), chosenLocale', 'loaded.location.timezone), chosenLocale')
 
-# Remove the legacy foreground listener which treated every resume like a cold GPS reload.
+# Remove every legacy foreground listener that force-refreshed GPS on AppState active.
 app = re.sub(
-    r'\n\s*useEffect\(\(\) => \{\n\s*const subscription = AppState\.addEventListener\("change", \(state\) => \{.*?\n\s*\}, \[[^\]]*\]\);\n',
+    r'\n\s*useEffect\(\(\) => \{\n\s*const subscription = AppState\.addEventListener\("change", \(state\) => \{.*?refreshPrayerLocation\(true\).*?\n\s*\}, \[[^\]]*\]\);\n',
     '\n', app, count=1, flags=re.S
 )
 
-# Persist active tab. A normal background/foreground transition does nothing. If Android
-# really kills the process, the cold start restores the last top-level screen.
+# Persist active tab. Background -> foreground does not reinitialize the app.
 resume_effects = '''
   useEffect(() => {
     let mounted = true;
@@ -186,30 +185,26 @@ new_home = '''  const homeScreen = (
 '''
 app = app[:home_start] + new_home + app[alerts_start:]
 
-# Legacy Home helpers are no longer needed.
+# Legacy Home-only helpers/derived values are no longer needed.
 app = re.sub(r'\nfunction nextPrayerFor\(.*?\n\}\n\nfunction countdownLabel', '\nfunction countdownLabel', app, count=1, flags=re.S)
 app = re.sub(r'\nfunction countdownLabel\(.*?\n\}\n\nfunction hijriDateLabel', '\nfunction hijriDateLabel', app, count=1, flags=re.S)
 app = re.sub(r'\nfunction hijriDateLabel\(.*?\n\}\n\nexport default function App', '\nexport default function App', app, count=1, flags=re.S)
-
-# Remove now-unused legacy Home derived values while keeping todayKey/today for alert/event pages.
 app = re.sub(r'\n\s*const next = useMemo\(.*?;\n', '\n', app, count=1)
 app = re.sub(r'\n\s*const badge = badgeForWins\(.*?;\n', '\n', app, count=1)
 app = re.sub(r'\n\s*const upcomingBadge = nextBadge\(.*?;\n', '\n', app, count=1)
 app = re.sub(r'\n\s*const islamicTimeline = useMemo\(.*?;\n\s*const upcomingIslamicEvent = .*?;\n\s*const upcomingIslamicDays = .*?;\n', '\n', app, count=1)
 
-# Remove unused Home-only imports if no longer referenced.
+# Remove unused Home-only imports.
 app = app.replace('import { useCallback, useEffect, useMemo, useState } from "react";', 'import { useCallback, useEffect, useState } from "react";')
 app = app.replace('import { badgeForWins, EMPTY_QUIZ_STATS, loadQuizStats, nextBadge, type QuizStats } from "./src/islamicQuiz";', 'import { EMPTY_QUIZ_STATS, loadQuizStats, type QuizStats } from "./src/islamicQuiz";')
-app = app.replace('import { islamicEventCountdown, islamicEventTimeline } from "./src/islamicEvents";', 'import { islamicEventCountdown, islamicEventTimeline } from "./src/islamicEvents";')
 
-# The legacy loading gate used old `today`; keep app shell available immediately and let
-# HomePrayerPage show its own loading card from the saved canonical context.
+# Remove the legacy whole-app loading gate/date calculations. HomePrayerPage owns Home loading.
 app = re.sub(
     r'\n\s*if \(busy && !today\) \{.*?\n\s*\}\n\n\s*const date = .*?\n\s*const shortDate = .*?\n\s*const hijriDate = .*?\n',
     '\n', app, count=1, flags=re.S
 )
 
-# Hard invariants: these old paths must not exist in the generated application.
+# Hard invariants: old Home/location paths must not survive in generated source.
 for forbidden in [
     'loadLocationPrayerContext',
     'HomePrayerPanel',
@@ -229,6 +224,7 @@ for required in [
     'hassoun:active-tab:v3',
     'context={prayerContext}',
     'onRefresh={refreshHome}',
+    'startupAudioCleared',
 ]:
     if required not in app:
         raise SystemExit(f'Ground-zero Home requirement missing: {required}')
