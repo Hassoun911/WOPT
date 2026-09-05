@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 import { STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./config";
 import { getInstallationId } from "./installation";
 import { loadSavedPrayerContext } from "./prayerData";
+import { loadPrayerCalculationPreferences, tuneString } from "./prayerCalculationSettings";
 
 function expoProjectId() {
   return (
@@ -22,6 +23,7 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   const installationId = await getInstallationId();
   const prayerContext = await loadSavedPrayerContext();
+  const calculation = await loadPrayerCalculationPreferences();
 
   const response = await fetch(`${pushApiUrl.replace(/\/$/, "")}/subscriptions/expo`, {
     method: "POST",
@@ -36,7 +38,10 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
       latitude: prayerContext?.location.latitude ?? null,
       longitude: prayerContext?.location.longitude ?? null,
       prayerSource: prayerContext?.location.source || null,
-      calculationMethod: prayerContext?.calculationMethod ?? null,
+      calculationMethod: prayerContext?.calculationMethod ?? calculation.method,
+      calculationSchool: calculation.school,
+      highLatitude: calculation.highLatitude,
+      tune: tuneString(calculation.offsets),
       prayerCalculatedAt: prayerContext?.calculatedAt || null,
       appVersion: Constants.expoConfig?.version ?? "unknown"
     })
