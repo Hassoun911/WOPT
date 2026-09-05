@@ -39,3 +39,7 @@ if(!index.includes('deleteRestrictedPushCampaign(request,env,url.pathname.split(
 }
 fs.writeFileSync(indexPath,index);
 console.log('Applied CRM push delete action backend');
+
+// Keep remote push/email prayer scheduling synchronized with the same canonical
+// prayer context that the mobile app, widgets and native Adhan scheduler use.
+await import('./apply-device-prayer-context-sync.mjs');
