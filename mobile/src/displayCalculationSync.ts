@@ -16,6 +16,7 @@ export async function syncCalculationToPairedDisplays(preferences: PrayerCalcula
   if (!Array.isArray(displays) || !displays.length) return;
 
   const patch = {
+    prayerScheduleSource: preferences.scheduleSource,
     calculationMode: preferences.mode,
     calculationMethod: preferences.method,
     calculationSchool: preferences.school,
