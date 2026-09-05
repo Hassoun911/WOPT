@@ -49,22 +49,35 @@ page = page.replace(summary_style, summary_replacement, 1)
 
 PAGE.write_text(page, encoding="utf-8")
 
-required = [
+# The page renders METHOD_OPTIONS dynamically, so method names belong to the
+# generated calculation-settings source, not literally inside the page component.
+written = PAGE.read_text(encoding="utf-8")
+page_required = [
     "PRAYER TIME SOURCE / API",
     "AlAdhan Prayer Times API",
     "Smart automatic",
     "CALCULATION METHOD",
-    "Muslim World League",
-    "ISNA",
-    "Umm al-Qura",
+    "METHOD_OPTIONS.map",
     "ASR SCHOOL",
     "HIGH-LATITUDE RULE",
     "FINE-TUNE BY MINUTES",
     "Save & use these settings",
 ]
-written = PAGE.read_text(encoding="utf-8")
-for needle in required:
+for needle in page_required:
     if needle not in written:
-        raise SystemExit(f"Missing prayer calculation UI requirement: {needle}")
+        raise SystemExit(f"Missing prayer calculation page requirement: {needle}")
+
+method_required = [
+    "ISNA",
+    "Muslim World League",
+    "Umm al-Qura, Makkah",
+    "Egyptian Authority",
+    "University of Karachi",
+    "Tehran",
+    "Jafari",
+]
+for needle in method_required:
+    if needle not in source:
+        raise SystemExit(f"Missing prayer calculation method option: {needle}")
 
 print("Restored full prayer calculation settings page with API source + customization")
