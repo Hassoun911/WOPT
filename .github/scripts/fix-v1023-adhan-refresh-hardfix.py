@@ -30,8 +30,7 @@ v1029 = HERE / "fix-v1029-force-gps-direct-prayer-refresh.py"
 exec(compile(v1029.read_text(encoding="utf-8"), str(v1029), "exec"), {"__file__": str(v1029), "__name__": "__main__"})
 
 # Prayer notifications: resolve a real city name for 20m, 10m and prayer-time alerts.
-# v1030 is deliberately signature-independent because generated notificationContent
-# signatures can change across reconstructed feature stacks.
+# v1030 inserts city resolution only after locationLabel has been declared.
 v1030 = HERE / "fix-v1030-notification-city-label.py"
 exec(compile(v1030.read_text(encoding="utf-8"), str(v1030), "exec"), {"__file__": str(v1030), "__name__": "__main__"})
 
