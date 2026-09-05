@@ -16,8 +16,13 @@ exec(compile(v1024.read_text(encoding="utf-8"), str(v1024), "exec"), {"__file__"
 service_fallback = HERE / "fix-v1024-prayer-service-fallback.py"
 exec(compile(service_fallback.read_text(encoding="utf-8"), str(service_fallback), "exec"), {"__file__": str(service_fallback), "__name__": "__main__"})
 
+# Final native/runtime hard fix: no stale alarm may play unless it is registered by
+# the current APK, and Worker/geocoder calls are bounded so travel refresh cannot hang.
+v1025 = HERE / "fix-v1025-native-alarm-and-refresh-timeouts.py"
+exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__": str(v1025), "__name__": "__main__"})
+
 # Keep this test build on the existing v1.0.23 metadata because the proven workflow
-# verifier is intentionally pinned there. Runtime code still contains the new fix.
+# verifier is intentionally pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
 cfg = config.read_text(encoding="utf-8")
 cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
