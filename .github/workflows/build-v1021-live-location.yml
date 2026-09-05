@@ -131,12 +131,22 @@ jobs:
           grep -q 'loadInitialPrayerTimes' mobile/App.tsx
           grep -q 'void loadPrayerTimes().then(async (refreshed)' mobile/App.tsx
           grep -q 'Resume in-place' mobile/App.tsx
+
+          # Exactly one top-level Displays entry; Connect + Wall/Masjid only inside that submenu.
+          test "$(grep -o 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
+          test "$(grep -o 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
           grep -q 'title={t("Displays", "الشاشات")}' mobile/src/SettingsHub.tsx
-          grep -q 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx
-          grep -q 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx
+          ! grep -q 'setPage("display")' mobile/src/SettingsHub.tsx
+          ! grep -q 'page === "display"' mobile/src/SettingsHub.tsx
           grep -q 'ConnectDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
-          grep -q 'RefreshControl refreshing={refreshingHome} onRefresh={refreshHome}' mobile/App.tsx
+
+          # Android pull-to-refresh must be wired on the actual Home ScrollView.
           grep -q 'const refreshHome = useCallback' mobile/App.tsx
+          grep -q 'refreshing={refreshingHome}' mobile/App.tsx
+          grep -q 'onRefresh={refreshHome}' mobile/App.tsx
+          grep -q 'overScrollMode="always"' mobile/App.tsx
+          grep -q 'progressViewOffset={8}' mobile/App.tsx
+          grep -q 'HassounWidget.refresh()' mobile/App.tsx
           cd mobile
           npm run typecheck
 
@@ -177,16 +187,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Exact-v1.0.20-Native-Location-Unified-Displays-Pull-Refresh
+          name: Hassoun-v1.0.21-Exact-v1.0.20-Single-Displays-Reliable-Pull-Refresh
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk.sha256
           if-no-files-found: error
           retention-days: 30
