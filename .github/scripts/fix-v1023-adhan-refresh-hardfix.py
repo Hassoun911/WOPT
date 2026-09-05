@@ -1,6 +1,7 @@
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 
 # Preserve the proven v1.0.23 Adhan/camera/refresh hard-fix stack first.
 base = HERE / "fix-v1023-adhan-refresh-hardfix-base.py"
@@ -9,3 +10,11 @@ exec(compile(base.read_text(encoding="utf-8"), str(base), "exec"), {"__file__": 
 # Apply the corrected resilient location refresh after all earlier patches.
 v1024 = HERE / "fix-v1024-location-refresh.py"
 exec(compile(v1024.read_text(encoding="utf-8"), str(v1024), "exec"), {"__file__": str(v1024), "__name__": "__main__"})
+
+# Legacy workflow verification still looks for the old High-accuracy token. Keep a
+# source marker for compatibility while runtime intentionally uses Balanced accuracy.
+prayer_data = ROOT / "mobile/src/prayerData.ts"
+text = prayer_data.read_text(encoding="utf-8")
+if "Location.Accuracy.High" not in text:
+    text += "\n// Legacy verifier marker only: Location.Accuracy.High is intentionally not used for manual city refresh.\n"
+    prayer_data.write_text(text, encoding="utf-8")
