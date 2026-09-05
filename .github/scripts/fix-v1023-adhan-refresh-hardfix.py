@@ -34,7 +34,11 @@ for rel in canonical_files:
     target.write_text(content, encoding="utf-8")
     print(f"Installed canonical source: {rel}")
 
-# Replace the reconstructed legacy Home completely with the new source component.
+# Delete the reconstructed legacy Home before installing the new Home integration.
+cleanup = HERE / "remove-legacy-home-before-rewrite.py"
+exec(compile(cleanup.read_text(encoding="utf-8"), str(cleanup), "exec"), {"__file__": str(cleanup), "__name__": "__main__"})
+
+# Install the new Home component as the only Home implementation.
 ground_zero = HERE / "rewrite-home-ground-zero.py"
 exec(compile(ground_zero.read_text(encoding="utf-8"), str(ground_zero), "exec"), {"__file__": str(ground_zero), "__name__": "__main__"})
 
