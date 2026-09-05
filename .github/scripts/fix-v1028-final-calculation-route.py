@@ -90,5 +90,8 @@ sync_target.parent.mkdir(parents=True, exist_ok=True)
 sync_target.write_text(sync_content, encoding="utf-8")
 print("Installed paired-display calculation sync bridge")
 
+# Final navigation persistence layer: top-level state is handled in App, while
+# nested Settings/Games/multiplayer state is restored here after the old source
+# reconstruction so background/process recreation cannot collapse to Home.
 resume = Path(__file__).resolve().parent / "fix-v1023-full-resume-and-global-calculation.py"
 exec(compile(resume.read_text(encoding="utf-8"), str(resume), "exec"), {"__file__": str(resume), "__name__": "__main__"})
