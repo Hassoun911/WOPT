@@ -24,6 +24,7 @@ exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__"
 # Restore the real Prayer Calculation settings UI as the final UI patch. This page
 # explicitly shows the prayer-time API/source and gives Smart + full manual methods,
 # Asr school, high-latitude rule and per-prayer minute customization.
+# v1.0.26 verifier now validates method labels in METHOD_OPTIONS source where they live.
 v1026 = HERE / "fix-v1026-prayer-calculation-ui.py"
 exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__": str(v1026), "__name__": "__main__"})
 
