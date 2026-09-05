@@ -31,9 +31,9 @@ if n1 != 1 or n2 != 1:
     raise SystemExit("Could not set v1.0.21/versionCode 65")
 CONFIG.write_text(cfg, encoding="utf-8")
 
-# Apply Android hardware-back navigation as part of the same v1.0.21 patch stage.
-# This keeps the existing workflow recipe intact while ensuring child pages go
-# back inside Hassoun instead of closing the Android activity.
+# Android hardware-back navigation plus last-screen restoration if Android recreates
+# the activity/process while the app is backgrounded.
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-android-back-navigation.py"), run_name="__main__")
+runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-resume-state.py"), run_name="__main__")
 
-print("Applied v1.0.21 resume-in-place, Android back navigation, and versionCode 65")
+print("Applied v1.0.21 resume-in-place, last-screen restoration, Android back navigation, and versionCode 65")
