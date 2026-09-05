@@ -70,7 +70,7 @@ jobs:
           set -euo pipefail
           cd mobile
           npm ci --no-audit --no-fund
-          npx expo install expo-splash-screen expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
+          npx expo install expo-splash-screen expo-screen-orientation expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
 
       - name: Clean Android prebuild
         run: |
