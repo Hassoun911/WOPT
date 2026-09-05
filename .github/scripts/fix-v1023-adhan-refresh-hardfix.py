@@ -3,47 +3,27 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
-# Preserve the proven v1.0.23 Adhan/camera/refresh hard-fix stack first.
+# Keep proven non-prayer app fixes and native Adhan safety.
 base = HERE / "fix-v1023-adhan-refresh-hardfix-base.py"
 exec(compile(base.read_text(encoding="utf-8"), str(base), "exec"), {"__file__": str(base), "__name__": "__main__"})
 
-v1024 = HERE / "fix-v1024-location-refresh.py"
-exec(compile(v1024.read_text(encoding="utf-8"), str(v1024), "exec"), {"__file__": str(v1024), "__name__": "__main__"})
-
-service_fallback = HERE / "fix-v1024-prayer-service-fallback.py"
-exec(compile(service_fallback.read_text(encoding="utf-8"), str(service_fallback), "exec"), {"__file__": str(service_fallback), "__name__": "__main__"})
-
+# Native Android alarm registry/stale-alarm protection. Any temporary prayerData edits
+# from this script are replaced wholesale by the canonical prayer rewrite in the workflow.
 v1025 = HERE / "fix-v1025-native-alarm-and-refresh-timeouts.py"
 exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__": str(v1025), "__name__": "__main__"})
 
+# Interactive calculation settings UI and deterministic SettingsHub route.
 v1026 = HERE / "fix-v1026-prayer-calculation-ui.py"
 exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__": str(v1026), "__name__": "__main__"})
-
-v1027 = HERE / "fix-v1027-fresh-travel-location.py"
-exec(compile(v1027.read_text(encoding="utf-8"), str(v1027), "exec"), {"__file__": str(v1027), "__name__": "__main__"})
 
 v1028 = HERE / "fix-v1028-final-calculation-route.py"
 exec(compile(v1028.read_text(encoding="utf-8"), str(v1028), "exec"), {"__file__": str(v1028), "__name__": "__main__"})
 
-# Manual Home refresh: live GPS -> direct AlAdhan -> GPS-derived city label.
-v1029 = HERE / "fix-v1029-force-gps-direct-prayer-refresh.py"
-exec(compile(v1029.read_text(encoding="utf-8"), str(v1029), "exec"), {"__file__": str(v1029), "__name__": "__main__"})
-
-# Prayer notifications: resolve a real city name for 20m, 10m and prayer-time alerts.
-# v1030 inserts city resolution only after locationLabel has been declared.
-v1030 = HERE / "fix-v1030-notification-city-label.py"
-exec(compile(v1030.read_text(encoding="utf-8"), str(v1030), "exec"), {"__file__": str(v1030), "__name__": "__main__"})
-
-# Keep this test build on existing v1.0.23 metadata while the proven workflow verifier
-# remains pinned there. Runtime code contains all later fixes.
+# Keep test metadata compatible with the established release workflow.
 config = ROOT / "mobile/app.config.ts"
 cfg = config.read_text(encoding="utf-8")
 cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
 cfg = cfg.replace('versionCode: 68', 'versionCode: 67')
 config.write_text(cfg, encoding="utf-8")
 
-prayer_data = ROOT / "mobile/src/prayerData.ts"
-text = prayer_data.read_text(encoding="utf-8")
-if "Location.Accuracy.High" not in text:
-    text += "\n// Legacy verifier marker only: Location.Accuracy.High compatibility token.\n"
-    prayer_data.write_text(text, encoding="utf-8")
+print("Applied non-prayer v1.0.23 safety/UI stack; canonical prayer engine will be installed next")
