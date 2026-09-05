@@ -142,4 +142,15 @@ for forbidden in ('onHomeTouchMove', 'homePullStartY', 'homePullTriggered', 'nes
         raise SystemExit('Old gesture fallback still present: ' + forbidden)
 
 APP.write_text(app, encoding="utf-8")
-print("Enabled reliable native Android pull-to-refresh on Home without touch-handler conflicts")
+
+# React Native's StyleSheet typings expose absoluteFill, not absoluteFillObject in this SDK.
+# The native Masjid generator runs before this script, so normalize the generated screen here.
+MASJID = ROOT / "mobile/src/MasjidDisplayPage.tsx"
+if MASJID.exists():
+    masjid = MASJID.read_text(encoding="utf-8")
+    masjid = masjid.replace("StyleSheet.absoluteFillObject", "StyleSheet.absoluteFill")
+    MASJID.write_text(masjid, encoding="utf-8")
+    if "absoluteFillObject" in masjid:
+        raise SystemExit("Masjid display still contains unsupported StyleSheet.absoluteFillObject")
+
+print("Enabled reliable native Android pull-to-refresh on Home and normalized Masjid StyleSheet compatibility")
