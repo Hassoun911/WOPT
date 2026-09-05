@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { STORAGE_KEYS, WINDSOR_TIME_ZONE } from "./config";
 import { getInstallationId } from "./installation";
+import { loadSavedPrayerContext } from "./prayerData";
 
 function expoProjectId() {
   return (
@@ -20,10 +21,8 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   const installationId = await getInstallationId();
+  const prayerContext = await loadSavedPrayerContext();
 
-  // Always refresh the server registration. This is intentionally not skipped
-  // when the token matches local storage because subscriber/device links and
-  // server-side preferences can change after the token was first created.
   const response = await fetch(`${pushApiUrl.replace(/\/$/, "")}/subscriptions/expo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -32,7 +31,13 @@ export async function registerDeviceForServerPush(locale: "en" | "ar") {
       token,
       platform: Platform.OS,
       locale,
-      scheduleTimeZone: WINDSOR_TIME_ZONE,
+      scheduleTimeZone: prayerContext?.location.timezone || WINDSOR_TIME_ZONE,
+      locationLabel: prayerContext?.location.label || null,
+      latitude: prayerContext?.location.latitude ?? null,
+      longitude: prayerContext?.location.longitude ?? null,
+      prayerSource: prayerContext?.location.source || null,
+      calculationMethod: prayerContext?.calculationMethod ?? null,
+      prayerCalculatedAt: prayerContext?.calculatedAt || null,
       appVersion: Constants.expoConfig?.version ?? "unknown"
     })
   });
