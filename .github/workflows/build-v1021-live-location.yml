@@ -7,6 +7,7 @@ on:
       - ".github/v1021-trigger.txt"
       - ".github/workflows/build-v1021-live-location.yml"
       - ".github/scripts/fix-v1021-no-resume-reload.py"
+      - ".github/scripts/fix-v1021-native-masjid-display.py"
       - ".github/scripts/fix-v1021-unified-display-menu.py"
       - ".github/scripts/fix-v1021-pull-to-refresh.py"
 
@@ -114,6 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/scripts/fix-v1021-no-resume-reload.py
+          python3 .github/scripts/fix-v1021-native-masjid-display.py
           python3 .github/scripts/fix-v1021-unified-display-menu.py
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
 
@@ -139,6 +141,16 @@ jobs:
           ! grep -q 'setPage("display")' mobile/src/SettingsHub.tsx
           ! grep -q 'page === "display"' mobile/src/SettingsHub.tsx
           grep -q 'ConnectDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
+
+          # Wall/Masjid must be a native in-app screen, never an external browser/WebView link.
+          test -f mobile/src/MasjidDisplayPage.tsx
+          grep -q 'MasjidDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
+          grep -q 'setPage("masjidDisplay")' mobile/src/SettingsHub.tsx
+          grep -q 'useWindowDimensions' mobile/src/MasjidDisplayPage.tsx
+          grep -q 'loadPrayerTimes' mobile/src/MasjidDisplayPage.tsx
+          grep -q 'ScreenOrientation.unlockAsync' mobile/src/MasjidDisplayPage.tsx
+          ! grep -q 'Linking.openURL("https://hassoun.app/masjid-tv/"' mobile/src/SettingsHub.tsx
+          ! grep -q 'WebView' mobile/src/MasjidDisplayPage.tsx
 
           # Android pull-to-refresh must be wired on the actual Home ScrollView.
           grep -q 'const refreshHome = useCallback' mobile/App.tsx
@@ -187,16 +199,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Exact-v1.0.20-Single-Displays-Reliable-Pull-Refresh
+          name: Hassoun-v1.0.21-Exact-v1.0.20-Native-Masjid-Single-Displays-Pull-Refresh
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-single-displays-reliable-pull-refresh.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk.sha256
           if-no-files-found: error
           retention-days: 30
