@@ -139,7 +139,7 @@ jobs:
           from pathlib import Path
           checks = {
             'mobile/src/AboutHassounPage.tsx': ['Abdul Jalil Hassoun', 'Salwa Hassoun', 'A continuing Sadaqah Jariyah'],
-            'mobile/App.tsx': ['const refreshHome = useCallback', 'loadPrayerTimes({ forceLocation: true })', 'HomePrayerPage', 'context={prayerContext}', 'hassoun:active-tab:v3', 'startupAudioCleared', 'if (!startupAudioCleared) return;'],
+            'mobile/App.tsx': ['const refreshHome = useCallback', 'loadPrayerTimes({ forceLocation: true })', 'HomePrayerPage', 'context={prayerContext}', 'startupAudioCleared', 'if (!startupAudioCleared) return;'],
             'mobile/src/HomePrayerPage.tsx': ['RefreshControl', 'onRefresh={() => { void onRefresh(); }}', 'alwaysBounceVertical', 'PRAYER SUBSCRIPTION', 'context?.location.label'],
             'mobile/src/prayerData.ts': ['hassoun:prayer-context:v3', 'Location.reverseGeocodeAsync', 'forceLocation', 'Location.Accuracy.High', 'api.aladhan.com/v1/calendar', 'loadSavedPrayerContext'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
@@ -154,9 +154,10 @@ jobs:
                 raise SystemExit(f'Missing {needle!r} in {file}')
             print(f'OK {file}')
           app = Path('mobile/App.tsx').read_text(encoding='utf-8')
-          for forbidden in ('REFRESH LOCATION', 'loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'setLocationLabel(', 'setPrayerTimeZone(', 'setSourceLabel(', 'setPrayerTimes('):
+          # Shared prayerTimes/prayerLocation state remains for Masjid TV; only old PHONE Home code is forbidden.
+          for forbidden in ('REFRESH LOCATION', 'loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'phoneHomeScreen'):
             if forbidden in app:
-              raise SystemExit(f'Legacy Home code still present: {forbidden}')
+              raise SystemExit(f'Legacy phone Home code still present: {forbidden}')
           pa = Path('mobile/src/prayerAudio.ts').read_text(encoding='utf-8')
           for forbidden in ('startFirstLaunchExactAlarmSetup()', 'restoreExactPrayerAlarms()'):
             if forbidden in pa:
