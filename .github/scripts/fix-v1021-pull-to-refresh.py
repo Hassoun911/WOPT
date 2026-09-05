@@ -40,6 +40,16 @@ if old_position in prayer_data:
 elif new_position not in prayer_data:
     raise SystemExit("Could not patch fresh-GPS position block")
 
+# The original v1.0.20 outer catch returns the saved Windsor schedule for any error.
+# That means a forced manual refresh can fail but still look successful and keep
+# Windsor on screen. Forced mode must propagate the error to the Home refresh UI.
+old_outer = '''  } catch {\n    return fallback;\n  }\n}'''
+new_outer = '''  } catch (error) {\n    if (options.forceLocation) throw error;\n    return fallback;\n  }\n}'''
+if old_outer in prayer_data:
+    prayer_data = prayer_data.replace(old_outer, new_outer, 1)
+elif new_outer not in prayer_data:
+    raise SystemExit("Could not patch outer fallback for forced refresh")
+
 state_anchor = '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);'
 if state_anchor not in app:
     raise SystemExit("Could not find Home state anchor")
@@ -111,6 +121,8 @@ for forbidden in ('onHomeTouchMove', 'homePullStartY', 'homePullTriggered', 'nes
 
 if 'Location.Accuracy.High' not in prayer_data or 'options.forceLocation' not in prayer_data:
     raise SystemExit('Forced fresh GPS mode was not installed in prayerData.ts')
+if 'if (options.forceLocation) throw error;' not in prayer_data:
+    raise SystemExit('Forced refresh can still silently fall back to stale saved location')
 
 APP.write_text(app, encoding="utf-8")
 PRAYER_DATA.write_text(prayer_data, encoding="utf-8")
@@ -123,4 +135,4 @@ if MASJID.exists():
     if "absoluteFillObject" in masjid:
         raise SystemExit("Masjid display still contains unsupported StyleSheet.absoluteFillObject")
 
-print("Enabled Home pull-to-refresh with forced high-accuracy GPS and robust ScrollView parsing")
+print("Enabled Home pull-to-refresh with forced high-accuracy GPS, explicit failure, and no stale-location fallback")
