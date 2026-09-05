@@ -65,7 +65,7 @@ export async function savePrayerCalculationPreferences(value: PrayerCalculationP
 
 export function subscribePrayerCalculationChanges(listener: () => void) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => { listeners.delete(listener); };
 }
 
 export function smartMethodForLocation(latitude: number, longitude: number) {
