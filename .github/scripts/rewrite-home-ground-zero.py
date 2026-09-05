@@ -115,12 +115,28 @@ if 'setPrayerContext(loaded);' not in app:
 app = app.replace('loaded.locationLabel', 'loaded.location.label')
 app = app.replace('loaded.timezone', 'loaded.location.timezone')
 
-# Background -> foreground must not force GPS/network refresh.
-pattern = re.compile(r'\n\s*useEffect\(\(\) => \{.*?AppState\.addEventListener\("change".*?\n\s*\}, \[[^\]]*\]\);\n', re.S)
-for match in list(pattern.finditer(app))[::-1]:
-    block = match.group(0)
-    if 'loadPrayerTimes' in block or 'refreshPrayerLocation' in block:
-        app = app[:match.start()] + '\n' + app[match.end():]
+# Background -> foreground must not force GPS/network refresh. Remove only the specific
+# useEffect that contains an AppState listener AND a prayer/location reload. Never span across
+# neighboring effects, because the main cold-start initializer must remain intact.
+search_from = 0
+while True:
+    listener = app.find('AppState.addEventListener("change"', search_from)
+    if listener < 0:
+        break
+    effect_start = app.rfind('  useEffect(() => {', 0, listener)
+    effect_end = app.find('\n  },', listener)
+    if effect_start < 0 or effect_end < 0:
+        search_from = listener + 1
+        continue
+    effect_end_line = app.find('\n', effect_end + 1)
+    if effect_end_line < 0:
+        effect_end_line = len(app)
+    block = app[effect_start:effect_end_line]
+    if 'loadPrayerTimes' in block or 'refreshPrayerLocation' in block or 'loadLocationPrayerContext' in block:
+        app = app[:effect_start] + '\n' + app[effect_end_line:]
+        search_from = effect_start + 1
+    else:
+        search_from = effect_end_line
 
 if 'if (state === "active") setNow(new Date());' not in app:
     marker = '  const toggleLocale = async () => {'
