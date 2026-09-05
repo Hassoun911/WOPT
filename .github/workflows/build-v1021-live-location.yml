@@ -5,9 +5,10 @@ on:
   push:
     paths:
       - ".github/v1021-trigger.txt"
+      - ".github/workflows/build-v1021-live-location.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: hassoun-v1021-live-location
@@ -18,26 +19,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
-      - name: Checkout main
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Apply v1.0.21 location-only patch
+      - name: Restore exact known-good v1.0.20 mobile baseline
+        run: |
+          set -euo pipefail
+          BASELINE=d5e0ec5510079ef08a525a6a67d2f0dbbbe6d19a
+          git checkout "$BASELINE" -- mobile
+          grep -q 'version: "1.0.20"' mobile/app.config.ts
+          grep -q 'AboutHassounPage' mobile/src/SettingsHub.tsx
+          grep -q 'hassoun-logo.png' mobile/src/SettingsHub.tsx
+          echo "Exact v1.0.20 mobile baseline restored from $BASELINE"
+
+      - name: Apply location-only fix to exact v1.0.20 baseline
         run: |
           set -euo pipefail
           python .github/scripts/fix-v1021-live-location.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/app.config.ts')
+          s = p.read_text()
+          s = s.replace('versionCode: 55', 'versionCode: 65')
+          p.write_text(s)
+          PY
 
-      - name: Verify location changes
+      - name: Verify protected UI and location changes
         run: |
           set -euo pipefail
           grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.21"' mobile/app.config.ts
-          grep -q 'versionCode: 55' mobile/app.config.ts
+          grep -q 'versionCode: 65' mobile/app.config.ts
+          grep -q 'AboutHassounPage' mobile/src/SettingsHub.tsx
+          grep -q 'hassoun-logo.png' mobile/src/SettingsHub.tsx
           grep -q 'loadLocationPrayerContext' mobile/App.tsx
           grep -q 'locationLabel' mobile/App.tsx
-          grep -q 'Local Adhan calculation' mobile/src/localPrayerTimes.ts
+          grep -q 'Local Adhan calculation • device location' mobile/src/localPrayerTimes.ts
           grep -q 'Windsor Islamic Association • official Adhan time' mobile/src/localPrayerTimes.ts
-          grep -q 'hassoun-logo.png' mobile/App.tsx
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -61,16 +80,6 @@ jobs:
           npm ci --no-audit --no-fund
           npx tsc --noEmit
 
-      - name: Commit validated source
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile
-          git commit -m "Hassoun v1.0.21 live GPS prayer location" || true
-          git pull --rebase origin main
-          git push origin HEAD:main
-
       - name: Clean Android prebuild
         run: |
           cd mobile
@@ -92,12 +101,12 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > /tmp/v1021-apk.txt
           grep -E 'assets/(index\.android\.bundle|.*\.hbc)' /tmp/v1021-apk.txt
-          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-live-location.apk
+          cp "$APK" mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-v1020-baseline-live-location.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hassoun-v1.0.21-live-location-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-live-location.apk
+          name: hassoun-v1.0.21-v1020-baseline-live-location-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-v1020-baseline-live-location.apk
           if-no-files-found: error
           retention-days: 14
