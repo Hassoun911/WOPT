@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -6,12 +6,12 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
+  TextInput,
   View
 } from "react-native";
 import type { PrayerAlertPreferences } from "./alertPreferences";
-import PrayerAlertPreferenceGrid from "./PrayerAlertPreferenceGrid";
+import { subscribeToDailyPrayerTimes } from "./emailSignup";
 import type { LoadedPrayerTimes } from "./prayerData";
 import { addDateDays, dateKeyInZone, formatPrayerTime, localToDateInZone } from "./time";
 import { PRAYER_KEYS, type PrayerKey } from "./types";
@@ -62,14 +62,7 @@ function nextPrayer(context: LoadedPrayerTimes, now: Date) {
     for (const prayer of PRAYER_KEYS) {
       const target = localToDateInZone(key, day[prayer], zone);
       const deltaMs = target.getTime() - now.getTime();
-      if (deltaMs > 0) {
-        return {
-          prayer,
-          time: day[prayer],
-          secondsRemaining: Math.ceil(deltaMs / 1000),
-          tomorrow: key !== currentKey
-        };
-      }
+      if (deltaMs > 0) return { prayer, time: day[prayer], secondsRemaining: Math.ceil(deltaMs / 1000), tomorrow: key !== currentKey };
     }
   }
   return null;
@@ -87,31 +80,20 @@ function countdownParts(total: number) {
 function hijriLabel(date: Date, locale: Locale, timeZone: string) {
   try {
     return new Intl.DateTimeFormat(locale === "ar" ? "ar-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone
+      day: "numeric", month: "long", year: "numeric", timeZone
     }).format(date);
-  } catch {
-    return "";
-  }
+  } catch { return ""; }
 }
 
 export default function HomePrayerPage({
   locale,
   context,
   refreshing,
-  alertsEnabled,
-  alertPreferencesBusy,
   preferences,
-  scheduledCount,
   onRefresh,
   onMenu,
   onToggleLocale,
   onOpenQibla,
-  onOpenAlerts,
-  onToggleAlerts,
-  onChangePreferences,
   onTogglePrayerAudio
 }: Props) {
   const now = new Date();
@@ -121,13 +103,33 @@ export default function HomePrayerPage({
   const next = useMemo(() => context ? nextPrayer(context, now) : null, [context, todayKey, Math.floor(now.getTime() / 1000)]);
   const countdown = next ? countdownParts(next.secondsRemaining) : null;
   const shortDate = new Intl.DateTimeFormat(locale === "ar" ? "ar-CA" : "en-CA", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: zone
+    weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: zone
   }).format(now);
   const hijri = hijriLabel(now, locale, zone);
+
+  const [email, setEmail] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const submitPrayerEmail = async () => {
+    if (!context || !emailValid || emailBusy) return;
+    setEmailBusy(true);
+    setEmailMessage("");
+    try {
+      const result = await subscribeToDailyPrayerTimes(email, locale, context.location);
+      setEmailMessage(result.alreadySubscribed
+        ? (locale === "ar" ? "هذا البريد مشترك بالفعل." : "This email is already subscribed.")
+        : (result.verificationRequired
+          ? (locale === "ar" ? "تحقق من بريدك لتأكيد الاشتراك." : "Check your email to confirm your subscription.")
+          : (locale === "ar" ? "تم الاشتراك بمواقيت الصلاة." : "Prayer-times email subscription saved.")));
+      if (!result.alreadySubscribed) setEmail("");
+    } catch (error) {
+      setEmailMessage(locale === "ar" ? "تعذر حفظ الاشتراك الآن." : `Could not subscribe right now${error instanceof Error ? `: ${error.message}` : "."}`);
+    } finally {
+      setEmailBusy(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -136,21 +138,14 @@ export default function HomePrayerPage({
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical
       overScrollMode="always"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => { void onRefresh(); }}
-          progressViewOffset={8}
-          enabled
-        />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void onRefresh(); }} progressViewOffset={8} enabled />}
     >
       <View style={styles.header}>
         <Pressable onPress={onMenu} style={styles.menuButton}><Text style={styles.menuIcon}>☰</Text></Pressable>
         <Image source={require("../assets/hassoun-logo.png")} style={styles.headerLogo} />
         <View style={styles.brandText}>
           <Text style={styles.title}>Hassoun</Text>
-          <Text numberOfLines={1} style={styles.subtitle}>📍 {context?.location.label || (locale === "ar" ? "جارٍ تحديد الموقع" : "Locating…")} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text>
+          <Text numberOfLines={1} style={styles.subtitle}>📍 {context?.location.label || (locale === "ar" ? "جارٍ تحميل الموقع" : "Loading location…")} • {locale === "ar" ? "مواقيت الصلاة" : "Prayer Times"}</Text>
         </View>
         <Pressable onPress={onToggleLocale} style={styles.languageButton}><Text style={styles.languageText}>{locale === "en" ? "AR" : "EN"}</Text></Pressable>
       </View>
@@ -161,15 +156,13 @@ export default function HomePrayerPage({
           {hijri ? <Text style={styles.dateHijri}>🌙 {hijri}</Text> : null}
           <View style={styles.syncRow}>
             <View style={[styles.syncDot, !context?.live && styles.syncDotSaved]} />
-            <Text style={styles.syncText}>{context ? (context.location.source === "windsor_islamic_association" ? "Windsor Islamic Association • official Adhan time" : context.location.source === "aladhan" ? "Local Adhan calculation • device location" : "Saved prayer schedule") : "Loading prayer context"}</Text>
+            <Text style={styles.syncText}>{context ? (context.location.source === "windsor_islamic_association" ? "Windsor Islamic Association • official Adhan time" : context.location.source === "aladhan" ? "Local Adhan calculation • device location" : "Saved prayer schedule") : "Opening saved prayer schedule…"}</Text>
           </View>
         </View>
         <View style={styles.heroLogoShell}><Image source={require("../assets/hassoun-logo.png")} resizeMode="contain" style={styles.heroLogo} /></View>
       </View>
 
-      {!context ? (
-        <View style={styles.loadingCard}><ActivityIndicator size="small" /><Text style={styles.loadingText}>{locale === "ar" ? "جارٍ تحميل مواقيت الصلاة…" : "Loading prayer times…"}</Text></View>
-      ) : null}
+      {!context ? <View style={styles.loadingCard}><ActivityIndicator size="small" /><Text style={styles.loadingText}>{locale === "ar" ? "جارٍ فتح مواقيت الصلاة…" : "Opening prayer times…"}</Text></View> : null}
 
       {next ? (
         <View style={styles.nextCard}>
@@ -193,26 +186,30 @@ export default function HomePrayerPage({
       ) : null}
 
       <Text style={styles.sectionTitle}>{locale === "ar" ? "مواقيت الصلاة اليوم" : "Today’s Prayer Times"}</Text>
-      <Text style={styles.sectionHint}>{locale === "ar" ? "يمكنك كتم أو تشغيل أذان كل صلاة بشكل مستقل" : "Mute or unmute the Adhan for each prayer separately"}</Text>
+      <Text style={styles.sectionHint}>{locale === "ar" ? "جميع الصلوات الخمس ظاهرة، والصلاة القادمة مميزة" : "All five prayers are shown; the next prayer is highlighted"}</Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
+      <View style={styles.prayerList}>
         {today ? PRAYER_KEYS.map((prayer) => {
           const active = next?.prayer === prayer && !next.tomorrow;
           const muted = !preferences[prayer].athan;
           return (
-            <View key={prayer} style={[styles.prayerCard, active && styles.prayerCardActive]}>
-              {active ? <View style={styles.nextBadge}><Text style={styles.nextBadgeText}>NEXT</Text></View> : null}
-              <Text style={[styles.glyph, active && styles.activeGold]}>{GLYPHS[prayer]}</Text>
-              <Text style={[styles.prayerArabic, active && styles.activeWhite]}>{NAMES[prayer].ar}</Text>
-              <Text style={[styles.prayerEnglish, active && styles.activeSub]}>{NAMES[prayer].en}</Text>
+            <View key={prayer} style={[styles.prayerRow, active && styles.prayerRowActive]}>
+              <View style={[styles.glyphShell, active && styles.glyphShellActive]}><Text style={[styles.glyph, active && styles.activeGold]}>{GLYPHS[prayer]}</Text></View>
+              <View style={styles.prayerNames}>
+                <View style={styles.prayerNameLine}>
+                  <Text style={[styles.prayerEnglish, active && styles.activeWhite]}>{NAMES[prayer].en}</Text>
+                  {active ? <View style={styles.nextBadge}><Text style={styles.nextBadgeText}>{locale === "ar" ? "التالي" : "NEXT"}</Text></View> : null}
+                </View>
+                <Text style={[styles.prayerArabic, active && styles.activeSub]}>{NAMES[prayer].ar}</Text>
+              </View>
               <Text style={[styles.prayerTime, active && styles.activeWhite]}>{formatPrayerTime(today[prayer], locale)}</Text>
-              <Pressable onPress={() => onTogglePrayerAudio(prayer)} style={[styles.audioButton, muted && styles.audioButtonMuted]}>
-                <Text style={[styles.audioText, muted && styles.audioTextMuted]}>{muted ? (locale === "ar" ? "مكتوم" : "MUTED") : (locale === "ar" ? "الأذان" : "ADHAN")}</Text>
+              <Pressable onPress={() => onTogglePrayerAudio(prayer)} style={[styles.audioButton, muted && styles.audioButtonMuted, active && !muted && styles.audioButtonActive]}>
+                <Text style={[styles.audioText, muted && styles.audioTextMuted, active && !muted && styles.audioTextActive]}>{muted ? (locale === "ar" ? "مكتوم" : "MUTED") : (locale === "ar" ? "الأذان" : "ADHAN")}</Text>
               </Pressable>
             </View>
           );
         }) : <Text style={styles.empty}>{locale === "ar" ? "لا يوجد جدول صلاة متاح اليوم." : "No prayer schedule is available today."}</Text>}
-      </ScrollView>
+      </View>
 
       <Pressable onPress={onOpenQibla} style={styles.qiblaCard}>
         <View style={styles.qiblaIconShell}><Text style={styles.qiblaIcon}>🕋</Text></View>
@@ -220,19 +217,32 @@ export default function HomePrayerPage({
         <Text style={styles.chevron}>›</Text>
       </Pressable>
 
-      <View style={styles.subscriptionCard}>
-        <View style={styles.subscriptionHeader}>
-          <View style={styles.subscriptionIcon}><Text style={styles.subscriptionIconText}>🔔</Text></View>
-          <View style={styles.subscriptionCopy}>
-            <Text style={styles.subscriptionEyebrow}>{locale === "ar" ? "اشتراك تنبيهات الصلاة" : "PRAYER SUBSCRIPTION"}</Text>
-            <Text style={styles.subscriptionTitle}>{locale === "ar" ? "تنبيهات الصلاة لهذا الهاتف" : "Prayer alerts for this phone"}</Text>
-            <Text style={styles.subscriptionText}>{locale === "ar" ? "اختر تنبيهات ٢٠ دقيقة و١٠ دقائق والأذان لكل صلاة." : "Choose 20-minute, 10-minute and prayer-time Adhan alerts for each prayer."}</Text>
+      <View style={styles.dawahCard}>
+        <View style={styles.dawahTop}>
+          <View style={styles.dawahIcon}><Text style={styles.dawahIconText}>✉️</Text></View>
+          <View style={styles.dawahCopy}>
+            <Text style={styles.dawahEyebrow}>{locale === "ar" ? "دعوة • مواقيت الصلاة" : "DA’WAH • PRAYER EMAILS"}</Text>
+            <Text style={styles.dawahTitle}>{locale === "ar" ? "استلم مواقيت الصلاة عبر البريد" : "Receive prayer times by email"}</Text>
+            <Text style={styles.dawahText}>{locale === "ar" ? "أدخل بريدك ليصلك جدول الصلاة المحلي." : "Enter your email to receive your local prayer schedule."}</Text>
           </View>
-          <Switch value={alertsEnabled} onValueChange={onToggleAlerts} disabled={alertPreferencesBusy} />
         </View>
-        {alertsEnabled ? <Text style={styles.scheduledText}>✓ {scheduledCount} {locale === "ar" ? "تنبيه/أذان مجدول" : "scheduled prayer events"}</Text> : null}
-        <PrayerAlertPreferenceGrid locale={locale} value={preferences} onChange={onChangePreferences} disabled={alertPreferencesBusy} />
-        <Pressable onPress={onOpenAlerts} style={styles.manageButton}><Text style={styles.manageButtonText}>{locale === "ar" ? "إدارة جميع إعدادات التنبيهات" : "Manage all alert settings"}</Text><Text style={styles.manageArrow}>›</Text></Pressable>
+        <View style={styles.emailRow}>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder={locale === "ar" ? "البريد الإلكتروني" : "Email address"}
+            placeholderTextColor="#929b96"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!emailBusy}
+            style={styles.emailInput}
+          />
+          <Pressable onPress={() => { void submitPrayerEmail(); }} disabled={!context || !emailValid || emailBusy} style={[styles.subscribeButton, (!context || !emailValid || emailBusy) && styles.subscribeButtonDisabled]}>
+            {emailBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.subscribeButtonText}>{locale === "ar" ? "اشتراك" : "Subscribe"}</Text>}
+          </Pressable>
+        </View>
+        {emailMessage ? <Text style={styles.emailMessage}>{emailMessage}</Text> : null}
       </View>
 
       <Text style={styles.footer}>{context?.location.source === "windsor_islamic_association" ? "Official Windsor Islamic Association schedule" : context?.location.source === "aladhan" ? "AlAdhan calculation using device location" : "Saved prayer schedule"}</Text>
@@ -285,22 +295,28 @@ const styles = StyleSheet.create({
   colon: { color: "#e8ca77", fontSize: 20, fontWeight: "900" },
   sectionTitle: { color: "#173f35", fontSize: 19, fontWeight: "900", marginTop: 22 },
   sectionHint: { color: "#7b8984", fontSize: 9, marginTop: 3, marginBottom: 10 },
-  cardsRow: { gap: 9, paddingRight: 18, paddingBottom: 3 },
-  prayerCard: { width: 118, minHeight: 202, borderRadius: 22, backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#ded9ce", padding: 10, alignItems: "center" },
-  prayerCardActive: { backgroundColor: deepGreen, borderColor: gold, borderWidth: 1.5 },
-  nextBadge: { position: "absolute", top: 8, right: 8, borderRadius: 99, backgroundColor: gold, paddingHorizontal: 6, paddingVertical: 2 },
-  nextBadgeText: { color: deepGreen, fontSize: 6.5, fontWeight: "900" },
-  glyph: { color: "#a77f2d", fontSize: 30, marginTop: 15, marginBottom: 6 },
+  prayerList: { gap: 8 },
+  prayerRow: { minHeight: 76, borderRadius: 19, backgroundColor: "#fffdf8", borderWidth: 1, borderColor: "#ded9ce", padding: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  prayerRowActive: { backgroundColor: deepGreen, borderColor: gold, borderWidth: 1.5 },
+  glyphShell: { width: 48, height: 48, borderRadius: 15, backgroundColor: "#eef5f1", alignItems: "center", justifyContent: "center" },
+  glyphShellActive: { backgroundColor: "rgba(255,255,255,.10)", borderWidth: 1, borderColor: "rgba(215,180,94,.55)" },
+  glyph: { color: "#a77f2d", fontSize: 25 },
   activeGold: { color: "#f1d689" },
-  prayerArabic: { color: "#183f35", fontSize: 16, fontWeight: "900" },
-  prayerEnglish: { color: "#78857f", fontSize: 10, fontWeight: "700", marginTop: 1 },
-  prayerTime: { color: "#123e34", fontSize: 14, fontWeight: "900", marginTop: 8 },
+  prayerNames: { flex: 1 },
+  prayerNameLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  prayerArabic: { color: "#78857f", fontSize: 10, marginTop: 2 },
+  prayerEnglish: { color: "#183f35", fontSize: 15, fontWeight: "900" },
+  prayerTime: { color: "#123e34", fontSize: 15, fontWeight: "900", minWidth: 74, textAlign: "right" },
+  nextBadge: { borderRadius: 99, backgroundColor: gold, paddingHorizontal: 7, paddingVertical: 2 },
+  nextBadgeText: { color: deepGreen, fontSize: 7, fontWeight: "900" },
   activeWhite: { color: "#fff" },
   activeSub: { color: "#c7ddd5" },
-  audioButton: { marginTop: "auto", minWidth: 88, minHeight: 31, borderRadius: 12, backgroundColor: "#e8f3ee", alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
+  audioButton: { minWidth: 58, minHeight: 34, borderRadius: 12, backgroundColor: "#e8f3ee", alignItems: "center", justifyContent: "center", paddingHorizontal: 7 },
   audioButtonMuted: { backgroundColor: "#efefeb" },
+  audioButtonActive: { backgroundColor: "rgba(255,255,255,.13)", borderWidth: 1, borderColor: "rgba(255,255,255,.28)" },
   audioText: { color: "#0a684f", fontSize: 8, fontWeight: "900" },
   audioTextMuted: { color: "#8a918e" },
+  audioTextActive: { color: "#fff" },
   empty: { color: "#75827d", paddingVertical: 30 },
   qiblaCard: { marginTop: 16, borderRadius: 23, backgroundColor: "#fff", borderWidth: 1, borderColor: "#dedfd9", padding: 15, flexDirection: "row", alignItems: "center", gap: 12 },
   qiblaIconShell: { width: 52, height: 52, borderRadius: 17, backgroundColor: "#edf3ef", alignItems: "center", justifyContent: "center" },
@@ -310,17 +326,19 @@ const styles = StyleSheet.create({
   qiblaTitle: { color: "#163f35", fontSize: 15, fontWeight: "900", marginTop: 2 },
   qiblaText: { color: "#7a8782", fontSize: 9, marginTop: 3 },
   chevron: { color: "#a88b48", fontSize: 28 },
-  subscriptionCard: { marginTop: 18, borderRadius: 25, backgroundColor: "#fff", borderWidth: 1, borderColor: "#dcded8", padding: 16 },
-  subscriptionHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  subscriptionIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#eef5f1", alignItems: "center", justifyContent: "center" },
-  subscriptionIconText: { fontSize: 22 },
-  subscriptionCopy: { flex: 1 },
-  subscriptionEyebrow: { color: "#9d8039", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  subscriptionTitle: { color: "#163f35", fontSize: 15, fontWeight: "900", marginTop: 2 },
-  subscriptionText: { color: "#7b8782", fontSize: 9, lineHeight: 13, marginTop: 3 },
-  scheduledText: { color: "#197255", fontSize: 9, fontWeight: "800", marginTop: 12 },
-  manageButton: { marginTop: 14, minHeight: 44, borderRadius: 14, backgroundColor: "#075f4a", paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  manageButtonText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  manageArrow: { color: "#e5c979", fontSize: 22 },
+  dawahCard: { marginTop: 16, borderRadius: 21, backgroundColor: "#fff", borderWidth: 1, borderColor: "#dcded8", padding: 14 },
+  dawahTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dawahIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#eef5f1", alignItems: "center", justifyContent: "center" },
+  dawahIconText: { fontSize: 19 },
+  dawahCopy: { flex: 1 },
+  dawahEyebrow: { color: "#9d8039", fontSize: 7.5, fontWeight: "900", letterSpacing: 1 },
+  dawahTitle: { color: "#163f35", fontSize: 14, fontWeight: "900", marginTop: 2 },
+  dawahText: { color: "#7b8782", fontSize: 9, lineHeight: 13, marginTop: 2 },
+  emailRow: { flexDirection: "row", gap: 8, marginTop: 11 },
+  emailInput: { flex: 1, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: "#d9ddd8", backgroundColor: "#fafbf8", paddingHorizontal: 12, color: "#173f35", fontSize: 12 },
+  subscribeButton: { minWidth: 88, minHeight: 42, borderRadius: 13, backgroundColor: green, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  subscribeButtonDisabled: { opacity: 0.4 },
+  subscribeButtonText: { color: "#fff", fontSize: 10, fontWeight: "900" },
+  emailMessage: { color: "#527168", fontSize: 9, marginTop: 8, lineHeight: 13 },
   footer: { textAlign: "center", color: "#919a96", fontSize: 8, marginTop: 18 }
 });
