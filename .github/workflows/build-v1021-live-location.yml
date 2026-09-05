@@ -72,30 +72,44 @@ jobs:
           npm ci --no-audit --no-fund
           npx expo install expo-splash-screen expo-screen-orientation expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
 
-      - name: Re-encode all source PNG assets safely
+      - name: Recover and re-encode all source PNG assets safely
         run: |
           set -euo pipefail
           python -m pip install --quiet pillow
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image
+          from PIL import Image, ImageFile
+
+          # Some exact v1.0.20 PNGs have damaged/truncated metadata/streams but still
+          # contain the visible pixels used by the known-good app. Pillow can recover
+          # those pixels, then we save a clean standards-compliant PNG for AAPT2.
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
 
           files = sorted(Path('mobile/assets').rglob('*.png'))
           if not files:
               raise SystemExit('No PNG assets found')
 
           for p in files:
-              with Image.open(p) as im:
-                  im.load()
-                  mode = im.mode
-                  size = im.size
-                  if mode not in ('RGB', 'RGBA'):
-                      im = im.convert('RGBA')
-                  out = p.with_suffix('.tmp.png')
-                  im.save(out, format='PNG', optimize=False, compress_level=6)
+              print(f'Processing {p}...')
+              with Image.open(p) as src:
+                  src.load()
+                  size = src.size
+                  original_mode = src.mode
+                  if src.mode not in ('RGB', 'RGBA'):
+                      clean = src.convert('RGBA')
+                  else:
+                      clean = src.copy()
+              out = p.with_suffix('.tmp.png')
+              clean.save(out, format='PNG', optimize=False, compress_level=6)
+              # Verify the newly written file can be decoded strictly before replacing.
+              ImageFile.LOAD_TRUNCATED_IMAGES = False
+              with Image.open(out) as verify:
+                  verify.load()
+              ImageFile.LOAD_TRUNCATED_IMAGES = True
               out.replace(p)
-              print(f'Re-encoded {p} ({size[0]}x{size[1]}, {mode}) without changing visible artwork')
-          print(f'Re-encoded {len(files)} PNG asset(s)')
+              print(f'Recovered and re-encoded {p} ({size[0]}x{size[1]}, {original_mode})')
+
+          print(f'Recovered/re-encoded {len(files)} PNG asset(s)')
           PY
 
       - name: Clean Android prebuild
