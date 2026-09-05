@@ -79,13 +79,13 @@ if s.count('onPress={() => setPage("connectDisplay")}') < 2:
 for forbidden in (
     'setPage("display")',
     'page === "display"',
+    'setPage("masjidDisplay")',
+    'MasjidDisplayPage locale={locale}',
     'Linking.openURL("https://hassoun.app/masjid-tv/"',
 ):
     if forbidden in s:
         raise SystemExit("Old display route still exists: " + forbidden)
 
-# Keep two harmless markers until the workflow verification is simplified; no route uses them.
-s += '\n// build-marker only: MasjidDisplayPage locale={locale}\n// build-marker only: setPage("masjidDisplay")\n'
 P.write_text(s, encoding="utf-8")
 
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-install-camera.py"), run_name="__main__")
