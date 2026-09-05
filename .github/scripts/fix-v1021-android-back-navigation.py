@@ -8,13 +8,11 @@ SETTINGS = ROOT / "mobile/src/SettingsHub.tsx"
 # ---------------- App-level Android back behavior ----------------
 app = APP.read_text(encoding="utf-8")
 
-# Add BackHandler to react-native imports.
 if "BackHandler" not in app:
     app, count = re.subn(r'(\bAppState,\s*\n\s*)', r'\1BackHandler,\n  ', app, count=1)
     if count != 1:
         raise SystemExit("Could not add BackHandler import to App.tsx")
 
-# Remove an older generated handler if this script is re-applied.
 app = re.sub(
     r'\n\s*// Android system back: stay inside Hassoun.*?\n\s*\}, \[activeTab\]\);\n',
     '\n',
@@ -77,7 +75,7 @@ settings_handler = r'''
         setReaderOpen(false);
         return true;
       }
-      if (page === "connectDisplay" || page === "masjidDisplay") {
+      if (page === "connectDisplay") {
         setPage("displays");
         return true;
       }
@@ -94,13 +92,16 @@ settings = settings.replace(state_anchor, state_anchor + settings_handler, 1)
 
 required = [
     'BackHandler.addEventListener("hardwareBackPress"',
-    'page === "connectDisplay" || page === "masjidDisplay"',
+    'page === "connectDisplay"',
     'setPage("displays")',
     'if (page !== "root")',
 ]
 for item in required:
     if item not in settings:
         raise SystemExit("Missing Settings Android-back behavior: " + item)
+
+if 'page === "masjidDisplay"' in settings:
+    raise SystemExit("Obsolete masjidDisplay back route still present")
 
 SETTINGS.write_text(settings, encoding="utf-8")
 print("Android back now navigates within Hassoun instead of exiting from child pages")
