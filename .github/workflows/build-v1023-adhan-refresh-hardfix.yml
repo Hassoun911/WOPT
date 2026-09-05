@@ -15,6 +15,7 @@ on:
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix-base.py"
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
       - ".github/scripts/rewrite-home-ground-zero.py"
+      - ".github/scripts/remove-legacy-home-before-rewrite.py"
       - "mobile/src/HomePrayerPage.tsx"
       - "mobile/src/prayerData.ts"
       - "mobile/src/prayerCalculationSettings.ts"
@@ -166,6 +167,9 @@ jobs:
               raise SystemExit(f'Legacy display route still present: {forbidden}')
           print('Ground-zero Home verification passed')
           PY
+          echo '--- generated App.tsx around Home boundary ---'
+          nl -ba mobile/App.tsx | sed -n '400,470p'
+          echo '--- end generated App.tsx boundary ---'
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
             cd mobile
             npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
