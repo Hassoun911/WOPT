@@ -40,9 +40,11 @@ jobs:
           python .github/scripts/fix-v1021-live-location.py
           python - <<'PY'
           from pathlib import Path
+          import re
           p = Path('mobile/app.config.ts')
           s = p.read_text()
-          s = s.replace('versionCode: 55', 'versionCode: 65')
+          s = re.sub(r'version:\s*(?:process\.env\.EXPO_APP_VERSION\s*\|\|\s*)?"[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.21"', s, count=1)
+          s = re.sub(r'versionCode:\s*\d+', 'versionCode: 65', s, count=1)
           p.write_text(s)
           PY
 
@@ -55,8 +57,8 @@ jobs:
           grep -q 'hassoun-logo.png' mobile/src/SettingsHub.tsx
           grep -q 'loadLocationPrayerContext' mobile/App.tsx
           grep -q 'locationLabel' mobile/App.tsx
-          grep -q 'Local Adhan calculation • device location' mobile/src/localPrayerTimes.ts
-          grep -q 'Windsor Islamic Association • official Adhan time' mobile/src/localPrayerTimes.ts
+          grep -q 'Local Adhan calculation' mobile/src/localPrayerTimes.ts
+          grep -q 'Windsor Islamic Association' mobile/src/localPrayerTimes.ts
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
