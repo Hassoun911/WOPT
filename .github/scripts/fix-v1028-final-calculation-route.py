@@ -36,7 +36,7 @@ alert_row = re.search(
 )
 if not alert_row:
     raise SystemExit("Prayer alerts row missing")
-calc_row = '\n        <Row emoji="🧭" title={t("Prayer calculation", "حساب مواقيت الصلاة")} text={t("API source, Smart or manual method, Asr school, high-latitude rules and minute tuning", "مصدر API والطريقة الذكية أو اليدوية ومذهب العصر وقواعد خطوط العرض وضبط الدقائق")} onPress={() => setPage("calculation")} />'
+calc_row = '\n        <Row emoji="🧭" title={t("Prayer calculation", "حساب مواقيت الصلاة")} text={t("Smart source, official mosque schedule, calculated times, Asr school and tuning", "مصدر ذكي أو جدول مسجد رسمي أو مواقيت محسوبة ومذهب العصر والضبط")} onPress={() => setPage("calculation")} />'
 hub = hub[:alert_row.end()] + calc_row + hub[alert_row.end():]
 
 hub = re.sub(r'\n\s*if \(page === "calculation"\).*?;\n', '\n', hub)
@@ -61,34 +61,34 @@ for needle in required_hub:
     if needle not in hub:
         raise SystemExit(f"Final calculation route missing: {needle}")
 
-required_page = [
-    'PRAYER TIME SOURCE / API',
-    'AlAdhan Prayer Times API',
-    'Smart automatic',
-    'METHOD_OPTIONS.map',
-    'ASR SCHOOL',
-    'HIGH-LATITUDE RULE',
-    'FINE-TUNE BY MINUTES',
-    'Save & use these settings',
-]
-for needle in required_page:
-    if needle not in page:
-        raise SystemExit(f"Interactive calculation page missing: {needle}")
-
 for needle in ['Muslim World League','ISNA','Umm al-Qura','Egyptian','Karachi','Tehran','Jafari']:
     if needle not in settings:
         raise SystemExit(f"Calculation method data missing: {needle}")
 
-print("Forced final SettingsHub Prayer calculation route to interactive calculation page")
+print("Forced final SettingsHub Prayer calculation route")
 
-# Install the paired-display calculation bridge from current HEAD. The workflow
-# restores an older source tree first, so this file must be explicitly restored.
-sync_rel = "mobile/src/displayCalculationSync.ts"
-sync_content = subprocess.check_output(["git", "show", f"HEAD:{sync_rel}"], text=True)
-sync_target = ROOT / sync_rel
-sync_target.parent.mkdir(parents=True, exist_ok=True)
-sync_target.write_text(sync_content, encoding="utf-8")
-print("Installed paired-display calculation sync bridge")
+# The workflow reconstructs an older mobile tree first. Restore the canonical,
+# source-aware calculation page and the paired-display calculation bridge from
+# current HEAD after the legacy route has been created.
+for rel in ["mobile/src/PrayerCalculationSettingsPage.tsx", "mobile/src/displayCalculationSync.ts"]:
+    content = subprocess.check_output(["git", "show", f"HEAD:{rel}"], text=True)
+    target = ROOT / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    print(f"Installed canonical calculation source: {rel}")
+
+page = PAGE.read_text(encoding="utf-8")
+for needle in [
+    'Smart Automatic',
+    'Official Local Mosque Schedule',
+    'Calculated Prayer Times',
+    'Official timetable is active',
+    'Use calculated times instead',
+    'Live Asr preview',
+    'Save & use these settings',
+]:
+    if needle not in page:
+        raise SystemExit(f"Source-aware calculation page missing: {needle}")
 
 # Final navigation persistence layer: top-level state is handled in App, while
 # nested Settings/Games/multiplayer state is restored here after the old source
