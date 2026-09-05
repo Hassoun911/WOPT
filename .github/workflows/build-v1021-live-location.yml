@@ -9,6 +9,7 @@ on:
       - ".github/scripts/fix-v1021-live-location.py"
       - ".github/scripts/fix-v1021-no-resume-reload.py"
       - ".github/scripts/fix-v1021-unified-display-menu.py"
+      - ".github/scripts/fix-v1021-pull-to-refresh.py"
 
 permissions:
   contents: read
@@ -116,6 +117,7 @@ jobs:
           python3 .github/scripts/fix-v1021-live-location.py
           python3 .github/scripts/fix-v1021-no-resume-reload.py
           python3 .github/scripts/fix-v1021-unified-display-menu.py
+          python3 .github/scripts/fix-v1021-pull-to-refresh.py
 
       - name: Verify exact UI is preserved and new issues are fixed
         run: |
@@ -134,6 +136,8 @@ jobs:
           grep -q 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx
           grep -q 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx
           grep -q 'ConnectDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
+          grep -q 'RefreshControl refreshing={refreshingHome} onRefresh={refreshHome}' mobile/App.tsx
+          grep -q 'const refreshHome = useCallback' mobile/App.tsx
           cd mobile
           npm run typecheck
 
@@ -174,16 +178,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Exact-v1.0.20-Live-Location-Unified-Displays
+          name: Hassoun-v1.0.21-Exact-v1.0.20-Live-Location-Unified-Displays-Pull-Refresh
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk.sha256
           if-no-files-found: error
           retention-days: 30
