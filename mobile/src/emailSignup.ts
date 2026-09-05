@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { anyPrayerAlertEnabled, type PrayerAlertPreferences } from "./alertPreferences";
+import { anyPrayerAlertEnabled, DEFAULT_EMAIL_PRAYER_ALERTS, type PrayerAlertPreferences } from "./alertPreferences";
 import { detectPrayerLocation, type DetectedPrayerLocation } from "./deviceLocation";
 import { getInstallationId } from "./installation";
 
@@ -76,8 +76,42 @@ export async function subscribeToPrayerEmails(
 
   const payload = await response.json().catch(() => ({})) as EmailSignupResult & { error?: string };
   if (!response.ok) throw new Error(payload.error || `Email signup failed (${response.status})`);
-  return {
-    result: payload,
-    detectedLocation: location
-  };
+  return { result: payload, detectedLocation: location };
+}
+
+export async function subscribeToDailyPrayerTimes(
+  email: string,
+  locale: "en" | "ar",
+  location: { latitude: number; longitude: number; timezone: string; label: string }
+) {
+  const installationId = await getInstallationId();
+  const labelParts = location.label.split(",").map((part) => part.trim()).filter(Boolean);
+  const response = await fetch(`${apiBase()}/email/subscribers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: email.trim(),
+      locale,
+      installationId,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      timezone: location.timezone,
+      city: labelParts[0] || location.label,
+      region: labelParts[1] || undefined,
+      preferences: {
+        prayerAlerts: false,
+        dailyPrayerSchedule: true,
+        religiousOccasions: true,
+        dailyContent: false,
+        announcements: false,
+        communityEvents: false,
+        marketing: false
+      },
+      prayers: DEFAULT_EMAIL_PRAYER_ALERTS
+    })
+  });
+
+  const payload = await response.json().catch(() => ({})) as EmailSignupResult & { error?: string };
+  if (!response.ok) throw new Error(payload.error || `Email signup failed (${response.status})`);
+  return payload;
 }
