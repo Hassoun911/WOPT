@@ -10,6 +10,8 @@ on:
       - ".github/scripts/fix-v1021-native-masjid-display.py"
       - ".github/scripts/fix-v1021-unified-display-menu.py"
       - ".github/scripts/fix-v1021-pull-to-refresh.py"
+      - ".github/scripts/fix-v1021-install-camera.py"
+      - ".github/scripts/fix-v1021-display-pairing-admin.py"
 
 permissions:
   contents: read
@@ -58,13 +60,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install the exact v1.0.20 dependencies
+      - name: Install the exact v1.0.20 dependencies plus camera
         run: |
           set -euo pipefail
           cd mobile
           npm ci --ignore-scripts --no-audit --no-fund
-          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen --npm
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera --npm
           npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+          test -d node_modules/@typescript/typescript-linux-x64
 
       - name: Reconstruct the exact good v1.0.20 feature stack
         run: |
@@ -134,31 +137,37 @@ jobs:
           grep -q 'void loadPrayerTimes().then(async (refreshed)' mobile/App.tsx
           grep -q 'Resume in-place' mobile/App.tsx
 
-          # Exactly one top-level Displays entry; Connect + Wall/Masjid only inside that submenu.
+          # Exactly one Displays menu; both display actions lead to the pairing/admin controller.
           test "$(grep -o 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
           test "$(grep -o 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
           grep -q 'title={t("Displays", "الشاشات")}' mobile/src/SettingsHub.tsx
-          ! grep -q 'setPage("display")' mobile/src/SettingsHub.tsx
-          ! grep -q 'page === "display"' mobile/src/SettingsHub.tsx
           grep -q 'ConnectDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
+          test "$(grep -o 'setPage("connectDisplay")' mobile/src/SettingsHub.tsx | wc -l)" -ge 2
+          ! grep -q 'setPage("masjidDisplay")' mobile/src/SettingsHub.tsx
+          ! grep -q 'MasjidDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
 
-          # Wall/Masjid must be a native in-app screen, never an external browser/WebView link.
-          test -f mobile/src/MasjidDisplayPage.tsx
-          grep -q 'MasjidDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
-          grep -q 'setPage("masjidDisplay")' mobile/src/SettingsHub.tsx
-          grep -q 'useWindowDimensions' mobile/src/MasjidDisplayPage.tsx
-          grep -q 'loadPrayerTimes' mobile/src/MasjidDisplayPage.tsx
-          grep -q 'ScreenOrientation.unlockAsync' mobile/src/MasjidDisplayPage.tsx
-          ! grep -q 'Linking.openURL("https://hassoun.app/masjid-tv/"' mobile/src/SettingsHub.tsx
-          ! grep -q 'WebView' mobile/src/MasjidDisplayPage.tsx
+          # Pairing screen must support QR scanning, manual six-digit code, saved devices and admin.
+          grep -q 'CameraView' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'useCameraPermissions' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'Scan QR code' mobile/src/ConnectDisplayPage.tsx
+          grep -q '6-DIGIT PAIRING CODE' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'SAVED DISPLAYS' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'openAdmin' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'mosqueLocation' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'DISPLAY ADMIN' mobile/src/ConnectDisplayPage.tsx
+          grep -q 'expo-camera' mobile/package.json
 
-          # Android pull-to-refresh must be wired on the actual Home ScrollView.
+          # Android pull-to-refresh must be wired on the actual Home ScrollView and force fresh location.
           grep -q 'const refreshHome = useCallback' mobile/App.tsx
           grep -q 'refreshing={refreshingHome}' mobile/App.tsx
           grep -q 'onRefresh={refreshHome}' mobile/App.tsx
           grep -q 'overScrollMode="always"' mobile/App.tsx
           grep -q 'progressViewOffset={8}' mobile/App.tsx
           grep -q 'HassounWidget.refresh()' mobile/App.tsx
+          grep -q 'loadPrayerTimes({ forceLocation: true })' mobile/App.tsx
+
+          # Guard against the exact run #42 failure.
+          test -d mobile/node_modules/@typescript/typescript-linux-x64
           cd mobile
           npm run typecheck
 
@@ -199,16 +208,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Exact-v1.0.20-Native-Masjid-Single-Displays-Pull-Refresh
+          name: Hassoun-v1.0.21-Display-Pairing-Admin-Force-Location-Refresh
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-native-masjid-single-displays-pull-refresh.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-display-pairing-admin-force-location-refresh.apk.sha256
           if-no-files-found: error
           retention-days: 30
