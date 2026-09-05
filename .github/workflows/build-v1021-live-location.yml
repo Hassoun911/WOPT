@@ -72,20 +72,18 @@ jobs:
           npm ci --no-audit --no-fund
           npx expo install expo-splash-screen expo-screen-orientation expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
 
-      - name: Repair configured PNG CRC fields only
+      - name: Repair all source PNG CRC fields only
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import struct, zlib
 
-          files = [
-              Path('mobile/assets/icon.png'),
-              Path('mobile/assets/adaptive-icon.png'),
-              Path('mobile/assets/splash-logo.png'),
-              Path('mobile/assets/notification-icon.png'),
-          ]
+          files = sorted(Path('mobile/assets').rglob('*.png'))
+          if not files:
+              raise SystemExit('No PNG assets found')
           signature = b'\x89PNG\r\n\x1a\n'
+          total_changed = 0
           for p in files:
               raw = p.read_bytes()
               if not raw.startswith(signature):
@@ -108,6 +106,7 @@ jobs:
                   new_crc = zlib.crc32(data, new_crc) & 0xffffffff
                   if old_crc != new_crc:
                       changed += 1
+                      total_changed += 1
                   out.extend(raw[pos:pos+8+length])
                   out.extend(struct.pack('>I', new_crc))
                   pos = end
@@ -118,8 +117,10 @@ jobs:
                       break
               if not saw_iend:
                   raise SystemExit(f'Missing IEND: {p}')
-              p.write_bytes(out)
-              print(f'{p}: corrected {changed} CRC field(s), image chunk data unchanged')
+              if changed:
+                  p.write_bytes(out)
+                  print(f'{p}: corrected {changed} CRC field(s); image chunk data unchanged')
+          print(f'Checked {len(files)} PNG assets; corrected {total_changed} CRC field(s) total')
           PY
 
       - name: Clean Android prebuild
