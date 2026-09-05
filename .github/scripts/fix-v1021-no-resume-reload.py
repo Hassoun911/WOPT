@@ -31,8 +31,10 @@ if n1 != 1 or n2 != 1:
     raise SystemExit("Could not set v1.0.21/versionCode 65")
 CONFIG.write_text(cfg, encoding="utf-8")
 
+# Chain the v1.0.21 fixes here because this script is already part of the exact-v1.0.20 build recipe.
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-android-back-navigation.py"), run_name="__main__")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-resume-state.py"), run_name="__main__")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-passive-pull-fallback.py"), run_name="__main__")
+runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-prayer-calculation-settings.py"), run_name="__main__")
 
-print("Applied resume-in-place, last-screen restoration, Android back navigation, and passive pull-refresh fallback")
+print("Applied all v1.0.21 navigation, background-state, refresh, calculation settings, and versionCode fixes")
