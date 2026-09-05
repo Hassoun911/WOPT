@@ -129,7 +129,9 @@ if 'DailyIslamicCards' not in home:
 HOME.write_text(home, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
-# Permissions page: show live status and direct enable actions.
+# Permissions page: show live status and direct enable actions. Remove the old
+# static permissions renderer so TypeScript does not keep a second unreachable
+# permissions branch after the new early return.
 # ---------------------------------------------------------------------------
 hub = HUB.read_text(encoding="utf-8")
 if 'import PermissionsStatusPage from "./PermissionsStatusPage";' not in hub:
@@ -137,6 +139,14 @@ if 'import PermissionsStatusPage from "./PermissionsStatusPage";' not in hub:
     if import_anchor not in hub:
         raise SystemExit('SettingsHub BrandMark import missing')
     hub = hub.replace(import_anchor, import_anchor + 'import PermissionsStatusPage from "./PermissionsStatusPage";\n', 1)
+
+hub = re.sub(
+    r'\n  if \(page === "permissions"\) \{.*?\n  \}\n\n(?=  if \(page === "privacy"\))',
+    '\n',
+    hub,
+    count=1,
+    flags=re.S,
+)
 
 route_anchor = '  if (page === "root") return root;\n'
 if route_anchor not in hub:
@@ -147,6 +157,8 @@ if 'PermissionsStatusPage locale={locale}' not in hub:
         route_anchor + '\n  if (page === "permissions") return <PermissionsStatusPage locale={locale} onBack={() => setPage("root")} />;\n',
         1,
     )
+if hub.count('page === "permissions"') != 1:
+    raise SystemExit('More than one Permissions route remains')
 HUB.write_text(hub, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
@@ -159,7 +171,6 @@ HUB.write_text(hub, encoding="utf-8")
 # ---------------------------------------------------------------------------
 app = APP.read_text(encoding="utf-8")
 
-# Add exact-alarm helpers to whichever prayerAudio import exists.
 m = re.search(r'import \{([^}]*)\} from "\./src/prayerAudio";', app)
 if not m:
     raise SystemExit('prayerAudio import missing')
@@ -189,7 +200,6 @@ if 'const [exactAlarmAllowed, setExactAlarmAllowed]' not in app:
         1,
     )
 
-# Add a side-effect-light permission recheck. It must not load prayer data.
 permission_anchor = '  const toggleLocale = async () => {'
 permission_pos = app.find(permission_anchor)
 if permission_pos < 0:
@@ -233,8 +243,6 @@ if 'refreshExactAlarmPermissionState' not in app:
 '''
     app = app[:permission_pos] + permission_effect + app[permission_pos:]
 
-# Persist the current top-level tab so a true Android Activity/process recreation
-# comes back to the same place rather than visibly resetting to Home.
 if 'hassoun:last-active-tab:v2' not in app:
     tab_anchor = '  const [activeTab, setActiveTab] = useState<AppTab>("home");'
     if tab_anchor not in app:
@@ -265,13 +273,11 @@ if 'hassoun:last-active-tab:v2' not in app:
 '''
     app = app[:effects_pos] + persistence + app[effects_pos:]
 
-# Calculation settings now trigger the canonical refresh immediately after save.
 if 'subscribePrayerCalculationChanges(() => {' not in app:
-    refresh_end_marker = '  useEffect(() => {'
     refresh_start = app.find('  const refreshHome = useCallback')
     if refresh_start < 0:
         raise SystemExit('refreshHome callback missing')
-    next_effect = app.find(refresh_end_marker, refresh_start)
+    next_effect = app.find('  useEffect(() => {', refresh_start)
     if next_effect < 0:
         raise SystemExit('Could not find insertion point after refreshHome')
     calc_effect = '''  useEffect(() => {
@@ -283,7 +289,6 @@ if 'subscribePrayerCalculationChanges(() => {' not in app:
 '''
     app = app[:next_effect] + calc_effect + app[next_effect:]
 
-# Safety: foreground listeners may update clock/permission state, but may not reload GPS/prayers.
 for match in re.finditer(r'AppState\.addEventListener\("change"', app):
     effect_start = app.rfind('  useEffect(() => {', 0, match.start())
     effect_end = app.find('\n  },', match.end())
