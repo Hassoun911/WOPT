@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 HUB = ROOT / "mobile/src/SettingsHub.tsx"
@@ -24,7 +25,6 @@ if '"calculation"' not in m.group(1):
     replacement = 'type SettingsPage = ' + m.group(1).strip() + ' | "calculation";'
     hub = hub[:m.start()] + replacement + hub[m.end():]
 
-# Remove any pre-existing calculation row so only the real interactive route remains.
 hub = re.sub(
     r'\n\s*<Row emoji="(?:🧭|🧮|🧿|🧭)" title=\{t\("Prayer calculation".*?onPress=\{\(\) => setPage\("calculation"\)\} />',
     '', hub, flags=re.S
@@ -39,7 +39,6 @@ if not alert_row:
 calc_row = '\n        <Row emoji="🧭" title={t("Prayer calculation", "حساب مواقيت الصلاة")} text={t("API source, Smart or manual method, Asr school, high-latitude rules and minute tuning", "مصدر API والطريقة الذكية أو اليدوية ومذهب العصر وقواعد خطوط العرض وضبط الدقائق")} onPress={() => setPage("calculation")} />'
 hub = hub[:alert_row.end()] + calc_row + hub[alert_row.end():]
 
-# Remove duplicate/legacy calculation renderers, then install exactly one renderer.
 hub = re.sub(r'\n\s*if \(page === "calculation"\).*?;\n', '\n', hub)
 marker = '  if (page === "widgets") {'
 idx = hub.find(marker)
@@ -81,3 +80,15 @@ for needle in ['Muslim World League','ISNA','Umm al-Qura','Egyptian','Karachi','
         raise SystemExit(f"Calculation method data missing: {needle}")
 
 print("Forced final SettingsHub Prayer calculation route to interactive calculation page")
+
+# Install the paired-display calculation bridge from current HEAD. The workflow
+# restores an older source tree first, so this file must be explicitly restored.
+sync_rel = "mobile/src/displayCalculationSync.ts"
+sync_content = subprocess.check_output(["git", "show", f"HEAD:{sync_rel}"], text=True)
+sync_target = ROOT / sync_rel
+sync_target.parent.mkdir(parents=True, exist_ok=True)
+sync_target.write_text(sync_content, encoding="utf-8")
+print("Installed paired-display calculation sync bridge")
+
+resume = Path(__file__).resolve().parent / "fix-v1023-full-resume-and-global-calculation.py"
+exec(compile(resume.read_text(encoding="utf-8"), str(resume), "exec"), {"__file__": str(resume), "__name__": "__main__"})
