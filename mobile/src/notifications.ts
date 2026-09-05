@@ -32,6 +32,12 @@ const ISLAMIC_EVENT_MARKER_KEY = "hassoun:islamic-event:last-scheduled:v1";
 let notificationScheduleQueue: Promise<void> = Promise.resolve();
 
 export type PrayerNotificationContext = { timeZone?: string; locationLabel?: string };
+type PrayerNotificationContextInput = PrayerNotificationContext | string | undefined;
+
+function normalizeContext(contextOrLabel?: PrayerNotificationContextInput, legacyTimeZone?: string): PrayerNotificationContext {
+  if (typeof contextOrLabel === "string") return { locationLabel: contextOrLabel, timeZone: legacyTimeZone };
+  return contextOrLabel || {};
+}
 
 function withNotificationScheduleLock<T>(operation: () => Promise<T>): Promise<T> {
   const run = notificationScheduleQueue.then(operation, operation);
@@ -163,13 +169,15 @@ async function schedulePrayerNotificationsUnlocked(
   prayerTimes: PrayerTimes,
   locale: "en" | "ar",
   suppliedPreferences?: PrayerAlertPreferences,
-  context: PrayerNotificationContext = {}
+  contextOrLabel?: PrayerNotificationContextInput,
+  legacyTimeZone?: string
 ) {
   const granted = await requestNotificationPermission();
   if (!granted) return { granted: false, count: 0 };
   await cancelPrayerNotificationsUnlocked();
   const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();
   const savedContext = await loadSavedPrayerContext();
+  const context = normalizeContext(contextOrLabel, legacyTimeZone);
   const timeZone = context.timeZone || savedContext?.location.timezone || WINDSOR_TIME_ZONE;
   const locationLabel = context.locationLabel || savedContext?.location.label || CITY_LABEL;
   const days = Platform.OS === "ios" ? 4 : 14;
@@ -203,9 +211,10 @@ export function schedulePrayerNotifications(
   prayerTimes: PrayerTimes,
   locale: "en" | "ar",
   preferences?: PrayerAlertPreferences,
-  context: PrayerNotificationContext = {}
+  contextOrLabel?: PrayerNotificationContextInput,
+  legacyTimeZone?: string
 ) {
-  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences, context));
+  return withNotificationScheduleLock(() => schedulePrayerNotificationsUnlocked(prayerTimes, locale, preferences, contextOrLabel, legacyTimeZone));
 }
 
 export async function disablePrayerNotifications() {
