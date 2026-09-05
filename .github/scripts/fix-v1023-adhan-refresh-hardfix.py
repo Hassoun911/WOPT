@@ -22,23 +22,21 @@ exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__"
 v1027 = HERE / "fix-v1027-fresh-travel-location.py"
 exec(compile(v1027.read_text(encoding="utf-8"), str(v1027), "exec"), {"__file__": str(v1027), "__name__": "__main__"})
 
-# Final navigation hard-fix: after every Settings patch, force the visible Prayer
-# calculation card to open the real interactive calculation component.
 v1028 = HERE / "fix-v1028-final-calculation-route.py"
 exec(compile(v1028.read_text(encoding="utf-8"), str(v1028), "exec"), {"__file__": str(v1028), "__name__": "__main__"})
 
-# Final Home refresh hard-fix: manual refresh is GPS -> direct AlAdhan -> GPS-derived
-# city label. This deliberately bypasses the Hassoun Worker outside Windsor.
+# Manual Home refresh: live GPS -> direct AlAdhan -> GPS-derived city label.
 v1029 = HERE / "fix-v1029-force-gps-direct-prayer-refresh.py"
 exec(compile(v1029.read_text(encoding="utf-8"), str(v1029), "exec"), {"__file__": str(v1029), "__name__": "__main__"})
 
-# Final notification-label fix: 20-minute, 10-minute and prayer-time alerts must show
-# the resolved city instead of the generic "Current location" label.
+# Prayer notifications: resolve a real city name for 20m, 10m and prayer-time alerts.
+# v1030 is deliberately signature-independent because generated notificationContent
+# signatures can change across reconstructed feature stacks.
 v1030 = HERE / "fix-v1030-notification-city-label.py"
 exec(compile(v1030.read_text(encoding="utf-8"), str(v1030), "exec"), {"__file__": str(v1030), "__name__": "__main__"})
 
-# Keep this test build on the existing v1.0.23 metadata because the proven workflow
-# verifier is intentionally pinned there. Runtime code contains all later fixes.
+# Keep this test build on existing v1.0.23 metadata while the proven workflow verifier
+# remains pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
 cfg = config.read_text(encoding="utf-8")
 cfg = cfg.replace('version: process.env.EXPO_APP_VERSION || "1.0.24"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"')
