@@ -7,6 +7,7 @@ on:
       - ".github/workflows/build-v1024-native-alarm-refresh.yml"
       - ".github/scripts/fix-v1024-native-alarm-refresh.py"
       - ".github/scripts/prepare-v1024-scheduler.py"
+      - ".github/scripts/post-v1024-user-runtime-fixes.py"
 
 permissions:
   contents: read
@@ -124,12 +125,21 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           checks = {
-            'mobile/App.tsx': ['const refreshHome = useCallback', 'loadPrayerTimes({ forceLocation: true })', 'onRefresh={() => { void refreshHome(); }}', 'REFRESH LOCATION', 'Last location refresh', 'startupAudioCleared'],
+            'mobile/App.tsx': [
+              'const refreshHome = useCallback',
+              'loadPrayerTimes({ forceLocation: true })',
+              'onRefresh={() => { void refreshHome(); }}',
+              'accessibilityLabel={locale === "ar" ? "تحديث الموقع" : "Refresh location"}',
+              'Last location refresh',
+              'startupAudioCleared',
+              'ALARMS & REMINDERS PERMISSION',
+              'exactAlarmAllowed'
+            ],
             'mobile/src/prayerData.ts': ['forceLocation', 'Location.Accuracy.Highest'],
             'mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt': ['GENERATION_KEY', 'isCurrentDueAlarm', 'java.util.UUID.randomUUID()', 'putExtra("generation"'],
             'mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt': ['PrayerAlarmScheduler.isCurrentDueAlarm', 'authorizedAlarm'],
             'mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAudioService.kt': ['authorizedAlarm', 'intent?.action != ACTION_PLAY'],
-            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', '6-DIGIT PAIRING CODE', 'DISPLAY ADMIN'],
+            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', '6-DIGIT PAIRING CODE', 'DISPLAY ADMIN', 'PermissionsAndroid.PERMISSIONS.CAMERA', 'CAMERA_PENDING_KEY', 'finishPendingCameraScan'],
             'mobile/app.config.ts': ['1.0.24', 'versionCode: 68'],
           }
           for file, needles in checks.items():
@@ -138,6 +148,9 @@ jobs:
               if needle not in text:
                 raise SystemExit(f'Missing {needle!r} in {file}')
             print(f'OK {file}')
+          app = Path('mobile/App.tsx').read_text(encoding='utf-8')
+          if 'REFRESH LOCATION' in app:
+            raise SystemExit('Old oversized REFRESH LOCATION button still present')
           print('Generated v1.0.24 source verification passed')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
@@ -185,16 +198,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-native-alarm-refresh-fixed.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-permissions-camera-refresh-fixed.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.24-Native-Alarm-Refresh-Fixed
+          name: Hassoun-v1.0.24-Permissions-Camera-Refresh-Fixed
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-native-alarm-refresh-fixed.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-native-alarm-refresh-fixed.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-permissions-camera-refresh-fixed.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-permissions-camera-refresh-fixed.apk.sha256
           if-no-files-found: error
           retention-days: 30
