@@ -27,6 +27,11 @@ exec(compile(v1027.read_text(encoding="utf-8"), str(v1027), "exec"), {"__file__"
 v1028 = HERE / "fix-v1028-final-calculation-route.py"
 exec(compile(v1028.read_text(encoding="utf-8"), str(v1028), "exec"), {"__file__": str(v1028), "__name__": "__main__"})
 
+# Final Home refresh hard-fix: manual refresh is GPS -> direct AlAdhan -> GPS-derived
+# city label. This deliberately bypasses the Hassoun Worker outside Windsor.
+v1029 = HERE / "fix-v1029-force-gps-direct-prayer-refresh.py"
+exec(compile(v1029.read_text(encoding="utf-8"), str(v1029), "exec"), {"__file__": str(v1029), "__name__": "__main__"})
+
 # Keep this test build on the existing v1.0.23 metadata because the proven workflow
 # verifier is intentionally pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
