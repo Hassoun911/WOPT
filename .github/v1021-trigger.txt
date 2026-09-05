@@ -1,2 +1,2 @@
-Build Hassoun v1.0.21 from the exact protected v1.0.20 mobile baseline commit d5e0ec5510079ef08a525a6a67d2f0dbbbe6d19a with only the live GPS city/prayer-time fix.
-Exact baseline rebuild trigger 2026-09-05.
+Build Hassoun from the exact protected v1.0.20 mobile baseline with current v1.0.21+ runtime fixes.
+Trigger 2026-09-05: reliable Home pull-to-refresh with forced fresh GPS, preserve active app/settings page after Android background recreation, and add smart prayer calculation method/madhab/high-latitude/manual-offset settings.
