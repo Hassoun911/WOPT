@@ -26,9 +26,6 @@ if "RefreshControl" not in app:
 if "prayerLocation" not in app or "loadPrayerTimes" not in app:
     raise SystemExit("Expected v1.0.20 prayerLocation/loadPrayerTimes pipeline is missing")
 
-# Make the prayer loader support a real forced-location mode. Normal startup stays
-# exactly as v1.0.20, but an explicit Home pull asks Android for a fresh high-accuracy
-# GPS fix instead of allowing a cached/last-known coordinate to mask movement.
 old_sig = 'export async function loadPrayerTimes(): Promise<LoadedPrayerTimes> {'
 new_sig = 'export async function loadPrayerTimes(options: { forceLocation?: boolean } = {}): Promise<LoadedPrayerTimes> {'
 if old_sig in prayer_data:
@@ -75,9 +72,13 @@ if home_index < 0:
 scroll_index = app.find("<ScrollView", home_index)
 if scroll_index < 0:
     raise SystemExit("Could not find Home ScrollView")
-tag_end = app.find(">", scroll_index)
-if tag_end < 0:
+# Do NOT use app.find('>') here: passive touch handlers contain arrow functions (=>),
+# whose > character is not the end of the JSX opening tag. The true tag terminator is
+# on its own indented line.
+closing_match = re.search(r'\n\s*>', app[scroll_index:])
+if not closing_match:
     raise SystemExit("Could not parse Home ScrollView opening tag")
+tag_end = scroll_index + closing_match.end() - 1
 opening = app[scroll_index:tag_end + 1]
 
 for pat in [
@@ -122,4 +123,4 @@ if MASJID.exists():
     if "absoluteFillObject" in masjid:
         raise SystemExit("Masjid display still contains unsupported StyleSheet.absoluteFillObject")
 
-print("Enabled Home pull-to-refresh with forced high-accuracy GPS and no stale-location fallback")
+print("Enabled Home pull-to-refresh with forced high-accuracy GPS and robust ScrollView parsing")
