@@ -1,4 +1,4 @@
 ground-zero Home prayer page rebuild
 pull-down refresh + prayer subscription + resume-safe state
-retry after state-boundary rewrite fix
+retry after stripping legacy refresh setters
 2026-09-05
