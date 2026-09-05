@@ -3,3 +3,4 @@ pull-down refresh + prayer subscription + resume-safe state
 retry after stripping legacy refresh setters
 2026-09-05
 full nested resume persistence + global calculation profile
+retry resilient multiplayer restore installer
