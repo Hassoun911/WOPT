@@ -60,12 +60,31 @@ if 'resolvePrayerNotificationLocationLabel' not in text:
         raise SystemExit('Could not find notificationContent function')
     text = text[:at] + helpers + text[at:]
 
-preferences_line = '  const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();'
 resolved_line = '  const resolvedLocationLabel = await resolvePrayerNotificationLocationLabel(locationLabel);'
 if resolved_line not in text:
-    if preferences_line not in text:
-        raise SystemExit('Could not find prayer notification preferences line')
-    text = text.replace(preferences_line, preferences_line + '\n' + resolved_line, 1)
+    # In the reconstructed source, locationLabel is derived from the notification context.
+    # Insert resolution only AFTER that local variable exists.
+    location_line = '  const locationLabel = context.locationLabel || CITY_LABEL;'
+    if location_line in text:
+        text = text.replace(location_line, location_line + '\n' + resolved_line, 1)
+    else:
+        # Compatibility path for older generated signatures where locationLabel is a parameter.
+        function_start = text.find('async function schedulePrayerNotificationsUnlocked(')
+        if function_start < 0:
+            raise SystemExit('Could not find schedulePrayerNotificationsUnlocked')
+        body_start = text.find('{', function_start)
+        if body_start < 0:
+            raise SystemExit('Could not find prayer notification function body')
+        preferences_line = '  const preferences = suppliedPreferences ?? await loadPhonePrayerAlertPreferences();'
+        pref_at = text.find(preferences_line, body_start)
+        if pref_at < 0:
+            raise SystemExit('Could not find prayer notification preferences line')
+        # Only use this fallback when locationLabel is actually part of the function signature.
+        signature = text[function_start:body_start]
+        if 'locationLabel' not in signature:
+            raise SystemExit('locationLabel is neither a context local nor a function parameter')
+        insert_at = pref_at + len(preferences_line)
+        text = text[:insert_at] + '\n' + resolved_line + text[insert_at:]
 
 # Route every scheduled 20m/10m/prayer-time notification through the resolved city.
 new_text, count = re.subn(
@@ -78,6 +97,13 @@ if count:
     text = new_text
 elif 'notificationContent(event, locale, resolvedLocationLabel)' not in text:
     raise SystemExit('Could not route prayer notifications through resolved city label')
+
+# Build-time ordering guard: resolvedLocationLabel must come after locationLabel declaration
+# when the context-local form is present.
+loc_decl = text.find('const locationLabel = context.locationLabel || CITY_LABEL;')
+resolved_decl = text.find('const resolvedLocationLabel = await resolvePrayerNotificationLocationLabel(locationLabel);')
+if loc_decl >= 0 and (resolved_decl < 0 or resolved_decl <= loc_decl):
+    raise SystemExit('Notification city label is resolved before locationLabel is declared')
 
 NOTIFICATIONS.write_text(text, encoding="utf-8")
 
@@ -94,4 +120,4 @@ for needle in checks:
     if needle not in written:
         raise SystemExit(f'Missing notification city-label fix: {needle}')
 
-print('Applied prayer notification city-label resolution for 20m, 10m, and prayer-time alerts')
+print('Applied prayer notification city-label resolution after locationLabel declaration')
