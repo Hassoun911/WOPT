@@ -72,6 +72,11 @@ function gregorianKey(value: unknown) {
   return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
 }
 
+function localDateKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function monthWindow() {
   const now = new Date();
   return [0, 1].map((offset) => {
@@ -200,6 +205,21 @@ export async function loadSavedPrayerContext(): Promise<LoadedPrayerTimes | null
   }
 }
 
+export async function previewPrayerDayForPreferences(preferences: PrayerCalculationPreferences): Promise<{ asr?: string; source: string }> {
+  const saved = await loadSavedPrayerContext();
+  if (!saved?.location) throw new Error("NO_SAVED_LOCATION");
+  const { latitude, longitude } = saved.location;
+  const now = new Date();
+  const { payload, method } = await fetchAlAdhanMonth(latitude, longitude, now.getFullYear(), now.getMonth() + 1, preferences);
+  const target = localDateKey();
+  const day = payload.data?.find((item) => gregorianKey(item.date?.gregorian?.date) === target);
+  const asr = parseTiming(day?.timings?.Asr) || undefined;
+  return {
+    asr,
+    source: `${preferences.school === 1 ? "Hanafi" : "Standard"} Asr · method ${method}`
+  };
+}
+
 function windsorFallback(): LoadedPrayerTimes {
   const prayerTimes = (bundledSchedule as PrayerFile).prayer_times;
   return {
@@ -233,9 +253,12 @@ export async function loadPrayerTimes(options: { forceLocation?: boolean } = {})
     const latitude = position.coords.latitude;
     const longitude = position.coords.longitude;
     const locationLabel = await resolveCity(latitude, longitude);
+    const preferences = await loadPrayerCalculationPreferences();
+    const nearWindsor = isNearWindsor(latitude, longitude);
+    const shouldUseOfficialWindsor = nearWindsor && preferences.scheduleSource !== "calculated";
 
     let context: LoadedPrayerTimes;
-    if (isNearWindsor(latitude, longitude)) {
+    if (shouldUseOfficialWindsor) {
       context = {
         prayerTimes: (bundledSchedule as PrayerFile).prayer_times,
         live: true,
@@ -250,7 +273,6 @@ export async function loadPrayerTimes(options: { forceLocation?: boolean } = {})
         calculatedAt: new Date().toISOString()
       };
     } else {
-      const preferences = await loadPrayerCalculationPreferences();
       const calculated = await calculateOutsideWindsor(latitude, longitude, preferences);
       context = {
         prayerTimes: calculated.prayerTimes,
