@@ -132,7 +132,7 @@ jobs:
             'mobile/App.tsx': ['prayerLocation.label', 'const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })'],
             'mobile/src/prayerData.ts': ['Location.reverseGeocodeAsync', 'forceLocation'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
-            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Scan QR code', '6-DIGIT PAIRING CODE', 'SAVED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
+            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Scan QR code', '6-DIGIT PAIRING CODE', 'CONNECTED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
             'mobile/app.config.ts': ['1.0.21', 'versionCode: 65'],
           }
           for file, needles in checks.items():
