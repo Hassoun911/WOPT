@@ -200,6 +200,13 @@ app = app.replace('phoneHomeScreen', 'homeScreen')
 for handler in ('manualHomeTouchStart', 'manualHomeTouchMove', 'manualHomeTouchEnd', 'onHomeTouchStart', 'onHomeTouchMove', 'onHomeTouchEnd'):
     app = re.sub(rf'\n\s*const {handler}\b.*?(?=\n\s*const |\n\s*useEffect\(|\n\s*async function )', '\n', app, count=1, flags=re.S)
 
+# Earlier refresh patches can also leave JSX props that point at those deleted handlers on
+# non-Home ScrollViews (for example Alerts). Strip every dangling legacy touch prop globally.
+app = re.sub(r'^\s*onTouchStart=\{manualHomeTouchStart\}\s*\n', '', app, flags=re.M)
+app = re.sub(r'^\s*onTouchMove=\{manualHomeTouchMove\}\s*\n', '', app, flags=re.M)
+app = re.sub(r'^\s*onTouchEnd=\{manualHomeTouchEnd\}\s*\n', '', app, flags=re.M)
+app = re.sub(r'^\s*onTouchCancel=\{manualHomeTouchEnd\}\s*\n', '', app, flags=re.M)
+
 for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen']:
     if forbidden in app:
         idx = app.find(forbidden)
