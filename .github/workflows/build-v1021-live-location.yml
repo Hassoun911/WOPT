@@ -72,19 +72,55 @@ jobs:
           npm ci --no-audit --no-fund
           npx expo install expo-splash-screen expo-screen-orientation expo-document-picker expo-video expo-brightness expo-battery expo-image-picker
 
-      - name: Repair legacy configured PNG CRCs without changing artwork
+      - name: Repair configured PNG CRC fields only
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq pngcrush pngcheck
-          for f in mobile/assets/icon.png mobile/assets/adaptive-icon.png mobile/assets/splash-logo.png mobile/assets/notification-icon.png; do
-            test -s "$f"
-            if ! pngcheck -q "$f"; then
-              echo "Repairing PNG CRC metadata: $f"
-              pngcrush -q -fix -ow "$f" >/dev/null 2>&1 || true
-            fi
-            pngcheck -q "$f" || { echo "PNG remains invalid: $f"; exit 1; }
-          done
+          python - <<'PY'
+          from pathlib import Path
+          import struct, zlib
+
+          files = [
+              Path('mobile/assets/icon.png'),
+              Path('mobile/assets/adaptive-icon.png'),
+              Path('mobile/assets/splash-logo.png'),
+              Path('mobile/assets/notification-icon.png'),
+          ]
+          signature = b'\x89PNG\r\n\x1a\n'
+          for p in files:
+              raw = p.read_bytes()
+              if not raw.startswith(signature):
+                  raise SystemExit(f'Not a PNG: {p}')
+              pos = len(signature)
+              out = bytearray(signature)
+              changed = 0
+              saw_iend = False
+              while pos < len(raw):
+                  if pos + 12 > len(raw):
+                      raise SystemExit(f'Truncated PNG chunk header: {p}')
+                  length = struct.unpack('>I', raw[pos:pos+4])[0]
+                  end = pos + 12 + length
+                  if end > len(raw):
+                      raise SystemExit(f'Truncated PNG chunk: {p}')
+                  ctype = raw[pos+4:pos+8]
+                  data = raw[pos+8:pos+8+length]
+                  old_crc = struct.unpack('>I', raw[pos+8+length:end])[0]
+                  new_crc = zlib.crc32(ctype)
+                  new_crc = zlib.crc32(data, new_crc) & 0xffffffff
+                  if old_crc != new_crc:
+                      changed += 1
+                  out.extend(raw[pos:pos+8+length])
+                  out.extend(struct.pack('>I', new_crc))
+                  pos = end
+                  if ctype == b'IEND':
+                      saw_iend = True
+                      if pos != len(raw):
+                          out.extend(raw[pos:])
+                      break
+              if not saw_iend:
+                  raise SystemExit(f'Missing IEND: {p}')
+              p.write_bytes(out)
+              print(f'{p}: corrected {changed} CRC field(s), image chunk data unchanged')
+          PY
 
       - name: Clean Android prebuild
         run: |
