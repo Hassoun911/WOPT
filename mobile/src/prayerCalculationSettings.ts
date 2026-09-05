@@ -2,8 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { syncCalculationToPairedDisplays } from "./displayCalculationSync";
 
 export type CalculationMode = "smart" | "manual";
+export type PrayerScheduleSource = "smart" | "official" | "calculated";
 
 export type PrayerCalculationPreferences = {
+  scheduleSource: PrayerScheduleSource;
   mode: CalculationMode;
   method: number;
   school: 0 | 1;
@@ -20,6 +22,7 @@ export type PrayerCalculationPreferences = {
 export const CALCULATION_PREFS_KEY = "hassoun:prayer-calculation:v2";
 
 export const DEFAULT_CALCULATION_PREFS: PrayerCalculationPreferences = {
+  scheduleSource: "smart",
   mode: "smart",
   method: 2,
   school: 0,
@@ -44,9 +47,11 @@ export async function loadPrayerCalculationPreferences(): Promise<PrayerCalculat
     const raw = await AsyncStorage.getItem(CALCULATION_PREFS_KEY);
     if (!raw) return DEFAULT_CALCULATION_PREFS;
     const parsed = JSON.parse(raw) as Partial<PrayerCalculationPreferences>;
+    const scheduleSource: PrayerScheduleSource = parsed.scheduleSource === "official" || parsed.scheduleSource === "calculated" ? parsed.scheduleSource : "smart";
     return {
       ...DEFAULT_CALCULATION_PREFS,
       ...parsed,
+      scheduleSource,
       mode: parsed.mode === "manual" ? "manual" : "smart",
       school: parsed.school === 1 ? 1 : 0,
       highLatitude: parsed.highLatitude === 0 || parsed.highLatitude === 1 || parsed.highLatitude === 2 ? parsed.highLatitude : 3,
