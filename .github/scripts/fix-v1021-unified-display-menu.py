@@ -29,6 +29,7 @@ def keep_row(match: re.Match[str]) -> str:
     return '' if any(marker in row for marker in legacy_markers) else row
 s = row_pattern.sub(keep_row, s)
 
+# Remove old direct display routes from reconstructed sources.
 s = re.sub(r'\n\s*if \(page === "display"\) return <ConnectDisplayPage[^\n]+;\n', '\n', s)
 s = re.sub(r'\n\s*if \(page === "masjidDisplay"\) return <MasjidDisplayPage[^\n]+;\n', '\n', s)
 s = re.sub(r'\n\s*if \(page === "wallDisplay[^\"]*"\).*?(?=\n\s*if \(page ===|\n\s*const |\n\s*return )', '\n', s, flags=re.S)
@@ -51,24 +52,20 @@ displays_row = '\n        <Row emoji="🖥️" title={t("Displays", "الشاش�
 if 'title={t("Displays", "الشاشات")}' not in s:
     s = s[:match.end()] + displays_row + s[match.end():]
 
-anchor = '  if (page === "root") return root;\n\n'
-if anchor not in s:
-    raise SystemExit("Root-page return anchor missing")
+root_anchor = '  if (page === "root") return root;\n\n'
+widgets_route = '  if (page === "widgets") {'
+root_pos = s.find(root_anchor)
+widgets_pos = s.find(widgets_route, root_pos + len(root_anchor) if root_pos >= 0 else 0)
+if root_pos < 0 or widgets_pos < 0:
+    raise SystemExit("Could not locate root/widgets route boundary")
 
 submenu = '''  if (page === "connectDisplay") return <ConnectDisplayPage locale={locale} onBack={() => setPage("displays")} />;\n\n  if (page === "displays") {\n    return (\n      <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n        <BackHeader title={t("Displays", "الشاشات")} onBack={() => setPage("root")} />\n        <Text style={styles.subtitle}>{t("Pair a screen, manage saved devices, or open a connected display’s admin panel.", "اربط شاشة أو أدر الأجهزة المحفوظة أو افتح لوحة إدارة شاشة متصلة.")}</Text>\n        <Section title={t("DISPLAY OPTIONS", "خيارات الشاشة")}>\n          <Row emoji="🔗" title={t("Connect Display", "ربط شاشة")} text={t("Scan a QR code or enter the 6-digit pairing code", "امسح رمز QR أو أدخل رمز الربط المكوّن من 6 أرقام")} onPress={() => setPage("connectDisplay")} />\n          <Row emoji="🕌" title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")} text={t("Connect or manage a Wall & Masjid display and open its admin panel", "اربط أو أدر شاشة الحائط والمسجد وافتح لوحة الإدارة الخاصة بها")} onPress={() => setPage("connectDisplay")} />\n        </Section>\n      </ScrollView>\n    );\n  }\n\n'''
 
-start = s.find('  if (page === "connectDisplay")')
-end = s.find('  if (page === "widgets")', start if start >= 0 else 0)
-if start >= 0 and end > start:
-    s = s[:start] + submenu + s[end:]
-elif 'if (page === "displays")' in s:
-    start = s.find('  if (page === "displays")')
-    end = s.find('  if (page === "widgets")', start)
-    if end <= start:
-        raise SystemExit("Could not replace existing Displays submenu")
-    s = s[:start] + submenu + s[end:]
-else:
-    s = s.replace(anchor, anchor + submenu, 1)
+# Everything between root return and widgets is display routing inserted by older
+# reconstruction scripts. Replace only that route region; never search for the
+# connectDisplay text globally because Android BackHandler also references it.
+prefix_end = root_pos + len(root_anchor)
+s = s[:prefix_end] + submenu + s[widgets_pos:]
 
 if s.count('title={t("Connect Display", "ربط شاشة")}') != 1:
     raise SystemExit("Connect Display must exist only inside Displays")
@@ -80,6 +77,7 @@ for forbidden in (
     'setPage("display")',
     'page === "display"',
     'setPage("masjidDisplay")',
+    'page === "masjidDisplay"',
     'MasjidDisplayPage locale={locale}',
     'Linking.openURL("https://hassoun.app/masjid-tv/"',
 ):
