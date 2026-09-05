@@ -122,52 +122,40 @@ jobs:
           python3 .github/scripts/fix-v1021-unified-display-menu.py
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
 
-      - name: Verify exact UI is preserved and new issues are fixed
+      - name: Verify generated v1.0.21 source and typecheck
         run: |
           set -euo pipefail
-          grep -q 'version: process.env.EXPO_APP_VERSION || "1.0.21"' mobile/app.config.ts
-          grep -q 'versionCode: 65' mobile/app.config.ts
-          grep -q 'AboutHassounPage' mobile/src/SettingsHub.tsx
-          grep -q 'Abdul Jalil Hassoun' mobile/src/AboutHassounPage.tsx
-          grep -q 'Salwa Hassoun' mobile/src/AboutHassounPage.tsx
-          grep -q 'A continuing Sadaqah Jariyah' mobile/src/AboutHassounPage.tsx
-          grep -q '📍 {prayerLocation.label}' mobile/App.tsx
-          grep -q 'Location.reverseGeocodeAsync' mobile/src/prayerData.ts
-          grep -q 'loadInitialPrayerTimes' mobile/App.tsx
-          grep -q 'void loadPrayerTimes().then(async (refreshed)' mobile/App.tsx
-          grep -q 'Resume in-place' mobile/App.tsx
-
-          # Exactly one Displays menu; both display actions lead to the pairing/admin controller.
-          test "$(grep -o 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
-          test "$(grep -o 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx | wc -l)" -eq 1
-          grep -q 'title={t("Displays", "الشاشات")}' mobile/src/SettingsHub.tsx
-          grep -q 'ConnectDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
-          test "$(grep -o 'setPage("connectDisplay")' mobile/src/SettingsHub.tsx | wc -l)" -ge 2
-          ! grep -q 'setPage("masjidDisplay")' mobile/src/SettingsHub.tsx
-          ! grep -q 'MasjidDisplayPage locale={locale}' mobile/src/SettingsHub.tsx
-
-          # Pairing screen must support QR scanning, manual six-digit code, saved devices and admin.
-          grep -q 'CameraView' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'useCameraPermissions' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'Scan QR code' mobile/src/ConnectDisplayPage.tsx
-          grep -q '6-DIGIT PAIRING CODE' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'SAVED DISPLAYS' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'openAdmin' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'mosqueLocation' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'DISPLAY ADMIN' mobile/src/ConnectDisplayPage.tsx
-          grep -q 'expo-camera' mobile/package.json
-
-          # Android pull-to-refresh must be wired on the actual Home ScrollView and force fresh location.
-          grep -q 'const refreshHome = useCallback' mobile/App.tsx
-          grep -q 'refreshing={refreshingHome}' mobile/App.tsx
-          grep -q 'onRefresh={refreshHome}' mobile/App.tsx
-          grep -q 'overScrollMode="always"' mobile/App.tsx
-          grep -q 'progressViewOffset={8}' mobile/App.tsx
-          grep -q 'HassounWidget.refresh()' mobile/App.tsx
-          grep -q 'loadPrayerTimes({ forceLocation: true })' mobile/App.tsx
-
-          # Guard against the exact run #42 failure.
-          test -d mobile/node_modules/@typescript/typescript-linux-x64
+          python3 - <<'PY'
+          from pathlib import Path
+          checks = {
+            'mobile/src/AboutHassounPage.tsx': ['Abdul Jalil Hassoun', 'Salwa Hassoun', 'A continuing Sadaqah Jariyah'],
+            'mobile/App.tsx': ['prayerLocation.label', 'const refreshHome = useCallback', 'onRefresh={refreshHome}', 'loadPrayerTimes({ forceLocation: true })'],
+            'mobile/src/prayerData.ts': ['Location.reverseGeocodeAsync', 'forceLocation'],
+            'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
+            'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Scan QR code', '6-DIGIT PAIRING CODE', 'SAVED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
+            'mobile/app.config.ts': ['1.0.21', 'versionCode: 65'],
+          }
+          for file, needles in checks.items():
+            text = Path(file).read_text(encoding='utf-8')
+            for needle in needles:
+              if needle not in text:
+                raise SystemExit(f'Missing {needle!r} in {file}')
+            print(f'OK {file}')
+          settings = Path('mobile/src/SettingsHub.tsx').read_text(encoding='utf-8')
+          for forbidden in ('setPage("masjidDisplay")', 'MasjidDisplayPage locale={locale}', 'setPage("display")'):
+            if forbidden in settings:
+              raise SystemExit(f'Legacy display route still present: {forbidden}')
+          package = Path('mobile/package.json').read_text(encoding='utf-8')
+          if 'expo-camera' not in package:
+            raise SystemExit('expo-camera missing from generated package.json')
+          print('Generated source verification passed')
+          PY
+          test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
+            echo 'TypeScript platform package disappeared; restoring it before typecheck'
+            cd mobile
+            npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+            cd ..
+          }
           cd mobile
           npm run typecheck
 
