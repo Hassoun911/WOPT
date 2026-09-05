@@ -28,8 +28,8 @@ exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__"
 v1026 = HERE / "fix-v1026-prayer-calculation-ui.py"
 exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__": str(v1026), "__name__": "__main__"})
 
-# v1.0.27: a manual travel refresh must use a truly fresh high-accuracy GPS fix.
-# Never let Android's stale/last-known Windsor location masquerade as a successful refresh.
+# v1.0.27: manual travel refresh now waits for two fresh, consistent live GPS samples.
+# This prevents Android fused-location cache from keeping a traveller stuck in Windsor.
 v1027 = HERE / "fix-v1027-fresh-travel-location.py"
 exec(compile(v1027.read_text(encoding="utf-8"), str(v1027), "exec"), {"__file__": str(v1027), "__name__": "__main__"})
 
