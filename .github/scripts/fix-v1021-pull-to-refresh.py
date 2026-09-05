@@ -5,14 +5,15 @@ ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "mobile/App.tsx"
 app = APP.read_text(encoding="utf-8")
 
-# Pull-to-refresh uses useCallback/useRef.
+# Native React Native RefreshControl is the reliable Android implementation.
 react_import = re.search(r'import \{([^}]*)\} from "react";', app)
 if not react_import:
     raise SystemExit("React import not found")
 imports = [x.strip() for x in react_import.group(1).split(',') if x.strip()]
-for needed in ("useCallback", "useRef"):
-    if needed not in imports:
-        imports.append(needed)
+if "useCallback" not in imports:
+    imports.append("useCallback")
+# Remove the old gesture fallback dependency if a prior candidate added it.
+imports = [x for x in imports if x != "useRef"]
 replacement = 'import { ' + ', '.join(imports) + ' } from "react";'
 app = app[:react_import.start()] + replacement + app[react_import.end():]
 
@@ -27,16 +28,13 @@ if "prayerLocation" not in app or "loadPrayerTimes" not in app:
 state_anchor = '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);'
 if state_anchor not in app:
     raise SystemExit("Could not find Home state anchor")
-extra_state = '''
-  const [refreshingHome, setRefreshingHome] = useState(false);
-  const homePullStartY = useRef<number | null>(null);
-  const homeScrollY = useRef(0);
-  const homePullTriggered = useRef(false);'''
+
+# Remove every previous refresh/gesture state then add only the native refreshing state.
 app = re.sub(r'\n\s*const \[refreshingHome, setRefreshingHome\] = useState\(false\);', '', app)
 app = re.sub(r'\n\s*const homePullStartY = useRef<number \| null>\(null\);', '', app)
 app = re.sub(r'\n\s*const homeScrollY = useRef\(0\);', '', app)
 app = re.sub(r'\n\s*const homePullTriggered = useRef\(false\);', '', app)
-app = app.replace(state_anchor, state_anchor + extra_state, 1)
+app = app.replace(state_anchor, state_anchor + '\n  const [refreshingHome, setRefreshingHome] = useState(false);', 1)
 
 refresh_impl = '''  const refreshHome = useCallback(async () => {
     if (refreshingHome) return;
@@ -69,37 +67,21 @@ refresh_impl = '''  const refreshHome = useCallback(async () => {
         ).catch(() => undefined);
       }
     } finally {
-      const remaining = Math.max(0, 900 - (Date.now() - startedAt));
+      // Keep the spinner visible long enough to give clear feedback that refresh happened.
+      const remaining = Math.max(0, 800 - (Date.now() - startedAt));
       if (remaining) await new Promise((resolve) => setTimeout(resolve, remaining));
       setRefreshingHome(false);
     }
-  }, [alertsEnabled, locale, phoneAlertPreferences, quizStats, refreshingHome]);
+  }, [alertsEnabled, locale, phoneAlertPreferences, quizStats, refreshingHome]);'''
 
-  // Android fallback: trigger the same refresh after a real downward finger drag at top.
-  const onHomeScroll = useCallback((event: any) => {
-    homeScrollY.current = Number(event?.nativeEvent?.contentOffset?.y || 0);
-  }, []);
-  const onHomeTouchStart = useCallback((event: any) => {
-    homePullStartY.current = Number(event?.nativeEvent?.pageY || 0);
-    homePullTriggered.current = false;
-  }, []);
-  const onHomeTouchMove = useCallback((event: any) => {
-    if (refreshingHome || homePullTriggered.current || homePullStartY.current === null) return;
-    if (homeScrollY.current > 8) return;
-    const currentY = Number(event?.nativeEvent?.pageY || 0);
-    if (currentY - homePullStartY.current >= 55) {
-      homePullTriggered.current = true;
-      void refreshHome();
-    }
-  }, [refreshHome, refreshingHome]);
-  const onHomeTouchEnd = useCallback(() => {
-    homePullStartY.current = null;
-    homePullTriggered.current = false;
-  }, []);'''
-
-pattern = re.compile(r'  const refreshHome = useCallback\(async \(\) => \{.*?^  \}, \[[^\]]*\]\);(?:\n\n  // Android fallback:.*?^  \}, \[\]\);)?', re.M | re.S)
-if pattern.search(app):
-    app = pattern.sub(refresh_impl, app, count=1)
+# Remove any earlier refreshHome + manual touch fallback block.
+start = app.find('  const refreshHome = useCallback')
+if start >= 0:
+    end_marker = '  useEffect(() => {\n    if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);'
+    end = app.find(end_marker, start)
+    if end < 0:
+        raise SystemExit("Could not locate end of old refresh block")
+    app = app[:start] + refresh_impl + '\n\n' + app[end:]
 else:
     marker = '  useEffect(() => {\n    if (Object.keys(prayerTimes).length) HassounWidget.syncPrayerSchedule(JSON.stringify(prayerTimes), locale);'
     idx = app.find(marker)
@@ -118,6 +100,8 @@ if tag_end < 0:
     raise SystemExit("Could not parse Home ScrollView opening tag")
 opening = app[scroll_index:tag_end + 1]
 
+# Strip all previous refresh/gesture props. Manual onTouch handlers compete with
+# Android SwipeRefreshLayout and were the reason the downward gesture was unreliable.
 for pat in [
     r'\s+alwaysBounceVertical', r'\s+overScrollMode="[^"]+"', r'\s+nestedScrollEnabled',
     r'\s+scrollEventThrottle=\{[^}]+\}', r'\s+onScroll=\{onHomeScroll\}',
@@ -127,22 +111,16 @@ for pat in [
 ]:
     opening = re.sub(pat, '', opening, flags=re.S)
 
+# Make the Home ScrollView own the pull gesture and use the platform-native control.
 opening = opening[:-1] + '''
       alwaysBounceVertical
       overScrollMode="always"
-      nestedScrollEnabled
-      scrollEventThrottle={16}
-      onScroll={onHomeScroll}
-      onTouchStart={onHomeTouchStart}
-      onTouchMove={onHomeTouchMove}
-      onTouchEnd={onHomeTouchEnd}
-      onScrollEndDrag={onHomeTouchEnd}
       refreshControl={
         <RefreshControl
           refreshing={refreshingHome}
           onRefresh={refreshHome}
           progressViewOffset={8}
-          enabled={true}
+          enabled
         />
       }
     >'''
@@ -150,11 +128,8 @@ app = app[:scroll_index] + opening + app[tag_end + 1:]
 
 required = [
     'const refreshHome = useCallback',
-    'const onHomeTouchMove = useCallback',
-    'currentY - homePullStartY.current >= 55',
     'refreshing={refreshingHome}',
     'onRefresh={refreshHome}',
-    'onTouchMove={onHomeTouchMove}',
     'overScrollMode="always"',
     'progressViewOffset={8}',
     'HassounWidget.refresh()',
@@ -162,6 +137,9 @@ required = [
 for item in required:
     if item not in app:
         raise SystemExit('Missing pull-to-refresh requirement: ' + item)
+for forbidden in ('onHomeTouchMove', 'homePullStartY', 'homePullTriggered', 'nestedScrollEnabled'):
+    if forbidden in app:
+        raise SystemExit('Old gesture fallback still present: ' + forbidden)
 
 APP.write_text(app, encoding="utf-8")
-print("Enabled native + gesture-fallback pull-to-refresh on Home")
+print("Enabled reliable native Android pull-to-refresh on Home without touch-handler conflicts")
