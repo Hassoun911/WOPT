@@ -5,59 +5,52 @@ ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "mobile/App.tsx"
 app = APP.read_text(encoding="utf-8")
 
-app = app.replace('import HomePrayerPanel from "./src/HomePrayerPanel";\n', '')
-app = app.replace('import { loadLocationPrayerContext } from "./src/localPrayerTimes";\n', '')
+# The phone Home is new, but Masjid TV / splash / remote / navigation state remains shared.
+app = re.sub(r'^import .*HomePrayerPanel.*\n', '', app, flags=re.M)
+app = re.sub(r'^import .*localPrayerTimes.*\n', '', app, flags=re.M)
 if 'import HomePrayerPage from "./src/HomePrayerPage";' not in app:
     app = app.replace('import SettingsHub from "./src/SettingsHub";\n', 'import SettingsHub from "./src/SettingsHub";\nimport HomePrayerPage from "./src/HomePrayerPage";\n')
 
-for old in [
-    'import { loadPrayerTimes } from "./src/prayerData";\n',
-    'import { loadPrayerTimes, type PrayerLocation } from "./src/prayerData";\n',
-]:
-    app = app.replace(old, '')
-if 'from "./src/prayerData"' not in app:
-    anchor = 'import { openExactAlarmSettings'
-    idx = app.find(anchor)
-    if idx < 0:
-        raise SystemExit('prayerAudio import anchor missing')
-    line_end = app.find('\n', idx) + 1
-    app = app[:line_end] + 'import { loadInitialPrayerTimes, loadPrayerTimes, type LoadedPrayerTimes } from "./src/prayerData";\n' + app[line_end:]
+# Normalize all prayerData imports so generated source always has canonical types/functions.
+app = re.sub(r'^import .*from "\./src/prayerData";\n', '', app, flags=re.M)
+anchor = 'import { openExactAlarmSettings'
+idx = app.find(anchor)
+if idx < 0:
+    raise SystemExit('prayerAudio import anchor missing')
+line_end = app.find('\n', idx) + 1
+app = app[:line_end] + 'import { loadInitialPrayerTimes, loadPrayerTimes, type LoadedPrayerTimes, type PrayerLocation } from "./src/prayerData";\n' + app[line_end:]
 
-state_start = app.find('  const [now, setNow] = useState(new Date());')
-derived_start = app.find('  const todayKey =', state_start)
-if state_start < 0 or derived_start < 0:
-    raise SystemExit('could not bound legacy Home state section')
-new_state = '''  const [now, setNow] = useState(new Date());
-  const [prayerContext, setPrayerContext] = useState<LoadedPrayerTimes | null>(null);
-  const [refreshingHome, setRefreshingHome] = useState(false);
-  const [startupAudioCleared, setStartupAudioCleared] = useState(false);
-  const [locale, setLocale] = useState<"en" | "ar">("en");
-  const [alertsEnabled, setAlertsEnabled] = useState(false);
-  const [busy, setBusy] = useState(true);
-  const [scheduledCount, setScheduledCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<AppTab>("home");
-  const [quranAppNavVisible, setQuranAppNavVisible] = useState(true);
-  const [quranOwnsAudioSurface, setQuranOwnsAudioSurface] = useState(false);
-  const [globalQuranAudio, setGlobalQuranAudio] = useState<QuranAudioStatus>({ available: Boolean(QuranAudio), state: "idle", positionMs: 0, durationMs: 0, speed: 1 });
-  const [quizStats, setQuizStats] = useState<QuizStats>(EMPTY_QUIZ_STATS);
-  const [phoneAlertPreferences, setPhoneAlertPreferences] = useState<PrayerAlertPreferences>(DEFAULT_PHONE_PRAYER_ALERTS);
-  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);
+# Preserve every existing shared state declaration. Add only the canonical context used by
+# the new phone Home. Existing prayerTimes/prayerLocation/live remain for Masjid/TV features.
+if 'const [prayerContext, setPrayerContext]' not in app:
+    state_anchor = '  const [alertPreferencesBusy, setAlertPreferencesBusy] = useState(false);'
+    if state_anchor not in app:
+        state_anchor = '  const [refreshingHome, setRefreshingHome] = useState(false);'
+    if state_anchor not in app:
+        raise SystemExit('could not find state insertion anchor')
+    app = app.replace(state_anchor, state_anchor + '\n  const [prayerContext, setPrayerContext] = useState<LoadedPrayerTimes | null>(null);', 1)
 
-  const prayerTimes = prayerContext?.prayerTimes ?? {};
-  const live = prayerContext?.live ?? false;
-  const locationLabel = prayerContext?.location.label ?? (locale === "ar" ? "جارٍ تحديد الموقع" : "Locating…");
-  const prayerTimeZone = prayerContext?.location.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
-  const sourceLabel = prayerContext?.location.source === "windsor_islamic_association"
-    ? "Windsor Islamic Association • official Adhan time"
-    : prayerContext?.location.source === "aladhan"
-      ? "Local Adhan calculation • device location"
-      : "Saved prayer schedule";
+# Old Home refresh callbacks were already removed by cleanup, but remove any variant that survived.
+for marker in ('  const refreshHome = useCallback', '  const refreshPrayerLocation = useCallback'):
+    while True:
+        start = app.find(marker)
+        if start < 0:
+            break
+        candidates = [p for p in (
+            app.find('\n  useEffect(', start + len(marker)),
+            app.find('\n  const ', start + len(marker)),
+            app.find('\n  async function ', start + len(marker)),
+        ) if p >= 0]
+        if not candidates:
+            raise SystemExit(f'could not bound old callback: {marker}')
+        app = app[:start] + app[min(candidates) + 1:]
 
-'''
-app = app[:state_start] + new_state + app[derived_start:]
-
-app = re.sub(r'\n\s*const refreshPrayerLocation = useCallback\(async \(force = false\) => \{.*?\n\s*\}, \[\]\);\n', '\n', app, count=1, flags=re.S)
-app = re.sub(r'\n\s*const refreshHome = useCallback\(async \(\) => \{.*?\n\s*\}, \[[^\]]*\]\);\n', '\n', app, count=1, flags=re.S)
+# Remove the passive/manual fallback refresh effect. Native RefreshControl in HomePrayerPage is
+# now the only phone Home refresh gesture.
+app = re.sub(
+    r'\n\s*useEffect\(\(\) => \{\n\s*if \(manualRefreshNonce <= 0\) return;.*?\n\s*\}, \[manualRefreshNonce\]\);\n',
+    '\n', app, count=1, flags=re.S
+)
 
 refresh_callback = '''
   const refreshHome = useCallback(async () => {
@@ -66,11 +59,20 @@ refresh_callback = '''
     try {
       const refreshed = await loadPrayerTimes({ forceLocation: true });
       setPrayerContext(refreshed);
+      setPrayerTimes(refreshed.prayerTimes);
+      setPrayerLocation(refreshed.location);
+      setLive(refreshed.live);
       setNow(new Date());
       HassounWidget.syncPrayerSchedule(JSON.stringify(refreshed.prayerTimes), locale);
       HassounWidget.refresh();
       if (alertsEnabled) {
-        const result = await schedulePrayerNotifications(refreshed.prayerTimes, locale, phoneAlertPreferences, refreshed.location.label, refreshed.location.timezone);
+        const result = await schedulePrayerNotifications(
+          refreshed.prayerTimes,
+          locale,
+          phoneAlertPreferences,
+          refreshed.location.label,
+          refreshed.location.timezone
+        );
         setScheduledCount(result.count);
       }
       void registerDeviceForServerPush(locale).catch(() => undefined);
@@ -94,52 +96,65 @@ if first_effect < 0:
     raise SystemExit('first effect missing')
 app = app[:first_effect] + refresh_callback + '\n' + app[first_effect:]
 
+# Cold start may use the saved canonical context, never an obsolete localPrayerTimes service.
 app = app.replace('loadLocationPrayerContext(false)', 'loadInitialPrayerTimes()')
-app = app.replace('loadPrayerTimes(),', 'loadInitialPrayerTimes(),')
-app = re.sub(
-    r'\n\s*setPrayerTimes\(loaded\.prayerTimes\);\n(?:\s*setLive\([^\n]+\);\n)?(?:\s*setLocationLabel\([^\n]+\);\n)?(?:\s*setPrayerTimeZone\([^\n]+\);\n)?(?:\s*setSourceLabel\([^\n]+\);)?',
-    '\n      setPrayerContext(loaded);', app, count=1
-)
+# The startup Promise.all historically calls loadPrayerTimes() once; use cache-first initial load.
+app = app.replace('        loadPrayerTimes(),\n        loadQuizStats()', '        loadInitialPrayerTimes(),\n        loadQuizStats()', 1)
+
+# Whenever startup receives `loaded`, keep all shared consumers synchronized and populate the
+# new phone Home context from the exact same object.
+startup_candidates = [
+    '      setPrayerLocation(loaded.location);',
+    '      setLive(loaded.live);',
+    '      setPhoneAlertPreferences(savedPhoneAlertPreferences);',
+]
 if 'setPrayerContext(loaded);' not in app:
-    startup_anchor = '      setPhoneAlertPreferences(savedPhoneAlertPreferences);'
-    if startup_anchor not in app:
-        raise SystemExit('startup preference anchor missing for canonical prayer context')
-    app = app.replace(startup_anchor, startup_anchor + '\n      setPrayerContext(loaded);', 1)
-app = app.replace('loaded.locationLabel, loaded.timezone', 'loaded.location.label, loaded.location.timezone')
-app = app.replace('loaded.timezone), chosenLocale', 'loaded.location.timezone), chosenLocale')
+    for startup_anchor in startup_candidates:
+        if startup_anchor in app:
+            app = app.replace(startup_anchor, startup_anchor + '\n      setPrayerContext(loaded);', 1)
+            break
+    else:
+        raise SystemExit('startup context anchor missing')
 
-# Remove any old resume listener that did GPS/network work.
-app = re.sub(
-    r'\n\s*useEffect\(\(\) => \{\n\s*const subscription = AppState\.addEventListener\("change", \(state\) => \{.*?\n\s*return \(\) => subscription\.remove\(\);\n\s*\}, \[[^\]]*\]\);\n',
-    '\n', app, count=1, flags=re.S
-)
+# Canonical location object fields.
+app = app.replace('loaded.locationLabel', 'loaded.location.label')
+app = app.replace('loaded.timezone', 'loaded.location.timezone')
 
-resume_effects = '''
-  useEffect(() => {
-    let mounted = true;
-    void AsyncStorage.getItem("hassoun:active-tab:v3").then((saved) => {
-      if (!mounted) return;
-      if (saved && ["home", "quran", "quiz", "alerts", "events", "qibla", "more"].includes(saved)) setActiveTab(saved as AppTab);
-    }).catch(() => undefined);
-    return () => { mounted = false; };
-  }, []);
+# Background -> foreground must not force GPS/network refresh. Remove AppState effects that call
+# loadPrayerTimes/refreshPrayerLocation, but preserve unrelated navigation/permission effects.
+pattern = re.compile(r'\n\s*useEffect\(\(\) => \{.*?AppState\.addEventListener\("change".*?\n\s*\}, \[[^\]]*\]\);\n', re.S)
+for match in list(pattern.finditer(app))[::-1]:
+    block = match.group(0)
+    if 'loadPrayerTimes' in block or 'refreshPrayerLocation' in block:
+        app = app[:match.start()] + '\n' + app[match.end():]
 
-  useEffect(() => {
-    void AsyncStorage.setItem("hassoun:active-tab:v3", activeTab).catch(() => undefined);
-  }, [activeTab]);
-
-  useEffect(() => {
+# Add a harmless resume listener only if there is no simple one already: update clock, no reload.
+if 'if (state === "active") setNow(new Date());' not in app:
+    marker = '  const toggleLocale = async () => {'
+    pos = app.find(marker)
+    if pos < 0:
+        raise SystemExit('toggleLocale anchor missing')
+    resume = '''  useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") setNow(new Date());
     });
     return () => subscription.remove();
   }, []);
+
 '''
-marker = '  const toggleLocale = async () => {'
-pos = app.find(marker)
-if pos < 0:
-    raise SystemExit('toggleLocale anchor missing')
-app = app[:pos] + resume_effects + '\n' + app[pos:]
+    app = app[:pos] + resume + app[pos:]
+
+# Remove every legacy phone Home declaration; cleanup already handles these, this is a final guard.
+for name in ('homeScreen', 'phoneHomeScreen'):
+    marker = f'  const {name} ='
+    while True:
+        start = app.find(marker)
+        if start < 0:
+            break
+        next_decl = app.find('\n  const ', start + len(marker))
+        if next_decl < 0:
+            raise SystemExit(f'could not bound remaining legacy {name}')
+        app = app[:start] + app[next_decl + 1:]
 
 new_home = '''  const homeScreen = (
     <HomePrayerPage
@@ -162,20 +177,7 @@ new_home = '''  const homeScreen = (
   );
 
 '''
-
-# Any remaining legacy Home declaration is removed as one full top-level declaration.
-for name in ('homeScreen', 'phoneHomeScreen'):
-    marker = f'  const {name} ='
-    while True:
-        start = app.find(marker)
-        if start < 0:
-            break
-        next_decl = app.find('\n  const ', start + len(marker))
-        if next_decl < 0:
-            raise SystemExit(f'could not bound remaining legacy {name}')
-        app = app[:start] + app[next_decl + 1:]
-
-# Insert new Home before the first remaining screen declaration.
+# Insert immediately before the first remaining *Screen declaration (normally Masjid TV).
 insert_match = re.search(r'\n\s*const [A-Za-z0-9_]+Screen\s*=\s*\(', app)
 if insert_match:
     insert_at = insert_match.start() + 1
@@ -184,23 +186,30 @@ else:
     if insert_at < 0:
         raise SystemExit('could not find Home insertion point')
 app = app[:insert_at] + new_home + app[insert_at:]
-
-# All former phoneHomeScreen usages must now resolve to the one canonical Home.
 app = app.replace('phoneHomeScreen', 'homeScreen')
 
-# Preserve shared date/next-prayer helpers because Masjid TV and other non-Home screens use them.
-# Ground-zero only removes obsolete Home state setters and data paths.
-for setter in ('setPrayerTimes', 'setLive', 'setLocationLabel', 'setPrayerTimeZone', 'setSourceLabel'):
-    app = re.sub(rf'(?m)^\s*{setter}\([^\n;]*\);\s*$', '', app)
+# The old manual-touch handlers belong only to the removed Home. Delete them so the new native
+# pull-to-refresh has no competing gesture implementation.
+for handler in ('manualHomeTouchStart', 'manualHomeTouchMove', 'manualHomeTouchEnd', 'onHomeTouchStart', 'onHomeTouchMove', 'onHomeTouchEnd'):
+    app = re.sub(rf'\n\s*const {handler}\b.*?(?=\n\s*const |\n\s*useEffect\(|\n\s*async function )', '\n', app, count=1, flags=re.S)
 
-for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen', 'setLocationLabel(', 'setPrayerTimeZone(', 'setSourceLabel(', 'setPrayerTimes(']:
+for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'phoneHomeScreen']:
     if forbidden in app:
         idx = app.find(forbidden)
-        snippet = app[max(0, idx - 220):idx + 320]
-        raise SystemExit(f'Legacy Home symbol still present: {forbidden}\n--- context ---\n{snippet}\n--- end context ---')
-for required in ['HomePrayerPage', 'loadInitialPrayerTimes', 'loadPrayerTimes({ forceLocation: true })', 'hassoun:active-tab:v3', 'context={prayerContext}', 'onRefresh={refreshHome}', 'startupAudioCleared', 'setPrayerContext(loaded);']:
+        snippet = app[max(0, idx - 180):idx + 260]
+        raise SystemExit(f'Legacy phone Home code still present: {forbidden}\n{snippet}')
+for required in [
+    'HomePrayerPage',
+    'loadInitialPrayerTimes',
+    'loadPrayerTimes({ forceLocation: true })',
+    'context={prayerContext}',
+    'onRefresh={refreshHome}',
+    'setPrayerContext(loaded);',
+    'setPrayerTimes(refreshed.prayerTimes);',
+    'startupAudioCleared',
+]:
     if required not in app:
         raise SystemExit(f'Ground-zero Home requirement missing: {required}')
 
 APP.write_text(app, encoding="utf-8")
-print('Rebuilt Home from ground zero: one phone Home, canonical PrayerContext, pull-down refresh, subscription area, resume without restart')
+print('Rebuilt phone Home from ground zero while preserving shared Masjid/TV/navigation/splash state')
