@@ -16,7 +16,6 @@ for needed in ("useCallback", "useRef"):
 replacement = 'import { ' + ', '.join(imports) + ' } from "react";'
 app = app[:react_import.start()] + replacement + app[react_import.end():]
 
-# Add RefreshControl import.
 if "RefreshControl" not in app:
     app, count = re.subn(r'(\bPressable,\s*\n\s*)(ScrollView,)', r'\1RefreshControl,\n  \2', app, count=1)
     if count != 1:
@@ -33,7 +32,6 @@ extra_state = '''
   const homePullStartY = useRef<number | null>(null);
   const homeScrollY = useRef(0);
   const homePullTriggered = useRef(false);'''
-# Remove prior injected state/refs and re-add exactly once.
 app = re.sub(r'\n\s*const \[refreshingHome, setRefreshingHome\] = useState\(false\);', '', app)
 app = re.sub(r'\n\s*const homePullStartY = useRef<number \| null>\(null\);', '', app)
 app = re.sub(r'\n\s*const homeScrollY = useRef\(0\);', '', app)
@@ -77,8 +75,7 @@ refresh_impl = '''  const refreshHome = useCallback(async () => {
     }
   }, [alertsEnabled, locale, phoneAlertPreferences, quizStats, refreshingHome]);
 
-  // Android fallback: RefreshControl can fail to claim the gesture on some Samsung builds.
-  // Track an actual downward finger drag while Home is at the top and trigger the same refresh.
+  // Android fallback: trigger the same refresh after a real downward finger drag at top.
   const onHomeScroll = useCallback((event: any) => {
     homeScrollY.current = Number(event?.nativeEvent?.contentOffset?.y || 0);
   }, []);
@@ -121,7 +118,6 @@ if tag_end < 0:
     raise SystemExit("Could not parse Home ScrollView opening tag")
 opening = app[scroll_index:tag_end + 1]
 
-# Strip any previous injected gesture/refresh props so the shipped Home ScrollView is deterministic.
 for pat in [
     r'\s+alwaysBounceVertical', r'\s+overScrollMode="[^"]+"', r'\s+nestedScrollEnabled',
     r'\s+scrollEventThrottle=\{[^}]+\}', r'\s+onScroll=\{onHomeScroll\}',
@@ -145,7 +141,7 @@ opening = opening[:-1] + '''
         <RefreshControl
           refreshing={refreshingHome}
           onRefresh={refreshHome}
-          progressViewOffset={16}
+          progressViewOffset={8}
           enabled={true}
         />
       }
@@ -160,7 +156,7 @@ required = [
     'onRefresh={refreshHome}',
     'onTouchMove={onHomeTouchMove}',
     'overScrollMode="always"',
-    'progressViewOffset={16}',
+    'progressViewOffset={8}',
     'HassounWidget.refresh()',
 ]
 for item in required:
