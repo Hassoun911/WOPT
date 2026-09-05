@@ -11,6 +11,11 @@ exec(compile(base.read_text(encoding="utf-8"), str(base), "exec"), {"__file__": 
 v1024 = HERE / "fix-v1024-location-refresh.py"
 exec(compile(v1024.read_text(encoding="utf-8"), str(v1024), "exec"), {"__file__": str(v1024), "__name__": "__main__"})
 
+# Remove the prayer Worker as a single point of failure. Windsor uses the bundled
+# official schedule; all other locations can fall back directly to AlAdhan.
+service_fallback = HERE / "fix-v1024-prayer-service-fallback.py"
+exec(compile(service_fallback.read_text(encoding="utf-8"), str(service_fallback), "exec"), {"__file__": str(service_fallback), "__name__": "__main__"})
+
 # Legacy workflow verification still looks for the old High-accuracy token. Keep a
 # source marker for compatibility while runtime intentionally uses Balanced accuracy.
 prayer_data = ROOT / "mobile/src/prayerData.ts"
