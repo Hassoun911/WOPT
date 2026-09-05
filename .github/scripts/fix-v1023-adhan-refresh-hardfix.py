@@ -41,6 +41,8 @@ pa = re.sub(
     '\n', pa, flags=re.S
 )
 pa = pa.replace('import { AppState, Platform } from "react-native";', 'import { Platform } from "react-native";')
+if 'automatic first-launch exact-alarm setup removed' not in pa:
+    pa += '\n// v1.0.23: automatic first-launch exact-alarm setup removed.\n'
 
 # HARD FIX 2: Stop playback + cancel old native alarms on EVERY cold app start, before
 # the saved current schedule is rebuilt. One-time-per-version guards are not enough.
@@ -77,7 +79,6 @@ if 'setStartupAudioCleared(true)' not in app:
     app = app[:first_effect] + startup_effect + '\n\n' + app[first_effect:]
 
 # Gate the main initialization effect so saved alerts are not rebuilt until cleanup completed.
-# Identify the effect containing savedLocale/savedAlerts.
 init_marker = 'const [savedLocale, savedAlerts'
 init_at = app.find(init_marker)
 if init_at < 0:
@@ -94,21 +95,14 @@ init_block = init_block[:-len('[]);')] + '[startupAudioCleared]);'
 app = app[:effect_start] + init_block + app[effect_end:]
 
 # HARD FIX 3: Make Home refresh usable both by pull gesture and an explicit button.
-# Keep RefreshControl, increase Android pull distance visibility and ensure scroll content
-# can overscroll even on larger screens.
 app = app.replace('progressViewOffset={64}', 'progressViewOffset={96}')
 app = app.replace('progressViewOffset={8}', 'progressViewOffset={96}')
-
-# Add flexGrow so RefreshControl can engage if the content happens to be shorter than viewport.
-# Preserve the original style by combining it with a small inline growth style.
 app = app.replace(
     'contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}',
     'contentContainerStyle={[styles.content, { flexGrow: 1 }]} showsVerticalScrollIndicator={false}',
     1,
 )
 
-# Add an explicit refresh control immediately below the Home header/loading indicator.
-# This uses the same refreshHome callback, so it is not a separate implementation.
 if 'REFRESH LOCATION' not in app:
     anchor = '''      {refreshingHome ? (\n        <View style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: "#eef7f3", flexDirection: "row", alignItems: "center", gap: 10 }}>\n          <ActivityIndicator size="small" />\n          <Text style={{ color: "#164c40", fontWeight: "800" }}>{locale === "ar" ? "جارٍ تحديث الموقع ومواقيت الصلاة…" : "Refreshing location & prayer times…"}</Text>\n        </View>\n      ) : null}\n'''
     if anchor not in app:
@@ -116,7 +110,6 @@ if 'REFRESH LOCATION' not in app:
     button = anchor + '''      <Pressable\n        onPress={() => void refreshHome()}\n        disabled={refreshingHome}\n        style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingVertical: 11, paddingHorizontal: 14, backgroundColor: refreshingHome ? "#dfe7e4" : "#0b5b47", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}\n      >\n        {refreshingHome ? <ActivityIndicator size="small" color="#ffffff" /> : <Text style={{ color: "#ffffff", fontSize: 16 }}>↻</Text>}\n        <Text style={{ color: "#ffffff", fontWeight: "900", letterSpacing: 0.4 }}>{locale === "ar" ? "تحديث الموقع" : "REFRESH LOCATION"}</Text>\n      </Pressable>\n'''
     app = app.replace(anchor, button, 1)
 
-# Version bump.
 cfg = re.sub(r'version:\s*(?:process\.env\.EXPO_APP_VERSION\s*\|\|\s*)?"[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.23"', cfg, count=1)
 cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 67', cfg, count=1)
 
