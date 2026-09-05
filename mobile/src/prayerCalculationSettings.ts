@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { syncCalculationToPairedDisplays } from "./displayCalculationSync";
 
 export type CalculationMode = "smart" | "manual";
 
@@ -61,6 +62,7 @@ export async function savePrayerCalculationPreferences(value: PrayerCalculationP
   for (const listener of listeners) {
     try { listener(); } catch {}
   }
+  await syncCalculationToPairedDisplays(value).catch(() => undefined);
 }
 
 export function subscribePrayerCalculationChanges(listener: () => void) {
