@@ -6,7 +6,6 @@ on:
     paths:
       - ".github/v1021-trigger.txt"
       - ".github/workflows/build-v1021-live-location.yml"
-      - ".github/scripts/fix-v1021-live-location.py"
       - ".github/scripts/fix-v1021-no-resume-reload.py"
       - ".github/scripts/fix-v1021-unified-display-menu.py"
       - ".github/scripts/fix-v1021-pull-to-refresh.py"
@@ -114,7 +113,6 @@ jobs:
       - name: Apply v1.0.21 fixes without changing the v1.0.20 UI
         run: |
           set -euo pipefail
-          python3 .github/scripts/fix-v1021-live-location.py
           python3 .github/scripts/fix-v1021-no-resume-reload.py
           python3 .github/scripts/fix-v1021-unified-display-menu.py
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
@@ -128,10 +126,11 @@ jobs:
           grep -q 'Abdul Jalil Hassoun' mobile/src/AboutHassounPage.tsx
           grep -q 'Salwa Hassoun' mobile/src/AboutHassounPage.tsx
           grep -q 'A continuing Sadaqah Jariyah' mobile/src/AboutHassounPage.tsx
-          grep -q 'Local Adhan calculation • device location' mobile/src/localPrayerTimes.ts
-          grep -q 'Windsor Islamic Association • official Adhan time' mobile/src/localPrayerTimes.ts
+          grep -q '📍 {prayerLocation.label}' mobile/App.tsx
+          grep -q 'Location.reverseGeocodeAsync' mobile/src/prayerData.ts
+          grep -q 'loadInitialPrayerTimes' mobile/App.tsx
+          grep -q 'void loadPrayerTimes().then(async (refreshed)' mobile/App.tsx
           grep -q 'Resume in-place' mobile/App.tsx
-          ! grep -q 'refreshPrayerLocation(true)' mobile/App.tsx
           grep -q 'title={t("Displays", "الشاشات")}' mobile/src/SettingsHub.tsx
           grep -q 'title={t("Connect Display", "ربط شاشة")}' mobile/src/SettingsHub.tsx
           grep -q 'title={t("Wall & Masjid Display", "شاشة الحائط والمسجد")}' mobile/src/SettingsHub.tsx
@@ -178,16 +177,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.21-Exact-v1.0.20-Live-Location-Unified-Displays-Pull-Refresh
+          name: Hassoun-v1.0.21-Exact-v1.0.20-Native-Location-Unified-Displays-Pull-Refresh
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-live-location-unified-displays-pull-refresh.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.21-exact-v1.0.20-native-location-unified-displays-pull-refresh.apk.sha256
           if-no-files-found: error
           retention-days: 30
