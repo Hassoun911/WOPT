@@ -1,2 +1,2 @@
-Build Hassoun v1.0.21 from the protected v1.0.20-era interface with live GPS city/prayer-time behavior.
-Retry 2 after validation cleanup.
+Build Hassoun v1.0.21 from the exact protected v1.0.20 mobile baseline commit d5e0ec5510079ef08a525a6a67d2f0dbbbe6d19a with only the live GPS city/prayer-time fix.
+Exact baseline rebuild trigger 2026-09-05.
