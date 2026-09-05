@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import runpy
 
 ROOT = Path(__file__).resolve().parents[2]
 P = ROOT / "mobile/src/SettingsHub.tsx"
@@ -13,7 +14,6 @@ if 'import ConnectDisplayPage from "./ConnectDisplayPage";' not in s:
         raise SystemExit("Could not find ConnectDisplayPage import anchor")
     s = s.replace(anchor, anchor + 'import ConnectDisplayPage from "./ConnectDisplayPage";\n', 1)
 
-# Wall & Masjid Display is now a controller/pairing workflow, not a local prayer-screen renderer.
 s = s.replace('import MasjidDisplayPage from "./MasjidDisplayPage";\n', '')
 
 row_pattern = re.compile(r'\n\s*<Row[^\n]*/>')
@@ -88,4 +88,9 @@ for forbidden in (
         raise SystemExit("Old display route still exists: " + forbidden)
 
 P.write_text(s, encoding="utf-8")
+
+# The existing workflow already runs this script, so chain the QR/admin upgrade here.
+runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-install-camera.py"), run_name="__main__")
+runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-display-pairing-admin.py"), run_name="__main__")
+
 print("Wall & Masjid Display now opens QR/manual pairing, saved devices, and native admin panel")
