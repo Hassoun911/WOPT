@@ -21,6 +21,12 @@ exec(compile(service_fallback.read_text(encoding="utf-8"), str(service_fallback)
 v1025 = HERE / "fix-v1025-native-alarm-and-refresh-timeouts.py"
 exec(compile(v1025.read_text(encoding="utf-8"), str(v1025), "exec"), {"__file__": str(v1025), "__name__": "__main__"})
 
+# Restore the real Prayer Calculation settings UI as the final UI patch. This page
+# explicitly shows the prayer-time API/source and gives Smart + full manual methods,
+# Asr school, high-latitude rule and per-prayer minute customization.
+v1026 = HERE / "fix-v1026-prayer-calculation-ui.py"
+exec(compile(v1026.read_text(encoding="utf-8"), str(v1026), "exec"), {"__file__": str(v1026), "__name__": "__main__"})
+
 # Keep this test build on the existing v1.0.23 metadata because the proven workflow
 # verifier is intentionally pinned there. Runtime code contains all later fixes.
 config = ROOT / "mobile/app.config.ts"
