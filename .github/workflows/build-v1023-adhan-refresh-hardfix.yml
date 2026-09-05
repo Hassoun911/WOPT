@@ -16,11 +16,13 @@ on:
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
       - ".github/scripts/rewrite-home-ground-zero.py"
       - ".github/scripts/remove-legacy-home-before-rewrite.py"
+      - ".github/scripts/ensure-home-prayer-autoload.py"
       - "mobile/src/HomePrayerPage.tsx"
       - "mobile/src/prayerData.ts"
       - "mobile/src/prayerCalculationSettings.ts"
       - "mobile/src/notifications.ts"
       - "mobile/src/push.ts"
+      - "mobile/src/emailSignup.ts"
 
 permissions:
   contents: read
@@ -139,8 +141,9 @@ jobs:
           from pathlib import Path
           checks = {
             'mobile/src/AboutHassounPage.tsx': ['Abdul Jalil Hassoun', 'Salwa Hassoun', 'A continuing Sadaqah Jariyah'],
-            'mobile/App.tsx': ['const refreshHome = useCallback', 'loadPrayerTimes({ forceLocation: true })', 'HomePrayerPage', 'context={prayerContext}', 'startupAudioCleared', 'if (!startupAudioCleared) return;'],
-            'mobile/src/HomePrayerPage.tsx': ['RefreshControl', 'onRefresh={() => { void onRefresh(); }}', 'alwaysBounceVertical', 'PRAYER SUBSCRIPTION', 'context?.location.label'],
+            'mobile/App.tsx': ['const refreshHome = useCallback', 'loadPrayerTimes({ forceLocation: true })', 'HomePrayerPage', 'context={prayerContext}', 'startupAudioCleared', 'if (!startupAudioCleared) return;', 'HOME_PRAYER_AUTOLOAD_V1'],
+            'mobile/src/HomePrayerPage.tsx': ['RefreshControl', 'onRefresh={() => { void onRefresh(); }}', 'alwaysBounceVertical', 'DA’WAH • PRAYER EMAILS', 'context?.location.label', 'PRAYER_KEYS.map', 'subscribeToDailyPrayerTimes'],
+            'mobile/src/emailSignup.ts': ['subscribeToDailyPrayerTimes', 'dailyPrayerSchedule: true', 'prayerAlerts: false'],
             'mobile/src/prayerData.ts': ['hassoun:prayer-context:v3', 'Location.reverseGeocodeAsync', 'forceLocation', 'Location.Accuracy.High', 'api.aladhan.com/v1/calendar', 'loadSavedPrayerContext'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}', 'Wall & Masjid Display', 'setPage("connectDisplay")'],
             'mobile/src/ConnectDisplayPage.tsx': ['CameraView', 'useCameraPermissions', 'Camera access is ready. Tap Scan QR code again.', '6-DIGIT PAIRING CODE', 'CONNECTED DISPLAYS', 'openAdmin', 'mosqueLocation', 'DISPLAY ADMIN'],
@@ -154,10 +157,13 @@ jobs:
                 raise SystemExit(f'Missing {needle!r} in {file}')
             print(f'OK {file}')
           app = Path('mobile/App.tsx').read_text(encoding='utf-8')
-          # Shared prayerTimes/prayerLocation state remains for Masjid TV; only old PHONE Home code is forbidden.
           for forbidden in ('REFRESH LOCATION', 'loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'phoneHomeScreen'):
             if forbidden in app:
               raise SystemExit(f'Legacy phone Home code still present: {forbidden}')
+          home = Path('mobile/src/HomePrayerPage.tsx').read_text(encoding='utf-8')
+          for forbidden in ('PrayerAlertPreferenceGrid', 'scheduled prayer events', 'Prayer alerts for this phone'):
+            if forbidden in home:
+              raise SystemExit(f'Oversized phone alert controls still on Home: {forbidden}')
           pa = Path('mobile/src/prayerAudio.ts').read_text(encoding='utf-8')
           for forbidden in ('startFirstLaunchExactAlarmSetup()', 'restoreExactPrayerAlarms()'):
             if forbidden in pa:
@@ -168,9 +174,6 @@ jobs:
               raise SystemExit(f'Legacy display route still present: {forbidden}')
           print('Ground-zero Home verification passed')
           PY
-          echo '--- generated App.tsx around Home boundary ---'
-          nl -ba mobile/App.tsx | sed -n '400,470p'
-          echo '--- end generated App.tsx boundary ---'
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || {
             cd mobile
             npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
