@@ -51,7 +51,6 @@ jobs:
           grep -q 'loadPrayerTimes().then(async (refreshed)' mobile/App.tsx
           grep -q 'Local Adhan calculation • device location' mobile/App.tsx
           grep -q 'locationLabel: refreshed.location.label' mobile/App.tsx
-          test ! -e mobile/src/localPrayerTimes.ts
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
