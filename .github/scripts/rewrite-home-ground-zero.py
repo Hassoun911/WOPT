@@ -101,6 +101,12 @@ app = re.sub(
     r'\n\s*setPrayerTimes\(loaded\.prayerTimes\);\n(?:\s*setLive\([^\n]+\);\n)?(?:\s*setLocationLabel\([^\n]+\);\n)?(?:\s*setPrayerTimeZone\([^\n]+\);\n)?(?:\s*setSourceLabel\([^\n]+\);)?',
     '\n      setPrayerContext(loaded);', app, count=1
 )
+# Ensure cold-start initialization always loads the canonical context exactly once.
+if 'setPrayerContext(loaded);' not in app:
+    startup_anchor = '      setPhoneAlertPreferences(savedPhoneAlertPreferences);'
+    if startup_anchor not in app:
+        raise SystemExit('startup preference anchor missing for canonical prayer context')
+    app = app.replace(startup_anchor, startup_anchor + '\n      setPrayerContext(loaded);', 1)
 app = app.replace('loaded.locationLabel, loaded.timezone', 'loaded.location.label, loaded.location.timezone')
 app = app.replace('loaded.timezone), chosenLocale', 'loaded.location.timezone), chosenLocale')
 
@@ -159,13 +165,9 @@ new_home = '''  const homeScreen = (
 
 '''
 
-# Delete the old Home renderer if present. Do not depend on the name of the next screen.
 home_match = re.search(r'\n\s*const homeScreen\s*=\s*\(.*?\n\s*\);\n', app, flags=re.S)
 if home_match:
     app = app[:home_match.start()] + '\n' + app[home_match.end():]
-
-# Insert the new Home renderer before the first remaining screen declaration. If screen
-# declarations were transformed, insert before the final app return section instead.
 insert_match = re.search(r'\n\s*const [A-Za-z0-9_]+Screen\s*=\s*\(', app)
 if insert_match:
     insert_at = insert_match.start() + 1
@@ -191,10 +193,17 @@ app = re.sub(
     '\n', app, count=1, flags=re.S
 )
 
+# Ground-zero means obsolete setter calls are not allowed anywhere. Earlier reconstruction
+# scripts can leave passive effects behind; remove those calls after canonical context wiring.
+for setter in ('setPrayerTimes', 'setLive', 'setLocationLabel', 'setPrayerTimeZone', 'setSourceLabel'):
+    app = re.sub(rf'(?m)^\s*{setter}\([^\n;]*\);\s*$', '', app)
+
 for forbidden in ['loadLocationPrayerContext', 'HomePrayerPanel', 'refreshPrayerLocation', 'REFRESH LOCATION', 'setLocationLabel(', 'setPrayerTimeZone(', 'setSourceLabel(', 'setPrayerTimes(']:
     if forbidden in app:
-        raise SystemExit(f'Legacy Home symbol still present: {forbidden}')
-for required in ['HomePrayerPage', 'loadInitialPrayerTimes', 'loadPrayerTimes({ forceLocation: true })', 'hassoun:active-tab:v3', 'context={prayerContext}', 'onRefresh={refreshHome}', 'startupAudioCleared']:
+        idx = app.find(forbidden)
+        snippet = app[max(0, idx - 220):idx + 320]
+        raise SystemExit(f'Legacy Home symbol still present: {forbidden}\n--- context ---\n{snippet}\n--- end context ---')
+for required in ['HomePrayerPage', 'loadInitialPrayerTimes', 'loadPrayerTimes({ forceLocation: true })', 'hassoun:active-tab:v3', 'context={prayerContext}', 'onRefresh={refreshHome}', 'startupAudioCleared', 'setPrayerContext(loaded);']:
     if required not in app:
         raise SystemExit(f'Ground-zero Home requirement missing: {required}')
 
