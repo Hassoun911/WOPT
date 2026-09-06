@@ -15,7 +15,6 @@ for import_line, anchor in [
             raise SystemExit(f"Display import anchor missing: {anchor.strip()}")
         s = s.replace(anchor, anchor + import_line, 1)
 
-# Remove prior display rows/routes so the submenu has one clean source of truth.
 row_pattern = re.compile(r'\n\s*<Row[^\n]*/>')
 def keep_row(match: re.Match[str]) -> str:
     row = match.group(0)
@@ -31,6 +30,7 @@ def keep_row(match: re.Match[str]) -> str:
 s = row_pattern.sub(keep_row, s)
 s = re.sub(r'\n\s*if \(page === "connectDisplay"\) return <ConnectDisplayPage[^\n]+;\n', '\n', s)
 s = re.sub(r'\n\s*if \(page === "masjidDisplay"\) return <MasjidDisplayPage[^\n]+;\n', '\n', s)
+s = re.sub(r'\n\s*if \(page === "permissions"\) return <PermissionsStatusPage[^\n]+;\n', '\n', s)
 s = re.sub(r'\n\s*if \(page === "displays"\).*?(?=\n\s*if \(page === "widgets"\))', '\n', s, flags=re.S)
 
 m = re.search(r'type SettingsPage = ([^;]+);', s)
@@ -38,7 +38,7 @@ if not m:
     raise SystemExit("SettingsPage union not found")
 parts = [part.strip() for part in m.group(1).split('|')]
 parts = [part for part in parts if part not in ('"display"', '"wallDisplay"', '"wallDisplays"')]
-for page in ('"displays"', '"connectDisplay"', '"masjidDisplay"'):
+for page in ('"displays"', '"connectDisplay"', '"masjidDisplay"', '"permissions"'):
     if page not in parts:
         parts.append(page)
 s = s[:m.start(1)] + ' | '.join(parts) + s[m.end(1):]
@@ -58,7 +58,7 @@ widgets_pos = s.find(widgets_route, root_pos + len(root_anchor) if root_pos >= 0
 if root_pos < 0 or widgets_pos < 0:
     raise SystemExit("Could not locate root/widgets route boundary")
 
-submenu = '''  if (page === "connectDisplay") return <ConnectDisplayPage locale={locale} onBack={() => setPage("displays")} />;\n\n  if (page === "masjidDisplay") return <MasjidDisplayPage locale={locale} onBack={() => setPage("displays")} />;\n\n  if (page === "displays") {\n    return (\n      <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n        <BackHeader title={t("Displays", "الشاشات")} onBack={() => setPage("root")} />\n        <Text style={styles.subtitle}>{t("Open this device as a wall display, or pair and remotely control another display.", "افتح هذا الجهاز كشاشة حائط أو اربط شاشة أخرى وتحكم بها عن بُعد.")}</Text>\n        <Section title={t("DISPLAY OPTIONS", "خيارات الشاشة")}>\n          <Row emoji="🕌" title={t("Tablet / Wall Display", "شاشة الجهاز اللوحي / الحائط")} text={t("Open the full-screen rotating prayer display on this device", "افتح شاشة الصلاة الدوارة بملء الشاشة على هذا الجهاز")} onPress={() => setPage("masjidDisplay")} />\n          <Row emoji="🔗" title={t("Connect Display", "ربط شاشة")} text={t("Scan a QR code or enter the 6-digit pairing code", "امسح رمز QR أو أدخل رمز الربط المكوّن من 6 أرقام")} onPress={() => setPage("connectDisplay")} />\n          <Row emoji="🖥️" title={t("Manage Wall & Masjid Displays", "إدارة شاشات الحائط والمسجد")} text={t("Manage saved displays and open their remote admin controls", "إدارة الشاشات المحفوظة وفتح أدوات التحكم عن بُعد")} onPress={() => setPage("connectDisplay")} />\n        </Section>\n      </ScrollView>\n    );\n  }\n\n'''
+submenu = '''  if (page === "permissions") return <PermissionsStatusPage locale={locale} onBack={() => setPage("root")} />;\n\n  if (page === "connectDisplay") return <ConnectDisplayPage locale={locale} onBack={() => setPage("displays")} />;\n\n  if (page === "masjidDisplay") return <MasjidDisplayPage locale={locale} onBack={() => setPage("displays")} />;\n\n  if (page === "displays") {\n    return (\n      <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>\n        <BackHeader title={t("Displays", "الشاشات")} onBack={() => setPage("root")} />\n        <Text style={styles.subtitle}>{t("Open this device as a wall display, or pair and remotely control another display.", "افتح هذا الجهاز كشاشة حائط أو اربط شاشة أخرى وتحكم بها عن بُعد.")}</Text>\n        <Section title={t("DISPLAY OPTIONS", "خيارات الشاشة")}>\n          <Row emoji="🕌" title={t("Tablet / Wall Display", "شاشة الجهاز اللوحي / الحائط")} text={t("Open the full-screen rotating prayer display on this device", "افتح شاشة الصلاة الدوارة بملء الشاشة على هذا الجهاز")} onPress={() => setPage("masjidDisplay")} />\n          <Row emoji="🔗" title={t("Connect Display", "ربط شاشة")} text={t("Scan a QR code or enter the 6-digit pairing code", "امسح رمز QR أو أدخل رمز الربط المكوّن من 6 أرقام")} onPress={() => setPage("connectDisplay")} />\n          <Row emoji="🖥️" title={t("Manage Wall & Masjid Displays", "إدارة شاشات الحائط والمسجد")} text={t("Manage saved displays and open their remote admin controls", "إدارة الشاشات المحفوظة وفتح أدوات التحكم عن بُعد")} onPress={() => setPage("connectDisplay")} />\n        </Section>\n      </ScrollView>\n    );\n  }\n\n'''
 
 prefix_end = root_pos + len(root_anchor)
 s = s[:prefix_end] + submenu + s[widgets_pos:]
@@ -71,6 +71,7 @@ required = [
     'page === "masjidDisplay"',
     '<MasjidDisplayPage locale={locale}',
     'title={t("Connect Display"',
+    'PermissionsStatusPage locale={locale}',
 ]
 for needle in required:
     if needle not in s:
@@ -79,4 +80,4 @@ for needle in required:
 P.write_text(s, encoding="utf-8")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-install-camera.py"), run_name="__main__")
 runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-display-pairing-admin.py"), run_name="__main__")
-print("Displays menu now includes native Tablet / Wall Display plus QR/manual pairing and remote admin")
+print("Displays menu now includes native Tablet / Wall Display, QR pairing, remote admin, and preserves Permissions")
