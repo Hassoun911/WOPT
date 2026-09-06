@@ -1,257 +1,42 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Linking,
-  Modal,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Switch,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, useWindowDimensions, View } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { loadInitialPrayerTimes, loadPrayerTimes, type PrayerLocation } from "./prayerData";
 import { PRAYER_KEYS, type PrayerDay, type PrayerTimes } from "./types";
 
-type Props = { locale: "en" | "ar"; onBack: () => void };
-type PrayerKey = keyof PrayerDay;
-type PrayerMeta = { key: PrayerKey; en: string; ar: string };
+type Props={locale:"en"|"ar";onBack:()=>void};type PrayerKey=keyof PrayerDay;type Meta={key:PrayerKey;en:string;ar:string};
+type Device={id:string;code:string;secret:string;name:string};
+const API="https://wopt-prayer-push.wopt-windsor.workers.dev",SETTINGS_KEY="hassoun:native-wall-display:v3",DEVICE_KEY="hassoun:native-wall-display-device:v2";
+const PRAYERS:Meta[]=[{key:"fajr",en:"Fajr",ar:"الفجر"},{key:"dhuhr",en:"Dhuhr",ar:"الظهر"},{key:"asr",en:"Asr",ar:"العصر"},{key:"maghrib",en:"Maghrib",ar:"المغرب"},{key:"isha",en:"Isha",ar:"العشاء"}];
+const DEFAULT_THEME={pageGradientA:"#11aa91",pageGradientB:"#078f79",pageGradientAngle:160,gradientMix:50,clockColor:"#f6f2ff",clockOutline:"#b27b33",clockSize:1,clockFont:"sans-serif",showSeconds:true,showClockPeriod:true,metaColor:"#f9f4ff",metaSize:1,showLocation:true,showDate:true,cardGradientA:"#12aa91",cardGradientB:"#0c957f",cardGradientAngle:180,cardBorder:"#e0b761",cardRadius:28,arabicColor:"#fbf5ff",arabicSize:1,arabicFont:"sans-serif",englishColor:"#f4cb77",englishSize:1,englishFont:"sans-serif",prayerTimeColor:"#fbf4ff",prayerTimeSize:1,prayerTimeFont:"sans-serif",showPrayerPeriod:true,showPrayerLabel:true,prayerLabelText:"PRAYER",prayerLabelEmoji:"",showAdhan:true,adhanText:"Adhan On",adhanEmoji:"🔊",miniGradientA:"#f3ebf6",miniGradientB:"#e9e2ee",miniTextColor:"#27312f",miniNextA:"#0d8e77",miniNextB:"#087a67",miniNextText:"#ffffff",showMiniPeriod:false,sliderSeconds:8};
+const rand=()=>Math.random().toString(36).slice(2,10);const makeDevice=():Device=>({id:`${Date.now().toString(36)}${rand()}${rand()}`,code:String(Math.floor(100000+Math.random()*900000)),secret:`${rand()}${rand()}${rand()}${rand()}`,name:"Hassoun Tablet Wall"});
+const th=(s:Record<string,any>)=>({...DEFAULT_THEME,...(s.tabletTheme&&typeof s.tabletTheme==="object"?s.tabletTheme:{})});
+function dateKey(d:Date,z:string){const p=new Intl.DateTimeFormat("en-CA",{timeZone:z,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d),g=(x:string)=>p.find(q=>q.type===x)?.value||"";return `${g("year")}-${g("month")}-${g("day")}`}
+function minutes(v?:string){const m=String(v||"").match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):null}
+function nowMinutes(d:Date,z:string){const p=new Intl.DateTimeFormat("en-US",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(d);return Number(p.find(x=>x.type==="hour")?.value||0)*60+Number(p.find(x=>x.type==="minute")?.value||0)}
+function prayerParts(v?:string,period=true){const m=String(v||"").match(/^(\d{1,2}):(\d{2})/);if(!m)return{main:"--:--",period:""};const h=Number(m[1]);return{main:`${h%12||12}:${m[2]}`,period:period?(h>=12?"p.m.":"a.m."):""}}
+function clockParts(d:Date,z:string,seconds:boolean){const p=new Intl.DateTimeFormat("en-US",{timeZone:z,hour:"numeric",minute:"2-digit",second:seconds?"2-digit":undefined,hour12:true}).formatToParts(d);return{main:`${p.find(x=>x.type==="hour")?.value||""}:${p.find(x=>x.type==="minute")?.value||"00"}${seconds?`:${p.find(x=>x.type==="second")?.value||"00"}`:""}`,period:p.find(x=>x.type==="dayPeriod")?.value||""}}
+function colors(a:string,b:string){return [a||"#11aa91",b||a||"#078f79"] as [string,string]}
 
-type DisplaySettings = {
-  nextPrayerCardColor: string;
-  nextPrayerMiniCardColor: string;
-  highlightNextPrayerCard: boolean;
-  highlightNextPrayerMiniCard: boolean;
-  sliderSeconds: number;
-};
-
-type DisplayDevice = { id: string; code: string; secret: string; name: string };
-
-const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
-const SETTINGS_KEY = "hassoun:native-wall-display:v2";
-const DEVICE_KEY = "hassoun:native-wall-display-device:v1";
-const DEFAULT_SETTINGS: DisplaySettings = {
-  nextPrayerCardColor: "#0B6B55",
-  nextPrayerMiniCardColor: "#0B6B55",
-  highlightNextPrayerCard: true,
-  highlightNextPrayerMiniCard: true,
-  sliderSeconds: 8,
-};
-const COLORS = ["#0B6B55", "#08795E", "#0A5B4A", "#146B63", "#255F48", "#4A6C46"];
-const PRAYERS: PrayerMeta[] = [
-  { key: "fajr", en: "Fajr", ar: "الفجر" },
-  { key: "dhuhr", en: "Dhuhr", ar: "الظهر" },
-  { key: "asr", en: "Asr", ar: "العصر" },
-  { key: "maghrib", en: "Maghrib", ar: "المغرب" },
-  { key: "isha", en: "Isha", ar: "العشاء" },
-];
-
-const randomPart = () => Math.random().toString(36).slice(2, 10);
-const makeDevice = (): DisplayDevice => ({
-  id: `${Date.now().toString(36)}${randomPart()}${randomPart()}`,
-  code: String(Math.floor(100000 + Math.random() * 900000)),
-  secret: `${randomPart()}${randomPart()}${randomPart()}${randomPart()}`,
-  name: "Hassoun Wall Display",
-});
-
-function dateKey(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
+export default function MasjidDisplayPage({locale,onBack}:Props){
+ const {width,height}=useWindowDimensions(),landscape=width>height,ar=locale==="ar",t=(en:string,a:string)=>ar?a:en;const [now,setNow]=useState(new Date()),[times,setTimes]=useState<PrayerTimes>({}),[location,setLocation]=useState<PrayerLocation>({latitude:42.3149,longitude:-83.0364,timezone:"America/Toronto",label:"Current location",source:"saved"}),[loading,setLoading]=useState(true),[setup,setSetup]=useState(false),[settings,setSettings]=useState<Record<string,any>>({}),[device,setDevice]=useState<Device|null>(null),[paired,setPaired]=useState(false),[slide,setSlide]=useState(0);
+ const theme=th(settings);const refresh=useCallback(async()=>{try{const x=await loadPrayerTimes();setTimes(x.prayerTimes);setLocation(x.location)}finally{setLoading(false)}},[]);
+ useEffect(()=>{let alive=true;void(async()=>{const [rawS,rawD,loaded]=await Promise.all([AsyncStorage.getItem(SETTINGS_KEY),AsyncStorage.getItem(DEVICE_KEY),loadInitialPrayerTimes()]);if(!alive)return;let s:Record<string,any>={};if(rawS)try{s=JSON.parse(rawS)}catch{}setSettings(s);let d:Device;try{d=rawD?JSON.parse(rawD):makeDevice()}catch{d=makeDevice()}setDevice(d);await AsyncStorage.setItem(DEVICE_KEY,JSON.stringify(d));setTimes(loaded.prayerTimes);setLocation(loaded.location);setLoading(false);void refresh()})();const id=setInterval(()=>setNow(new Date()),1000);void ScreenOrientation.unlockAsync().catch(()=>undefined);return()=>{alive=false;clearInterval(id)}},[refresh]);
+ useEffect(()=>{const id=setInterval(()=>setSlide(n=>(n+1)%PRAYERS.length),Math.max(4,Number(theme.sliderSeconds)||8)*1000);return()=>clearInterval(id)},[theme.sliderSeconds]);
+ useEffect(()=>{if(!device)return;let dead=false,timer:ReturnType<typeof setTimeout>|null=null;const register=async()=>{try{await fetch(`${API}/masjid-displays/register`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({deviceId:device.id,pairCode:device.code,deviceSecret:device.secret,name:device.name,settings:{...settings,displayMode:"tablet"}})})}catch{}};const poll=async()=>{if(dead)return;try{const r=await fetch(`${API}/masjid-displays/device/${encodeURIComponent(device.id)}?secret=${encodeURIComponent(device.secret)}`);if(r.status===404)await register();else if(r.ok){const d=await r.json() as {pairCode?:string;settings?:Record<string,any>;paired?:boolean;controllerCount?:number};if(d.pairCode&&/^\d{6}$/.test(d.pairCode)&&d.pairCode!==device.code){const n={...device,code:d.pairCode};setDevice(n);await AsyncStorage.setItem(DEVICE_KEY,JSON.stringify(n))}if(d.settings&&typeof d.settings==="object"){setSettings(d.settings);await AsyncStorage.setItem(SETTINGS_KEY,JSON.stringify(d.settings))}setPaired(Boolean(d.paired)||(Number(d.controllerCount)||0)>0)}}catch{}timer=setTimeout(poll,650)};void register().then(poll);return()=>{dead=true;if(timer)clearTimeout(timer)}},[device?.id]);
+ const key=dateKey(now,location.timezone),day=times[key],cur=nowMinutes(now,location.timezone);const next=useMemo(()=>{if(!day)return "fajr" as PrayerKey;for(const p of PRAYER_KEYS){const m=minutes(day[p]);if(m!==null&&m>cur)return p}return "fajr" as PrayerKey},[day,cur]);const current=PRAYERS[slide],cp=clockParts(now,location.timezone,theme.showSeconds!==false),pp=prayerParts(day?.[current.key],theme.showPrayerPeriod!==false);const date=new Intl.DateTimeFormat(ar?"ar":"en-CA",{timeZone:location.timezone,weekday:"short",month:"short",day:"numeric",year:"numeric"}).format(now);const pairUrl=device?`https://hassoun.app/masjid-tv/pair/?device=${encodeURIComponent(device.id)}&code=${device.code}`:"",qr=pairUrl?`https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=8&data=${encodeURIComponent(pairUrl)}`:"";
+ const localTheme=(patch:Record<string,any>)=>{const n={...settings,tabletTheme:{...theme,...patch}};setSettings(n);void AsyncStorage.setItem(SETTINGS_KEY,JSON.stringify(n))};
+ return <Modal visible animationType="fade" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onBack}><LinearGradient colors={colors(theme.pageGradientA,theme.pageGradientB)} style={styles.root}><StatusBar hidden/>
+  <View style={styles.meta}>{theme.showLocation!==false?<Text style={[styles.metaText,{color:theme.metaColor,fontSize:17*(Number(theme.metaSize)||1)}]}>✦ {location.label}</Text>:null}{theme.showLocation!==false&&theme.showDate!==false?<Text style={[styles.metaText,{color:theme.metaColor}]}>|</Text>:null}{theme.showDate!==false?<Text style={[styles.metaText,{color:theme.metaColor,fontSize:17*(Number(theme.metaSize)||1)}]}>▣ {date}</Text>:null}</View>
+  <Pressable onPress={()=>setSetup(true)} style={styles.clockButton}><View style={styles.clockRow}><Text style={[styles.clock,{color:theme.clockColor,fontSize:(landscape?76:104)*(Number(theme.clockSize)||1),fontFamily:theme.clockFont}]}>{cp.main}</Text>{theme.showClockPeriod!==false?<Text style={[styles.clockPeriod,{color:theme.clockColor,fontFamily:theme.clockFont}]}>{cp.period}</Text>:null}</View></Pressable>
+  <LinearGradient colors={colors(theme.cardGradientA,theme.cardGradientB)} style={[styles.hero,{borderColor:theme.cardBorder,borderRadius:Number(theme.cardRadius)||28}]}>
+   {theme.showPrayerLabel!==false?<View style={[styles.prayerPill,{borderColor:theme.cardBorder}]}><Text style={[styles.pillText,{color:theme.cardBorder}]}>{theme.prayerLabelEmoji||""}{theme.prayerLabelText||"PRAYER"}</Text></View>:null}
+   <Text style={[styles.arabic,{color:theme.arabicColor,fontSize:(landscape?62:92)*(Number(theme.arabicSize)||1),fontFamily:theme.arabicFont}]}>{current.ar}</Text><Text style={[styles.english,{color:theme.englishColor,fontSize:(landscape?46:68)*(Number(theme.englishSize)||1),fontFamily:theme.englishFont}]}>{current.en}</Text><View style={[styles.rule,{backgroundColor:theme.cardBorder}]}/><View style={styles.prayerTimeRow}><Text style={[styles.prayerTime,{color:theme.prayerTimeColor,fontSize:(landscape?58:86)*(Number(theme.prayerTimeSize)||1),fontFamily:theme.prayerTimeFont}]}>{pp.main}</Text>{pp.period?<Text style={[styles.prayerPeriod,{color:theme.prayerTimeColor}]}>{pp.period}</Text>:null}</View>{theme.showAdhan!==false?<View style={[styles.adhan,{borderColor:theme.cardBorder}]}><Text style={styles.adhanText}>{theme.adhanEmoji||"🔊"} {theme.adhanText||"Adhan On"}</Text></View>:null}
+  </LinearGradient>
+  <View style={styles.miniRow}>{PRAYERS.map((p,i)=>{const n=p.key===next,m=prayerParts(day?.[p.key],theme.showMiniPeriod===true);return <Pressable key={p.key} onPress={()=>setSlide(i)} style={styles.miniWrap}><LinearGradient colors={colors(n?theme.miniNextA:theme.miniGradientA,n?theme.miniNextB:theme.miniGradientB)} style={[styles.mini,{borderColor:n?theme.cardBorder:"rgba(75,54,75,.28)"}]}><Text style={[styles.miniAr,{color:n?theme.miniNextText:theme.miniTextColor}]}>{p.ar}</Text><Text style={[styles.miniEn,{color:n?theme.miniNextText:theme.miniTextColor}]}>{p.en}</Text><Text style={[styles.miniTime,{color:n?theme.miniNextText:theme.miniTextColor}]}>{m.main}{m.period?` ${m.period}`:""}</Text>{n?<Text style={[styles.next,{color:theme.cardBorder}]}>NEXT</Text>:null}</LinearGradient></Pressable>})}</View>{loading?<View style={styles.loading}><ActivityIndicator size="large" color="#f4d074"/></View>:null}
+  <Modal visible={setup} transparent animationType="fade" onRequestClose={()=>setSetup(false)}><View style={styles.backdrop}><View style={styles.sheet}><ScrollView contentContainerStyle={styles.sheetBody}><View style={styles.sheetHead}><View><Text style={styles.sheetTitle}>{t("Tablet Wall Display","شاشة الجهاز اللوحي")}</Text><Text style={styles.sheetSub}>{t("Pair this tablet, then customize it live from Hassoun.","اربط هذه الشاشة ثم خصصها مباشرة من حسّون.")}</Text></View><Pressable onPress={()=>setSetup(false)} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View><Text style={styles.label}>{t("CONNECT THIS TABLET / IPAD","ربط هذا الجهاز")}</Text><View style={styles.pair}>{qr?<Image source={{uri:qr}} style={styles.qr}/>:null}<View style={styles.pairCopy}><Text style={styles.codeLabel}>6-DIGIT PAIRING CODE</Text><Text style={styles.code}>{device?.code||"------"}</Text><Text style={styles.pairHelp}>{t("Scan this QR from Hassoun → Settings → Displays → Connect Display, or enter the code manually.","امسح QR من حسّون ← الإعدادات ← الشاشات ← ربط شاشة أو أدخل الرمز.")}</Text><Text style={[styles.status,paired&&styles.statusOn]}>{paired?"● CONNECTED · LIVE":"○ WAITING FOR APP"}</Text></View></View><Text style={styles.label}>{t("QUICK CONTROLS","تحكم سريع")}</Text>{[["showSeconds",t("Show seconds","إظهار الثواني")],["showClockPeriod",t("Clock AM / PM","AM / PM للساعة")],["showPrayerPeriod",t("Prayer AM / PM","AM / PM للصلاة")],["showAdhan",t("Show Adhan badge","إظهار شارة الأذان")]].map(([k,l])=><View key={String(k)} style={styles.setting}><Text style={styles.settingText}>{l}</Text><Switch value={theme[String(k)]!==false} onValueChange={v=>localTheme({[String(k)]:v})}/></View>)}<Pressable onPress={()=>void Linking.openURL("https://hassoun.app/?mode=web")} style={styles.action}><Text style={styles.actionText}>🌐 Website Mode</Text></Pressable><Pressable onPress={()=>void Linking.openURL("https://hassoun.app/masjid-tv/?mode=tv&activate=1")} style={styles.action}><Text style={styles.actionText}>📺 TV Display Mode</Text></Pressable></ScrollView></View></View></Modal>
+ </LinearGradient></Modal>
 }
-function minutesFor(value?: string) {
-  if (!value) return null;
-  const m = value.trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
-  if (!m) return null;
-  let h = Number(m[1]); const min = Number(m[2]); const ap = (m[3] || "").toUpperCase();
-  if (ap === "PM" && h < 12) h += 12; if (ap === "AM" && h === 12) h = 0;
-  return h * 60 + min;
-}
-function nowMinutes(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
-  return Number(parts.find((p) => p.type === "hour")?.value || 0) * 60 + Number(parts.find((p) => p.type === "minute")?.value || 0);
-}
-function pretty(value?: string) {
-  if (!value) return "--:--";
-  const m = value.match(/^(\d{1,2}):(\d{2})/); if (!m) return value;
-  const raw = Number(m[1]); const suffix = raw >= 12 ? "PM" : "AM"; const hour = raw % 12 || 12;
-  return `${hour}:${m[2]} ${suffix}`;
-}
-function clockParts(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).formatToParts(date);
-  return {
-    time: `${parts.find((p) => p.type === "hour")?.value || ""}:${parts.find((p) => p.type === "minute")?.value || "00"}`,
-    second: parts.find((p) => p.type === "second")?.value || "00",
-    period: parts.find((p) => p.type === "dayPeriod")?.value || "",
-  };
-}
-
-export default function MasjidDisplayPage({ locale, onBack }: Props) {
-  const { width, height } = useWindowDimensions();
-  const landscape = width > height;
-  const ar = locale === "ar";
-  const t = (en: string, arabic: string) => ar ? arabic : en;
-  const [now, setNow] = useState(new Date());
-  const [times, setTimes] = useState<PrayerTimes>({});
-  const [location, setLocation] = useState<PrayerLocation>({ latitude: 42.3149, longitude: -83.0364, timezone: "America/Toronto", label: "Current location", source: "saved" });
-  const [loading, setLoading] = useState(true);
-  const [setupOpen, setSetupOpen] = useState(false);
-  const [settings, setSettings] = useState<DisplaySettings>(DEFAULT_SETTINGS);
-  const [device, setDevice] = useState<DisplayDevice | null>(null);
-  const [slide, setSlide] = useState(0);
-
-  const saveSettings = useCallback((patch: Partial<DisplaySettings>) => {
-    setSettings((current) => {
-      const next = { ...current, ...patch };
-      void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try { const loaded = await loadPrayerTimes(); setTimes(loaded.prayerTimes); setLocation(loaded.location); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const [savedSettings, savedDevice, loaded] = await Promise.all([
-        AsyncStorage.getItem(SETTINGS_KEY), AsyncStorage.getItem(DEVICE_KEY), loadInitialPrayerTimes(),
-      ]);
-      if (!alive) return;
-      if (savedSettings) { try { setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) }); } catch {} }
-      let nextDevice: DisplayDevice;
-      try { nextDevice = savedDevice ? JSON.parse(savedDevice) : makeDevice(); } catch { nextDevice = makeDevice(); }
-      setDevice(nextDevice);
-      await AsyncStorage.setItem(DEVICE_KEY, JSON.stringify(nextDevice));
-      setTimes(loaded.prayerTimes); setLocation(loaded.location); setLoading(false); void refresh();
-    })();
-    const clock = setInterval(() => setNow(new Date()), 1000);
-    return () => { alive = false; clearInterval(clock); };
-  }, [refresh]);
-
-  useEffect(() => {
-    const id = setInterval(() => setSlide((n) => (n + 1) % PRAYERS.length), Math.max(4, settings.sliderSeconds) * 1000);
-    return () => clearInterval(id);
-  }, [settings.sliderSeconds]);
-
-  useEffect(() => { void ScreenOrientation.unlockAsync().catch(() => undefined); }, []);
-
-  useEffect(() => {
-    if (!device) return;
-    let stopped = false; let timer: ReturnType<typeof setTimeout> | null = null;
-    const register = async () => {
-      try { await fetch(`${API}/masjid-displays/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceId: device.id, pairCode: device.code, deviceSecret: device.secret, name: device.name, settings }) }); } catch {}
-    };
-    const poll = async () => {
-      if (stopped) return;
-      try {
-        const response = await fetch(`${API}/masjid-displays/device/${encodeURIComponent(device.id)}?secret=${encodeURIComponent(device.secret)}`);
-        if (response.status === 404) await register();
-        else if (response.ok) {
-          const data = await response.json() as { pairCode?: string; settings?: Record<string, unknown> };
-          if (data.pairCode && /^\d{6}$/.test(data.pairCode) && data.pairCode !== device.code) {
-            const nextDevice = { ...device, code: data.pairCode }; setDevice(nextDevice); await AsyncStorage.setItem(DEVICE_KEY, JSON.stringify(nextDevice));
-          }
-          if (data.settings && typeof data.settings === "object") {
-            const remote = data.settings as Partial<DisplaySettings>;
-            const next = { ...settings, ...remote };
-            setSettings(next); await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-          }
-        }
-      } catch {}
-      timer = setTimeout(poll, 3000);
-    };
-    void register().then(poll);
-    return () => { stopped = true; if (timer) clearTimeout(timer); };
-  }, [device?.id]);
-
-  const key = dateKey(now, location.timezone); const day = times[key]; const currentMinutes = nowMinutes(now, location.timezone);
-  const nextKey = useMemo(() => {
-    if (!day) return null;
-    for (const prayer of PRAYER_KEYS) { const m = minutesFor(day[prayer]); if (m !== null && m > currentMinutes) return prayer; }
-    return "fajr" as PrayerKey;
-  }, [day, currentMinutes]);
-  const currentPrayer = PRAYERS[slide]; const isNextSlide = currentPrayer.key === nextKey;
-  const clock = clockParts(now, location.timezone);
-  const date = new Intl.DateTimeFormat(ar ? "ar" : "en-CA", { timeZone: location.timezone, weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
-  let hijri = ""; try { hijri = new Intl.DateTimeFormat(ar ? "ar-SA-u-ca-islamic" : "en-US-u-ca-islamic", { timeZone: location.timezone, month: "long", day: "numeric", year: "numeric" }).format(now); } catch {}
-  const pairUrl = device ? `https://hassoun.app/masjid-tv/pair/?device=${encodeURIComponent(device.id)}&code=${device.code}` : "";
-  const qrUrl = pairUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=8&data=${encodeURIComponent(pairUrl)}` : "";
-
-  return <Modal visible animationType="fade" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onBack}>
-    <View style={styles.root}>
-      <StatusBar hidden />
-      <View style={styles.top}>
-        <Pressable onPress={() => setSetupOpen(true)} style={styles.clockButton} accessibilityLabel="Open wall display setup">
-          <View style={styles.clockLine}><Text style={styles.clock}>{clock.time}</Text><View><Text style={styles.period}>{clock.period}</Text><Text style={styles.seconds}>{clock.second}</Text></View></View>
-          <Text style={styles.tapHint}>{t("Tap clock for setup", "اضغط على الساعة للإعداد")}</Text>
-        </Pressable>
-        <View style={styles.locationBox}><Text style={styles.location}>📍 {location.label}</Text><Text style={styles.date}>{date}</Text>{hijri ? <Text style={styles.hijri}>☾ {hijri}</Text> : null}</View>
-      </View>
-
-      <View style={styles.heroWrap}>
-        <View style={[styles.heroCard, isNextSlide && settings.highlightNextPrayerCard && { backgroundColor: settings.nextPrayerCardColor, borderColor: "#E8C864" }]}>
-          {isNextSlide ? <Text style={styles.nextBadge}>{t("NEXT PRAYER", "الصلاة القادمة")}</Text> : <Text style={styles.slideBadge}>{t("PRAYER", "الصلاة")}</Text>}
-          <Text style={styles.heroArabic}>{currentPrayer.ar}</Text>
-          <Text style={styles.heroEnglish}>{currentPrayer.en}</Text>
-          <Text style={styles.heroTime}>{pretty(day?.[currentPrayer.key])}</Text>
-          <View style={styles.dots}>{PRAYERS.map((p, i) => <View key={p.key} style={[styles.dot, i === slide && styles.dotActive]} />)}</View>
-        </View>
-      </View>
-
-      <View style={[styles.miniRow, landscape && styles.miniRowLandscape]}>
-        {PRAYERS.map((prayer, index) => {
-          const active = prayer.key === nextKey;
-          return <Pressable key={prayer.key} onPress={() => setSlide(index)} style={[styles.miniCard, active && settings.highlightNextPrayerMiniCard && { backgroundColor: settings.nextPrayerMiniCardColor, borderColor: "#E8C864" }]}>
-            <Text style={styles.miniArabic}>{prayer.ar}</Text><Text style={styles.miniEnglish}>{prayer.en}</Text><Text style={styles.miniTime}>{pretty(day?.[prayer.key])}</Text>{active ? <Text style={styles.miniNext}>{t("NEXT", "القادمة")}</Text> : null}
-          </Pressable>;
-        })}
-      </View>
-      <Text style={styles.footer}>{t("Prayer • Qur’an • Knowledge", "الصلاة • القرآن • المعرفة")}</Text>
-      {loading ? <View style={styles.loading}><ActivityIndicator size="large" color="#E7C768"/><Text style={styles.loadingText}>{t("Updating prayer times…", "جارٍ تحديث مواقيت الصلاة…")}</Text></View> : null}
-
-      <Modal visible={setupOpen} transparent animationType="fade" onRequestClose={() => setSetupOpen(false)}>
-        <View style={styles.sheetBackdrop}><View style={styles.sheet}><ScrollView contentContainerStyle={styles.sheetContent}>
-          <View style={styles.sheetHead}><View><Text style={styles.sheetTitle}>{t("Wall Display Setup", "إعداد شاشة الحائط")}</Text><Text style={styles.sheetSub}>{t("Pair, customize, or switch modes", "الربط والتخصيص وتغيير الوضع")}</Text></View><Pressable onPress={() => setSetupOpen(false)} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable></View>
-          <Text style={styles.sectionLabel}>{t("CONNECT THIS DISPLAY", "ربط هذه الشاشة")}</Text>
-          <View style={styles.pairCard}>{qrUrl ? <Image source={{ uri: qrUrl }} style={styles.qr}/> : null}<View style={styles.pairCopy}><Text style={styles.codeLabel}>{t("6-DIGIT PAIRING CODE", "رمز الربط من 6 أرقام")}</Text><Text style={styles.code}>{device?.code || "------"}</Text><Text style={styles.pairHelp}>{t("Scan this QR or enter the code from Hassoun → Displays → Connect Display.", "امسح الرمز أو أدخل الرقم من حسّون ← الشاشات ← ربط شاشة.")}</Text></View></View>
-
-          <Text style={styles.sectionLabel}>{t("NEXT PRAYER CARD", "بطاقة الصلاة القادمة")}</Text>
-          <View style={styles.settingRow}><Text style={styles.settingText}>{t("Highlight next large prayer card", "تمييز بطاقة الصلاة القادمة الكبيرة")}</Text><Switch value={settings.highlightNextPrayerCard} onValueChange={(value) => saveSettings({ highlightNextPrayerCard: value })}/></View>
-          <View style={styles.settingRow}><Text style={styles.settingText}>{t("Highlight matching mini card", "تمييز البطاقة المصغرة المطابقة")}</Text><Switch value={settings.highlightNextPrayerMiniCard} onValueChange={(value) => saveSettings({ highlightNextPrayerMiniCard: value })}/></View>
-          <Text style={styles.colorTitle}>{t("Next-prayer green", "لون الصلاة القادمة")}</Text><View style={styles.colors}>{COLORS.map((color) => <Pressable key={color} onPress={() => saveSettings({ nextPrayerCardColor: color, nextPrayerMiniCardColor: color })} style={[styles.swatch, { backgroundColor: color }, settings.nextPrayerCardColor === color && styles.swatchActive]} />)}</View>
-
-          <Text style={styles.sectionLabel}>{t("DISPLAY MODE", "وضع الشاشة")}</Text>
-          <Pressable style={styles.menuButton} onPress={() => void refresh()}><Text style={styles.menuButtonText}>↻ {t("Refresh prayer times", "تحديث مواقيت الصلاة")}</Text></Pressable>
-          <Pressable style={styles.menuButton} onPress={() => void Linking.openURL("https://hassoun.app/?mode=web")}><Text style={styles.menuButtonText}>🌐 {t("Website Mode", "وضع الموقع")}</Text></Pressable>
-          <Pressable style={styles.menuButton} onPress={onBack}><Text style={styles.menuButtonText}>← {t("Exit Wall Display", "الخروج من شاشة الحائط")}</Text></Pressable>
-          <Pressable style={styles.resetButton} onPress={() => saveSettings(DEFAULT_SETTINGS)}><Text style={styles.resetText}>{t("Reset display customization", "إعادة إعدادات الشاشة")}</Text></Pressable>
-        </ScrollView></View></View>
-      </Modal>
-    </View>
-  </Modal>;
-}
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#03221C", paddingHorizontal: 18, paddingTop: 24, paddingBottom: 18 },
-  top: { alignItems: "center" }, clockButton: { alignItems: "center", paddingHorizontal: 18, paddingVertical: 4 }, clockLine: { flexDirection: "row", alignItems: "center", gap: 8 },
-  clock: { color: "#FFFFFF", fontSize: 78, lineHeight: 82, fontWeight: "900", letterSpacing: -3 }, period: { color: "#E6C66A", fontSize: 17, fontWeight: "900" }, seconds: { color: "#88A99E", fontSize: 12, fontWeight: "800" }, tapHint: { color: "#73988D", fontSize: 10, marginTop: -2 },
-  locationBox: { alignItems: "center", marginTop: 4 }, location: { color: "#DCE9E4", fontSize: 15, fontWeight: "800" }, date: { color: "#9DB9B0", fontSize: 12, marginTop: 3 }, hijri: { color: "#E0C268", fontSize: 12, marginTop: 2 },
-  heroWrap: { flex: 1, justifyContent: "center", paddingVertical: 14 }, heroCard: { minHeight: 390, flex: 1, maxHeight: 520, borderRadius: 28, borderWidth: 1.5, borderColor: "rgba(231,199,104,.65)", backgroundColor: "#0B493D", alignItems: "center", justifyContent: "center", padding: 26, shadowColor: "#000", shadowOpacity: .32, shadowRadius: 18, elevation: 9 },
-  nextBadge: { position: "absolute", top: 18, color: "#F7D978", fontSize: 12, letterSpacing: 2, fontWeight: "900" }, slideBadge: { position: "absolute", top: 18, color: "#7DA99C", fontSize: 11, letterSpacing: 2, fontWeight: "900" }, heroArabic: { color: "#FFFFFF", fontSize: 86, lineHeight: 100, fontWeight: "900", textAlign: "center" }, heroEnglish: { color: "#FFFFFF", fontSize: 40, fontWeight: "900", marginTop: 8 }, heroTime: { color: "#F4D26F", fontSize: 58, fontWeight: "900", marginTop: 20 },
-  dots: { flexDirection: "row", gap: 7, position: "absolute", bottom: 18 }, dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,.25)" }, dotActive: { width: 22, backgroundColor: "#E8C864" },
-  miniRow: { flexDirection: "row", gap: 6, marginTop: 3 }, miniRowLandscape: { gap: 10 }, miniCard: { flex: 1, minHeight: 98, borderRadius: 14, borderWidth: 1, borderColor: "rgba(197,166,82,.42)", backgroundColor: "#0A4036", alignItems: "center", justifyContent: "center", paddingVertical: 7, paddingHorizontal: 2 }, miniArabic: { color: "#F1D47C", fontSize: 16, fontWeight: "900" }, miniEnglish: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", marginTop: 1 }, miniTime: { color: "#FFFFFF", fontSize: 12, fontWeight: "900", marginTop: 5 }, miniNext: { color: "#F5D36D", fontSize: 7, fontWeight: "900", letterSpacing: 1, marginTop: 3 }, footer: { color: "#73988D", textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: "700" },
-  loading: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(3,34,28,.78)", alignItems: "center", justifyContent: "center", zIndex: 20 }, loadingText: { color: "#FFFFFF", marginTop: 12, fontWeight: "800" },
-  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,.66)", justifyContent: "center", padding: 16 }, sheet: { maxHeight: "92%", borderRadius: 24, overflow: "hidden", backgroundColor: "#082F28", borderWidth: 1, borderColor: "#4E786C" }, sheetContent: { padding: 20, paddingBottom: 28 }, sheetHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }, sheetTitle: { color: "#FFFFFF", fontSize: 24, fontWeight: "900" }, sheetSub: { color: "#9EBBB2", fontSize: 12, marginTop: 3 }, close: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" }, closeText: { color: "#FFFFFF", fontSize: 26 },
-  sectionLabel: { color: "#E3C363", fontSize: 11, fontWeight: "900", letterSpacing: 1.7, marginTop: 12, marginBottom: 9 }, pairCard: { flexDirection: "row", gap: 16, borderRadius: 18, backgroundColor: "#0B4036", padding: 14, alignItems: "center" }, qr: { width: 132, height: 132, borderRadius: 10, backgroundColor: "#FFFFFF" }, pairCopy: { flex: 1 }, codeLabel: { color: "#8FB0A6", fontSize: 9, fontWeight: "900", letterSpacing: 1.3 }, code: { color: "#F1CD69", fontSize: 38, fontWeight: "900", letterSpacing: 7, marginVertical: 4 }, pairHelp: { color: "#D4E1DD", fontSize: 11, lineHeight: 16 },
-  settingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#315B50" }, settingText: { flex: 1, color: "#FFFFFF", fontSize: 14, fontWeight: "800" }, colorTitle: { color: "#D6E2DE", fontSize: 12, fontWeight: "800", marginTop: 12, marginBottom: 8 }, colors: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, swatch: { width: 46, height: 46, borderRadius: 13, borderWidth: 2, borderColor: "rgba(255,255,255,.24)" }, swatchActive: { borderColor: "#F4D36D", borderWidth: 4 },
-  menuButton: { borderRadius: 14, borderWidth: 1, borderColor: "#426D61", backgroundColor: "#0A4238", padding: 14, marginBottom: 9 }, menuButtonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 14 }, resetButton: { alignItems: "center", padding: 14, marginTop: 5 }, resetText: { color: "#9DB9B0", fontWeight: "800", fontSize: 12 },
-});
+const styles=StyleSheet.create({root:{flex:1,paddingHorizontal:14,paddingTop:12,paddingBottom:10},meta:{height:36,flexDirection:"row",justifyContent:"center",alignItems:"center",gap:10},metaText:{fontWeight:"900",textShadowColor:"rgba(0,0,0,.35)",textShadowOffset:{width:0,height:2},textShadowRadius:2},clockButton:{height:150,alignItems:"center",justifyContent:"center"},clockRow:{flexDirection:"row",alignItems:"baseline",justifyContent:"center",gap:10},clock:{fontWeight:"900",letterSpacing:-5,textShadowColor:"#9b6f32",textShadowOffset:{width:3,height:5},textShadowRadius:1},clockPeriod:{fontSize:42,fontWeight:"900",textShadowColor:"#9b6f32",textShadowOffset:{width:2,height:3},textShadowRadius:1},hero:{flex:1,borderWidth:3,alignItems:"center",justifyContent:"center",position:"relative",paddingHorizontal:15,minHeight:310},prayerPill:{position:"absolute",top:22,borderWidth:2,borderRadius:999,paddingHorizontal:22,paddingVertical:6},pillText:{fontWeight:"900",letterSpacing:2},arabic:{fontWeight:"900",lineHeight:110,marginTop:20},english:{fontWeight:"900",marginTop:6},rule:{width:"72%",height:3,marginVertical:25,opacity:.9},prayerTimeRow:{flexDirection:"row",alignItems:"baseline",gap:7},prayerTime:{fontWeight:"900"},prayerPeriod:{fontSize:36,fontWeight:"900"},adhan:{position:"absolute",bottom:20,borderWidth:2,borderRadius:999,paddingHorizontal:17,paddingVertical:6},adhanText:{color:"#fff",fontWeight:"900"},miniRow:{height:105,flexDirection:"row",gap:5,marginTop:7},miniWrap:{flex:1},mini:{flex:1,borderWidth:2,borderRadius:11,alignItems:"center",justifyContent:"center",padding:3},miniAr:{fontSize:16,fontWeight:"900"},miniEn:{fontSize:14,fontWeight:"800"},miniTime:{fontSize:17,fontWeight:"900",marginTop:3},next:{fontSize:7,fontWeight:"900",letterSpacing:1.2,marginTop:2},loading:{position:"absolute",inset:0 as any,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(0,0,0,.25)"},backdrop:{flex:1,backgroundColor:"rgba(0,0,0,.68)",padding:18,alignItems:"center",justifyContent:"center"},sheet:{width:"100%",maxWidth:720,maxHeight:"90%",backgroundColor:"#073f35",borderRadius:24,borderWidth:1,borderColor:"#72a69a"},sheetBody:{padding:20,gap:11},sheetHead:{flexDirection:"row",justifyContent:"space-between",gap:12},sheetTitle:{color:"white",fontSize:24,fontWeight:"900"},sheetSub:{color:"#b7d0c8",marginTop:4},close:{width:42,height:42,borderRadius:21,backgroundColor:"#225c50",alignItems:"center",justifyContent:"center"},closeText:{fontSize:27,color:"white"},label:{fontSize:10,fontWeight:"900",letterSpacing:1.4,color:"#f0cc6e",marginTop:9},pair:{flexDirection:"row",gap:13,borderWidth:1,borderColor:"#5a897e",borderRadius:15,padding:12,backgroundColor:"#09342b"},qr:{width:130,height:130,borderRadius:9},pairCopy:{flex:1,justifyContent:"center"},codeLabel:{fontSize:9,fontWeight:"900",letterSpacing:1.1,color:"#b5cec6"},code:{fontSize:37,fontWeight:"900",letterSpacing:5,color:"#f2cf72"},pairHelp:{fontSize:11,color:"#b8d0c9",lineHeight:16},status:{marginTop:7,color:"#bcd3cc",fontWeight:"900",fontSize:11},statusOn:{color:"#75e3b3"},setting:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",borderBottomWidth:1,borderBottomColor:"#315e53",paddingVertical:8},settingText:{color:"white",fontWeight:"800"},action:{backgroundColor:"#0d5548",borderWidth:1,borderColor:"#68968a",borderRadius:12,padding:13},actionText:{color:"white",fontWeight:"900"}});
