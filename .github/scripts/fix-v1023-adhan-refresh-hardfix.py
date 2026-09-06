@@ -41,25 +41,27 @@ run("ensure-home-prayer-autoload.py")
 run("ensure-startup-audio-gate.py")
 run("fix-v1023-runtime-permissions-camera-resume.py")
 run("fix-v1026-home-highlight-resume.py")
+run("fix-v1027-functional-prayer-calculation.py")
 run("restore-live-display-admin.py")
 run("fix-v1021-unified-display-menu.py")
 run("restore-native-wall-display.py")
 
 app_config = ROOT / "mobile/app.config.ts"
 cfg = app_config.read_text(encoding="utf-8")
-cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.26"', cfg, count=1)
-cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 70', cfg, count=1)
+cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.27"', cfg, count=1)
+cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 71', cfg, count=1)
 app_config.write_text(cfg, encoding="utf-8")
 
 checks = {
-    "mobile/src/prayerData.ts": ["hassoun:prayer-context:v3", "api.aladhan.com/v1/calendar", "preferences.school", "tuneString(preferences.offsets)"],
+    "mobile/src/prayerData.ts": ["hassoun:prayer-context:v3", "api.aladhan.com/v1/calendar", "preferences.school", "tuneString(preferences.offsets)", "fajr: parseTiming", "isha: parseTiming"],
+    "mobile/src/PrayerCalculationSettingsPage.tsx": ["Smart Automatic", "Official Local Mosque Schedule", "Calculated Prayer Times", "Save & apply now", "LIVE PREVIEW", "Reset defaults", "Switch to calculated times"],
     "mobile/src/HomePrayerPage.tsx": ["RefreshControl", "DA’WAH • PRAYER EMAILS", "DailyIslamicCards", "NEXT • TOMORROW", "const active = next?.prayer === prayer;"],
     "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
     "mobile/src/PermissionsStatusPage.tsx": ["Alarms & reminders", "PermissionsAndroid.PERMISSIONS.CAMERA", "openExactAlarmSettings"],
-    "mobile/src/SettingsHub.tsx": ["Tablet / Wall Display", 'setPage("masjidDisplay")', '<MasjidDisplayPage locale={locale}', "ConnectDisplayPage locale={locale}"],
+    "mobile/src/SettingsHub.tsx": ["PrayerCalculationSettingsPage", 'setPage("calculation")', "Tablet / Wall Display", 'setPage("masjidDisplay")', '<MasjidDisplayPage locale={locale}', "ConnectDisplayPage locale={locale}"],
     "mobile/src/ConnectDisplayPage.tsx": ["PermissionsAndroid.PERMISSIONS.CAMERA", "CameraView", "LIVE TABLET EDITOR", "gradientMix", "Pair and open live editor", "tabletTheme"],
     "mobile/src/MasjidDisplayPage.tsx": ["Tablet Wall Display", "WAITING FOR APP", "CONNECTED · LIVE", "tabletTheme", "pageGradientA", "clockOutline", "showSeconds", "showClockPeriod", "showPrayerPeriod", "/masjid-displays/register"],
-    "mobile/app.config.ts": ["1.0.26", "versionCode: 70", "android.permission.SCHEDULE_EXACT_ALARM", "android.permission.CAMERA"],
+    "mobile/app.config.ts": ["1.0.27", "versionCode: 71", "android.permission.SCHEDULE_EXACT_ALARM", "android.permission.CAMERA"],
 }
 for rel, needles in checks.items():
     text = (ROOT / rel).read_text(encoding="utf-8")
@@ -71,4 +73,4 @@ app = (ROOT / "mobile/App.tsx").read_text(encoding="utf-8")
 for forbidden in ("REFRESH LOCATION", "loadLocationPrayerContext", "HomePrayerPanel", "refreshPrayerLocation", "phoneHomeScreen"):
     if forbidden in app:
         raise SystemExit(f"Legacy Home code remains: {forbidden}")
-print("Installed canonical prayer runtime, robust exact-screen resume, next-prayer highlight and live-editable tablet display")
+print("Installed canonical prayer runtime, fully functional Prayer Calculation, robust exact-screen resume, next-prayer highlight and live-editable tablet display")
