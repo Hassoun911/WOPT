@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.27 Functional Prayer Calculation
+name: Build Hassoun v1.0.28 No-Reset Background Resume
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - ".github/workflows/build-v1026-resume-highlight.yml"
       - ".github/scripts/fix-v1026-home-highlight-resume.py"
       - ".github/scripts/fix-v1027-functional-prayer-calculation.py"
+      - ".github/scripts/fix-v1028-never-reset-on-background.py"
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
       - "mobile/src/HomePrayerPage.tsx"
       - "mobile/src/PrayerCalculationSettingsPage.tsx"
@@ -17,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-v1027-prayer-calculation
+  group: hassoun-v1028-no-reset-background
   cancel-in-progress: true
 
 jobs:
@@ -120,29 +121,34 @@ jobs:
           python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
           python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
 
-      - name: Verify functional prayer calculation and resume
+      - name: Verify no-reset resume and functional calculation
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
           app=Path('mobile/App.tsx').read_text(encoding='utf-8')
           home=Path('mobile/src/HomePrayerPage.tsx').read_text(encoding='utf-8')
           calc=Path('mobile/src/PrayerCalculationSettingsPage.tsx').read_text(encoding='utf-8')
           data=Path('mobile/src/prayerData.ts').read_text(encoding='utf-8')
           cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
-          for needle in ['hassoun:resume-exact-screen:v1','HASSOUN_EXACT_SCREEN_RESUME_V3','resumeStateReady','activeTabRef.current = activeTab']:
-              if needle not in app: raise SystemExit(f'Missing resume fix: {needle}')
+          for needle in ['hassoun:resume-exact-screen:v1','HASSOUN_EXACT_SCREEN_RESUME_V3','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4','resumeStateReady','activeTabRef.current = activeTab']:
+              if needle not in app: raise SystemExit(f'Missing no-reset resume invariant: {needle}')
+          for match in re.finditer(r'AppState\.addEventListener\("change", \(state\) => \{(.*?)\n\s*\}\);', app, re.S):
+              body=match.group(1)
+              for forbidden in ['refreshPrayerLocation(','loadPrayerTimes(','loadInitialPrayerTimes(','loadLocationPrayerContext(','setActiveTab("home")']:
+                  if forbidden in body: raise SystemExit(f'Resume listener forbidden action: {forbidden}')
           for needle in ['const active = next?.prayer === prayer;','NEXT • TOMORROW','prayerRowActive']:
               if needle not in home: raise SystemExit(f'Missing highlight fix: {needle}')
           for needle in ['Smart Automatic','Official Local Mosque Schedule','Calculated Prayer Times','Save & apply now','LIVE PREVIEW','Reset defaults','Switch to calculated times']:
               if needle not in calc: raise SystemExit(f'Missing functional calculation UI: {needle}')
           for needle in ['fajr: parseTiming','dhuhr: parseTiming','asr: parseTiming','maghrib: parseTiming','isha: parseTiming']:
               if needle not in data: raise SystemExit(f'Missing live prayer preview field: {needle}')
-          for needle in ['1.0.27','versionCode: 71']:
+          for needle in ['1.0.28','versionCode: 72']:
               if needle not in cfg: raise SystemExit(f'Missing version: {needle}')
           for forbidden in ('loadLocationPrayerContext','HomePrayerPanel','refreshPrayerLocation','phoneHomeScreen'):
               if forbidden in app: raise SystemExit(f'Legacy runtime remains: {forbidden}')
-          print('Functional prayer calculation, robust resume and next-prayer highlight verified')
+          print('No-reset background resume, functional calculation and prayer highlight verified')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || { cd mobile; npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2; cd ..; }
           cd mobile
@@ -170,6 +176,10 @@ jobs:
           main.set(f'{{{ns}}}screenOrientation','unspecified')
           main.set(f'{{{ns}}}launchMode','singleTask')
           main.set(f'{{{ns}}}alwaysRetainTaskState','true')
+          main.set(f'{{{ns}}}clearTaskOnLaunch','false')
+          main.set(f'{{{ns}}}finishOnTaskLaunch','false')
+          main.set(f'{{{ns}}}noHistory','false')
+          main.set(f'{{{ns}}}documentLaunchMode','never')
           tree.write(p,encoding='utf-8',xml_declaration=True)
           PY
 
@@ -186,16 +196,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.27-prayer-calculation.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.28-no-reset-resume.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.27-Prayer-Calculation
+          name: Hassoun-v1.0.28-No-Reset-Resume
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.27-prayer-calculation.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.27-prayer-calculation.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.28-no-reset-resume.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.28-no-reset-resume.apk.sha256
           if-no-files-found: error
           retention-days: 30
