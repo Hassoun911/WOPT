@@ -49,6 +49,11 @@ run("restore-live-display-admin.py")
 run("fix-v1021-unified-display-menu.py")
 run("restore-native-wall-display.py")
 
+# IMPORTANT: the unified Displays menu rebuilds the route block between Settings
+# root and Widgets. Re-apply Prayer Calculation last so Displays/QR/tablet support
+# cannot accidentally remove the calculation card or renderer from the final APK.
+run("fix-v1028-final-calculation-route.py")
+
 app_config = ROOT / "mobile/app.config.ts"
 cfg = app_config.read_text(encoding="utf-8")
 cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.29"', cfg, count=1)
