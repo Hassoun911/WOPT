@@ -6,100 +6,132 @@ APP = ROOT / "mobile/App.tsx"
 HOME = ROOT / "mobile/src/HomePrayerPage.tsx"
 
 home = HOME.read_text(encoding="utf-8")
-old = '          const active = next?.prayer === prayer && !next.tomorrow;'
-new = '          const active = next?.prayer === prayer;'
-if old in home:
-    home = home.replace(old, new, 1)
-elif new not in home:
-    raise SystemExit("Could not find next-prayer active-row calculation")
-
 home = home.replace(
-    '<Text style={styles.nextBadgeText}>{locale === "ar" ? "التالي" : "NEXT"}</Text>',
-    '<Text style={styles.nextBadgeText}>{next?.tomorrow ? (locale === "ar" ? "التالي • غداً" : "NEXT • TOMORROW") : (locale === "ar" ? "التالي" : "NEXT")}</Text>',
+    '          const active = next?.prayer === prayer && !next.tomorrow;',
+    '          const active = next?.prayer === prayer;',
     1,
 )
+if 'const active = next?.prayer === prayer;' not in home:
+    raise SystemExit("Could not install next-prayer active-row calculation")
+
+old_badge = '<Text style={styles.nextBadgeText}>{locale === "ar" ? "التالي" : "NEXT"}</Text>'
+new_badge = '<Text style={styles.nextBadgeText}>{next?.tomorrow ? (locale === "ar" ? "التالي • غداً" : "NEXT • TOMORROW") : (locale === "ar" ? "التالي" : "NEXT")}</Text>'
+if old_badge in home:
+    home = home.replace(old_badge, new_badge, 1)
+elif 'NEXT • TOMORROW' not in home:
+    raise SystemExit("Could not install tomorrow badge")
 HOME.write_text(home, encoding="utf-8")
 
 app = APP.read_text(encoding="utf-8")
 
-# useRef lets us retain the exact current tab in the AppState background callback.
-react_import = re.search(r'import \{([^}]*)\} from "react";', app)
-if not react_import:
+# Add useRef without depending on the exact order produced by older reconstruction scripts.
+m = re.search(r'import \{([^}]*)\} from "react";', app)
+if not m:
     raise SystemExit("React import missing")
-parts = [p.strip() for p in react_import.group(1).split(',') if p.strip()]
+parts = [p.strip() for p in m.group(1).split(',') if p.strip()]
 if "useRef" not in parts:
     parts.append("useRef")
-app = app[:react_import.start()] + 'import { ' + ', '.join(parts) + ' } from "react";' + app[react_import.end():]
+app = app[:m.start()] + 'import { ' + ', '.join(parts) + ' } from "react";' + app[m.end():]
 
-state_anchor = '  const [runtimeNavRestored, setRuntimeNavRestored] = useState(false);'
-if state_anchor not in app:
-    raise SystemExit("runtimeNavRestored state missing; resume persistence must run first")
+active_state = re.search(r'^(\s*)const \[activeTab, setActiveTab\] = useState<AppTab>\("home"\);', app, re.M)
+if not active_state:
+    raise SystemExit("activeTab state missing")
+indent = active_state.group(1)
+state_line = active_state.group(0)
+extra = []
+if 'const [resumeStateReady, setResumeStateReady]' not in app:
+    extra.append(f'{indent}const [resumeStateReady, setResumeStateReady] = useState(false);')
 if 'const activeTabRef = useRef<AppTab>("home");' not in app:
-    app = app.replace(state_anchor, state_anchor + '\n  const activeTabRef = useRef<AppTab>("home");', 1)
+    extra.append(f'{indent}const activeTabRef = useRef<AppTab>("home");')
+if extra:
+    app = app.replace(state_line, state_line + '\n' + '\n'.join(extra), 1)
 
-# Persist the tab on every navigation change and immediately when Android backgrounds the app.
-if 'hassoun:resume-exact-screen:v1' not in app:
-    anchor = '''  useEffect(() => {
-    if (!runtimeNavRestored) return;
-    void AsyncStorage.setItem("hassoun:last-active-tab:v2", activeTab).catch(() => undefined);
-  }, [activeTab, runtimeNavRestored]);
-'''
-    if anchor not in app:
-        raise SystemExit("active-tab persistence effect missing")
-    stronger = anchor + '''
+# Install one self-contained restore/persist implementation. It reads every historical key,
+# writes all of them on navigation, and writes immediately when Android backgrounds the app.
+if 'HASSOUN_EXACT_SCREEN_RESUME_V3' not in app:
+    insert_candidates = [
+        app.find('  const refreshHome = useCallback'),
+        app.find('  useEffect(() => {'),
+        app.find('  const toggleLocale = async () => {'),
+    ]
+    insert_candidates = [x for x in insert_candidates if x >= 0]
+    if not insert_candidates:
+        raise SystemExit("Could not find resume-effect insertion point")
+    pos = min(insert_candidates)
+    block = '''  // HASSOUN_EXACT_SCREEN_RESUME_V3
   useEffect(() => {
-    if (!runtimeNavRestored) return;
+    let alive = true;
+    void AsyncStorage.multiGet([
+      "hassoun:resume-exact-screen:v1",
+      "hassoun:last-active-tab:v2",
+      "hassoun:last-active-tab:v1"
+    ]).then((rows) => {
+      if (!alive) return;
+      const saved = rows[0]?.[1] || rows[1]?.[1] || rows[2]?.[1];
+      const allowed: AppTab[] = ["home", "quran", "quiz", "alerts", "events", "qibla", "more"];
+      if (saved && allowed.includes(saved as AppTab)) {
+        activeTabRef.current = saved as AppTab;
+        setActiveTab(saved as AppTab);
+      }
+    }).finally(() => {
+      if (alive) setResumeStateReady(true);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!resumeStateReady) return;
     activeTabRef.current = activeTab;
     void AsyncStorage.multiSet([
+      ["hassoun:resume-exact-screen:v1", activeTab],
       ["hassoun:last-active-tab:v2", activeTab],
-      ["hassoun:resume-exact-screen:v1", activeTab]
+      ["hassoun:last-active-tab:v1", activeTab]
     ]).catch(() => undefined);
-  }, [activeTab, runtimeNavRestored]);
+  }, [activeTab, resumeStateReady]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") return;
       const current = activeTabRef.current;
       void AsyncStorage.multiSet([
+        ["hassoun:resume-exact-screen:v1", current],
         ["hassoun:last-active-tab:v2", current],
-        ["hassoun:resume-exact-screen:v1", current]
+        ["hassoun:last-active-tab:v1", current]
       ]).catch(() => undefined);
     });
     return () => subscription.remove();
   }, []);
+
 '''
-    app = app.replace(anchor, stronger, 1)
+    app = app[:pos] + block + app[pos:]
 
-# Restore from the strongest resume key first, then the older tab key.
-old_restore = '    void AsyncStorage.getItem("hassoun:last-active-tab:v2")\n      .then((saved) => {'
-if old_restore in app:
-    app = app.replace(
-        old_restore,
-        '    void AsyncStorage.multiGet(["hassoun:resume-exact-screen:v1", "hassoun:last-active-tab:v2"])\n      .then((rows) => {\n        const saved = rows[0]?.[1] || rows[1]?.[1];',
-        1,
+# Do not paint Home while the saved route is still being restored. Match reconstructed variants.
+if 'if (!resumeStateReady || (busy && !today)) {' not in app:
+    app, n = re.subn(
+        r'  if \(busy && !today\) \{',
+        '  if (!resumeStateReady || (busy && !today)) {',
+        app,
+        count=1,
     )
-
-# Never render Home while navigation restoration is still asynchronous. This prevents the
-# visible "restart to Home" flash and makes process recreation reopen the saved screen first.
-loading_anchor = '  if (busy && !today) {'
-if loading_anchor in app:
-    app = app.replace(loading_anchor, '  if (!runtimeNavRestored || (busy && !today)) {', 1)
-elif 'if (!runtimeNavRestored || (busy && !today)) {' not in app:
-    raise SystemExit("Could not find startup loading gate")
+    if n != 1:
+        # Some variants already gate on runtimeNavRestored. Strengthen that gate instead.
+        app, n = re.subn(
+            r'  if \(!runtimeNavRestored \|\| \(busy && !today\)\) \{',
+            '  if (!resumeStateReady || !runtimeNavRestored || (busy && !today)) {',
+            app,
+            count=1,
+        )
+    if n != 1:
+        raise SystemExit("Could not find startup render gate")
 
 APP.write_text(app, encoding="utf-8")
 
-for needle in [
-    'const active = next?.prayer === prayer;',
-    'NEXT • TOMORROW',
-]:
+checks_home = ['const active = next?.prayer === prayer;', 'NEXT • TOMORROW', 'prayerRowActive']
+checks_app = ['HASSOUN_EXACT_SCREEN_RESUME_V3', 'resumeStateReady', 'activeTabRef.current = activeTab', 'hassoun:resume-exact-screen:v1']
+for needle in checks_home:
     if needle not in HOME.read_text(encoding="utf-8"):
         raise SystemExit(f"Home highlight fix missing: {needle}")
-for needle in [
-    'hassoun:resume-exact-screen:v1',
-    'activeTabRef.current = activeTab',
-    'if (!runtimeNavRestored || (busy && !today))',
-]:
+for needle in checks_app:
     if needle not in APP.read_text(encoding="utf-8"):
         raise SystemExit(f"Resume fix missing: {needle}")
-print("Applied next-prayer highlight including tomorrow and exact-screen background/process resume")
+print("Applied robust next-prayer highlight and exact-screen background/process resume")
