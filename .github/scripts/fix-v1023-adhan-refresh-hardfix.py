@@ -62,7 +62,7 @@ app_config.write_text(cfg, encoding="utf-8")
 
 checks = {
     "mobile/src/prayerData.ts": ["hassoun:prayer-context:v3", "api.aladhan.com/v1/calendar", "preferences.school", "tuneString(preferences.offsets)", "fajr: parseTiming", "isha: parseTiming"],
-    "mobile/src/PrayerCalculationSettingsPage.tsx": ["Smart Automatic", "Official Local Mosque Schedule", "Calculated Prayer Times", "Save & apply now", "LIVE PREVIEW", "Reset defaults", "Switch to calculated times"],
+    "mobile/src/PrayerCalculationSettingsPage.tsx": ["Smart Automatic", "Official Local Mosque Schedule", "Calculated Prayer Times", "Save & use these settings", "Live Asr preview", "Use calculated times instead"],
     "mobile/src/HomePrayerPage.tsx": ["RefreshControl", "DA’WAH • PRAYER EMAILS", "DailyIslamicCards", "NEXT • TOMORROW", "const active = next?.prayer === prayer;"],
     "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "HASSOUN_BACKGROUND_RESUME_NO_RESET_V4", "HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4", "HASSOUN_EXACT_ALARM_PERMISSION_V4", "Allow Alarms & reminders", "showExactAlarmPermissionPrompt", "exactAlarmPromptShownRef", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
     "mobile/src/PermissionsStatusPage.tsx": ["Alarms & reminders", "PermissionsAndroid.PERMISSIONS.CAMERA", "openExactAlarmSettings"],
