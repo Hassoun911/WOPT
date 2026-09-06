@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.24 Tablet Wall Display
+name: Build Hassoun v1.0.25 Live Tablet Studio
 
 on:
   workflow_dispatch:
@@ -16,11 +16,13 @@ on:
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
       - ".github/scripts/fix-v1023-runtime-permissions-camera-resume.py"
       - ".github/scripts/restore-native-wall-display.py"
+      - ".github/scripts/restore-live-display-admin.py"
       - ".github/scripts/rewrite-home-ground-zero.py"
       - ".github/scripts/remove-legacy-home-before-rewrite.py"
       - ".github/scripts/ensure-home-prayer-autoload.py"
       - "mobile/app.config.ts"
       - "mobile/src/MasjidDisplayPage.tsx"
+      - "mobile/src/ConnectDisplayPage.tsx"
       - "mobile/src/HomePrayerPage.tsx"
       - "mobile/src/DailyIslamicCards.tsx"
       - "mobile/src/dailyIslamicContent.ts"
@@ -36,7 +38,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-v1024-tablet-wall
+  group: hassoun-v1025-live-tablet-studio
   cancel-in-progress: true
 
 jobs:
@@ -81,7 +83,7 @@ jobs:
           set -euo pipefail
           cd mobile
           npm ci --ignore-scripts --no-audit --no-fund
-          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera --npm
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera expo-linear-gradient --npm
           npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
 
       - name: Reconstruct approved feature stack
@@ -139,7 +141,7 @@ jobs:
           python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
           python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
 
-      - name: Verify canonical runtime and tablet display
+      - name: Verify canonical runtime and live tablet studio
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -150,10 +152,10 @@ jobs:
             'mobile/src/DailyIslamicCards.tsx': ['Qur’an verse of the day','Hadith of the day'],
             'mobile/src/prayerData.ts': ['hassoun:prayer-context:v3','Location.reverseGeocodeAsync','api.aladhan.com/v1/calendar','preferences.school','tuneString(preferences.offsets)'],
             'mobile/src/SettingsHub.tsx': ['ConnectDisplayPage locale={locale}','Tablet / Wall Display','setPage("masjidDisplay")','MasjidDisplayPage locale={locale}','PermissionsStatusPage locale={locale}'],
-            'mobile/src/MasjidDisplayPage.tsx': ['Tap clock for setup','NEXT PRAYER','highlightNextPrayerCard','highlightNextPrayerMiniCard','6-DIGIT PAIRING CODE','Website Mode','/masjid-displays/register','setSlide((n) => (n + 1) % PRAYERS.length)'],
+            'mobile/src/MasjidDisplayPage.tsx': ['Tablet Wall Display','WAITING FOR APP','CONNECTED · LIVE','tabletTheme','pageGradientA','clockOutline','showSeconds','showClockPeriod','showPrayerPeriod','6-DIGIT PAIRING CODE','/masjid-displays/register'],
             'mobile/src/PermissionsStatusPage.tsx': ['Alarms & reminders','NOT ENABLED','PermissionsAndroid.PERMISSIONS.CAMERA','openExactAlarmSettings'],
-            'mobile/src/ConnectDisplayPage.tsx': ['CameraView','PermissionsAndroid.PERMISSIONS.CAMERA','6-DIGIT PAIRING CODE','CONNECTED DISPLAYS'],
-            'mobile/app.config.ts': ['1.0.24','versionCode: 68','android.permission.SCHEDULE_EXACT_ALARM','android.permission.CAMERA'],
+            'mobile/src/ConnectDisplayPage.tsx': ['CameraView','PermissionsAndroid.PERMISSIONS.CAMERA','6-DIGIT PAIRING CODE','CONNECTED DISPLAYS','LIVE TABLET EDITOR','gradientMix','Pair and open live editor','tabletTheme'],
+            'mobile/app.config.ts': ['1.0.25','versionCode: 69','android.permission.SCHEDULE_EXACT_ALARM','android.permission.CAMERA'],
           }
           for file, needles in checks.items():
             text=Path(file).read_text(encoding='utf-8')
@@ -163,7 +165,7 @@ jobs:
           app=Path('mobile/App.tsx').read_text(encoding='utf-8')
           for forbidden in ('REFRESH LOCATION','loadLocationPrayerContext','HomePrayerPanel','refreshPrayerLocation','phoneHomeScreen'):
             if forbidden in app: raise SystemExit(f'Legacy Home code remains: {forbidden}')
-          print('Canonical runtime + native tablet wall display verification passed')
+          print('Canonical runtime + approved live tablet studio verification passed')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || { cd mobile; npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2; cd ..; }
           cd mobile
@@ -206,16 +208,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-tablet-wall.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.25-live-tablet-studio.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.24-Tablet-Wall
+          name: Hassoun-v1.0.25-Live-Tablet-Studio
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-tablet-wall.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.24-tablet-wall.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.25-live-tablet-studio.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.25-live-tablet-studio.apk.sha256
           if-no-files-found: error
           retention-days: 30
