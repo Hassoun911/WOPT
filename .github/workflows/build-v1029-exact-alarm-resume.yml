@@ -1,0 +1,192 @@
+name: Build Hassoun v1.0.29 Alarms Permission + Resume
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-v1029-exact-alarm-resume.yml"
+      - ".github/scripts/fix-v1029-exact-alarm-permission.py"
+      - ".github/scripts/fix-v1028-never-reset-on-background.py"
+      - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v1029-alarms-resume
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore proven base
+        run: |
+          set -euo pipefail
+          GOOD=ae1efdf4ac082e6f4bf64d3b08d3bdccb23e8166
+          git checkout "$GOOD" -- mobile scripts .github/logo-official
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera expo-linear-gradient --npm
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+
+      - name: Reconstruct approved stack
+        run: |
+          set -euo pipefail
+          cd mobile
+          node scripts/apply-wall-shell-for-masjid.mjs
+          node scripts/apply-masjid-tv.mjs
+          node scripts/apply-masjid-remote.mjs
+          node scripts/apply-masjid-typefix.mjs
+          node scripts/apply-masjid-tv-fixes.mjs
+          node scripts/apply-masjid-clock-click-branding.mjs
+          cd ..
+          python3 scripts/apply-v1015-full-store-fixes.py
+          python3 scripts/apply-v1017-quran-word-swipe-fixes.py
+          python3 scripts/fix-v1017-quran-word-styles.py
+          python3 scripts/apply-v1018-reader-gesture-hardfix.py
+          python3 scripts/apply-v1018-quran-session-restore.py
+          python3 scripts/apply-v1019-splash-animation.py
+          python3 scripts/apply-v1020-fast-location-startup.py
+
+      - name: Restore branding
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet Pillow
+          tr -d '\n\r ' < .github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-approved.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source=Image.open('/tmp/hassoun-approved.jpg').convert('RGB')
+          full=source.resize((1024,1024),Image.Resampling.LANCZOS).convert('RGBA')
+          full.save('mobile/assets/hassoun-logo.png','PNG',optimize=True)
+          full.save('mobile/assets/splash-logo.png','PNG',optimize=True)
+          bg=(7,43,37,255)
+          legacy=Image.new('RGBA',(1024,1024),bg)
+          art=ImageOps.contain(source,(770,770),Image.Resampling.LANCZOS).convert('RGBA')
+          legacy.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2))
+          legacy.save('mobile/assets/icon.png','PNG',optimize=True)
+          adaptive=Image.new('RGBA',(1024,1024),(0,0,0,0))
+          art2=ImageOps.contain(source,(700,700),Image.Resampling.LANCZOS).convert('RGBA')
+          adaptive.alpha_composite(art2,((1024-art2.width)//2,(1024-art2.height)//2))
+          adaptive.save('mobile/assets/adaptive-icon.png','PNG',optimize=True)
+          widget=Path('mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
+          widget.parent.mkdir(parents=True,exist_ok=True)
+          full.resize((512,512),Image.Resampling.LANCZOS).save(widget,'PNG',optimize=True)
+          PY
+
+      - name: Apply current canonical fixes
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1021-no-resume-reload.py
+          python3 .github/scripts/fix-v1021-native-masjid-display.py
+          python3 .github/scripts/fix-v1021-unified-display-menu.py
+          python3 .github/scripts/fix-v1021-pull-to-refresh.py
+          python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
+          python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
+
+      - name: Verify alarms permission and no-reset resume
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          app=Path('mobile/App.tsx').read_text(encoding='utf-8')
+          audio=Path('mobile/src/prayerAudio.ts').read_text(encoding='utf-8')
+          cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
+          manifest=Path('mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+          for n in ['HASSOUN_EXACT_ALARM_PERMISSION_V3','Allow Alarms & reminders','Allow now','hassoun:exact-alarm-permission-prompt:v3','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4','hassoun:resume-exact-screen:v1']:
+            if n not in app: raise SystemExit(f'Missing runtime invariant: {n}')
+          if 'startFirstLaunchExactAlarmSetup()' in audio: raise SystemExit('Silent settings launcher still present')
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest: raise SystemExit('SCHEDULE_EXACT_ALARM missing from native module')
+          for match in re.finditer(r'AppState\.addEventListener\("change", \(state\) => \{(.*?)\n\s*\}\);', app, re.S):
+            body=match.group(1)
+            for bad in ['refreshPrayerLocation(','loadPrayerTimes(','loadInitialPrayerTimes(','loadLocationPrayerContext(','setActiveTab("home")']:
+              if bad in body: raise SystemExit(f'Foreground resume still resets/reloads: {bad}')
+          for n in ['1.0.29','versionCode: 73','android.permission.SCHEDULE_EXACT_ALARM']:
+            if n not in cfg: raise SystemExit(f'Missing app config: {n}')
+          print('Alarms & reminders prompt + no-reset background resume verified')
+          PY
+          cd mobile
+          npm run typecheck
+
+      - name: Generate Android
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Verify Android task and special access
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('mobile/android/app/src/main/AndroidManifest.xml'); ns='http://schemas.android.com/apk/res/android'; ET.register_namespace('android',ns)
+          tree=ET.parse(p); root=tree.getroot(); app=root.find('application')
+          perms={x.attrib.get(f'{{{ns}}}name') for x in root.findall('uses-permission')}
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in perms: raise SystemExit('Generated SCHEDULE_EXACT_ALARM missing')
+          if 'android.permission.USE_EXACT_ALARM' in perms: raise SystemExit('USE_EXACT_ALARM must not be present')
+          app.set(f'{{{ns}}}banner','@drawable/hassoun_widget_logo')
+          main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{ns}}}name','').endswith('MainActivity')),None)
+          if main is None: raise SystemExit('MainActivity missing')
+          for k,v in {'screenOrientation':'unspecified','launchMode':'singleTask','alwaysRetainTaskState':'true','clearTaskOnLaunch':'false','finishOnTaskLaunch':'false','noHistory':'false','documentLaunchMode':'never'}.items(): main.set(f'{{{ns}}}{k}',v)
+          tree.write(p,encoding='utf-8',xml_declaration=True)
+          PY
+
+      - name: Build release APK
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name APK
+        run: |
+          set -euo pipefail
+          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
+          test -s "$APK"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.29-alarms-resume.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.29-Alarms-Resume
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.29-alarms-resume.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.29-alarms-resume.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
