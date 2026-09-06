@@ -8,6 +8,7 @@ on:
       - ".github/scripts/fix-v1029-exact-alarm-permission.py"
       - ".github/scripts/fix-v1028-never-reset-on-background.py"
       - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
+      - "mobile/src/types.ts"
 
 permissions:
   contents: read
@@ -154,9 +155,9 @@ jobs:
           print('Forced Alarms & reminders prompt + no-reset background resume verified')
           PY
 
-      - name: TypeScript diagnostics
-        continue-on-error: true
+      - name: TypeScript verification
         run: |
+          set -euo pipefail
           cd mobile
           npm run typecheck
 
