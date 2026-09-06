@@ -127,10 +127,11 @@ jobs:
           cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
           manifest=Path('mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
           required_app = [
-            'HASSOUN_EXACT_ALARM_PERMISSION_V3',
+            'HASSOUN_EXACT_ALARM_PERMISSION_V4',
             'Allow Alarms & reminders',
             'Allow now',
-            'hassoun:exact-alarm-permission-prompt:v3',
+            'showExactAlarmPermissionPrompt',
+            'exactAlarmPromptShownRef',
             'HASSOUN_BACKGROUND_RESUME_NO_RESET_V4',
             'HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4',
             'hassoun:resume-exact-screen:v1',
@@ -139,6 +140,10 @@ jobs:
           for n in required_app:
             if n not in app:
               raise SystemExit(f'Missing runtime invariant: {n}')
+          if 'hassoun:exact-alarm-permission-prompt:v3' in app:
+            raise SystemExit('Persisted alarm prompt suppression still present')
+          if 'startupAudioCleared || exactAlarmAllowed' in app:
+            raise SystemExit('Alarm prompt still gated by startup audio')
           if 'startFirstLaunchExactAlarmSetup()' in audio:
             raise SystemExit('Silent settings launcher still present')
           if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest:
@@ -146,7 +151,7 @@ jobs:
           for n in ['1.0.29','versionCode: 73','android.permission.SCHEDULE_EXACT_ALARM']:
             if n not in cfg:
               raise SystemExit(f'Missing app config: {n}')
-          print('Alarms & reminders prompt + no-reset background resume verified')
+          print('Forced Alarms & reminders prompt + no-reset background resume verified')
           PY
 
       - name: TypeScript diagnostics
