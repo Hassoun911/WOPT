@@ -11,6 +11,11 @@ audio = AUDIO.read_text(encoding="utf-8")
 audio = re.sub(r'\nlet exactAlarmSetupStarted = false;.*?\nstartFirstLaunchExactAlarmSetup\(\);\n', '\n', audio, flags=re.S)
 if 'startFirstLaunchExactAlarmSetup()' in audio or 'exactAlarmSettingsOpenedThisSession' in audio:
     raise SystemExit('Automatic exact-alarm settings launcher still exists')
+
+# The canonical v1.0.23 stack expects this helper in App.tsx. Re-add it after the
+# canonical prayerAudio.ts restore so Metro/TypeScript cannot fail on the import.
+if 'export async function stopAndroidPrayerAudioPlayback()' not in audio:
+    audio += '''\n\nexport async function stopAndroidPrayerAudioPlayback() {\n  if (Platform.OS === "android" && PrayerAudio) {\n    await PrayerAudio.stopPrayerAudioPlayback();\n  }\n}\n'''
 AUDIO.write_text(audio, encoding='utf-8')
 
 app = APP.read_text(encoding="utf-8")
@@ -24,6 +29,17 @@ for name in ('canScheduleAndroidExactAlarms', 'openExactAlarmSettings'):
         parts.append(name)
 app = app[:m.start()] + 'import { ' + ', '.join(parts) + ' } from "./src/prayerAudio";' + app[m.end():]
 
+# Make this patch idempotent. The canonical aggregator already runs this script once,
+# and the v1.0.29 workflow runs it once more. Remove the complete V4 block first so a
+# second application never redeclares exactAlarmPromptShownRef.
+app = re.sub(
+    r'\n  // HASSOUN_EXACT_ALARM_PERMISSION_V4\n.*?(?=\n  const toggleLocale = async \(\) => \{)',
+    '\n',
+    app,
+    flags=re.S,
+)
+
+# Remove older exact-alarm permission effects that may exist on the reconstructed base.
 start = app.find('  const refreshExactAlarmPermissionState = useCallback(() => {')
 if start >= 0:
     end = app.find('  const toggleLocale = async () => {', start)
@@ -100,6 +116,8 @@ if needle not in app:
 
 APP.write_text(app, encoding='utf-8')
 
+final_app = APP.read_text(encoding='utf-8')
+final_audio = AUDIO.read_text(encoding='utf-8')
 for needle in [
     'HASSOUN_EXACT_ALARM_PERMISSION_V4',
     'Allow Alarms & reminders',
@@ -108,12 +126,16 @@ for needle in [
     'openExactAlarmSettings()',
     'exactAlarmPromptShownRef',
 ]:
-    if needle not in APP.read_text(encoding='utf-8'):
+    if needle not in final_app:
         raise SystemExit(f'Missing exact alarm permission flow: {needle}')
-if 'startupAudioCleared || exactAlarmAllowed' in APP.read_text(encoding='utf-8'):
+if final_app.count('const exactAlarmPromptShownRef = useRef(false);') != 1:
+    raise SystemExit('exactAlarmPromptShownRef must be declared exactly once')
+if 'startupAudioCleared || exactAlarmAllowed' in final_app:
     raise SystemExit('Permission prompt is still incorrectly gated by startup audio')
-if 'hassoun:exact-alarm-permission-prompt:v3' in APP.read_text(encoding='utf-8'):
+if 'hassoun:exact-alarm-permission-prompt:v3' in final_app:
     raise SystemExit('Persisted v3 prompt suppression still exists')
-if 'startFirstLaunchExactAlarmSetup()' in AUDIO.read_text(encoding='utf-8'):
+if 'startFirstLaunchExactAlarmSetup()' in final_audio:
     raise SystemExit('Automatic special-access launcher remains')
-print('Installed forced visible Alarms & reminders permission prompt with Android Settings handoff')
+if 'export async function stopAndroidPrayerAudioPlayback()' not in final_audio:
+    raise SystemExit('Prayer audio stop helper missing after canonical restore')
+print('Installed idempotent Alarms & reminders prompt and restored prayer-audio stop helper')
