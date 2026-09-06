@@ -2,81 +2,73 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const STORAGE = "hassoun:web-masjid-tv:v2";
-const DATA_URL = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
-const PRAYERS = ["fajr","dhuhr","asr","maghrib","isha"] as const;
-type Prayer = typeof PRAYERS[number];
-type Day = Record<Prayer,string>;
-const EN: Record<Prayer,string> = { fajr:"Fajr", dhuhr:"Dhuhr", asr:"Asr", maghrib:"Maghrib", isha:"Isha" };
-const AR: Record<Prayer,string> = { fajr:"الفجر", dhuhr:"الظهر", asr:"العصر", maghrib:"المغرب", isha:"العشاء" };
-const FALLBACK: Day = { fajr:"05:00", dhuhr:"13:30", asr:"17:00", maghrib:"20:00", isha:"21:30" };
-const COLORS = ["#0B6B55", "#08795E", "#0A5B4A", "#146B63", "#255F48", "#4A6C46"];
-
+const API="https://wopt-prayer-push.wopt-windsor.workers.dev";
+const STORAGE="hassoun:web-masjid-tv:v2";
+const DEVICE_KEY="hassoun:web-tablet-display-device:v2";
+const DATA_URL="https://raw.githubusercontent.com/Hassoun911/WOPT/main/windsor_islamic_association_2026_prayer_times.json";
+const PRAYERS=["fajr","dhuhr","asr","maghrib","isha"] as const;
+type Prayer=typeof PRAYERS[number];
+type Day=Record<Prayer,string>;
+type Device={id:string;code:string;secret:string;name:string};
+const EN:Record<Prayer,string>={fajr:"Fajr",dhuhr:"Dhuhr",asr:"Asr",maghrib:"Maghrib",isha:"Isha"};
+const AR:Record<Prayer,string>={fajr:"الفجر",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"};
+const FALLBACK:Day={fajr:"05:00",dhuhr:"13:30",asr:"17:00",maghrib:"20:00",isha:"21:30"};
+const DEFAULT_THEME={
+  pageGradientA:"#11aa91",pageGradientB:"#078f79",pageGradientAngle:160,
+  clockColor:"#f6f2ff",clockOutline:"#b27b33",clockSize:1,clockFont:"Arial Black",showSeconds:true,showClockPeriod:true,
+  metaColor:"#f9f4ff",metaSize:1,showLocation:true,showDate:true,
+  cardGradientA:"#12aa91",cardGradientB:"#0c957f",cardGradientAngle:180,cardBorder:"#e0b761",cardRadius:28,
+  arabicColor:"#fbf5ff",arabicSize:1,arabicFont:"Arial",englishColor:"#f4cb77",englishSize:1,englishFont:"Arial Black",
+  prayerTimeColor:"#fbf4ff",prayerTimeSize:1,prayerTimeFont:"Arial Black",showPrayerPeriod:true,
+  showPrayerLabel:true,prayerLabelText:"PRAYER",prayerLabelEmoji:"",showAdhan:true,adhanText:"Adhan On",adhanEmoji:"🔊",
+  miniGradientA:"#f3ebf6",miniGradientB:"#e9e2ee",miniTextColor:"#27312f",miniNextA:"#0d8e77",miniNextB:"#087a67",miniNextText:"#ffffff",showMiniPeriod:false,
+  sliderSeconds:8
+};
 const pad=(n:number)=>String(n).padStart(2,"0");
 const dayKey=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const mins=(v:string)=>{const m=String(v||"").match(/^(\d{1,2}):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):NaN};
-const pretty=(v:string)=>{const m=String(v||"").match(/^(\d{1,2}):(\d{2})/);if(!m)return v||"—";const raw=Number(m[1]),ap=raw>=12?"PM":"AM";return `${raw%12||12}:${m[2]} ${ap}`};
-function readSettings(){try{return JSON.parse(localStorage.getItem(STORAGE)||"{}") as Record<string,any>}catch{return {}}}
+const timeParts=(v:string,period=true)=>{const m=String(v||"").match(/^(\d{1,2}):(\d{2})/);if(!m)return {main:v||"—",period:""};const raw=Number(m[1]);return {main:`${raw%12||12}:${m[2]}`,period:period?(raw>=12?"p.m.":"a.m."):""}};
+const rand=()=>Math.random().toString(36).slice(2,10);
+const makeDevice=():Device=>({id:`${Date.now().toString(36)}${rand()}${rand()}`,code:String(Math.floor(100000+Math.random()*900000)),secret:`${rand()}${rand()}${rand()}${rand()}`,name:"Hassoun Tablet Wall"});
+function localSettings(){try{return JSON.parse(localStorage.getItem(STORAGE)||"{}") as Record<string,any>}catch{return {}}}
+function localDevice(){try{const x=JSON.parse(localStorage.getItem(DEVICE_KEY)||"null");return x?.id?x as Device:null}catch{return null}}
+function themeOf(s:Record<string,any>){return {...DEFAULT_THEME,...(s.tabletTheme&&typeof s.tabletTheme==="object"?s.tabletTheme:{})}}
+function gradient(a:string,b:string,angle:number){return `linear-gradient(${Number(angle)||0}deg,${a},${b})`}
 
 export default function TabletWallDisplayMode(){
-  const [tablet,setTablet]=useState(false);
-  const [now,setNow]=useState(new Date());
-  const [today,setToday]=useState<Day>(FALLBACK);
-  const [settings,setSettings]=useState<Record<string,any>>({});
-  const [slide,setSlide]=useState(0);
-  const [menu,setMenu]=useState(false);
-
+  const [tablet,setTablet]=useState(false),[now,setNow]=useState(new Date()),[today,setToday]=useState<Day>(FALLBACK),[settings,setSettings]=useState<Record<string,any>>({}),[slide,setSlide]=useState(0),[menu,setMenu]=useState(false),[device,setDevice]=useState<Device|null>(null),[paired,setPaired]=useState(false);
   useEffect(()=>{
-    const params=new URLSearchParams(location.search);
-    const enabled=params.get("mode")==="tablet";
-    setTablet(enabled);
-    if(!enabled)return;
-    document.documentElement.dataset.hassounTabletWall="1";
-    document.body.dataset.hassounTabletWall="1";
-    const initial=readSettings();setSettings(initial);
-    const schedule=initial.prayerSchedule&&typeof initial.prayerSchedule==="object"?initial.prayerSchedule:{};
-    const row=schedule[dayKey(new Date())]?.adhan;
-    if(row&&PRAYERS.every(p=>row[p])) setToday(row as Day);
-    else void fetch(DATA_URL).then(r=>r.json()).then((d:{prayer_times?:Record<string,Day>})=>{const x=d.prayer_times?.[dayKey(new Date())];if(x)setToday(x)}).catch(()=>undefined);
-    const clock=window.setInterval(()=>setNow(new Date()),1000);
-    const storage=(e:StorageEvent)=>{if(e.key===STORAGE){const s=readSettings();setSettings(s);const r=s.prayerSchedule?.[dayKey(new Date())]?.adhan;if(r)setToday(r)}};
-    window.addEventListener("storage",storage);
-    return()=>{window.clearInterval(clock);window.removeEventListener("storage",storage);delete document.documentElement.dataset.hassounTabletWall;delete document.body.dataset.hassounTabletWall};
+    const enabled=new URLSearchParams(location.search).get("mode")==="tablet";setTablet(enabled);if(!enabled)return;
+    document.documentElement.dataset.hassounTabletWall="1";document.body.dataset.hassounTabletWall="1";
+    const initial=localSettings();setSettings(initial);const schedule=initial.prayerSchedule&&typeof initial.prayerSchedule==="object"?initial.prayerSchedule:{};const row=schedule[dayKey(new Date())]?.adhan;
+    if(row&&PRAYERS.every(p=>row[p]))setToday(row as Day);else void fetch(DATA_URL).then(r=>r.json()).then((d:{prayer_times?:Record<string,Day>})=>{const x=d.prayer_times?.[dayKey(new Date())];if(x)setToday(x)}).catch(()=>undefined);
+    let d=localDevice();if(!d){d=makeDevice();localStorage.setItem(DEVICE_KEY,JSON.stringify(d))}setDevice(d);
+    const clock=window.setInterval(()=>setNow(new Date()),1000);return()=>{window.clearInterval(clock);delete document.documentElement.dataset.hassounTabletWall;delete document.body.dataset.hassounTabletWall};
   },[]);
-
+  useEffect(()=>{if(!tablet||!device)return;let dead=false,timer:number|undefined;
+    const register=async()=>{try{await fetch(`${API}/masjid-displays/register`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({deviceId:device.id,pairCode:device.code,deviceSecret:device.secret,name:device.name,settings:{...settings,displayMode:"tablet"}})})}catch{}};
+    const poll=async()=>{if(dead)return;try{const r=await fetch(`${API}/masjid-displays/device/${encodeURIComponent(device.id)}?secret=${encodeURIComponent(device.secret)}`,{cache:"no-store"});if(r.status===404)await register();else if(r.ok){const data=await r.json() as {pairCode?:string;settings?:Record<string,any>;paired?:boolean;controllerCount?:number};if(data.pairCode&&/^\d{6}$/.test(data.pairCode)&&data.pairCode!==device.code){const n={...device,code:data.pairCode};setDevice(n);localStorage.setItem(DEVICE_KEY,JSON.stringify(n))}if(data.settings&&typeof data.settings==="object"){const next={...localSettings(),...data.settings};setSettings(next);localStorage.setItem(STORAGE,JSON.stringify(next));const rr=next.prayerSchedule?.[dayKey(new Date())]?.adhan;if(rr)setToday(rr)}setPaired(Boolean(data.paired)||(Number(data.controllerCount)||0)>0)}}catch{}timer=window.setTimeout(poll,650)};
+    void register().then(poll);return()=>{dead=true;if(timer)window.clearTimeout(timer)};
+  },[tablet,device?.id]);
   const next=useMemo<Prayer>(()=>{const n=now.getHours()*60+now.getMinutes();for(const p of PRAYERS){const m=mins(today[p]);if(Number.isFinite(m)&&m>n)return p}return "fajr"},[now,today]);
-  useEffect(()=>{if(!tablet)return;const id=window.setInterval(()=>setSlide(v=>(v+1)%PRAYERS.length),Math.max(4,Number(settings.tabletSliderSeconds||8))*1000);return()=>window.clearInterval(id)},[tablet,settings.tabletSliderSeconds]);
+  const th=themeOf(settings);useEffect(()=>{if(!tablet)return;const id=window.setInterval(()=>setSlide(v=>(v+1)%5),Math.max(4,Number(th.sliderSeconds)||8)*1000);return()=>window.clearInterval(id)},[tablet,th.sliderSeconds]);
   if(!tablet)return null;
-
-  const p=PRAYERS[slide], active=p===next;
-  const nextBg=String(settings.nextPrayerCardColor||"#0B6B55");
-  const miniBg=String(settings.nextPrayerMiniCardColor||nextBg);
-  const highlightBig=settings.highlightNextPrayerCard!==false;
-  const highlightMini=settings.highlightNextPrayerMiniCard!==false;
-  const time=now.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"});
-  const date=now.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric",year:"numeric"});
-  let hijri="";try{hijri=new Intl.DateTimeFormat("en-u-ca-islamic",{day:"numeric",month:"long",year:"numeric"}).format(now)}catch{}
-  const locationLabel=String(settings.mosqueLocation||settings.locationLabel||"Local prayer times");
-  const save=(patch:Record<string,any>)=>{const next={...readSettings(),...patch};localStorage.setItem(STORAGE,JSON.stringify(next));setSettings(next);window.dispatchEvent(new StorageEvent("storage",{key:STORAGE,newValue:JSON.stringify(next)}))};
-
-  return <div className="htw-root">
+  const p=PRAYERS[slide],isNext=p===next,pt=timeParts(today[p],th.showPrayerPeriod!==false);
+  const clockParts=new Intl.DateTimeFormat([], {hour:"numeric",minute:"2-digit",second:th.showSeconds!==false?"2-digit":undefined,hour12:true}).formatToParts(now);const clockMain=`${clockParts.find(x=>x.type==="hour")?.value||""}:${clockParts.find(x=>x.type==="minute")?.value||"00"}${th.showSeconds!==false?`:${clockParts.find(x=>x.type==="second")?.value||"00"}`:""}`;const clockPeriod=th.showClockPeriod!==false?(clockParts.find(x=>x.type==="dayPeriod")?.value||""):"";
+  const date=now.toLocaleDateString([], {weekday:"short",month:"short",day:"numeric",year:"numeric"});const locationLabel=String(settings.mosqueLocation||settings.locationLabel||"Windsor, Ontario");
+  const pairUrl=device?`https://hassoun.app/masjid-tv/pair/?device=${encodeURIComponent(device.id)}&code=${device.code}`:"";const qr=pairUrl?`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(pairUrl)}`:"";
+  const saveTheme=(patch:Record<string,any>)=>{const next={...localSettings(),tabletTheme:{...themeOf(localSettings()),...patch}};localStorage.setItem(STORAGE,JSON.stringify(next));setSettings(next)};
+  return <div className="ht-old-root" style={{background:gradient(th.pageGradientA,th.pageGradientB,th.pageGradientAngle)}}>
     <style>{`
-      html[data-hassoun-tablet-wall='1'],html[data-hassoun-tablet-wall='1'] body{margin:0!important;background:#03221c!important;overflow:hidden!important}
-      html[data-hassoun-tablet-wall='1'] body>*:not(.htw-root){visibility:hidden!important}
-      .htw-root{position:fixed;inset:0;z-index:2147483646;background:radial-gradient(circle at 50% 20%,#0b5748 0,#063c33 42%,#03221c 100%);color:#fff;font-family:Arial,sans-serif;display:flex;flex-direction:column;padding:2.2vh 3.2vw 1.5vh;box-sizing:border-box;overflow:hidden}
-      .htw-clock{align-self:center;background:none;border:0;color:white;cursor:pointer;text-align:center}.htw-time{font-size:clamp(64px,12vw,118px);font-weight:900;line-height:.96;letter-spacing:-.06em}.htw-tap{color:#7ba69a;font-size:11px;margin-top:5px}.htw-meta{text-align:center;color:#bdd1ca;font-size:clamp(12px,2.1vw,18px);margin-top:1vh}.htw-meta b{display:block;color:#e9c765;margin-top:.4vh}
-      .htw-hero{flex:1;min-height:0;margin:2vh auto 1.4vh;width:min(91vw,760px);border:2px solid rgba(230,194,91,.72);border-radius:28px;background:#0b493d;box-shadow:0 18px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transition:background .35s ease}.htw-badge{position:absolute;top:3%;font-size:11px;letter-spacing:.22em;font-weight:900;color:#f3d375}.htw-ar{font-size:clamp(74px,17vw,150px);font-weight:900;line-height:1.05}.htw-en{font-size:clamp(35px,7vw,64px);font-weight:900;margin-top:1vh}.htw-prayer-time{font-size:clamp(48px,10vw,90px);font-weight:900;color:#f1cf69;margin-top:2vh}.htw-dots{position:absolute;bottom:3%;display:flex;gap:7px}.htw-dot{width:8px;height:8px;border-radius:8px;background:rgba(255,255,255,.24)}.htw-dot.on{width:26px;background:#e8c864}
-      .htw-mini{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.htw-mini-card{min-width:0;border:1px solid rgba(222,187,87,.46);border-radius:14px;background:#0a4036;padding:1vh .3vw;text-align:center;cursor:pointer;color:white;position:relative}.htw-mini-ar{font-size:clamp(13px,2.6vw,23px);font-weight:900;color:#f0d177}.htw-mini-en{font-size:clamp(9px,1.7vw,15px);font-weight:800;margin-top:2px}.htw-mini-time{font-size:clamp(9px,1.7vw,15px);font-weight:900;margin-top:5px}.htw-mini-next{font-size:7px;letter-spacing:.13em;color:#f5d36d;font-weight:900;margin-top:3px}.htw-footer{text-align:center;color:#759b90;font-size:11px;font-weight:700;padding-top:1vh}
-      .htw-backdrop{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:18px}.htw-menu{width:min(92vw,620px);max-height:90vh;overflow:auto;background:#082f28;border:1px solid #4f776c;border-radius:24px;padding:22px;box-sizing:border-box}.htw-menu-head{display:flex;justify-content:space-between;align-items:flex-start}.htw-menu h2{margin:0;font-size:24px}.htw-menu p{color:#a9c0b9}.htw-close{border:0;border-radius:99px;width:40px;height:40px;background:rgba(255,255,255,.09);color:white;font-size:25px}.htw-label{font-size:11px;letter-spacing:.16em;color:#e3c363;font-weight:900;margin:20px 0 10px}.htw-toggle{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #315b50;padding:12px 0;font-weight:800}.htw-toggle input{width:22px;height:22px}.htw-colors{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.htw-color{width:46px;height:46px;border:2px solid rgba(255,255,255,.25);border-radius:13px}.htw-color.sel{outline:3px solid #f2cf6d;outline-offset:2px}.htw-action{display:block;width:100%;border:1px solid #426d61;background:#0a4238;color:white;border-radius:14px;padding:14px;margin-top:9px;font-weight:900;text-align:left;cursor:pointer}
-      @media (orientation:landscape){.htw-root{padding-left:12vw;padding-right:12vw}.htw-hero{width:min(68vw,800px)}}
+      html[data-hassoun-tablet-wall='1'],html[data-hassoun-tablet-wall='1'] body{margin:0!important;overflow:hidden!important;background:#0b9a83!important}html[data-hassoun-tablet-wall='1'] body>*:not(.ht-old-root){visibility:hidden!important}
+      .ht-old-root{position:fixed;inset:0;z-index:2147483646;color:#fff;display:flex;flex-direction:column;padding:1.3vh 2.2vw 1.2vh;box-sizing:border-box;font-family:Arial,sans-serif;overflow:hidden}.ht-old-meta{height:4.5vh;text-align:center;font-size:clamp(14px,2.2vw,22px);font-weight:900;display:flex;justify-content:center;align-items:center;gap:13px;text-shadow:0 2px 2px rgba(0,0,0,.35)}.ht-old-clock{height:17vh;border:0;background:transparent;color:var(--clock);cursor:pointer;display:flex;justify-content:center;align-items:center;gap:.2em;line-height:.88;font-weight:1000;letter-spacing:-.055em;text-shadow:-2px -2px 0 var(--outline),2px -2px 0 var(--outline),-2px 2px 0 var(--outline),2px 2px 0 var(--outline),0 7px 0 rgba(98,72,42,.45)}.ht-old-clock-main{font-size:clamp(88px,18vw,188px)}.ht-old-clock-period{font-size:clamp(40px,7vw,76px);letter-spacing:0}.ht-old-hero{flex:1;min-height:0;border:3px solid var(--gold);border-radius:var(--radius);margin:.8vh 0 1vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}.ht-old-label{position:absolute;top:4%;border:2px solid var(--gold);border-radius:999px;padding:7px 23px;font-size:clamp(11px,1.5vw,17px);font-weight:1000;letter-spacing:.08em;color:#f6d27e}.ht-old-ar{font-weight:1000;line-height:1;font-size:clamp(76px,14vw,145px);margin-top:4vh}.ht-old-en{font-weight:1000;font-size:clamp(52px,9vw,96px);line-height:1.05;margin-top:2vh}.ht-old-rule{width:72%;height:3px;background:linear-gradient(90deg,transparent,var(--gold) 14%,var(--gold) 86%,transparent);margin:4vh 0 2.5vh}.ht-old-prayer-time{font-size:clamp(72px,13vw,142px);font-weight:1000;line-height:1;display:flex;align-items:baseline;gap:.15em}.ht-old-prayer-period{font-size:.48em}.ht-old-adhan{position:absolute;bottom:4%;border:2px solid var(--gold);border-radius:999px;padding:7px 18px;color:#fff;font-size:clamp(12px,1.8vw,18px);font-weight:1000}.ht-old-mini{height:12.5vh;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.ht-old-mini button{border:2px solid rgba(100,75,92,.35);border-radius:13px;padding:5px 2px;font-weight:900;overflow:hidden}.ht-old-mini-ar{font-size:clamp(13px,2.1vw,21px)}.ht-old-mini-en{font-size:clamp(12px,1.8vw,18px)}.ht-old-mini-time{font-size:clamp(16px,2.4vw,24px);font-weight:1000;margin-top:3px}.ht-old-mini-next{font-size:8px;letter-spacing:.16em;margin-top:2px}.ht-menu-bg{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;padding:18px}.ht-menu{width:min(94vw,720px);max-height:91vh;overflow:auto;background:#073f35;border:1px solid #70a99b;border-radius:23px;padding:20px;box-sizing:border-box;color:white}.ht-menu-head{display:flex;justify-content:space-between;gap:15px}.ht-menu h2{margin:0}.ht-menu p{margin:5px 0;color:#b8d0c9}.ht-close{width:42px;height:42px;border:0;border-radius:50%;font-size:25px;background:#20584d;color:white}.ht-section{font-size:11px;letter-spacing:.15em;color:#f2cf72;font-weight:1000;margin:18px 0 8px}.ht-pair{display:grid;grid-template-columns:130px 1fr;gap:15px;align-items:center;border:1px solid #58877b;border-radius:16px;padding:13px;background:#093329}.ht-pair img{width:130px;height:130px;border-radius:10px}.ht-code{font-size:38px;font-weight:1000;letter-spacing:.12em;color:#f5cf70}.ht-status{display:inline-block;margin-top:6px;padding:5px 9px;border-radius:999px;background:#15594b;font-size:11px;font-weight:900}.ht-row{display:grid;grid-template-columns:1fr 100px;align-items:center;gap:10px;margin:8px 0}.ht-row input[type=color]{width:100%;height:38px;border:1px solid #82a79d;border-radius:9px;background:transparent}.ht-row input[type=range]{width:100%}.ht-check{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #315e53;font-weight:800}.ht-action{width:100%;padding:13px;margin-top:8px;border:1px solid #699489;border-radius:12px;background:#0d5447;color:white;font-weight:900;text-align:left}
     `}</style>
-    <button className="htw-clock" onClick={()=>setMenu(true)}><div className="htw-time">{time}</div><div className="htw-tap">Tap clock for setup</div></button>
-    <div className="htw-meta">📍 {locationLabel}<div>{date}</div>{hijri?<b>☾ {hijri}</b>:null}</div>
-    <div className="htw-hero" style={active&&highlightBig?{background:nextBg}:undefined}>
-      <div className="htw-badge">{active?"NEXT PRAYER":"PRAYER"}</div><div className="htw-ar">{AR[p]}</div><div className="htw-en">{EN[p]}</div><div className="htw-prayer-time">{pretty(today[p])}</div><div className="htw-dots">{PRAYERS.map((x,i)=><span key={x} className={`htw-dot ${i===slide?"on":""}`}/>)}</div>
+    {th.showLocation!==false||th.showDate!==false?<div className="ht-old-meta" style={{color:th.metaColor,fontSize:`calc(clamp(14px,2.2vw,22px) * ${Number(th.metaSize)||1})`}}>{th.showLocation!==false?<span>✦ {locationLabel}</span>:null}{th.showLocation!==false&&th.showDate!==false?<span>|</span>:null}{th.showDate!==false?<span>▣ {date}</span>:null}</div>:null}
+    <button className="ht-old-clock" onClick={()=>setMenu(true)} style={{["--clock" as any]:th.clockColor,["--outline" as any]:th.clockOutline,fontFamily:th.clockFont,transform:`scale(${Number(th.clockSize)||1})`}}><span className="ht-old-clock-main">{clockMain}</span>{clockPeriod?<span className="ht-old-clock-period">{clockPeriod}</span>:null}</button>
+    <div className="ht-old-hero" style={{["--gold" as any]:th.cardBorder,["--radius" as any]:`${Number(th.cardRadius)||28}px`,background:gradient(th.cardGradientA,th.cardGradientB,th.cardGradientAngle)}}>
+      {th.showPrayerLabel!==false?<div className="ht-old-label">{th.prayerLabelEmoji||""}{th.prayerLabelText||"PRAYER"}</div>:null}<div className="ht-old-ar" style={{color:th.arabicColor,fontFamily:th.arabicFont,transform:`scale(${Number(th.arabicSize)||1})`}}>{AR[p]}</div><div className="ht-old-en" style={{color:th.englishColor,fontFamily:th.englishFont,transform:`scale(${Number(th.englishSize)||1})`}}>{EN[p]}</div><div className="ht-old-rule"/><div className="ht-old-prayer-time" style={{color:th.prayerTimeColor,fontFamily:th.prayerTimeFont,transform:`scale(${Number(th.prayerTimeSize)||1})`}}><span>{pt.main}</span>{pt.period?<span className="ht-old-prayer-period">{pt.period}</span>:null}</div>{th.showAdhan!==false?<div className="ht-old-adhan">{th.adhanEmoji||"🔊"} {th.adhanText||"Adhan On"}</div>:null}
     </div>
-    <div className="htw-mini">{PRAYERS.map((x,i)=>{const isNext=x===next;return <button key={x} className="htw-mini-card" onClick={()=>setSlide(i)} style={isNext&&highlightMini?{background:miniBg,borderColor:"#e8c864"}:undefined}><div className="htw-mini-ar">{AR[x]}</div><div className="htw-mini-en">{EN[x]}</div><div className="htw-mini-time">{pretty(today[x])}</div>{isNext?<div className="htw-mini-next">NEXT</div>:null}</button>})}</div>
-    <div className="htw-footer">Prayer • Qur’an • Knowledge</div>
-    {menu?<div className="htw-backdrop" onMouseDown={e=>{if(e.currentTarget===e.target)setMenu(false)}}><div className="htw-menu"><div className="htw-menu-head"><div><h2>Tablet Wall Display</h2><p>Customize this vertical display or switch modes.</p></div><button className="htw-close" onClick={()=>setMenu(false)}>×</button></div><div className="htw-label">NEXT PRAYER CARD</div><label className="htw-toggle"><span>Highlight next large prayer card</span><input type="checkbox" checked={highlightBig} onChange={e=>save({highlightNextPrayerCard:e.target.checked})}/></label><label className="htw-toggle"><span>Highlight matching mini card</span><input type="checkbox" checked={highlightMini} onChange={e=>save({highlightNextPrayerMiniCard:e.target.checked})}/></label><div className="htw-colors">{COLORS.map(c=><button key={c} className={`htw-color ${nextBg.toLowerCase()===c.toLowerCase()?"sel":""}`} style={{background:c}} onClick={()=>save({nextPrayerCardColor:c,nextPrayerMiniCardColor:c})}/>)}</div><div className="htw-label">DISPLAY MODE</div><button className="htw-action" onClick={()=>{sessionStorage.setItem("hassoun-web-force-website-session","1");location.href="/?mode=web"}}>🌐 Website Mode</button><button className="htw-action" onClick={()=>{sessionStorage.removeItem("hassoun-web-force-website-session");location.href="/masjid-tv/?mode=tv&activate=1"}}>📺 TV Display Mode</button></div></div>:null}
+    <div className="ht-old-mini">{PRAYERS.map((x,i)=>{const n=x===next,tm=timeParts(today[x],th.showMiniPeriod===true);return <button key={x} onClick={()=>setSlide(i)} style={{background:gradient(n?th.miniNextA:th.miniGradientA,n?th.miniNextB:th.miniGradientB,180),color:n?th.miniNextText:th.miniTextColor,borderColor:n?th.cardBorder:undefined}}><div className="ht-old-mini-ar">{AR[x]}</div><div className="ht-old-mini-en">{EN[x]}</div><div className="ht-old-mini-time">{tm.main}{tm.period?` ${tm.period}`:""}</div>{n?<div className="ht-old-mini-next">NEXT</div>:null}</button>})}</div>
+    {menu?<div className="ht-menu-bg" onMouseDown={e=>{if(e.currentTarget===e.target)setMenu(false)}}><div className="ht-menu"><div className="ht-menu-head"><div><h2>Tablet Wall Display</h2><p>Pair this screen, then edit every visual detail live from Hassoun.</p></div><button className="ht-close" onClick={()=>setMenu(false)}>×</button></div><div className="ht-section">CONNECT THIS TABLET / IPAD</div><div className="ht-pair">{qr?<img src={qr} alt="Pairing QR code"/>:null}<div><div>Scan in Hassoun → Settings → Displays → Connect Display</div><div className="ht-code">{device?.code||"------"}</div><span className="ht-status">{paired?"● CONNECTED · LIVE":"○ WAITING FOR APP"}</span><div style={{marginTop:6,fontSize:11,color:"#a9c9c0"}}>You can also enter this 6-digit code manually in the app.</div></div></div><div className="ht-section">QUICK LOCAL CONTROLS</div><label className="ht-check"><span>Show clock seconds</span><input type="checkbox" checked={th.showSeconds!==false} onChange={e=>saveTheme({showSeconds:e.target.checked})}/></label><label className="ht-check"><span>Show clock AM / PM</span><input type="checkbox" checked={th.showClockPeriod!==false} onChange={e=>saveTheme({showClockPeriod:e.target.checked})}/></label><label className="ht-check"><span>Show prayer AM / PM</span><input type="checkbox" checked={th.showPrayerPeriod!==false} onChange={e=>saveTheme({showPrayerPeriod:e.target.checked})}/></label><label className="ht-check"><span>Show Adhan badge</span><input type="checkbox" checked={th.showAdhan!==false} onChange={e=>saveTheme({showAdhan:e.target.checked})}/></label><div className="ht-row"><span>Page color 1</span><input type="color" value={th.pageGradientA} onChange={e=>saveTheme({pageGradientA:e.target.value})}/></div><div className="ht-row"><span>Page color 2</span><input type="color" value={th.pageGradientB} onChange={e=>saveTheme({pageGradientB:e.target.value})}/></div><div className="ht-row"><span>Gradient direction</span><input type="range" min="0" max="360" value={th.pageGradientAngle} onChange={e=>saveTheme({pageGradientAngle:Number(e.target.value)})}/></div><button className="ht-action" onClick={()=>{sessionStorage.setItem("hassoun-web-force-website-session","1");location.href="/?mode=web"}}>🌐 Website Mode</button><button className="ht-action" onClick={()=>{sessionStorage.removeItem("hassoun-web-force-website-session");location.href="/masjid-tv/?mode=tv&activate=1"}}>📺 TV Display Mode</button></div></div>:null}
   </div>;
 }
