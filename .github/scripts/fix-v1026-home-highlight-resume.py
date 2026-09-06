@@ -24,7 +24,6 @@ HOME.write_text(home, encoding="utf-8")
 
 app = APP.read_text(encoding="utf-8")
 
-# Add useRef without depending on the exact order produced by older reconstruction scripts.
 m = re.search(r'import \{([^}]*)\} from "react";', app)
 if not m:
     raise SystemExit("React import missing")
@@ -46,18 +45,12 @@ if 'const activeTabRef = useRef<AppTab>("home");' not in app:
 if extra:
     app = app.replace(state_line, state_line + '\n' + '\n'.join(extra), 1)
 
-# Install one self-contained restore/persist implementation. It reads every historical key,
-# writes all of them on navigation, and writes immediately when Android backgrounds the app.
 if 'HASSOUN_EXACT_SCREEN_RESUME_V3' not in app:
-    insert_candidates = [
-        app.find('  const refreshHome = useCallback'),
-        app.find('  useEffect(() => {'),
-        app.find('  const toggleLocale = async () => {'),
-    ]
-    insert_candidates = [x for x in insert_candidates if x >= 0]
-    if not insert_candidates:
+    candidates = [app.find('  const refreshHome = useCallback'), app.find('  useEffect(() => {'), app.find('  const toggleLocale = async () => {')]
+    candidates = [x for x in candidates if x >= 0]
+    if not candidates:
         raise SystemExit("Could not find resume-effect insertion point")
-    pos = min(insert_candidates)
+    pos = min(candidates)
     block = '''  // HASSOUN_EXACT_SCREEN_RESUME_V3
   useEffect(() => {
     let alive = true;
@@ -105,29 +98,38 @@ if 'HASSOUN_EXACT_SCREEN_RESUME_V3' not in app:
 '''
     app = app[:pos] + block + app[pos:]
 
-# Do not paint Home while the saved route is still being restored. Match reconstructed variants.
-if 'if (!resumeStateReady || (busy && !today)) {' not in app:
-    app, n = re.subn(
-        r'  if \(busy && !today\) \{',
-        '  if (!resumeStateReady || (busy && !today)) {',
-        app,
-        count=1,
-    )
-    if n != 1:
-        # Some variants already gate on runtimeNavRestored. Strengthen that gate instead.
-        app, n = re.subn(
-            r'  if \(!runtimeNavRestored \|\| \(busy && !today\)\) \{',
-            '  if (!resumeStateReady || !runtimeNavRestored || (busy && !today)) {',
-            app,
-            count=1,
-        )
-    if n != 1:
-        raise SystemExit("Could not find startup render gate")
+# Prevent a Home flash while the persisted route is being restored. Some reconstructed
+# variants have an existing loading gate and some do not, so support both forms.
+if 'HASSOUN_RESUME_RENDER_GATE_V3' not in app:
+    replaced = False
+    app, n = re.subn(r'  if \(busy && !today\) \{', '  // HASSOUN_RESUME_RENDER_GATE_V3\n  if (!resumeStateReady || (busy && !today)) {', app, count=1)
+    replaced = n == 1
+    if not replaced:
+        app, n = re.subn(r'  if \(!runtimeNavRestored \|\| \(busy && !today\)\) \{', '  // HASSOUN_RESUME_RENDER_GATE_V3\n  if (!resumeStateReady || !runtimeNavRestored || (busy && !today)) {', app, count=1)
+        replaced = n == 1
+    if not replaced:
+        # Ground-zero Home variants can have no startup gate at all. Insert a minimal gate
+        # immediately before screen JSX declarations, after all hooks have already run.
+        marker = '  const homeScreen = ('
+        pos = app.find(marker)
+        if pos < 0:
+            raise SystemExit("Could not locate Home screen declaration for resume gate")
+        gate = '''  // HASSOUN_RESUME_RENDER_GATE_V3
+  if (!resumeStateReady) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f7f8f4" }}>
+        <ActivityIndicator color="#0b5b47" size="large" />
+      </View>
+    );
+  }
+
+'''
+        app = app[:pos] + gate + app[pos:]
 
 APP.write_text(app, encoding="utf-8")
 
 checks_home = ['const active = next?.prayer === prayer;', 'NEXT • TOMORROW', 'prayerRowActive']
-checks_app = ['HASSOUN_EXACT_SCREEN_RESUME_V3', 'resumeStateReady', 'activeTabRef.current = activeTab', 'hassoun:resume-exact-screen:v1']
+checks_app = ['HASSOUN_EXACT_SCREEN_RESUME_V3', 'HASSOUN_RESUME_RENDER_GATE_V3', 'resumeStateReady', 'activeTabRef.current = activeTab', 'hassoun:resume-exact-screen:v1']
 for needle in checks_home:
     if needle not in HOME.read_text(encoding="utf-8"):
         raise SystemExit(f"Home highlight fix missing: {needle}")
