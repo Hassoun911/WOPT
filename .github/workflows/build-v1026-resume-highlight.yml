@@ -1,0 +1,191 @@
+name: Build Hassoun v1.0.26 Resume Highlight
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-v1026-resume-highlight.yml"
+      - ".github/scripts/fix-v1026-home-highlight-resume.py"
+      - ".github/scripts/fix-v1023-adhan-refresh-hardfix.py"
+      - "mobile/src/HomePrayerPage.tsx"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v1026-resume-highlight
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+    steps:
+      - name: Checkout current build tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore exact source inputs used by the good v1.0.20/store build
+        run: |
+          set -euo pipefail
+          GOOD=ae1efdf4ac082e6f4bf64d3b08d3bdccb23e8166
+          git checkout "$GOOD" -- mobile scripts .github/logo-official
+          grep -q 'AboutHassounPage' mobile/src/SettingsHub.tsx
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera expo-linear-gradient --npm
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+
+      - name: Reconstruct approved feature stack
+        run: |
+          set -euo pipefail
+          cd mobile
+          node scripts/apply-wall-shell-for-masjid.mjs
+          node scripts/apply-masjid-tv.mjs
+          node scripts/apply-masjid-remote.mjs
+          node scripts/apply-masjid-typefix.mjs
+          node scripts/apply-masjid-tv-fixes.mjs
+          node scripts/apply-masjid-clock-click-branding.mjs
+          cd ..
+          python3 scripts/apply-v1015-full-store-fixes.py
+          python3 scripts/apply-v1017-quran-word-swipe-fixes.py
+          python3 scripts/fix-v1017-quran-word-styles.py
+          python3 scripts/apply-v1018-reader-gesture-hardfix.py
+          python3 scripts/apply-v1018-quran-session-restore.py
+          python3 scripts/apply-v1019-splash-animation.py
+          python3 scripts/apply-v1020-fast-location-startup.py
+
+      - name: Generate approved Hassoun branding
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet Pillow
+          tr -d '\n\r ' < .github/logo-official/hassoun-official-256.jpg.b64 | base64 --decode > /tmp/hassoun-approved.jpg
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source=Image.open('/tmp/hassoun-approved.jpg').convert('RGB')
+          full=source.resize((1024,1024),Image.Resampling.LANCZOS).convert('RGBA')
+          full.save('mobile/assets/hassoun-logo.png','PNG',optimize=True)
+          full.save('mobile/assets/splash-logo.png','PNG',optimize=True)
+          bg=(7,43,37,255)
+          legacy=Image.new('RGBA',(1024,1024),bg)
+          art=ImageOps.contain(source,(770,770),Image.Resampling.LANCZOS).convert('RGBA')
+          legacy.alpha_composite(art,((1024-art.width)//2,(1024-art.height)//2))
+          legacy.save('mobile/assets/icon.png','PNG',optimize=True)
+          adaptive=Image.new('RGBA',(1024,1024),(0,0,0,0))
+          art2=ImageOps.contain(source,(700,700),Image.Resampling.LANCZOS).convert('RGBA')
+          adaptive.alpha_composite(art2,((1024-art2.width)//2,(1024-art2.height)//2))
+          adaptive.save('mobile/assets/adaptive-icon.png','PNG',optimize=True)
+          widget=Path('mobile/modules/hassoun-widget/android/src/main/res/drawable/hassoun_widget_logo.png')
+          widget.parent.mkdir(parents=True,exist_ok=True)
+          full.resize((512,512),Image.Resampling.LANCZOS).save(widget,'PNG',optimize=True)
+          PY
+
+      - name: Apply canonical Hassoun fixes
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1021-no-resume-reload.py
+          python3 .github/scripts/fix-v1021-native-masjid-display.py
+          python3 .github/scripts/fix-v1021-unified-display-menu.py
+          python3 .github/scripts/fix-v1021-pull-to-refresh.py
+          python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
+          python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
+
+      - name: Verify resume and next-prayer highlight
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          app=Path('mobile/App.tsx').read_text(encoding='utf-8')
+          home=Path('mobile/src/HomePrayerPage.tsx').read_text(encoding='utf-8')
+          cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
+          for needle in ['hassoun:resume-exact-screen:v1','activeTabRef.current = activeTab','if (!runtimeNavRestored || (busy && !today))']:
+              if needle not in app: raise SystemExit(f'Missing resume fix: {needle}')
+          for needle in ['const active = next?.prayer === prayer;','NEXT • TOMORROW','prayerRowActive']:
+              if needle not in home: raise SystemExit(f'Missing highlight fix: {needle}')
+          for needle in ['1.0.26','versionCode: 70']:
+              if needle not in cfg: raise SystemExit(f'Missing version: {needle}')
+          for forbidden in ('loadLocationPrayerContext','HomePrayerPanel','refreshPrayerLocation','phoneHomeScreen'):
+              if forbidden in app: raise SystemExit(f'Legacy runtime remains: {forbidden}')
+          print('Exact-screen resume and next-prayer highlight verified')
+          PY
+          test -d mobile/node_modules/@typescript/typescript-linux-x64 || { cd mobile; npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2; cd ..; }
+          cd mobile
+          npm run typecheck
+
+      - name: Generate Android project
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Verify Android task retention
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('mobile/android/app/src/main/AndroidManifest.xml'); ns='http://schemas.android.com/apk/res/android'; ET.register_namespace('android',ns)
+          tree=ET.parse(p); root=tree.getroot(); app=root.find('application')
+          permissions={node.attrib.get(f'{{{ns}}}name') for node in root.findall('uses-permission')}
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in permissions: raise SystemExit('SCHEDULE_EXACT_ALARM missing')
+          app.set(f'{{{ns}}}banner','@drawable/hassoun_widget_logo')
+          main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{ns}}}name','').endswith('MainActivity')),None)
+          if main is None: raise SystemExit('MainActivity missing')
+          main.set(f'{{{ns}}}screenOrientation','unspecified')
+          main.set(f'{{{ns}}}launchMode','singleTask')
+          main.set(f'{{{ns}}}alwaysRetainTaskState','true')
+          tree.write(p,encoding='utf-8',xml_declaration=True)
+          PY
+
+      - name: Build release APK
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name APK
+        run: |
+          set -euo pipefail
+          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
+          test -s "$APK"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.26-resume-highlight.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.26-Resume-Highlight
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.26-resume-highlight.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.26-resume-highlight.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
