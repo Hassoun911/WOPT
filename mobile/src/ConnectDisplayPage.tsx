@@ -1,131 +1,43 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { CameraView } from "expo-camera";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, AppState, Modal, PermissionsAndroid, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import BrandMark from "./BrandMark";
 
-const API = "https://wopt-prayer-push.wopt-windsor.workers.dev";
-const STORAGE_KEY = "hassoun:paired-displays:v2";
+const API="https://wopt-prayer-push.wopt-windsor.workers.dev";
+const STORAGE_KEY="hassoun:paired-displays:v2";
+type Display={id:string;code:string;name:string;token:string;pairedAt:string;location?:string};
+type Remote={name:string;settings:Record<string,any>;revision?:number;lastSeenAt?:string};
+type Props={locale:"en"|"ar";onBack:()=>void};
+type Part="page"|"meta"|"clock"|"card"|"arabic"|"english"|"time"|"adhan"|"mini";
+const DEFAULT_THEME={pageGradientA:"#11aa91",pageGradientB:"#078f79",pageGradientAngle:160,gradientMix:50,clockColor:"#f6f2ff",clockOutline:"#b27b33",clockSize:1,clockFont:"sans-serif",showSeconds:true,showClockPeriod:true,metaColor:"#f9f4ff",metaSize:1,showLocation:true,showDate:true,cardGradientA:"#12aa91",cardGradientB:"#0c957f",cardGradientAngle:180,cardBorder:"#e0b761",arabicColor:"#fbf5ff",arabicSize:1,arabicFont:"sans-serif",englishColor:"#f4cb77",englishSize:1,englishFont:"sans-serif",prayerTimeColor:"#fbf4ff",prayerTimeSize:1,prayerTimeFont:"sans-serif",showPrayerPeriod:true,showPrayerLabel:true,prayerLabelText:"PRAYER",prayerLabelEmoji:"",showAdhan:true,adhanText:"Adhan On",adhanEmoji:"🔊",miniGradientA:"#f3ebf6",miniGradientB:"#e9e2ee",miniTextColor:"#27312f",miniNextA:"#0d8e77",miniNextB:"#087a67",miniNextText:"#ffffff",showMiniPeriod:false,sliderSeconds:8};
+const FONTS=["sans-serif","serif","monospace","sans-serif-condensed"];
+const hex=(v:any,f:string)=>typeof v==="string"&&/^#[0-9a-f]{6}$/i.test(v)?v:f;
+const theme=(s:Record<string,any>)=>({...DEFAULT_THEME,...(s.tabletTheme&&typeof s.tabletTheme==="object"?s.tabletTheme:{})});
+function codeFromScan(raw:string){const direct=raw.match(/^\s*(\d{6})\s*$/)?.[1];if(direct)return direct;try{const u=new URL(raw);const q=u.searchParams.get("code")||"";if(/^\d{6}$/.test(q))return q}catch{}return raw.match(/(?:^|\D)(\d{6})(?:\D|$)/)?.[1]||""}
 
-type Display = { id: string; code: string; name: string; token: string; pairedAt: string };
-type Props = { locale: "en" | "ar"; onBack: () => void };
-
-export default function ConnectDisplayPage({ locale, onBack }: Props) {
-  const ar = locale === "ar";
-  const t = (en: string, arabic: string) => ar ? arabic : en;
-  const [code, setCode] = useState("");
-  const [displayName, setDisplayName] = useState("Masjid Display");
-  const [controllerName, setControllerName] = useState("Hassoun Android");
-  const [paired, setPaired] = useState<Display[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const valid = useMemo(() => /^\d{6}$/.test(code), [code]);
-
-  useEffect(() => {
-    void AsyncStorage.getItem(STORAGE_KEY).then((value) => {
-      if (!value) return;
-      try { setPaired(JSON.parse(value) as Display[]); } catch {}
-    });
-  }, []);
-
-  const save = async (next: Display[]) => {
-    setPaired(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
-
-  const pair = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch(`${API}/masjid-displays/pair`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, controllerName: (controllerName.trim() || "Hassoun Android").slice(0, 50) })
-      });
-      const data = await response.json() as { ok?: boolean; deviceId?: string; name?: string; token?: string; error?: string };
-      if (!response.ok || !data.ok || !data.deviceId || !data.token) throw new Error(data.error || t("Could not pair display", "تعذر ربط الشاشة"));
-      const item: Display = {
-        id: data.deviceId,
-        code,
-        name: (displayName.trim() || data.name || "Masjid Display").slice(0, 40),
-        token: data.token,
-        pairedAt: new Date().toISOString()
-      };
-      const next = [item, ...paired.filter((entry) => entry.id !== item.id)];
-      await save(next);
-      if (item.name !== data.name) {
-        await fetch(`${API}/masjid-displays/control/${encodeURIComponent(item.id)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${item.token}` },
-          body: JSON.stringify({ name: item.name })
-        }).catch(() => undefined);
-      }
-      setCode("");
-      setMessage(t("Connected. This display is now saved on this phone.", "تم الاتصال. تم حفظ هذه الشاشة على الهاتف."));
-    } catch (error) {
-      const text = error instanceof Error ? error.message : t("Could not pair display", "تعذر ربط الشاشة");
-      setMessage(text);
-      Alert.alert(t("Connection failed", "فشل الاتصال"), text);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (id: string) => save(paired.filter((entry) => entry.id !== id));
-
-  return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
-        <BrandMark size={48} />
-        <View style={styles.headerCopy}><Text style={styles.eyebrow}>HASSOUN DISPLAY</Text><Text style={styles.title}>{t("Connect a TV or display", "ربط تلفاز أو شاشة")}</Text></View>
-      </View>
-      <Text style={styles.subtitle}>{t("Enter the 6-digit code shown on a Hassoun Masjid TV, iPad, tablet or computer display. The Android app uses the same pairing system as the website.", "أدخل الرمز المكوّن من 6 أرقام الظاهر على شاشة حسّون في المسجد أو التلفاز أو الآيباد أو الكمبيوتر. يستخدم تطبيق أندرويد نفس نظام الربط الموجود في الموقع.")}</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>{t("PAIRING CODE", "رمز الربط")}</Text>
-        <TextInput value={code} onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="000000" placeholderTextColor="#91a39d" style={styles.codeInput} />
-        <Text style={styles.label}>{t("DISPLAY NAME", "اسم الشاشة")}</Text>
-        <TextInput value={displayName} onChangeText={setDisplayName} maxLength={40} style={styles.input} />
-        <Text style={styles.label}>{t("THIS CONTROLLER", "اسم هذا الجهاز")}</Text>
-        <TextInput value={controllerName} onChangeText={setControllerName} maxLength={50} style={styles.input} />
-        <Pressable onPress={pair} disabled={!valid || busy} style={[styles.connect, (!valid || busy) && styles.disabled]}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.connectText}>{t("Pair display", "ربط الشاشة")}</Text>}
-        </Pressable>
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-      </View>
-
-      <Text style={styles.sectionTitle}>{t("SAVED DISPLAYS", "الشاشات المحفوظة")}</Text>
-      {paired.length ? paired.map((item) => (
-        <View key={item.id} style={styles.savedCard}>
-          <View style={styles.savedCopy}><Text style={styles.savedName}>{item.name}</Text><Text style={styles.savedMeta}>{t("Display ID", "معرّف الشاشة")}: {item.id}</Text></View>
-          <Pressable onPress={() => void remove(item.id)} style={styles.remove}><Text style={styles.removeText}>{t("Remove", "حذف")}</Text></Pressable>
-        </View>
-      )) : <View style={styles.empty}><Text style={styles.emptyText}>{t("No paired displays yet.", "لا توجد شاشات مرتبطة بعد.")}</Text></View>}
-    </ScrollView>
-  );
+export default function ConnectDisplayPage({locale,onBack}:Props){
+  const ar=locale==="ar",t=(en:string,a:string)=>ar?a:en;
+  const [code,setCode]=useState(""),[controllerName,setControllerName]=useState("Hassoun Android"),[paired,setPaired]=useState<Display[]>([]),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[scannerOpen,setScannerOpen]=useState(false),[cameraReady,setCameraReady]=useState(false),[active,setActive]=useState<Display|null>(null),[remote,setRemote]=useState<Remote|null>(null),[selected,setSelected]=useState<Part>("clock"),[saving,setSaving]=useState(false);
+  const saveTimer=useRef<ReturnType<typeof setTimeout>|null>(null);const valid=useMemo(()=>/^\d{6}$/.test(code),[code]);
+  const saveList=async(next:Display[])=>{setPaired(next);await AsyncStorage.setItem(STORAGE_KEY,JSON.stringify(next))};
+  useEffect(()=>{void AsyncStorage.getItem(STORAGE_KEY).then(v=>{if(v)try{setPaired(JSON.parse(v))}catch{}});return()=>{if(saveTimer.current)clearTimeout(saveTimer.current)}},[]);
+  const ensureCamera=async()=>{if(Platform.OS!=="android"){setCameraReady(true);setScannerOpen(true);return}const p=PermissionsAndroid.PERMISSIONS.CAMERA;let granted=await PermissionsAndroid.check(p);if(!granted){await AsyncStorage.setItem("hassoun:pending-display-scanner:v1","1");granted=(await PermissionsAndroid.request(p))===PermissionsAndroid.RESULTS.GRANTED}if(!granted){Alert.alert(t("Camera permission needed","مطلوب إذن الكاميرا"),t("Allow camera access to scan the tablet QR code.","اسمح للكاميرا لمسح رمز الشاشة."));return}setTimeout(()=>{setCameraReady(true);setScannerOpen(true)},250)};
+  useEffect(()=>{const sub=AppState.addEventListener("change",state=>{if(state!=="active")return;void AsyncStorage.getItem("hassoun:pending-display-scanner:v1").then(async pending=>{if(pending!=="1"||Platform.OS!=="android")return;if(await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA)){await AsyncStorage.removeItem("hassoun:pending-display-scanner:v1");setTimeout(()=>{setCameraReady(true);setScannerOpen(true)},250)}})});return()=>sub.remove()},[]);
+  const pair=async()=>{if(!valid||busy)return;setBusy(true);setMessage("");try{const r=await fetch(`${API}/masjid-displays/pair`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,controllerName:(controllerName.trim()||"Hassoun Android").slice(0,50)})});const d=await r.json() as any;if(!r.ok||!d.ok||!d.deviceId||!d.token)throw new Error(d.error||"Could not pair display");const item:Display={id:d.deviceId,code,name:(d.name||"Tablet Wall Display").slice(0,40),token:d.token,pairedAt:new Date().toISOString()};const next=[item,...paired.filter(x=>x.id!==item.id)];await saveList(next);setCode("");setMessage(t("Connected. Opening live editor…","تم الاتصال. جارٍ فتح المحرر المباشر…"));await openEditor(item)}catch(e){const m=e instanceof Error?e.message:"Could not pair display";setMessage(m);Alert.alert(t("Connection failed","فشل الاتصال"),m)}finally{setBusy(false)}};
+  const loadRemote=async(item:Display)=>{const r=await fetch(`${API}/masjid-displays/control/${encodeURIComponent(item.id)}`,{headers:{Authorization:`Bearer ${item.token}`}});const d=await r.json() as Remote&{error?:string};if(!r.ok)throw new Error(d.error||"Could not load display");return d};
+  const openEditor=async(item:Display)=>{setActive(item);setBusy(true);try{setRemote(await loadRemote(item))}catch(e){Alert.alert("Display",e instanceof Error?e.message:"Could not load display")}finally{setBusy(false)}};
+  const send=async(next:Remote)=>{if(!active)return;setSaving(true);try{const r=await fetch(`${API}/masjid-displays/control/${encodeURIComponent(active.id)}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${active.token}`},body:JSON.stringify({name:next.name,settings:next.settings})});if(!r.ok)throw new Error("Could not update display");setMessage(t("LIVE · updated on tablet","مباشر · تم تحديث الشاشة"))}catch(e){setMessage(e instanceof Error?e.message:"Could not update display")}finally{setSaving(false)}};
+  const mutate=(patch:Record<string,any>)=>setRemote(cur=>{if(!cur)return cur;const th={...theme(cur.settings),...patch};const next={...cur,settings:{...cur.settings,displayMode:"tablet",tabletTheme:th}};if(saveTimer.current)clearTimeout(saveTimer.current);saveTimer.current=setTimeout(()=>void send(next),220);return next});
+  const setRoot=(key:string,value:any)=>setRemote(cur=>{if(!cur)return cur;const next={...cur,settings:{...cur.settings,[key]:value}};if(saveTimer.current)clearTimeout(saveTimer.current);saveTimer.current=setTimeout(()=>void send(next),220);return next});
+  const remove=async(id:string)=>saveList(paired.filter(x=>x.id!==id));
+  const colorField=(label:string,key:string,value:string)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.colorRow}><View style={[styles.swatch,{backgroundColor:hex(value,"#ffffff")}]} /><TextInput value={value} onChangeText={v=>mutate({[key]:v})} autoCapitalize="none" style={styles.input}/></View></View>;
+  const bool=(label:string,key:string,value:boolean)=><Pressable onPress={()=>mutate({[key]:!value})} style={styles.toggle}><Text style={styles.toggleText}>{label}</Text><View style={[styles.box,value&&styles.boxOn]}><Text style={styles.check}>{value?"✓":""}</Text></View></Pressable>;
+  const sizeField=(label:string,key:string,value:number)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.75,0.9,1,1.15,1.3,1.5].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(value-n)<.01&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View></View>;
+  const fontField=(key:string,value:string)=><View style={styles.field}><Text style={styles.fieldLabel}>FONT TYPE</Text><View style={styles.stepRow}>{FONTS.map(f=><Pressable key={f} onPress={()=>mutate({[key]:f})} style={[styles.step,value===f&&styles.stepOn]}><Text style={[styles.stepText,{fontFamily:f}]}>{f.replace("sans-serif","Sans")}</Text></Pressable>)}</View></View>;
+  if(active){const s=remote?.settings||{},th=theme(s);const partControls=()=>{switch(selected){case"page":return <>{colorField("BACKGROUND COLOR 1","pageGradientA",th.pageGradientA)}{colorField("BACKGROUND COLOR 2","pageGradientB",th.pageGradientB)}<Text style={styles.fieldLabel}>GRADIENT MIX POINTER</Text><View style={styles.stepRow}>{[0,25,50,75,100].map(n=><Pressable key={n} onPress={()=>mutate({gradientMix:n})} style={[styles.step,Number(th.gradientMix)===n&&styles.stepOn]}><Text style={styles.stepText}>{n}%</Text></Pressable>)}</View></>;case"meta":return <>{bool("Show location","showLocation",th.showLocation!==false)}{bool("Show date","showDate",th.showDate!==false)}{colorField("TEXT COLOR","metaColor",th.metaColor)}{sizeField("TEXT SIZE","metaSize",Number(th.metaSize)||1)}<TextInput value={String(s.mosqueLocation||"")} onChangeText={v=>setRoot("mosqueLocation",v)} placeholder="Location text" placeholderTextColor="#7c9991" style={styles.input}/></>;case"clock":return <>{bool("Show seconds","showSeconds",th.showSeconds!==false)}{bool("Show AM / PM","showClockPeriod",th.showClockPeriod!==false)}{colorField("CLOCK COLOR","clockColor",th.clockColor)}{colorField("OUTLINE / SHADOW","clockOutline",th.clockOutline)}{sizeField("CLOCK SIZE","clockSize",Number(th.clockSize)||1)}{fontField("clockFont",th.clockFont)}</>;case"card":return <>{colorField("CARD COLOR 1","cardGradientA",th.cardGradientA)}{colorField("CARD COLOR 2","cardGradientB",th.cardGradientB)}{colorField("BORDER COLOR","cardBorder",th.cardBorder)}{bool("Show PRAYER label","showPrayerLabel",th.showPrayerLabel!==false)}<TextInput value={String(th.prayerLabelText||"")} onChangeText={v=>mutate({prayerLabelText:v})} placeholder="PRAYER label" style={styles.input}/><TextInput value={String(th.prayerLabelEmoji||"")} onChangeText={v=>mutate({prayerLabelEmoji:v})} placeholder="Optional emoji" style={styles.input}/></>;case"arabic":return <>{colorField("ARABIC COLOR","arabicColor",th.arabicColor)}{sizeField("ARABIC SIZE","arabicSize",Number(th.arabicSize)||1)}{fontField("arabicFont",th.arabicFont)}</>;case"english":return <>{colorField("ENGLISH COLOR","englishColor",th.englishColor)}{sizeField("ENGLISH SIZE","englishSize",Number(th.englishSize)||1)}{fontField("englishFont",th.englishFont)}</>;case"time":return <>{bool("Show AM / PM","showPrayerPeriod",th.showPrayerPeriod!==false)}{colorField("TIME COLOR","prayerTimeColor",th.prayerTimeColor)}{sizeField("TIME SIZE","prayerTimeSize",Number(th.prayerTimeSize)||1)}{fontField("prayerTimeFont",th.prayerTimeFont)}</>;case"adhan":return <>{bool("Show Adhan badge","showAdhan",th.showAdhan!==false)}<TextInput value={String(th.adhanText||"")} onChangeText={v=>mutate({adhanText:v})} placeholder="Adhan On" style={styles.input}/><TextInput value={String(th.adhanEmoji||"")} onChangeText={v=>mutate({adhanEmoji:v})} placeholder="Emoji" style={styles.input}/></>;default:return <>{bool("Show mini-card AM / PM","showMiniPeriod",th.showMiniPeriod===true)}{colorField("MINI CARD COLOR 1","miniGradientA",th.miniGradientA)}{colorField("MINI CARD COLOR 2","miniGradientB",th.miniGradientB)}{colorField("NEXT CARD COLOR 1","miniNextA",th.miniNextA)}{colorField("NEXT CARD COLOR 2","miniNextB",th.miniNextB)}{colorField("TEXT COLOR","miniTextColor",th.miniTextColor)}</>}};
+    return <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.header}><Pressable onPress={()=>{setActive(null);setRemote(null)}} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={46}/><View style={styles.headerCopy}><Text style={styles.eyebrow}>LIVE TABLET EDITOR</Text><Text style={styles.title}>{active.name}</Text></View></View>{busy&&!remote?<ActivityIndicator/>:null}{remote?<><Text style={styles.help}>Tap any part of the preview. Every change is sent to the connected tablet/iPad automatically.</Text><View style={[styles.preview,{backgroundColor:hex(th.pageGradientA,"#11aa91")}]}><Pressable onPress={()=>setSelected("meta")} style={[styles.previewMeta,selected==="meta"&&styles.sel]}><Text style={{color:hex(th.metaColor,"#fff"),fontWeight:"800"}}>✦ {s.mosqueLocation||"Windsor, Ontario"}  |  ▣ Sat, Sep 5, 2026</Text></Pressable><Pressable onPress={()=>setSelected("clock")} style={[styles.previewClock,selected==="clock"&&styles.sel]}><Text style={{color:hex(th.clockColor,"#fff"),fontSize:42,fontWeight:"900",fontFamily:th.clockFont}}>07:51:03 PM</Text></Pressable><Pressable onPress={()=>setSelected("card")} style={[styles.previewCard,{backgroundColor:hex(th.cardGradientA,"#0d9d85"),borderColor:hex(th.cardBorder,"#e0b761")},selected==="card"&&styles.sel]}><Text style={{color:hex(th.cardBorder,"#e0b761"),fontWeight:"900"}}>PRAYER</Text><Pressable onPress={()=>setSelected("arabic")}><Text style={{fontSize:38,color:hex(th.arabicColor,"#fff"),fontFamily:th.arabicFont}}>الظهر</Text></Pressable><Pressable onPress={()=>setSelected("english")}><Text style={{fontSize:30,color:hex(th.englishColor,"#f4cb77"),fontWeight:"900",fontFamily:th.englishFont}}>Dhuhr</Text></Pressable><Pressable onPress={()=>setSelected("time")}><Text style={{fontSize:38,color:hex(th.prayerTimeColor,"#fff"),fontWeight:"900",fontFamily:th.prayerTimeFont}}>1:31 p.m.</Text></Pressable><Pressable onPress={()=>setSelected("adhan")} style={styles.adhan}><Text style={{color:"white",fontWeight:"800"}}>{th.adhanEmoji} {th.adhanText}</Text></Pressable></Pressable><Pressable onPress={()=>setSelected("mini")} style={[styles.previewMini,selected==="mini"&&styles.sel]}>{["Fajr","Dhuhr","Asr","Maghrib","Isha"].map((x,i)=><View key={x} style={[styles.mini,{backgroundColor:i===1?hex(th.miniNextA,"#0d8e77"):hex(th.miniGradientA,"#f3ebf6")}]}><Text style={{fontSize:10,color:i===1?"#fff":hex(th.miniTextColor,"#27312f"),fontWeight:"800"}}>{x}{"\n"}{["5:33","1:31","5:09","8:01","9:18"][i]}</Text></View>)}</Pressable><Pressable onPress={()=>setSelected("page")} style={styles.pageEdit}><Text style={styles.pageEditText}>Edit page background</Text></Pressable></View><View style={styles.editor}><Text style={styles.editorTitle}>EDIT {selected.toUpperCase()}</Text>{partControls()}</View><Text style={styles.live}>{saving?"Sending…":message||"LIVE · ready"}</Text></>:null}</ScrollView>}
+  return <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.header}><Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><BrandMark size={46}/><View style={styles.headerCopy}><Text style={styles.eyebrow}>DISPLAYS</Text><Text style={styles.title}>{t("Connect a tablet / iPad","ربط جهاز لوحي / آيباد")}</Text></View></View><Text style={styles.help}>{t("On the tablet, open Tablet Wall Display and tap the clock. Scan its QR code here or enter its 6-digit code.","على الجهاز اللوحي افتح شاشة الحائط واضغط الساعة. امسح QR أو أدخل رمز 6 أرقام.")}</Text><Pressable onPress={()=>void ensureCamera()} style={styles.scan}><Text style={styles.scanText}>▣ {t("Scan QR code","مسح QR")}</Text></Pressable><View style={styles.card}><Text style={styles.fieldLabel}>6-DIGIT PAIRING CODE</Text><TextInput value={code} onChangeText={v=>setCode(v.replace(/\D/g,"").slice(0,6))} keyboardType="number-pad" placeholder="000000" placeholderTextColor="#738d85" style={[styles.input,styles.codeInput]}/><Text style={styles.fieldLabel}>CONTROLLER NAME</Text><TextInput value={controllerName} onChangeText={setControllerName} style={styles.input}/><Pressable disabled={!valid||busy} onPress={()=>void pair()} style={[styles.connect,(!valid||busy)&&styles.disabled]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={styles.connectText}>{t("Pair and open live editor","ربط وفتح المحرر المباشر")}</Text>}</Pressable>{message?<Text style={styles.message}>{message}</Text>:null}</View>{paired.length?<><Text style={styles.section}>CONNECTED DISPLAYS</Text>{paired.map(item=><View key={item.id} style={styles.device}><View style={{flex:1}}><Text style={styles.deviceName}>{item.name}</Text><Text style={styles.deviceMeta}>Code {item.code}</Text></View><Pressable onPress={()=>void openEditor(item)} style={styles.manage}><Text style={styles.manageText}>Edit live</Text></Pressable><Pressable onPress={()=>void remove(item.id)} style={styles.remove}><Text style={styles.removeText}>×</Text></Pressable></View>)}</>:null}<Modal visible={scannerOpen} animationType="fade" onRequestClose={()=>setScannerOpen(false)}><View style={styles.cameraRoot}>{cameraReady?<CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{barcodeTypes:["qr"]}} onBarcodeScanned={({data})=>{const found=codeFromScan(data);if(!found)return;setCode(found);setScannerOpen(false);setCameraReady(false)}}/>:null}<Pressable onPress={()=>{setScannerOpen(false);setCameraReady(false)}} style={styles.cameraClose}><Text style={styles.cameraCloseText}>×</Text></Pressable><View style={styles.scanGuide}><Text style={styles.scanGuideText}>Point at the QR code shown on the tablet</Text></View></View></Modal></ScrollView>
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#f7f4ec" },
-  content: { padding: 18, paddingBottom: 36 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  back: { width: 44, height: 44, borderRadius: 15, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd9d0", alignItems: "center", justifyContent: "center" },
-  backText: { color: "#0b5b47", fontSize: 30, lineHeight: 32, fontWeight: "800" },
-  headerCopy: { flex: 1 }, eyebrow: { color: "#9b7a39", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  title: { color: "#173f35", fontSize: 23, fontWeight: "900", marginTop: 2 },
-  subtitle: { color: "#74817c", fontSize: 12, lineHeight: 18, marginTop: 14 },
-  card: { marginTop: 18, borderRadius: 23, backgroundColor: "#0b3b33", padding: 16, borderWidth: 1, borderColor: "#8a7548" },
-  label: { color: "#e4c576", fontSize: 8, fontWeight: "900", letterSpacing: 1, marginTop: 10, marginBottom: 6 },
-  codeInput: { minHeight: 62, borderRadius: 15, borderWidth: 1, borderColor: "#52786d", backgroundColor: "#082b26", color: "#f2cb73", fontSize: 28, fontWeight: "900", letterSpacing: 7, textAlign: "center" },
-  input: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: "#52786d", backgroundColor: "#082b26", color: "#fff", fontSize: 15, paddingHorizontal: 12 },
-  connect: { minHeight: 50, borderRadius: 999, backgroundColor: "#0b654f", marginTop: 18, alignItems: "center", justifyContent: "center" },
-  disabled: { opacity: .45 }, connectText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  message: { color: "#dff4ea", fontSize: 11, lineHeight: 16, marginTop: 12 },
-  sectionTitle: { color: "#8f7136", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginTop: 24, marginBottom: 8 },
-  savedCard: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#dfddd5", padding: 13, marginBottom: 8 },
-  savedCopy: { flex: 1 }, savedName: { color: "#173f35", fontSize: 14, fontWeight: "900" }, savedMeta: { color: "#89938f", fontSize: 9, marginTop: 3 },
-  remove: { borderRadius: 999, backgroundColor: "#f1e7df", paddingHorizontal: 12, paddingVertical: 8 }, removeText: { color: "#8f4d40", fontSize: 9, fontWeight: "900" },
-  empty: { minHeight: 70, borderRadius: 18, backgroundColor: "#eeeae1", alignItems: "center", justifyContent: "center" }, emptyText: { color: "#7a8580", fontSize: 11 }
-});
+const styles=StyleSheet.create({flex:{flex:1,backgroundColor:"#f4f8f6"},content:{padding:18,paddingBottom:44,gap:12},header:{flexDirection:"row",alignItems:"center",gap:10},back:{width:42,height:42,borderRadius:21,backgroundColor:"#e5efeb",alignItems:"center",justifyContent:"center"},backText:{fontSize:32,color:"#103b31",marginTop:-4},headerCopy:{flex:1},eyebrow:{fontSize:11,fontWeight:"900",letterSpacing:1.4,color:"#92712b"},title:{fontSize:22,fontWeight:"900",color:"#102e27"},help:{fontSize:14,lineHeight:20,color:"#60746e"},scan:{backgroundColor:"#0b6b55",borderRadius:14,padding:14,alignItems:"center"},scanText:{color:"white",fontSize:16,fontWeight:"900"},card:{backgroundColor:"white",borderRadius:18,padding:15,gap:10,borderWidth:1,borderColor:"#dae7e2"},field:{gap:6,marginBottom:8},fieldLabel:{fontSize:10,fontWeight:"900",letterSpacing:1.2,color:"#7a6a3b"},input:{borderWidth:1,borderColor:"#cadbd5",borderRadius:11,paddingHorizontal:12,paddingVertical:10,fontSize:15,color:"#133b31",backgroundColor:"#fbfdfc"},codeInput:{fontSize:28,fontWeight:"900",letterSpacing:8,textAlign:"center"},connect:{backgroundColor:"#0b6b55",borderRadius:12,padding:13,alignItems:"center"},connectText:{color:"white",fontWeight:"900"},disabled:{opacity:.45},message:{color:"#305e51",fontWeight:"700"},section:{fontSize:11,fontWeight:"900",letterSpacing:1.2,color:"#8c6a27",marginTop:8},device:{flexDirection:"row",alignItems:"center",gap:8,backgroundColor:"white",borderRadius:14,padding:12,borderWidth:1,borderColor:"#d8e5e0"},deviceName:{fontWeight:"900",color:"#153b31"},deviceMeta:{fontSize:11,color:"#71867f",marginTop:3},manage:{backgroundColor:"#d9b762",paddingHorizontal:10,paddingVertical:8,borderRadius:10},manageText:{fontSize:12,fontWeight:"900",color:"#17352d"},remove:{width:30,height:30,borderRadius:15,backgroundColor:"#f0e6e3",alignItems:"center",justifyContent:"center"},removeText:{fontSize:20,color:"#8f4f48"},cameraRoot:{flex:1,backgroundColor:"black"},cameraClose:{position:"absolute",top:45,right:20,width:46,height:46,borderRadius:23,backgroundColor:"rgba(0,0,0,.62)",alignItems:"center",justifyContent:"center"},cameraCloseText:{fontSize:30,color:"white"},scanGuide:{position:"absolute",left:25,right:25,bottom:60,backgroundColor:"rgba(0,0,0,.68)",padding:14,borderRadius:14},scanGuideText:{color:"white",textAlign:"center",fontWeight:"800"},preview:{borderRadius:22,padding:12,minHeight:470,borderWidth:2,borderColor:"#d6ae57",gap:7},previewMeta:{padding:5,alignItems:"center"},previewClock:{padding:8,alignItems:"center"},previewCard:{flex:1,borderWidth:2,borderRadius:18,alignItems:"center",justifyContent:"space-evenly",padding:10},adhan:{borderWidth:1,borderColor:"#e1bd68",borderRadius:20,paddingHorizontal:10,paddingVertical:4},previewMini:{flexDirection:"row",gap:4},mini:{flex:1,borderRadius:7,paddingVertical:6,alignItems:"center"},sel:{outlineWidth:3 as any,outlineColor:"#ffdc79" as any},pageEdit:{position:"absolute",right:10,top:10,backgroundColor:"rgba(0,0,0,.35)",padding:5,borderRadius:8},pageEditText:{color:"white",fontSize:9,fontWeight:"800"},editor:{backgroundColor:"white",borderRadius:18,padding:14,borderWidth:1,borderColor:"#d6e4df",gap:8},editorTitle:{fontSize:13,fontWeight:"900",color:"#91702c",letterSpacing:1.1},toggle:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingVertical:10,borderBottomWidth:1,borderBottomColor:"#edf2f0"},toggleText:{fontWeight:"800",color:"#244a40"},box:{width:28,height:28,borderRadius:7,borderWidth:2,borderColor:"#9bb5ac",alignItems:"center",justifyContent:"center"},boxOn:{backgroundColor:"#0b6b55",borderColor:"#0b6b55"},check:{color:"white",fontWeight:"900"},colorRow:{flexDirection:"row",gap:8,alignItems:"center"},swatch:{width:40,height:40,borderRadius:10,borderWidth:1,borderColor:"#a9bdb6"},stepRow:{flexDirection:"row",flexWrap:"wrap",gap:6},step:{paddingHorizontal:9,paddingVertical:7,borderRadius:9,borderWidth:1,borderColor:"#c8d9d3",backgroundColor:"#f6faf8"},stepOn:{backgroundColor:"#d9b762",borderColor:"#b99442"},stepText:{fontSize:11,fontWeight:"800",color:"#274a40"},live:{textAlign:"center",fontWeight:"900",color:"#0b6b55"}});
