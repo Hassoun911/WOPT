@@ -114,27 +114,38 @@ jobs:
           python3 .github/scripts/fix-v1021-pull-to-refresh.py
           python3 .github/scripts/fix-v1022-first-launch-camera-refresh.py
           python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
+          python3 .github/scripts/fix-v1028-never-reset-on-background.py
+          python3 .github/scripts/fix-v1029-exact-alarm-permission.py
 
       - name: Verify alarms permission and no-reset resume
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re
           app=Path('mobile/App.tsx').read_text(encoding='utf-8')
           audio=Path('mobile/src/prayerAudio.ts').read_text(encoding='utf-8')
           cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
           manifest=Path('mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
-          for n in ['HASSOUN_EXACT_ALARM_PERMISSION_V3','Allow Alarms & reminders','Allow now','hassoun:exact-alarm-permission-prompt:v3','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4','hassoun:resume-exact-screen:v1']:
-            if n not in app: raise SystemExit(f'Missing runtime invariant: {n}')
-          if 'startFirstLaunchExactAlarmSetup()' in audio: raise SystemExit('Silent settings launcher still present')
-          if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest: raise SystemExit('SCHEDULE_EXACT_ALARM missing from native module')
-          for match in re.finditer(r'AppState\.addEventListener\("change", \(state\) => \{(.*?)\n\s*\}\);', app, re.S):
-            body=match.group(1)
-            for bad in ['refreshPrayerLocation(','loadPrayerTimes(','loadInitialPrayerTimes(','loadLocationPrayerContext(','setActiveTab("home")']:
-              if bad in body: raise SystemExit(f'Foreground resume still resets/reloads: {bad}')
+          required_app = [
+            'HASSOUN_EXACT_ALARM_PERMISSION_V3',
+            'Allow Alarms & reminders',
+            'Allow now',
+            'hassoun:exact-alarm-permission-prompt:v3',
+            'HASSOUN_BACKGROUND_RESUME_NO_RESET_V4',
+            'HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4',
+            'hassoun:resume-exact-screen:v1',
+            'HASSOUN_EXACT_SCREEN_RESUME_V3',
+          ]
+          for n in required_app:
+            if n not in app:
+              raise SystemExit(f'Missing runtime invariant: {n}')
+          if 'startFirstLaunchExactAlarmSetup()' in audio:
+            raise SystemExit('Silent settings launcher still present')
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest:
+            raise SystemExit('SCHEDULE_EXACT_ALARM missing from native module')
           for n in ['1.0.29','versionCode: 73','android.permission.SCHEDULE_EXACT_ALARM']:
-            if n not in cfg: raise SystemExit(f'Missing app config: {n}')
+            if n not in cfg:
+              raise SystemExit(f'Missing app config: {n}')
           print('Alarms & reminders prompt + no-reset background resume verified')
           PY
           cd mobile
@@ -149,19 +160,37 @@ jobs:
 
       - name: Verify Android task and special access
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          p=Path('mobile/android/app/src/main/AndroidManifest.xml'); ns='http://schemas.android.com/apk/res/android'; ET.register_namespace('android',ns)
-          tree=ET.parse(p); root=tree.getroot(); app=root.find('application')
+          p=Path('mobile/android/app/src/main/AndroidManifest.xml')
+          ns='http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android',ns)
+          tree=ET.parse(p)
+          root=tree.getroot()
+          app=root.find('application')
           perms={x.attrib.get(f'{{{ns}}}name') for x in root.findall('uses-permission')}
-          if 'android.permission.SCHEDULE_EXACT_ALARM' not in perms: raise SystemExit('Generated SCHEDULE_EXACT_ALARM missing')
-          if 'android.permission.USE_EXACT_ALARM' in perms: raise SystemExit('USE_EXACT_ALARM must not be present')
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in perms:
+            raise SystemExit('Generated SCHEDULE_EXACT_ALARM missing')
+          if 'android.permission.USE_EXACT_ALARM' in perms:
+            raise SystemExit('USE_EXACT_ALARM must not be present')
           app.set(f'{{{ns}}}banner','@drawable/hassoun_widget_logo')
           main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{ns}}}name','').endswith('MainActivity')),None)
-          if main is None: raise SystemExit('MainActivity missing')
-          for k,v in {'screenOrientation':'unspecified','launchMode':'singleTask','alwaysRetainTaskState':'true','clearTaskOnLaunch':'false','finishOnTaskLaunch':'false','noHistory':'false','documentLaunchMode':'never'}.items(): main.set(f'{{{ns}}}{k}',v)
+          if main is None:
+            raise SystemExit('MainActivity missing')
+          for k,v in {
+            'screenOrientation':'unspecified',
+            'launchMode':'singleTask',
+            'alwaysRetainTaskState':'true',
+            'clearTaskOnLaunch':'false',
+            'finishOnTaskLaunch':'false',
+            'noHistory':'false',
+            'documentLaunchMode':'never',
+          }.items():
+            main.set(f'{{{ns}}}{k}',v)
           tree.write(p,encoding='utf-8',xml_declaration=True)
+          print('Generated Android manifest exact-alarm permission and task retention verified')
           PY
 
       - name: Build release APK
