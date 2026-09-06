@@ -59,7 +59,7 @@ checks = {
     "mobile/src/prayerData.ts": ["hassoun:prayer-context:v3", "api.aladhan.com/v1/calendar", "preferences.school", "tuneString(preferences.offsets)", "fajr: parseTiming", "isha: parseTiming"],
     "mobile/src/PrayerCalculationSettingsPage.tsx": ["Smart Automatic", "Official Local Mosque Schedule", "Calculated Prayer Times", "Save & apply now", "LIVE PREVIEW", "Reset defaults", "Switch to calculated times"],
     "mobile/src/HomePrayerPage.tsx": ["RefreshControl", "DA’WAH • PRAYER EMAILS", "DailyIslamicCards", "NEXT • TOMORROW", "const active = next?.prayer === prayer;"],
-    "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "HASSOUN_BACKGROUND_RESUME_NO_RESET_V4", "HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4", "HASSOUN_EXACT_ALARM_PERMISSION_V3", "Allow Alarms & reminders", "hassoun:exact-alarm-permission-prompt:v3", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
+    "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "HASSOUN_BACKGROUND_RESUME_NO_RESET_V4", "HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4", "HASSOUN_EXACT_ALARM_PERMISSION_V4", "Allow Alarms & reminders", "showExactAlarmPermissionPrompt", "exactAlarmPromptShownRef", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
     "mobile/src/PermissionsStatusPage.tsx": ["Alarms & reminders", "PermissionsAndroid.PERMISSIONS.CAMERA", "openExactAlarmSettings"],
     "mobile/src/SettingsHub.tsx": ["PrayerCalculationSettingsPage", 'setPage("calculation")', "Tablet / Wall Display", 'setPage("masjidDisplay")', '<MasjidDisplayPage locale={locale}', "ConnectDisplayPage locale={locale}"],
     "mobile/src/ConnectDisplayPage.tsx": ["PermissionsAndroid.PERMISSIONS.CAMERA", "CameraView", "LIVE TABLET EDITOR", "gradientMix", "Pair and open live editor", "tabletTheme"],
@@ -79,4 +79,6 @@ for forbidden in ("REFRESH LOCATION", "loadLocationPrayerContext", "HomePrayerPa
         raise SystemExit(f"Legacy Home code remains: {forbidden}")
 if "startFirstLaunchExactAlarmSetup()" in audio:
     raise SystemExit("Silent exact-alarm settings auto-launch remains")
-print("Installed canonical prayer runtime, functional Prayer Calculation, no-reset background resume, reliable alarms permission prompt, next-prayer highlight and live-editable tablet display")
+if "hassoun:exact-alarm-permission-prompt:v3" in app:
+    raise SystemExit("Persisted alarm prompt suppression remains")
+print("Installed canonical prayer runtime, functional Prayer Calculation, no-reset background resume, forced alarms permission prompt, next-prayer highlight and live-editable tablet display")
