@@ -124,7 +124,7 @@ jobs:
           app=Path('mobile/App.tsx').read_text(encoding='utf-8')
           home=Path('mobile/src/HomePrayerPage.tsx').read_text(encoding='utf-8')
           cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
-          for needle in ['hassoun:resume-exact-screen:v1','activeTabRef.current = activeTab','if (!runtimeNavRestored || (busy && !today))']:
+          for needle in ['hassoun:resume-exact-screen:v1','HASSOUN_EXACT_SCREEN_RESUME_V3','resumeStateReady','activeTabRef.current = activeTab']:
               if needle not in app: raise SystemExit(f'Missing resume fix: {needle}')
           for needle in ['const active = next?.prayer === prayer;','NEXT • TOMORROW','prayerRowActive']:
               if needle not in home: raise SystemExit(f'Missing highlight fix: {needle}')
@@ -132,7 +132,7 @@ jobs:
               if needle not in cfg: raise SystemExit(f'Missing version: {needle}')
           for forbidden in ('loadLocationPrayerContext','HomePrayerPanel','refreshPrayerLocation','phoneHomeScreen'):
               if forbidden in app: raise SystemExit(f'Legacy runtime remains: {forbidden}')
-          print('Exact-screen resume and next-prayer highlight verified')
+          print('Robust exact-screen resume and next-prayer highlight verified')
           PY
           test -d mobile/node_modules/@typescript/typescript-linux-x64 || { cd mobile; npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2; cd ..; }
           cd mobile
