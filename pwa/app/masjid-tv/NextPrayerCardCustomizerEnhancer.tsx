@@ -29,6 +29,7 @@ function nextPrayer() {
 function apply() {
   const s = read();
   const enabled = s.highlightNextPrayerCard !== false;
+  const miniEnabled = s.highlightNextPrayerMiniCard !== false;
   const bg = String(s.nextPrayerCardColor || "#0b6b55");
   const mini = String(s.nextPrayerMiniCardColor || bg);
   const border = String(s.nextPrayerCardBorderColor || "#e3bd5f");
@@ -38,7 +39,7 @@ function apply() {
   document.querySelectorAll<HTMLElement>(".hassoun-next-big,.hassoun-next-mini").forEach(el => el.classList.remove("hassoun-next-big", "hassoun-next-mini"));
   if (!enabled) return;
   document.querySelectorAll<HTMLElement>(".sg-next").forEach(el => el.classList.add("hassoun-next-big"));
-  document.querySelectorAll<HTMLElement>(".sg-next-row").forEach(el => el.classList.add("hassoun-next-mini"));
+  if (miniEnabled) document.querySelectorAll<HTMLElement>(".sg-next-row").forEach(el => el.classList.add("hassoun-next-mini"));
   const next = nextPrayer();
   if (!next) return;
   document.querySelectorAll<HTMLElement>(".sg-slide,.prayer-slide,.prayer-hero,.big-prayer-card,.prayer-card,[data-prayer],[data-prayer-card]").forEach(el => {
@@ -74,7 +75,7 @@ export default function NextPrayerCardCustomizerEnhancer() {
       card.querySelectorAll<HTMLButtonElement>(".hnp-swatch").forEach(btn => btn.addEventListener("click", () => setColor(btn.dataset.color || "#0b6b55")));
       card.querySelector<HTMLInputElement>(".hnp-color")?.addEventListener("input", e => setColor((e.currentTarget as HTMLInputElement).value));
       card.querySelector<HTMLInputElement>(".hnp-enabled")?.addEventListener("change", e => { write({ highlightNextPrayerCard:(e.currentTarget as HTMLInputElement).checked }); apply(); });
-      card.querySelector<HTMLInputElement>(".hnp-mini")?.addEventListener("change", e => { const checked=(e.currentTarget as HTMLInputElement).checked; write({ highlightNextPrayerMiniCard:checked }); document.querySelectorAll<HTMLElement>(".hassoun-next-mini").forEach(el=>el.style.setProperty("background", checked ? "var(--hassoun-next-mini-bg)" : "", "important")); });
+      card.querySelector<HTMLInputElement>(".hnp-mini")?.addEventListener("change", e => { write({ highlightNextPrayerMiniCard:(e.currentTarget as HTMLInputElement).checked }); apply(); });
       card.querySelector<HTMLButtonElement>(".hnp-reset")?.addEventListener("click", () => { write({ highlightNextPrayerCard:true, highlightNextPrayerMiniCard:true, nextPrayerCardColor:"#0b6b55", nextPrayerMiniCardColor:"#0b6b55", nextPrayerCardBorderColor:"#e3bd5f" }); setColor("#0b6b55"); });
     };
     enhance();
