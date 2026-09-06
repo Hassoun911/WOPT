@@ -25,6 +25,7 @@ canonical_files = [
     "mobile/src/push.ts",
     "mobile/src/config.ts",
     "mobile/src/emailSignup.ts",
+    "mobile/src/prayerAudio.ts",
     "mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmScheduler.kt",
     "mobile/modules/prayer-audio/android/src/main/java/ca/wopt/prayeraudio/PrayerAlarmReceiver.kt",
@@ -43,26 +44,27 @@ run("fix-v1023-runtime-permissions-camera-resume.py")
 run("fix-v1026-home-highlight-resume.py")
 run("fix-v1027-functional-prayer-calculation.py")
 run("fix-v1028-never-reset-on-background.py")
+run("fix-v1029-exact-alarm-permission.py")
 run("restore-live-display-admin.py")
 run("fix-v1021-unified-display-menu.py")
 run("restore-native-wall-display.py")
 
 app_config = ROOT / "mobile/app.config.ts"
 cfg = app_config.read_text(encoding="utf-8")
-cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.28"', cfg, count=1)
-cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 72', cfg, count=1)
+cfg = re.sub(r'version: process\.env\.EXPO_APP_VERSION \|\| "[^"]+"', 'version: process.env.EXPO_APP_VERSION || "1.0.29"', cfg, count=1)
+cfg = re.sub(r'versionCode:\s*\d+', 'versionCode: 73', cfg, count=1)
 app_config.write_text(cfg, encoding="utf-8")
 
 checks = {
     "mobile/src/prayerData.ts": ["hassoun:prayer-context:v3", "api.aladhan.com/v1/calendar", "preferences.school", "tuneString(preferences.offsets)", "fajr: parseTiming", "isha: parseTiming"],
     "mobile/src/PrayerCalculationSettingsPage.tsx": ["Smart Automatic", "Official Local Mosque Schedule", "Calculated Prayer Times", "Save & apply now", "LIVE PREVIEW", "Reset defaults", "Switch to calculated times"],
     "mobile/src/HomePrayerPage.tsx": ["RefreshControl", "DA’WAH • PRAYER EMAILS", "DailyIslamicCards", "NEXT • TOMORROW", "const active = next?.prayer === prayer;"],
-    "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "HASSOUN_BACKGROUND_RESUME_NO_RESET_V4", "HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
+    "mobile/App.tsx": ["HomePrayerPage", "hassoun:last-active-tab:v2", "hassoun:resume-exact-screen:v1", "HASSOUN_EXACT_SCREEN_RESUME_V3", "HASSOUN_BACKGROUND_RESUME_NO_RESET_V4", "HASSOUN_CONTINUOUS_SCREEN_CHECKPOINT_V4", "HASSOUN_EXACT_ALARM_PERMISSION_V3", "Allow Alarms & reminders", "hassoun:exact-alarm-permission-prompt:v3", "resumeStateReady", "activeTabRef.current = activeTab", "subscribePrayerCalculationChanges"],
     "mobile/src/PermissionsStatusPage.tsx": ["Alarms & reminders", "PermissionsAndroid.PERMISSIONS.CAMERA", "openExactAlarmSettings"],
     "mobile/src/SettingsHub.tsx": ["PrayerCalculationSettingsPage", 'setPage("calculation")', "Tablet / Wall Display", 'setPage("masjidDisplay")', '<MasjidDisplayPage locale={locale}', "ConnectDisplayPage locale={locale}"],
     "mobile/src/ConnectDisplayPage.tsx": ["PermissionsAndroid.PERMISSIONS.CAMERA", "CameraView", "LIVE TABLET EDITOR", "gradientMix", "Pair and open live editor", "tabletTheme"],
     "mobile/src/MasjidDisplayPage.tsx": ["Tablet Wall Display", "WAITING FOR APP", "CONNECTED · LIVE", "tabletTheme", "pageGradientA", "clockOutline", "showSeconds", "showClockPeriod", "showPrayerPeriod", "/masjid-displays/register"],
-    "mobile/app.config.ts": ["1.0.28", "versionCode: 72", "android.permission.SCHEDULE_EXACT_ALARM", "android.permission.CAMERA"],
+    "mobile/app.config.ts": ["1.0.29", "versionCode: 73", "android.permission.SCHEDULE_EXACT_ALARM", "android.permission.CAMERA"],
 }
 for rel, needles in checks.items():
     text = (ROOT / rel).read_text(encoding="utf-8")
@@ -71,7 +73,10 @@ for rel, needles in checks.items():
             raise SystemExit(f"Missing {needle!r} in {rel}")
 
 app = (ROOT / "mobile/App.tsx").read_text(encoding="utf-8")
+audio = (ROOT / "mobile/src/prayerAudio.ts").read_text(encoding="utf-8")
 for forbidden in ("REFRESH LOCATION", "loadLocationPrayerContext", "HomePrayerPanel", "refreshPrayerLocation", "phoneHomeScreen"):
     if forbidden in app:
         raise SystemExit(f"Legacy Home code remains: {forbidden}")
-print("Installed canonical prayer runtime, functional Prayer Calculation, no-reset background resume, next-prayer highlight and live-editable tablet display")
+if "startFirstLaunchExactAlarmSetup()" in audio:
+    raise SystemExit("Silent exact-alarm settings auto-launch remains")
+print("Installed canonical prayer runtime, functional Prayer Calculation, no-reset background resume, reliable alarms permission prompt, next-prayer highlight and live-editable tablet display")
