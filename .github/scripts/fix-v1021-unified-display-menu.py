@@ -78,6 +78,17 @@ for needle in required:
         raise SystemExit(f"Unified display menu missing: {needle}")
 
 P.write_text(s, encoding="utf-8")
-runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-install-camera.py"), run_name="__main__")
-runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-display-pairing-admin.py"), run_name="__main__")
-print("Displays menu now includes native Tablet / Wall Display, QR pairing, remote admin, and preserves Permissions")
+
+# The early build pass may need to create the pairing page. The final pass happens
+# after the runtime camera hard-fix; never overwrite that safer implementation.
+pair_path = ROOT / "mobile/src/ConnectDisplayPage.tsx"
+pair_text = pair_path.read_text(encoding="utf-8") if pair_path.exists() else ""
+safe_camera = 'CAMERA_PENDING_KEY' in pair_text or 'PermissionsAndroid.PERMISSIONS.CAMERA' in pair_text
+if not safe_camera:
+    runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-install-camera.py"), run_name="__main__")
+    runpy.run_path(str(ROOT / ".github/scripts/fix-v1021-display-pairing-admin.py"), run_name="__main__")
+    print("Generated base display pairing/admin page")
+else:
+    print("Preserved runtime-safe QR camera pairing page")
+
+print("Displays menu includes native Tablet / Wall Display, QR pairing, remote admin, and Permissions")
