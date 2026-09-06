@@ -1,5 +1,6 @@
 export const PRAYER_KEYS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 
+export type Locale = "en" | "ar";
 export type PrayerKey = (typeof PRAYER_KEYS)[number];
 export type PrayerDay = Record<PrayerKey, string>;
 export type PrayerTimes = Record<string, PrayerDay>;
