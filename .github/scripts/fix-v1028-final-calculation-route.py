@@ -95,3 +95,43 @@ for needle in [
 # reconstruction so background/process recreation cannot collapse to Home.
 resume = Path(__file__).resolve().parent / "fix-v1023-full-resume-and-global-calculation.py"
 exec(compile(resume.read_text(encoding="utf-8"), str(resume), "exec"), {"__file__": str(resume), "__name__": "__main__"})
+
+# Do not let an asynchronous restore of an older Settings page (for example
+# Terms of Use) overwrite a page the user just tapped, such as Prayer calculation.
+# Keep exact-page resume, but only apply the saved nested page while Settings is
+# still on its untouched root screen.
+hub = HUB.read_text(encoding="utf-8")
+if 'useRef' not in hub.split('from "react";')[0]:
+    hub = hub.replace(
+        'import { useEffect, useMemo, useState } from "react";',
+        'import { useEffect, useMemo, useRef, useState } from "react";',
+        1,
+    )
+state_anchor = '  const [page, setPage] = useState<SettingsPage>("root");\n'
+if 'settingsCurrentPageRef' not in hub:
+    if state_anchor not in hub:
+        raise SystemExit('Settings page state missing for restore-race hardfix')
+    hub = hub.replace(
+        state_anchor,
+        state_anchor + '  const settingsCurrentPageRef = useRef<SettingsPage>("root");\n  settingsCurrentPageRef.current = page;\n',
+        1,
+    )
+old_restore = '''      .then((saved) => {\n        if (!alive || !saved) return;\n        setPage(saved as SettingsPage);\n      })'''
+new_restore = '''      .then((saved) => {\n        if (!alive || !saved || settingsCurrentPageRef.current !== "root") return;\n        setPage(saved as SettingsPage);\n      })'''
+if old_restore in hub:
+    hub = hub.replace(old_restore, new_restore, 1)
+elif 'settingsCurrentPageRef.current !== "root"' not in hub:
+    raise SystemExit('Could not harden Settings nested-page restore race')
+HUB.write_text(hub, encoding='utf-8')
+
+final_hub = HUB.read_text(encoding='utf-8')
+for needle in [
+    'settingsCurrentPageRef',
+    'settingsCurrentPageRef.current !== "root"',
+    'onPress={() => setPage("calculation")}',
+    'page === "calculation"',
+    '<PrayerCalculationSettingsPage locale={locale}',
+]:
+    if needle not in final_hub:
+        raise SystemExit(f'Missing final calculation-navigation safeguard: {needle}')
+print('Hardened Prayer calculation navigation against stale Terms/settings restore')
