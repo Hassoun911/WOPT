@@ -7,6 +7,7 @@ on:
       - ".github/workflows/build-v1030-native-tablet-display-v2.yml"
       - ".github/scripts/fix-v1030-native-tablet-grand-display.py"
       - ".github/scripts/fix-v1030-tablet-remote-sizing.py"
+      - ".github/scripts/fix-v1030-tablet-sdk-compat.py"
 
 permissions:
   contents: read
@@ -121,6 +122,7 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/fix-v1030-native-tablet-grand-display.py
           python3 .github/scripts/fix-v1030-tablet-remote-sizing.py
+          python3 .github/scripts/fix-v1030-tablet-sdk-compat.py
 
       - name: Verify native tablet, remote sizing and alarm invariants
         run: |
@@ -132,16 +134,18 @@ jobs:
           app=Path('mobile/App.tsx').read_text(encoding='utf-8')
           cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
           manifest=Path('mobile/modules/prayer-audio/android/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
-          for marker in ['HASSOUN_NATIVE_TABLET_GRAND_V1','useKeepAwake()','NavigationBar.setVisibilityAsync("hidden")','NEXT PRAYER','Adhan On','Native display active','mainCardHeight','lowerCardHeight','remoteTheme']:
+          for marker in ['HASSOUN_NATIVE_TABLET_GRAND_V1','useKeepAwake()','NavigationBar.setVisibilityAsync("hidden")','NEXT PRAYER','Adhan On','Native display active','mainCardHeight','lowerCardHeight','remoteTheme','clockScale','arabicScale','englishScale','prayerTimeScale','metaScale']:
             if marker not in page: raise SystemExit(f'Missing native tablet invariant: {marker}')
-          for marker in ['MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','mainCardScale','lowerCardScale']:
+          if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
+            raise SystemExit('Unsupported tablet SDK API survived reconstruction')
+          for marker in ['MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','mainCardScale','lowerCardScale','Enter any size from 50% to 400%']:
             if marker not in editor: raise SystemExit(f'Missing paired editor sizing control: {marker}')
           for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','hassoun:resume-exact-screen:v1']:
             if marker not in app: raise SystemExit(f'Missing last-good app invariant: {marker}')
           if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest: raise SystemExit('SCHEDULE_EXACT_ALARM missing')
           for marker in ['1.0.30','versionCode: 74','android.permission.SCHEDULE_EXACT_ALARM']:
             if marker not in cfg: raise SystemExit(f'Missing app config marker: {marker}')
-          print('Native tablet + paired main/lower card sizing + last-good alarms verified')
+          print('Native tablet + manual text sizing + paired card sizing + last-good alarms verified')
           PY
 
       - name: TypeScript verification
