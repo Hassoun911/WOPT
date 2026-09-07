@@ -7,8 +7,18 @@ page = page_path.read_text(encoding="utf-8")
 # Add video/image background support to the native tablet screen.
 if 'from "expo-video"' not in page:
     page = page.replace('import * as ScreenOrientation from "expo-screen-orientation";\n', 'import * as ScreenOrientation from "expo-screen-orientation";\nimport { useVideoPlayer, VideoView } from "expo-video";\n', 1)
-if 'import { Image } from "react-native";' not in page:
-    page = 'import { Image } from "react-native";\n' + page
+
+# The reconstructed MasjidDisplayPage may already import Image from react-native.
+# Add it only when Image is not already present in a react-native import.
+rn_imports = re.findall(r'import\s*\{([^}]*)\}\s*from\s*["\']react-native["\'];', page, flags=re.S)
+has_image = any(re.search(r'(^|,)\s*Image\s*(,|$)', names) for names in rn_imports)
+if not has_image:
+    m = re.search(r'import\s*\{([^}]*)\}\s*from\s*["\']react-native["\'];', page, flags=re.S)
+    if not m:
+        raise SystemExit("Could not find react-native import to add Image")
+    names = m.group(1).strip()
+    replacement = 'import { Image, ' + names + '} from "react-native";'
+    page = page[:m.start()] + replacement + page[m.end():]
 
 anchor = '  const prayerTimeFont = typeof remoteTheme.prayerTimeFont === "string" ? remoteTheme.prayerTimeFont : undefined;\n'
 insert = '''  const backgroundMode = remoteTheme.backgroundMode === "image" || remoteTheme.backgroundMode === "video" ? remoteTheme.backgroundMode : "color";\n  const backgroundImageUrl = typeof remoteTheme.backgroundImageUrl === "string" ? remoteTheme.backgroundImageUrl.trim() : "";\n  const backgroundVideoUrl = typeof remoteTheme.backgroundVideoUrl === "string" ? remoteTheme.backgroundVideoUrl.trim() : "";\n  const pageA = themeHex(remoteTheme.pageGradientA, CLASSIC.pageA);\n  const pageB = themeHex(remoteTheme.pageGradientB, CLASSIC.pageB);\n  const mainCardWidthScale = Math.max(.5, Math.min(1, Number(remoteTheme.mainCardWidthScale) || 1));\n  const mainCardHeightScale = Math.max(.5, Math.min(1.6, Number(remoteTheme.mainCardHeightScale) || 1));\n  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl) player.play(); });\n'''
@@ -91,4 +101,4 @@ for marker in ['WHOLE DISPLAY BACKGROUND', 'IMAGE URL', 'VIDEO URL', 'APP BACKGR
         raise SystemExit(f"Missing smart editor control: {marker}")
 controller_path.write_text(controller, encoding="utf-8")
 
-print("HASSOUN_TABLET_SMART_EDITOR_V3 applied: fixed TypeScript syntax + whole-screen color/image/video backgrounds + independent main/lower card sizing/text/font/colors")
+print("HASSOUN_TABLET_SMART_EDITOR_V4 applied: duplicate-safe Image import + fixed TypeScript syntax + whole-screen color/image/video backgrounds + independent main/lower card sizing/text/font/colors")
