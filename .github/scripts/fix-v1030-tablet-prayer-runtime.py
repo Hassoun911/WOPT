@@ -28,27 +28,24 @@ state_anchor = '  const [slideSeconds, setSlideSeconds] = useState(8);'
 if state_anchor in page and 'tabletPrayerRuntimeStatus' not in page:
     page = page.replace(state_anchor, state_anchor + '\n  const [tabletPrayerRuntimeStatus, setTabletPrayerRuntimeStatus] = useState("arming");', 1)
 else:
-    # Final reconstructed page can have compressed state declarations. Add a standalone state
-    # immediately after the component opening declarations.
     comp_anchor = '  const [now, setNow] = useState(new Date());\n'
     if 'tabletPrayerRuntimeStatus' not in page:
         if comp_anchor not in page:
             raise SystemExit("tablet runtime: component state anchor missing")
         page = page.replace(comp_anchor, comp_anchor + '  const [tabletPrayerRuntimeStatus, setTabletPrayerRuntimeStatus] = useState("arming");\n', 1)
 
-# Self-healing scheduler: entering tablet mode arms all enabled phone prayer preferences,
-# requests normal notification permission through the canonical scheduler, and rebuilds
-# exact Android Adhan alarms. Re-arm on resume and periodically for long-running wall tablets.
+# Self-healing scheduler: entering tablet mode arms all enabled prayer preferences,
+# requests notification permission through the canonical scheduler, and rebuilds
+# exact Android Adhan alarms. Re-arm on resume and periodically for long-running tablets.
 if 'HASSOUN_TABLET_PRAYER_RUNTIME_V1' not in page:
     effect_anchor = '  useEffect(() => {\n    const id = setInterval(() => setSlide(n => (n + 1) % PRAYERS.length), Math.max(4, slideSeconds) * 1000);\n    return () => clearInterval(id);\n  }, [slideSeconds]);\n'
     if effect_anchor not in page:
         raise SystemExit("tablet runtime: slide effect anchor missing")
-    runtime = '''\n  // HASSOUN_TABLET_PRAYER_RUNTIME_V1\n  useEffect(() => {\n    if (loading || !Object.keys(times).length) return;\n    let dead = false;\n    let arming = false;\n    const arm = async () => {\n      if (arming || dead) return;\n      arming = true;\n      try {\n        const preferences = await loadPhonePrayerAlertPreferences();\n        const result = await schedulePrayerNotifications(times, locale, preferences, {\n          timeZone: location.timezone,\n          locationLabel: location.label,\n        });\n        if (!dead) {\n          if (!result.granted) setTabletPrayerRuntimeStatus("notification-permission-needed");\n          else if (result.exactAlarmGranted === false) setTabletPrayerRuntimeStatus("exact-alarm-permission-needed");\n          else setTabletPrayerRuntimeStatus(`armed:${result.count}`);\n        }\n      } catch {\n        if (!dead) setTabletPrayerRuntimeStatus("error");\n      } finally {\n        arming = false;\n      }\n    };\n    void arm();\n    const appSub = AppState.addEventListener("change", state => { if (state === "active") void arm(); });\n    const keepArmed = setInterval(() => { void arm(); }, 6 * 60 * 60 * 1000);\n    return () => { dead = true; appSub.remove(); clearInterval(keepArmed); };\n  }, [loading, times, locale, location.timezone, location.label]);\n'''
+    runtime = '''\n  // HASSOUN_TABLET_PRAYER_RUNTIME_V1\n  useEffect(() => {\n    if (loading || !Object.keys(times).length) return;\n    let dead = false;\n    let arming = false;\n    const arm = async () => {\n      if (arming || dead) return;\n      arming = true;\n      try {\n        const preferences = await loadPhonePrayerAlertPreferences();\n        const result = await schedulePrayerNotifications(times, locale, preferences, {\n          timeZone: location.timezone,\n          locationLabel: location.label,\n        });\n        if (!dead) {\n          if (!result.granted) setTabletPrayerRuntimeStatus("notification-permission-needed");\n          else if ("exactAlarmGranted" in result && result.exactAlarmGranted === false) setTabletPrayerRuntimeStatus("exact-alarm-permission-needed");\n          else setTabletPrayerRuntimeStatus(`armed:${result.count}`);\n        }\n      } catch {\n        if (!dead) setTabletPrayerRuntimeStatus("error");\n      } finally {\n        arming = false;\n      }\n    };\n    void arm();\n    const appSub = AppState.addEventListener("change", state => { if (state === "active") void arm(); });\n    const keepArmed = setInterval(() => { void arm(); }, 6 * 60 * 60 * 1000);\n    return () => { dead = true; appSub.remove(); clearInterval(keepArmed); };\n  }, [loading, times, locale, location.timezone, location.label]);\n'''
     page = page.replace(effect_anchor, effect_anchor + runtime, 1)
 
 # Prayer-time behavior: for the first five minutes after a prayer begins, pin the main
-# gallery to that prayer and highlight its lower card. This makes the display visibly react
-# at prayer time instead of continuing to slide as if nothing happened.
+# gallery to that prayer and highlight its lower card.
 next_anchor = '  const next = useMemo(() => {\n    if (!day) return "fajr" as PrayerKey;\n    for (const p of PRAYER_KEYS) {\n      const m = minutes(day[p]);\n      if (m !== null && m > cur) return p;\n    }\n    return "fajr" as PrayerKey;\n  }, [day, cur]);\n'
 if next_anchor not in page:
     raise SystemExit("tablet runtime: next-prayer anchor missing")
@@ -58,18 +55,10 @@ if 'const prayerNow =' not in page:
 
 page = page.replace('  const current = PRAYERS[slide];', '  const current = prayerNow ? (PRAYERS.find(p => p.key === prayerNow) || PRAYERS[slide]) : PRAYERS[slide];', 1)
 page = page.replace('  const isNext = current.key === next;', '  const isPrayerNow = prayerNow === current.key;\n  const isNext = !isPrayerNow && current.key === next;', 1)
-
-# Smart UX later derives the label; make PRAYER NOW win during the prayer-time window.
 page = page.replace('(isNext ? "NEXT PRAYER" : "PRAYER")', '(isPrayerNow ? "PRAYER NOW" : isNext ? "NEXT PRAYER" : "PRAYER")')
-
-# Lower cards: current prayer wins over next prayer during the prayer-now window.
 page = page.replace('            const active = p.key === next;', '            const active = prayerNow ? p.key === prayerNow : p.key === next;', 1)
-
-# Countdown should not show a misleading countdown while displaying PRAYER NOW.
 page = page.replace('{isNext ? <Text style={styles.countdown}>', '{isNext && !isPrayerNow ? <Text style={styles.countdown}>', 1)
 
-# Add visible runtime status to the native setup sheet so the tablet can be diagnosed
-# without leaving display mode.
 status_marker = '<Text style={styles.status}>{paired ? "CONNECTED · LIVE" : "WAITING FOR APP"}</Text>'
 if status_marker in page and 'PRAYER ALERT ENGINE' not in page:
     status = status_marker + '<Text style={styles.sheetSub}>PRAYER ALERT ENGINE · {tabletPrayerRuntimeStatus.startsWith("armed:") ? "ARMED" : tabletPrayerRuntimeStatus === "notification-permission-needed" ? "ALLOW NOTIFICATIONS" : tabletPrayerRuntimeStatus === "exact-alarm-permission-needed" ? "ALLOW ALARMS & REMINDERS" : tabletPrayerRuntimeStatus === "error" ? "CHECK SETTINGS" : "ARMING…"}</Text>'
