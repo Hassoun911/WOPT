@@ -72,3 +72,8 @@ for marker in ["COLOR PICKER", "COLOR_PALETTE", "Tap the color swatch", "CUSTOM 
 controller_path.write_text(controller, encoding="utf-8")
 
 print("HASSOUN_TABLET_LIVE_THEME_V3 applied: full-width auto-fit local clock + live theme + color picker")
+
+smart = Path(".github/scripts/fix-v1030-tablet-smart-editor.py")
+if not smart.exists():
+    raise SystemExit("Smart tablet editor patch is missing")
+exec(compile(smart.read_text(encoding="utf-8"), str(smart), "exec"))
