@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 page_path = Path("mobile/src/MasjidDisplayPage.tsx")
 page = page_path.read_text(encoding="utf-8")
@@ -36,13 +37,28 @@ fonts = 'const FONTS=["sans-serif","serif","monospace","sans-serif-condensed"];'
 palette = 'const COLOR_PALETTE=["#ffffff","#f8f3e8","#f4cb77","#e0b761","#ffb300","#ff6b35","#ef4444","#be123c","#ec4899","#a855f7","#6366f1","#2563eb","#06b6d4","#14b8a6","#10b981","#22c55e","#84cc16","#0d8e77","#087a67","#075d52","#111827","#374151","#6b7280","#000000"];'
 if fonts not in controller:
     raise SystemExit("Could not find FONTS constant")
-controller = controller.replace(fonts, fonts + '\n' + palette, 1)
+if 'const COLOR_PALETTE=' not in controller:
+    controller = controller.replace(fonts, fonts + '\n' + palette, 1)
 
-state_old = 'const [active,setActive]=useState<Display|null>(null),[remote,setRemote]=useState<Remote|null>(null),[selected,setSelected]=useState<Part>("clock"),[saving,setSaving]=useState(false);'
-state_new = 'const [active,setActive]=useState<Display|null>(null),[remote,setRemote]=useState<Remote|null>(null),[selected,setSelected]=useState<Part>("clock"),[saving,setSaving]=useState(false),[colorPicker,setColorPicker]=useState<{label:string;key:string;value:string}|null>(null);'
-if state_old not in controller:
-    raise SystemExit("Could not find controller state declaration")
-controller = controller.replace(state_old, state_new, 1)
+# Add color-picker state robustly regardless of how the long compressed state declaration is reconstructed.
+if '[colorPicker,setColorPicker]' not in controller:
+    saving_pattern = r'(\[saving\s*,\s*setSaving\]\s*=\s*useState\(false\))'
+    controller, n = re.subn(
+        saving_pattern,
+        r'\1,[colorPicker,setColorPicker]=useState<{label:string;key:string;value:string}|null>(null)',
+        controller,
+        count=1,
+    )
+    if n != 1:
+        # Fallback: insert a standalone state directly after the ar/t line near component start.
+        marker = '  const ar=locale==="ar",t=(en:string,a:string)=>ar?a:en;\n'
+        if marker not in controller:
+            raise SystemExit("Could not find a safe insertion point for color picker state")
+        controller = controller.replace(
+            marker,
+            marker + '  const [colorPicker,setColorPicker]=useState<{label:string;key:string;value:string}|null>(null);\n',
+            1,
+        )
 
 old_color = '  const colorField=(label:string,key:string,value:string)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.colorRow}><View style={[styles.swatch,{backgroundColor:hex(value,"#ffffff")}]} /><TextInput value={value} onChangeText={v=>mutate({[key]:v})} autoCapitalize="none" style={styles.input}/></View></View>;'
 new_color = '''  const colorField=(label:string,key:string,value:string)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.colorRow}><Pressable onPress={()=>setColorPicker({label,key,value})} style={[styles.swatch,{backgroundColor:hex(value,"#ffffff")}]}><Text style={{color:"#fff",fontWeight:"900",textAlign:"center"}}>◉</Text></Pressable><TextInput value={value} onChangeText={v=>mutate({[key]:v})} autoCapitalize="none" style={styles.input}/></View><Text style={styles.help}>Tap the color swatch to open the color picker.</Text><Modal visible={colorPicker?.key===key} transparent animationType="fade" onRequestClose={()=>setColorPicker(null)}><View style={{flex:1,backgroundColor:"rgba(0,0,0,.55)",justifyContent:"center",padding:22}}><View style={{backgroundColor:"#fff",borderRadius:24,padding:18,maxHeight:"82%"}}><Text style={[styles.title,{fontSize:22}]}>COLOR PICKER · {label}</Text><Text style={styles.help}>Choose a color below or mix your own with a HEX value.</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:10,marginVertical:16}}>{COLOR_PALETTE.map(c=><Pressable key={c} onPress={()=>{mutate({[key]:c});setColorPicker(null)}} style={{width:42,height:42,borderRadius:21,backgroundColor:c,borderWidth:2,borderColor:c.toLowerCase()===String(value||"").toLowerCase()?"#111":"#ddd"}} />)}</View><Text style={styles.fieldLabel}>CUSTOM / MIXED HEX COLOR</Text><TextInput defaultValue={value} autoCapitalize="none" placeholder="#12aa91" onEndEditing={e=>{const v=String(e.nativeEvent.text||"").trim();if(/^#[0-9a-f]{6}$/i.test(v)){mutate({[key]:v});setColorPicker(null)}}} style={styles.input}/><Pressable onPress={()=>setColorPicker(null)} style={[styles.step,{marginTop:14,alignSelf:"flex-end"}]}><Text style={styles.stepText}>CLOSE</Text></Pressable></View></View></Modal></View>;'''
@@ -50,9 +66,9 @@ if old_color not in controller:
     raise SystemExit("Could not find controller color field helper")
 controller = controller.replace(old_color, new_color, 1)
 
-for marker in ["COLOR PICKER", "COLOR_PALETTE", "Tap the color swatch", "CUSTOM / MIXED HEX COLOR"]:
+for marker in ["COLOR PICKER", "COLOR_PALETTE", "Tap the color swatch", "CUSTOM / MIXED HEX COLOR", "colorPicker"]:
     if marker not in controller:
         raise SystemExit(f"Missing color picker marker: {marker}")
 controller_path.write_text(controller, encoding="utf-8")
 
-print("HASSOUN_TABLET_LIVE_THEME_V1 applied: native clock/text colors+fonts, correct Arabic/English mapping, tappable color picker")
+print("HASSOUN_TABLET_LIVE_THEME_V2 applied: native clock/text colors+fonts, correct Arabic/English mapping, tappable color picker")
