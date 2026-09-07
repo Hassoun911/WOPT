@@ -78,10 +78,10 @@ controller_path.write_text(controller, encoding="utf-8")
 # The reconstructed app config can come from an older version string. Set v1.0.30 robustly.
 cfg_path = Path("mobile/app.config.ts")
 cfg = cfg_path.read_text(encoding="utf-8")
-cfg, n1 = re.subn(r'version\s*:\s*["\'][^"\']+["\']', 'version: "1.0.30"', cfg, count=1)
-cfg, n2 = re.subn(r'versionCode\s*:\s*\d+', 'versionCode: 74', cfg, count=1)
+cfg, n1 = re.subn(r'\bversion\s*:\s*["\'][^"\']+["\']', 'version: "1.0.30"', cfg, count=1)
+cfg, n2 = re.subn(r'\bversionCode\s*:\s*\d+', 'versionCode: 74', cfg, count=1)
 if n1 != 1 or n2 != 1:
     raise SystemExit(f"Could not set app version robustly: version={n1}, versionCode={n2}")
 cfg_path.write_text(cfg, encoding="utf-8")
 
-print("HASSOUN_TABLET_REMOTE_SIZING_V1 applied: main + lower prayer card sizing, full tabletTheme receive, v1.0.30/74")
+print("HASSOUN_TABLET_REMOTE_SIZING_V2 applied: main + lower prayer card sizing, full tabletTheme receive, v1.0.30/74")
