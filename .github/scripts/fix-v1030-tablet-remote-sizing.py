@@ -38,8 +38,17 @@ page = page.replace(
     1
 )
 
+# Expo SDK 57 typings do not expose setBehaviorAsync and React Native's StyleSheet
+# uses absoluteFill rather than absoluteFillObject in this reconstructed baseline.
+page = page.replace('      void NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => undefined);\n', '')
+page = page.replace('StyleSheet.absoluteFillObject', 'StyleSheet.absoluteFill')
+
 if 'mainCardHeight' not in page or 'lowerCardHeight' not in page:
     raise SystemExit("Native card sizing patch did not apply")
+if 'setBehaviorAsync' in page:
+    raise SystemExit("Unsupported NavigationBar.setBehaviorAsync still present")
+if 'StyleSheet.absoluteFillObject' in page:
+    raise SystemExit("Unsupported StyleSheet.absoluteFillObject still present")
 page_path.write_text(page, encoding="utf-8")
 
 controller_path = Path("mobile/src/ConnectDisplayPage.tsx")
@@ -87,4 +96,4 @@ if 'version: "1.0.30"' not in cfg or 'versionCode: 74' not in cfg:
     raise SystemExit("v1.0.30 config verification failed after replacement")
 cfg_path.write_text(cfg, encoding="utf-8")
 
-print("HASSOUN_TABLET_REMOTE_SIZING_V3 applied: main + lower prayer card sizing, full tabletTheme receive, v1.0.30/74")
+print("HASSOUN_TABLET_REMOTE_SIZING_V4 applied: tablet sizing + SDK57 TypeScript compatibility + v1.0.30/74")
