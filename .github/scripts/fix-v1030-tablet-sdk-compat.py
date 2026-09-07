@@ -36,3 +36,4 @@ for marker in [
     if marker not in final_page:
         raise SystemExit(f'Missing tablet prayer runtime marker: {marker}')
 print('HASSOUN_TABLET_PRAYER_RUNTIME_V1 verified after SDK compatibility pass')
+# rebuild trigger: tablet Adhan/notification runtime v1
