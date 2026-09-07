@@ -17,3 +17,4 @@ if 'NavigationBar.setVisibilityAsync("hidden")' not in page:
 
 page_path.write_text(page, encoding="utf-8")
 print('HASSOUN_TABLET_SDK_COMPAT_V1 applied')
+# rebuild trigger: smart editor V2 verifier compatibility
