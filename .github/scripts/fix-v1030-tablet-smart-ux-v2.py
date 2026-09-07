@@ -20,48 +20,53 @@ page = re.sub(r'const mainCardHeightScale = Math\.max\(\.5, Math\.min\(1\.6, Num
 page = page.replace('const miniWidth = Math.max(.55, Math.min(1.7, Number(remoteTheme[`${miniPrefix}width`]) || 1));', 'const miniWidth = Number(remoteTheme[`${miniPrefix}width`]) > 0 ? Number(remoteTheme[`${miniPrefix}width`]) : 1;', 1)
 page = page.replace('const miniHeight = Math.max(.55, Math.min(1.7, Number(remoteTheme[`${miniPrefix}height`]) || 1));', 'const miniHeight = Number(remoteTheme[`${miniPrefix}height`]) > 0 ? Number(remoteTheme[`${miniPrefix}height`]) : 1;', 1)
 
-# --- Native tablet: local-time band, safe text fitting, live labels/icons ---
 anchor = '  const prayerTimeFont = typeof remoteTheme.prayerTimeFont === "string" ? remoteTheme.prayerTimeFont : undefined;\n'
 if anchor not in page:
     raise SystemExit("smart ux: live-theme anchor missing")
-extra = '''  const displayClock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: remoteTheme.showSeconds !== false ? "2-digit" : undefined, hour12: remoteTheme.showClockPeriod !== false }).format(now);\n  const prayerLabelText = typeof remoteTheme.prayerLabelText === "string" && remoteTheme.prayerLabelText.trim() ? remoteTheme.prayerLabelText.trim() : (isNext ? "NEXT PRAYER" : "PRAYER");\n  const prayerLabelEmoji = typeof remoteTheme.prayerLabelEmoji === "string" ? remoteTheme.prayerLabelEmoji.trim() : "";\n  const showPrayerLabel = remoteTheme.showPrayerLabel !== false;\n  const adhanText = typeof remoteTheme.adhanText === "string" && remoteTheme.adhanText.trim() ? remoteTheme.adhanText.trim() : "Adhan On";\n  const adhanEmoji = typeof remoteTheme.adhanEmoji === "string" && remoteTheme.adhanEmoji.trim() ? remoteTheme.adhanEmoji.trim() : "🔊";\n  const showAdhan = remoteTheme.showAdhan !== false;\n'''
+extra = '''  const displayClock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: remoteTheme.showSeconds !== false ? "2-digit" : undefined, hour12: remoteTheme.showClockPeriod !== false }).format(now);\n  const prayerLabelText = typeof remoteTheme.prayerLabelText === "string" && remoteTheme.prayerLabelText.trim() ? remoteTheme.prayerLabelText.trim() : (isNext ? "NEXT PRAYER" : "PRAYER");\n  const prayerLabelEmoji = typeof remoteTheme.prayerLabelEmoji === "string" ? remoteTheme.prayerLabelEmoji.trim() : "";\n  const showPrayerLabel = remoteTheme.showPrayerLabel !== false;\n  const adhanText = typeof remoteTheme.adhanText === "string" && remoteTheme.adhanText.trim() ? remoteTheme.adhanText.trim() : "Adhan On";\n  const adhanEmoji = typeof remoteTheme.adhanEmoji === "string" && remoteTheme.adhanEmoji.trim() ? remoteTheme.adhanEmoji.trim() : "🔊";\n  const showAdhan = remoteTheme.showAdhan !== false;\n  const requestedClockBand = Math.max(1, Number(remoteTheme.clockBandScale) || clockScale);\n  const requestedMiniBand = Math.max(1, Number(remoteTheme.lowerCardScale) || 1);\n  const clockBandHeight = Math.max(78, Math.round(height * .09 * requestedClockBand));\n  const miniBandHeight = Math.max(76, Math.round(104 * requestedMiniBand));\n  const fixedReserve = Math.round(height * .045) + clockBandHeight + miniBandHeight;\n  const heroAvailableHeight = Math.max(160, height - fixedReserve);\n'''
 if 'const displayClock =' not in page:
     page = page.replace(anchor, anchor + extra, 1)
 
-# Upper local time owns the whole row. Large requested sizes reflow/auto-fit instead of clipping.
+# Clock gets the space the admin requests; main gallery yields space automatically.
 page = page.replace(
     '<Pressable onPress={() => setSetup(true)} style={[styles.clockButton,{width:"100%",alignSelf:"stretch",justifyContent:"center",overflow:"visible",paddingHorizontal:4}]}>',
-    '<Pressable onPress={() => setSetup(true)} style={[styles.clockButton,{width:"100%",alignSelf:"stretch",justifyContent:"center",alignItems:"center",overflow:"hidden",paddingHorizontal:2,minHeight:Math.max(88,height*.105),flexShrink:1}]}>',
+    '<Pressable onPress={() => setSetup(true)} style={[styles.clockButton,{width:"100%",alignSelf:"stretch",justifyContent:"center",alignItems:"center",overflow:"hidden",paddingHorizontal:2,height:clockBandHeight,flexShrink:0}]}>',
     1,
 )
 clock_pattern = re.compile(r'<Text numberOfLines=\{1\} adjustsFontSizeToFit minimumFontScale=\{0\.2\} allowFontScaling=\{false\} style=\{\[styles\.clock, \{ width:"100%", textAlign:"center", fontSize: \(landscape \? 78 : 112\) \* clockScale, color: clockColor, fontFamily: clockFont \}\]\}>\{clock\}</Text>')
-clock_repl = '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.clock, { width:"100%", maxWidth:"100%", textAlign:"center", alignSelf:"stretch", fontSize: Math.max(72,width*.19*clockScale), color: clockColor, fontFamily: clockFont, includeFontPadding:true, letterSpacing:-1 }]}>{displayClock}</Text>'
+clock_repl = '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.clock, { width:"100%", maxWidth:"100%", height:"100%", textAlign:"center", textAlignVertical:"center", alignSelf:"stretch", fontSize: Math.max(72,width*.19*clockScale), color: clockColor, fontFamily: clockFont, includeFontPadding:true, letterSpacing:-1 }]}>{displayClock}</Text>'
 page, n = clock_pattern.subn(clock_repl, page, count=1)
 if n != 1:
     page = page.replace('>{clock}</Text>', '>{displayClock}</Text>', 1)
 
-# Main gallery text can be requested at any size; it always fits/reflows rather than getting cut off.
+# Main gallery always consumes the remaining available height after top/bottom controls claim space.
+hero_pattern = re.compile(r'<LinearGradient colors=\{\[cardA, cardB\]\} style=\{\[styles\.hero, \{ borderColor: cardBorder, width: `\$\{Math\.round\(mainCardWidthScale \* 100\)\}%`, alignSelf: "center" \}, fitFullScreen \? \{ flex: 1 \} : \{ flex: 0, height: Math\.round\(mainCardHeight \* mainCardHeightScale\) \}\]\}>')
+hero_repl = '<LinearGradient colors={[cardA, cardB]} style={[styles.hero, { borderColor: cardBorder, width: `${Math.min(100,Math.max(1,Math.round(mainCardWidthScale*100)))}%`, alignSelf:"center", flexShrink:1, minHeight:140 }, fitFullScreen ? { flex:1, maxHeight:heroAvailableHeight } : { flex:0, height:Math.min(heroAvailableHeight,Math.max(140,Math.round(mainCardHeight*mainCardHeightScale))) }]}> '
+page, n = hero_pattern.subn(hero_repl, page, count=1)
+if n != 1:
+    page = page.replace(
+        '<LinearGradient colors={[cardA, cardB]} style={[styles.hero, { borderColor: cardBorder, width: `${Math.round(mainCardWidthScale * 100)}%`, alignSelf: "center" }, fitFullScreen ? { flex: 1 } : { flex: 0, height: Math.round(mainCardHeight * mainCardHeightScale) }]}>',
+        hero_repl,
+        1,
+    )
+
+# Main prayer text can be any requested size, but must stay inside the gallery card.
 repls = [
     ('<Text style={[styles.arabic, { fontSize: (landscape ? 58 : 78) * arabicScale, color: arabicColor, fontFamily: arabicFont }]}>{current.ar}</Text>',
-     '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.arabic, { width:"96%", alignSelf:"center", textAlign:"center", paddingVertical:8, includeFontPadding:true, fontSize: (landscape ? 58 : 78) * arabicScale, color: arabicColor, fontFamily: arabicFont, flexShrink:1 }]}>{current.ar}</Text>'),
+     '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.arabic, { width:"96%", maxHeight:"28%", alignSelf:"center", textAlign:"center", paddingVertical:6, includeFontPadding:true, fontSize:(landscape?58:78)*arabicScale, color:arabicColor, fontFamily:arabicFont, flexShrink:1 }]}>{current.ar}</Text>'),
     ('<Text style={[styles.english, { fontSize: (landscape ? 42 : 54) * englishScale, color: englishColor, fontFamily: englishFont }]}>{current.en}</Text>',
-     '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.english, { width:"96%", alignSelf:"center", textAlign:"center", paddingVertical:4, includeFontPadding:true, fontSize: (landscape ? 42 : 54) * englishScale, color: englishColor, fontFamily: englishFont, flexShrink:1 }]}>{current.en}</Text>'),
+     '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.english, { width:"96%", maxHeight:"22%", alignSelf:"center", textAlign:"center", paddingVertical:3, includeFontPadding:true, fontSize:(landscape?42:54)*englishScale, color:englishColor, fontFamily:englishFont, flexShrink:1 }]}>{current.en}</Text>'),
     ('<View style={styles.timeRow}><Text style={[styles.prayerTime, { fontSize: (landscape ? 62 : 82) * prayerTimeScale, color: prayerTimeColor, fontFamily: prayerTimeFont }]}>{currentTime.main}</Text><Text style={[styles.prayerPeriod, { fontSize: 26 * prayerTimeScale, color: prayerTimeColor, fontFamily: prayerTimeFont }]}>{currentTime.period}</Text></View>',
-     '<View style={[styles.timeRow,{width:"96%",alignSelf:"center",flexShrink:1}]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.prayerTime, { flexShrink:1, fontSize: (landscape ? 62 : 82) * prayerTimeScale, color: prayerTimeColor, fontFamily: prayerTimeFont }]}>{currentTime.main}</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} style={[styles.prayerPeriod, { flexShrink:1, fontSize: 26 * prayerTimeScale, color: prayerTimeColor, fontFamily: prayerTimeFont }]}>{currentTime.period}</Text></View>'),
+     '<View style={[styles.timeRow,{width:"96%",maxHeight:"24%",alignSelf:"center",flexShrink:1}]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.prayerTime,{flexShrink:1,fontSize:(landscape?62:82)*prayerTimeScale,color:prayerTimeColor,fontFamily:prayerTimeFont}]}>{currentTime.main}</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.01} allowFontScaling={false} style={[styles.prayerPeriod,{flexShrink:1,fontSize:26*prayerTimeScale,color:prayerTimeColor,fontFamily:prayerTimeFont}]}>{currentTime.period}</Text></View>'),
 ]
 for old,new in repls:
     if old in page:
         page = page.replace(old,new,1)
 
-# Make main card size priority responsive: requested huge sizes claim more available room,
-# but the physical screen remains the outer boundary and sibling sections shrink first.
-page = page.replace(
-    'width: `${Math.round(mainCardWidthScale * 100)}%`, alignSelf: "center"',
-    'width: `${Math.min(100, Math.max(1, Math.round(mainCardWidthScale * 100)))}%`, alignSelf: "center", flexGrow: Math.max(1, mainCardHeightScale), flexShrink:1',
-    1,
-)
+# Bottom cards claim their requested height; the gallery shrinks above them automatically.
+page = page.replace('<View style={[styles.miniRow, { height: lowerCardHeight }]}>', '<View style={[styles.miniRow,{height:miniBandHeight,flexShrink:0,alignItems:"stretch"}]}>', 1)
+page = page.replace('height: Math.round(lowerCardHeight * miniHeight)', 'height: "100%"', 1)
 
-# Live custom prayer label and Adhan badge.
 page = page.replace(
     '<View style={styles.prayerPill}><Text style={styles.pillText}>{isNext ? "NEXT PRAYER" : "PRAYER"}</Text></View>',
     '{showPrayerLabel ? <View style={styles.prayerPill}><Text style={styles.pillText}>{prayerLabelEmoji ? `${prayerLabelEmoji} ` : ""}{prayerLabelText}</Text></View> : null}',
@@ -73,44 +78,30 @@ page = page.replace(
     1,
 )
 
-# Per-prayer mini-card Islamic icon/emoji override.
 mini_font_line = '            const miniFont = typeof remoteTheme[`${miniPrefix}font`] === "string" ? remoteTheme[`${miniPrefix}font`] : undefined;\n'
 if mini_font_line in page and 'const miniEmoji =' not in page:
     page = page.replace(mini_font_line, mini_font_line + '            const miniEmoji = typeof remoteTheme[`${miniPrefix}emoji`] === "string" && remoteTheme[`${miniPrefix}emoji`].trim() ? remoteTheme[`${miniPrefix}emoji`].trim() : p.icon;\n', 1)
 page = page.replace('>{p.icon}</Text>', '>{miniEmoji}</Text>', 1)
 
-for marker in ['displayClock','prayerLabelEmoji','adhanEmoji','miniEmoji','adjustsFontSizeToFit','minimumFontScale={0.01}']:
+for marker in ['clockBandHeight','miniBandHeight','heroAvailableHeight','displayClock','miniEmoji','minimumFontScale={0.01}']:
     if marker not in page:
         raise SystemExit(f"smart ux native marker missing: {marker}")
 page_path.write_text(page, encoding="utf-8")
 
-# --- Paired admin: no max-size caps + obvious quick navigation + Islamic emoji palette ---
+# --- Paired admin: unlimited positive sizing + quick editor + Islamic emoji palette ---
 ctl_path = Path("mobile/src/ConnectDisplayPage.tsx")
 ctl = ctl_path.read_text(encoding="utf-8")
 
-# Remove 400% and card percentage limits from the generated editor helpers.
-ctl = re.sub(
-    r'const sizeField=\(label:string,key:string,value:number\)=><View style=\{styles\.field\}>.*?</View>;',
-    'const sizeField=(label:string,key:string,value:number)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(value-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum. Enter any positive percentage.</Text></View>;',
-    ctl,
-    count=1,
-    flags=re.S,
-)
-ctl = re.sub(
-    r'const percentField=\(label:string,key:string,value:number,min=50,max=170\)=><View style=\{styles\.field\}>.*?</View>;',
-    'const percentField=(label:string,key:string,value:number,min=1,max=0)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(Number(value)-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum. The layout automatically gives this item more room and shrinks/reflows surrounding items.</Text></View>;',
-    ctl,
-    count=1,
-    flags=re.S,
-)
-ctl = re.sub(
-    r'const cardSizeField=\(label:string,key:string,value:number\)=><View style=\{styles\.field\}>.*?</View>;',
-    'const cardSizeField=(label:string,key:string,value:number)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(Number(value)-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum.</Text></View>;',
-    ctl,
-    count=1,
-    flags=re.S,
-)
-ctl = ctl.replace('Enter any size from 50% to 400%.', 'No maximum. Enter any positive percentage.')
+# Replace size helpers with unlimited positive percentage inputs.
+size_start = ctl.find('  const sizeField=')
+font_start = ctl.find('  const fontField=')
+if size_start == -1 or font_start == -1 or font_start <= size_start:
+    raise SystemExit("smart ux: size/font helpers missing")
+unlimited_helpers = '''  const sizeField=(label:string,key:string,value:number)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(Number(value)-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum. Enter any positive percentage. The display will reflow other sections to make room.</Text></View>;
+  const cardSizeField=(label:string,key:string,value:number)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(Number(value)-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum. The gallery and other sections automatically adjust around it.</Text></View>;
+  const percentField=(label:string,key:string,value:number,min=1,max=0)=><View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><View style={styles.stepRow}>{[0.5,0.75,1,1.5,2,3,5,10].map(n=><Pressable key={n} onPress={()=>mutate({[key]:n})} style={[styles.step,Math.abs(Number(value)-n)<.001&&styles.stepOn]}><Text style={styles.stepText}>{Math.round(n*100)}%</Text></Pressable>)}</View><View style={styles.colorRow}><TextInput key={`${key}-${value}`} defaultValue={String(Math.round((Number(value)||1)*100))} keyboardType="decimal-pad" returnKeyType="done" onEndEditing={e=>{const pct=Number(String(e.nativeEvent.text||"").replace(/[^0-9.]/g,""));if(Number.isFinite(pct)&&pct>0)mutate({[key]:pct/100})}} style={styles.input}/><Text style={styles.fieldLabel}>%</Text></View><Text style={styles.help}>No maximum. Enter any positive percentage.</Text></View>;
+'''
+ctl = ctl[:size_start] + unlimited_helpers + ctl[font_start:]
 
 fonts = 'const FONTS=["sans-serif","serif","monospace","sans-serif-condensed"];'
 emojis = 'const ISLAMIC_EMOJIS=["🕌","☪️","🌙","🌙✨","🕋","📿","🤲","📖","✨","🌟","⭐","💫","🌅","🌄","🌇","🌆","🌌","☀️","🌤️","🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘","🧭","🔔","🔊","📢","🛐","🤍","💚","💛","🟢","🟡","💠","۞","◆","✦","☾","☽","ﷲ","ﷺ"];'
@@ -144,4 +135,4 @@ for marker in ['ISLAMIC_EMOJIS','emojiField','SMART EDIT · CHOOSE WHAT TO CHANG
         raise SystemExit(f"smart ux controller marker missing: {marker}")
 ctl_path.write_text(ctl, encoding="utf-8")
 
-print("HASSOUN_TABLET_SMART_UX_V3 applied: no artificial size caps + auto-fit/reflow + full-width local time + Islamic emoji palette")
+print("HASSOUN_TABLET_SMART_UX_V4 applied: unlimited admin sizing + dynamic vertical reflow + safe-fit gallery text + Islamic emoji palette")
