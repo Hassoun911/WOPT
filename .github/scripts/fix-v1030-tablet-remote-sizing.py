@@ -7,7 +7,7 @@ page = page_path.read_text(encoding="utf-8")
 # Native tablet consumes the paired editor's tabletTheme payload, including card sizing.
 page = page.replace(
     '  const [slideSeconds, setSlideSeconds] = useState(8);',
-    '  const [slideSeconds, setSlideSeconds] = useState(8);\n  const [remoteTheme, setRemoteTheme] = useState<Record<string, any>>({ mainCardScale: 1, lowerCardScale: 1 });'
+    '  const [slideSeconds, setSlideSeconds] = useState(8);\n  const [remoteTheme, setRemoteTheme] = useState<Record<string, any>>({ fitFullScreen: true, mainCardScale: 1, lowerCardScale: 1 });'
 )
 
 page = page.replace(
@@ -22,14 +22,14 @@ if old_poll not in page:
 page = page.replace(old_poll, new_poll)
 
 anchor = '  const pairUrl = device ? `https://hassoun.app/masjid-tv/pair/?device=${encodeURIComponent(device.id)}&code=${device.code}` : "";'
-insert = '''  const clampScale = (value: any, fallback = 1) => { const n = Number(value); return Number.isFinite(n) ? Math.max(.8, Math.min(1.1, n)) : fallback; };\n  const mainCardScale = clampScale(remoteTheme.mainCardScale);\n  const lowerCardScale = clampScale(remoteTheme.lowerCardScale);\n  const mainCardHeight = Math.round((landscape ? height * .48 : height * .57) * mainCardScale);\n  const lowerCardHeight = Math.round(104 * lowerCardScale);\n'''
+insert = '''  const clampScale = (value: any, fallback = 1) => { const n = Number(value); return Number.isFinite(n) ? Math.max(.8, Math.min(1.1, n)) : fallback; };\n  const fitFullScreen = remoteTheme.fitFullScreen !== false;\n  const mainCardScale = clampScale(remoteTheme.mainCardScale);\n  const lowerCardScale = clampScale(remoteTheme.lowerCardScale);\n  const mainCardHeight = Math.round((landscape ? height * .48 : height * .57) * mainCardScale);\n  const lowerCardHeight = Math.round(104 * lowerCardScale);\n'''
 if anchor not in page:
     raise SystemExit("Could not find native tablet sizing insertion point")
 page = page.replace(anchor, insert + anchor)
 
 page = page.replace(
     '<LinearGradient colors={[CLASSIC.cardA, CLASSIC.cardB]} style={styles.hero}>',
-    '<LinearGradient colors={[CLASSIC.cardA, CLASSIC.cardB]} style={[styles.hero, { flex: 0, height: mainCardHeight }]}>',
+    '<LinearGradient colors={[CLASSIC.cardA, CLASSIC.cardB]} style={[styles.hero, fitFullScreen ? { flex: 1 } : { flex: 0, height: mainCardHeight }]}>',
     1
 )
 page = page.replace(
@@ -38,17 +38,8 @@ page = page.replace(
     1
 )
 
-# Expo SDK 57 typings do not expose setBehaviorAsync and React Native's StyleSheet
-# uses absoluteFill rather than absoluteFillObject in this reconstructed baseline.
-page = page.replace('      void NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => undefined);\n', '')
-page = page.replace('StyleSheet.absoluteFillObject', 'StyleSheet.absoluteFill')
-
-if 'mainCardHeight' not in page or 'lowerCardHeight' not in page:
-    raise SystemExit("Native card sizing patch did not apply")
-if 'setBehaviorAsync' in page:
-    raise SystemExit("Unsupported NavigationBar.setBehaviorAsync still present")
-if 'StyleSheet.absoluteFillObject' in page:
-    raise SystemExit("Unsupported StyleSheet.absoluteFillObject still present")
+if 'fitFullScreen' not in page or 'mainCardHeight' not in page or 'lowerCardHeight' not in page:
+    raise SystemExit("Native full-screen/card sizing patch did not apply")
 page_path.write_text(page, encoding="utf-8")
 
 controller_path = Path("mobile/src/ConnectDisplayPage.tsx")
@@ -56,7 +47,7 @@ controller = controller_path.read_text(encoding="utf-8")
 
 controller = controller.replace(
     'showMiniPeriod:false,sliderSeconds:8',
-    'showMiniPeriod:false,mainCardScale:1,lowerCardScale:1,sliderSeconds:8'
+    'showMiniPeriod:false,fitFullScreen:true,mainCardScale:1,lowerCardScale:1,sliderSeconds:8'
 )
 
 size_anchor = '  const fontField=(key:string,value:string)=><View style={styles.field}><Text style={styles.fieldLabel}>FONT TYPE</Text>'
@@ -68,7 +59,7 @@ controller = controller.replace(
 )
 
 card_old = 'case"card":return <>{colorField("CARD COLOR 1","cardGradientA",th.cardGradientA)}'
-card_new = 'case"card":return <>{cardSizeField("MAIN GALLERY PRAYER CARD SIZE","mainCardScale",Number(th.mainCardScale)||1)}{colorField("CARD COLOR 1","cardGradientA",th.cardGradientA)}'
+card_new = 'case"card":return <>{bool("Fill tablet screen","fitFullScreen",th.fitFullScreen!==false)}{cardSizeField("MAIN GALLERY PRAYER CARD SIZE","mainCardScale",Number(th.mainCardScale)||1)}{colorField("CARD COLOR 1","cardGradientA",th.cardGradientA)}'
 if card_old not in controller:
     raise SystemExit("Could not find main card editor controls")
 controller = controller.replace(card_old, card_new)
@@ -79,7 +70,7 @@ if mini_old not in controller:
     raise SystemExit("Could not find lower card editor controls")
 controller = controller.replace(mini_old, mini_new)
 
-for marker in ["MAIN GALLERY PRAYER CARD SIZE", "LOWER PRAYER CARDS SIZE", "mainCardScale", "lowerCardScale"]:
+for marker in ["Fill tablet screen", "MAIN GALLERY PRAYER CARD SIZE", "LOWER PRAYER CARDS SIZE", "fitFullScreen", "mainCardScale", "lowerCardScale"]:
     if marker not in controller:
         raise SystemExit(f"Missing controller sizing marker: {marker}")
 controller_path.write_text(controller, encoding="utf-8")
@@ -96,4 +87,4 @@ if 'version: "1.0.30"' not in cfg or 'versionCode: 74' not in cfg:
     raise SystemExit("v1.0.30 config verification failed after replacement")
 cfg_path.write_text(cfg, encoding="utf-8")
 
-print("HASSOUN_TABLET_REMOTE_SIZING_V4 applied: tablet sizing + SDK57 TypeScript compatibility + v1.0.30/74")
+print("HASSOUN_TABLET_REMOTE_SIZING_V4 applied: admin full-screen fit + main/lower prayer card sizing, full tabletTheme receive, v1.0.30/74")
