@@ -1,6 +1,13 @@
 /* Desktop web-home polish: keep the normal website compact and readable.
    This intentionally overrides the older wall-display sizing rules on the
    standard homepage only. Masjid TV uses its own tv-* layout/classes. */
+
+/* The local Adhan/source banner is redundant with the prayer cards and source
+   shown above, so keep it off the normal website on every screen size. */
+.notice-card {
+  display: none !important;
+}
+
 @media (min-width: 900px) {
   html, body {
     height: auto !important;
@@ -171,10 +178,6 @@
   .daily-meaning {
     font-size: 12px !important;
     line-height: 1.45 !important;
-  }
-
-  .notice-card {
-    margin-top: 16px !important;
   }
 
   /* Email signup should read like a slim utility bar, not another hero card. */
