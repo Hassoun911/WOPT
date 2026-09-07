@@ -1,0 +1,201 @@
+/* Desktop web-home polish: keep the normal website compact and readable.
+   This intentionally overrides the older wall-display sizing rules on the
+   standard homepage only. Masjid TV uses its own tv-* layout/classes. */
+@media (min-width: 900px) {
+  html, body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .app-shell {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+    display: block !important;
+    padding-top: 0 !important;
+    padding-bottom: 36px !important;
+    --dash-pad: clamp(18px, 2vw, 34px) !important;
+  }
+
+  .topbar {
+    height: auto !important;
+    min-height: 58px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .dashboard {
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) !important;
+    gap: 16px !important;
+    margin-top: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .date-column,
+  .next-prayer-card {
+    height: auto !important;
+    min-height: 168px !important;
+    max-height: none !important;
+  }
+
+  .date-column {
+    padding: 18px !important;
+  }
+
+  .date-column h1 {
+    font-size: clamp(28px, 2.25vw, 38px) !important;
+    line-height: 1.02 !important;
+    margin-bottom: 6px !important;
+  }
+
+  .gregorian-date { font-size: 15px !important; }
+  .hijri-date { font-size: 12px !important; }
+
+  .next-prayer-card {
+    padding: 18px 22px !important;
+  }
+
+  .next-card-head {
+    gap: 14px !important;
+    align-items: flex-start !important;
+  }
+
+  .next-card-head h2 {
+    font-size: clamp(36px, 3vw, 50px) !important;
+    line-height: .94 !important;
+    margin: 0 !important;
+  }
+
+  .live-clock {
+    min-width: 150px !important;
+    padding: 10px 14px !important;
+  }
+
+  .live-clock strong {
+    font-size: 18px !important;
+    line-height: 1.1 !important;
+  }
+
+  .countdown-row {
+    gap: 10px !important;
+    margin-top: 14px !important;
+  }
+
+  .countdown-row > * {
+    min-width: 0 !important;
+  }
+
+  .countdown-row strong {
+    font-size: 18px !important;
+    line-height: 1.1 !important;
+  }
+
+  .countdown-row strong.countdown {
+    font-size: 24px !important;
+  }
+
+  .prayer-section {
+    margin-top: 22px !important;
+  }
+
+  .section-heading {
+    margin-bottom: 10px !important;
+  }
+
+  .prayer-grid {
+    gap: 10px !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .prayer-card {
+    height: auto !important;
+    min-height: 142px !important;
+    padding: 14px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+  }
+
+  .prayer-card .prayer-number {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .prayer-card .prayer-name h3 {
+    font-size: 18px !important;
+    line-height: 1.1 !important;
+  }
+
+  .prayer-card .prayer-name span {
+    font-size: 11px !important;
+  }
+
+  .prayer-card time {
+    font-size: clamp(20px, 1.55vw, 27px) !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+  }
+
+  .prayer-card.active {
+    padding-bottom: 18px !important;
+  }
+
+  .prayer-card.active::after {
+    max-height: 24px !important;
+  }
+
+  .daily-light-section {
+    margin-top: 24px !important;
+  }
+
+  .daily-light-grid {
+    gap: 10px !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .daily-card {
+    height: auto !important;
+    min-height: 150px !important;
+    max-height: none !important;
+    padding: 16px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+  }
+
+  .daily-arabic {
+    font-size: 18px !important;
+    line-height: 1.55 !important;
+  }
+
+  .daily-meaning {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+
+  .notice-card {
+    margin-top: 16px !important;
+  }
+
+  /* Email signup should read like a slim utility bar, not another hero card. */
+  [data-email-signup],
+  [data-email-adhan-signup] {
+    max-width: 760px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1180px) {
+  .dashboard {
+    grid-template-columns: minmax(230px, 285px) minmax(0, 1fr) !important;
+  }
+
+  .next-card-head h2 {
+    font-size: clamp(32px, 3.4vw, 42px) !important;
+  }
+
+  .prayer-card time {
+    font-size: clamp(18px, 1.7vw, 23px) !important;
+  }
+}
