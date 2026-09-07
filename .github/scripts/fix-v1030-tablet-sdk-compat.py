@@ -17,4 +17,22 @@ if 'NavigationBar.setVisibilityAsync("hidden")' not in page:
 
 page_path.write_text(page, encoding="utf-8")
 print('HASSOUN_TABLET_SDK_COMPAT_V1 applied')
-# rebuild trigger: smart editor V2 verifier compatibility
+
+# Final tablet runtime patch must run after every display/layout rewrite so the wall
+# mode owns its prayer notification/Adhan schedule and prayer-time visual reaction.
+runtime = Path('.github/scripts/fix-v1030-tablet-prayer-runtime.py')
+if not runtime.exists():
+    raise SystemExit('Tablet prayer runtime patch missing')
+exec(compile(runtime.read_text(encoding='utf-8'), str(runtime), 'exec'))
+
+final_page = page_path.read_text(encoding='utf-8')
+for marker in [
+    'HASSOUN_TABLET_PRAYER_RUNTIME_V1',
+    'schedulePrayerNotifications(times, locale, preferences',
+    'const prayerNow = useMemo',
+    'PRAYER NOW',
+    'tabletPrayerRuntimeStatus',
+]:
+    if marker not in final_page:
+        raise SystemExit(f'Missing tablet prayer runtime marker: {marker}')
+print('HASSOUN_TABLET_PRAYER_RUNTIME_V1 verified after SDK compatibility pass')
