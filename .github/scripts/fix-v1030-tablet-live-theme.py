@@ -14,7 +14,8 @@ page = page.replace(anchor, anchor + insert, 1)
 replacements = [
     ('<Text style={[styles.metaText, { fontSize: 16 * metaScale }]}>✦ {location.label}</Text>', '<Text style={[styles.metaText, { fontSize: 16 * metaScale, color: metaColor }]}>✦ {location.label}</Text>'),
     ('<Text style={[styles.metaText, { fontSize: 16 * metaScale }]}>▣ {date}</Text>', '<Text style={[styles.metaText, { fontSize: 16 * metaScale, color: metaColor }]}>▣ {date}</Text>'),
-    ('<Text style={[styles.clock, { fontSize: (landscape ? 78 : 112) * clockScale }]}>{clock}</Text>', '<Text style={[styles.clock, { fontSize: (landscape ? 78 : 112) * clockScale, color: clockColor, fontFamily: clockFont }]}>{clock}</Text>'),
+    ('<Pressable onPress={() => setSetup(true)} style={styles.clockButton}>', '<Pressable onPress={() => setSetup(true)} style={[styles.clockButton,{width:"100%",alignSelf:"stretch",justifyContent:"center",overflow:"visible",paddingHorizontal:4}]}>'),
+    ('<Text style={[styles.clock, { fontSize: (landscape ? 78 : 112) * clockScale }]}>{clock}</Text>', '<Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.2} allowFontScaling={false} style={[styles.clock, { width:"100%", textAlign:"center", fontSize: (landscape ? 78 : 112) * clockScale, color: clockColor, fontFamily: clockFont }]}>{clock}</Text>'),
     ('<LinearGradient colors={[CLASSIC.cardA, CLASSIC.cardB]} style={[styles.hero, fitFullScreen ? { flex: 1 } : { flex: 0, height: mainCardHeight }]}>', '<LinearGradient colors={[cardA, cardB]} style={[styles.hero, { borderColor: cardBorder }, fitFullScreen ? { flex: 1 } : { flex: 0, height: mainCardHeight }]}>'),
     ('<Text style={[styles.arabic, { fontSize: (landscape ? 58 : 78) * arabicScale }]}>{current.ar}</Text>', '<Text style={[styles.arabic, { fontSize: (landscape ? 58 : 78) * arabicScale, color: arabicColor, fontFamily: arabicFont }]}>{current.ar}</Text>'),
     ('<Text style={[styles.english, { fontSize: (landscape ? 42 : 54) * englishScale }]}>{current.en}</Text>', '<Text style={[styles.english, { fontSize: (landscape ? 42 : 54) * englishScale, color: englishColor, fontFamily: englishFont }]}>{current.en}</Text>'),
@@ -25,7 +26,7 @@ for old, new in replacements:
         raise SystemExit(f"Could not apply native live theme replacement: {old[:80]}")
     page = page.replace(old, new, 1)
 
-for marker in ["clockColor", "clockFont", "arabicColor", "englishColor", "prayerTimeColor", "cardBorder"]:
+for marker in ["clockColor", "clockFont", "arabicColor", "englishColor", "prayerTimeColor", "cardBorder", "adjustsFontSizeToFit", 'width:"100%"']:
     if marker not in page:
         raise SystemExit(f"Missing native live theme marker: {marker}")
 page_path.write_text(page, encoding="utf-8")
@@ -50,7 +51,6 @@ if '[colorPicker,setColorPicker]' not in controller:
         count=1,
     )
     if n != 1:
-        # Fallback: insert a standalone state directly after the ar/t line near component start.
         marker = '  const ar=locale==="ar",t=(en:string,a:string)=>ar?a:en;\n'
         if marker not in controller:
             raise SystemExit("Could not find a safe insertion point for color picker state")
@@ -71,4 +71,4 @@ for marker in ["COLOR PICKER", "COLOR_PALETTE", "Tap the color swatch", "CUSTOM 
         raise SystemExit(f"Missing color picker marker: {marker}")
 controller_path.write_text(controller, encoding="utf-8")
 
-print("HASSOUN_TABLET_LIVE_THEME_V2 applied: native clock/text colors+fonts, correct Arabic/English mapping, tappable color picker")
+print("HASSOUN_TABLET_LIVE_THEME_V3 applied: full-width auto-fit local clock + live theme + color picker")
