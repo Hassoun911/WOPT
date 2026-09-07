@@ -4,9 +4,11 @@ import re
 page_path = Path("mobile/src/MasjidDisplayPage.tsx")
 page = page_path.read_text(encoding="utf-8")
 
-# Add video background support to the native tablet screen.
+# Add video/image background support to the native tablet screen.
 if 'from "expo-video"' not in page:
     page = page.replace('import * as ScreenOrientation from "expo-screen-orientation";\n', 'import * as ScreenOrientation from "expo-screen-orientation";\nimport { useVideoPlayer, VideoView } from "expo-video";\n', 1)
+if 'import { Image } from "react-native";' not in page:
+    page = 'import { Image } from "react-native";\n' + page
 
 anchor = '  const prayerTimeFont = typeof remoteTheme.prayerTimeFont === "string" ? remoteTheme.prayerTimeFont : undefined;\n'
 insert = '''  const backgroundMode = remoteTheme.backgroundMode === "image" || remoteTheme.backgroundMode === "video" ? remoteTheme.backgroundMode : "color";\n  const backgroundImageUrl = typeof remoteTheme.backgroundImageUrl === "string" ? remoteTheme.backgroundImageUrl.trim() : "";\n  const backgroundVideoUrl = typeof remoteTheme.backgroundVideoUrl === "string" ? remoteTheme.backgroundVideoUrl.trim() : "";\n  const pageA = themeHex(remoteTheme.pageGradientA, CLASSIC.pageA);\n  const pageB = themeHex(remoteTheme.pageGradientB, CLASSIC.pageB);\n  const mainCardWidthScale = Math.max(.5, Math.min(1, Number(remoteTheme.mainCardWidthScale) || 1));\n  const mainCardHeightScale = Math.max(.5, Math.min(1.6, Number(remoteTheme.mainCardHeightScale) || 1));\n  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl) player.play(); });\n'''
@@ -79,7 +81,7 @@ if card_marker not in controller:
 controller = controller.replace(card_marker, 'case"card":return <>{bool("Fill tablet screen","fitFullScreen",th.fitFullScreen!==false)}{percentField("MAIN CARD WIDTH","mainCardWidthScale",Number(th.mainCardWidthScale)||1,50,100)}{percentField("MAIN CARD HEIGHT","mainCardHeightScale",Number(th.mainCardHeightScale)||1,50,160)}', 1)
 
 mini_pattern = re.compile(r'default:return <>.*?</>}};', re.S)
-mini_case = '''default:{const k=String(selectedMini||"fajr");const pref=`mini_${k}_`;return <><Text style={styles.fieldLabel}>LOWER PRAYER CARDS SIZE · EDIT LOWER PRAYER CARD</Text><View style={styles.stepRow}>{[["fajr","Fajr"],["dhuhr","Dhuhr"],["asr","Asr"],["maghrib","Maghrib"],["isha","Isha"]].map(([key,label])=><Pressable key={key} onPress={()=>setSelectedMini(key)} style={[styles.step,k===key&&styles.stepOn]}><Text style={styles.stepText}>{label}</Text></Pressable>)}</View>{percentField("CARD WIDTH",`${pref}width`,Number(th[`${pref}width`])||1,55,170)}{percentField("CARD HEIGHT",`${pref}height`,Number(th[`${pref}height`])||1,55,170)}{sizeField("ARABIC TEXT SIZE",`${pref}arabicSize`,Number(th[`${pref}arabicSize`])||1)}{sizeField("ENGLISH TEXT SIZE",`${pref}englishSize`,Number(th[`${pref}englishSize`])||1)}{sizeField("PRAYER TIME SIZE",`${pref}timeSize`,Number(th[`${pref}timeSize`])||1)}{fontField(`${pref}font`,String(th[`${pref}font`]||"sans-serif"))}{colorField("CARD COLOR 1",`${pref}bgA`,String(th[`${pref}bgA`]||th.miniGradientA))}{colorField("CARD COLOR 2",`${pref}bgB`,String(th[`${pref}bgB`]||th.miniGradientB))}{colorField("ALL TEXT COLOR",`${pref}textColor`,String(th[`${pref}textColor`]||th.miniTextColor))}{bool("Show mini-card AM / PM","showMiniPeriod",th.showMiniPeriod===true)}</>}};'''
+mini_case = '''default:{const k=String(selectedMini||"fajr");const pref=`mini_${k}_`;return <><Text style={styles.fieldLabel}>LOWER PRAYER CARDS SIZE · EDIT LOWER PRAYER CARD</Text><View style={styles.stepRow}>{[["fajr","Fajr"],["dhuhr","Dhuhr"],["asr","Asr"],["maghrib","Maghrib"],["isha","Isha"]].map(([key,label])=><Pressable key={key} onPress={()=>setSelectedMini(key)} style={[styles.step,k===key&&styles.stepOn]}><Text style={styles.stepText}>{label}</Text></Pressable>)}</View>{percentField("CARD WIDTH",`${pref}width`,Number(th[`${pref}width`])||1,55,170)}{percentField("CARD HEIGHT",`${pref}height`,Number(th[`${pref}height`])||1,55,170)}{sizeField("ARABIC TEXT SIZE",`${pref}arabicSize`,Number(th[`${pref}arabicSize`])||1)}{sizeField("ENGLISH TEXT SIZE",`${pref}englishSize`,Number(th[`${pref}englishSize`])||1)}{sizeField("PRAYER TIME SIZE",`${pref}timeSize`,Number(th[`${pref}timeSize`])||1)}{fontField(`${pref}font`,String(th[`${pref}font`]||"sans-serif"))}{colorField("CARD COLOR 1",`${pref}bgA`,String(th[`${pref}bgA`]||th.miniGradientA))}{colorField("CARD COLOR 2",`${pref}bgB`,String(th[`${pref}bgB`]||th.miniGradientB))}{colorField("ALL TEXT COLOR",`${pref}textColor`,String(th[`${pref}textColor`]||th.miniTextColor))}{bool("Show mini-card AM / PM","showMiniPeriod",th.showMiniPeriod===true)}</>;}}};'''
 controller, n = mini_pattern.subn(mini_case, controller, count=1)
 if n != 1:
     raise SystemExit("Could not replace lower-card editor")
@@ -89,4 +91,4 @@ for marker in ['WHOLE DISPLAY BACKGROUND', 'IMAGE URL', 'VIDEO URL', 'APP BACKGR
         raise SystemExit(f"Missing smart editor control: {marker}")
 controller_path.write_text(controller, encoding="utf-8")
 
-print("HASSOUN_TABLET_SMART_EDITOR_V2 applied: whole-screen color/image/video backgrounds + independent main/lower card sizing/text/font/colors")
+print("HASSOUN_TABLET_SMART_EDITOR_V3 applied: fixed TypeScript syntax + whole-screen color/image/video backgrounds + independent main/lower card sizing/text/font/colors")
