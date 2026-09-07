@@ -10,6 +10,7 @@ import "./home-app-match.css";
 import "./fluid-dashboard.css";
 import "./islamic-rich.css";
 import "./home-header-center.css";
+import "./home-desktop-polish.css";
 import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import WebMasjidTvMenuEnhancer from "./WebMasjidTvMenuEnhancer";
