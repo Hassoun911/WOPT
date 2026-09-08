@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.33 Tablet
+name: Build Hassoun v1.0.34 Android Universal
 
 on:
   workflow_dispatch:
@@ -20,12 +20,13 @@ on:
       - ".github/scripts/run-v1031-*.py"
       - ".github/scripts/fix-v1032-*.py"
       - ".github/scripts/fix-v1033-*.py"
+      - ".github/scripts/fix-v1034-*.py"
 
 permissions:
   contents: read
 
 concurrency:
-  group: hassoun-tablet-main-v1033
+  group: hassoun-android-universal-main-v1034
   cancel-in-progress: true
 
 jobs:
@@ -55,10 +56,11 @@ jobs:
           from pathlib import Path
           m=json.loads(Path('.github/tablet/manifest.json').read_text())
           assert m['authoritative_branch']=='main'
-          assert m['current_version']=='1.0.33'
-          assert m['android_version_code']==77
+          assert m['current_version']=='1.0.34'
+          assert m['android_version_code']==78
           assert m['workflow']=='.github/workflows/tablet-build.yml'
-          print('Canonical tablet manifest verified')
+          assert '.github/scripts/fix-v1034-tablet-audio-mute-safe.py' in m['tablet_patch_order']
+          print('Canonical Android universal manifest verified')
           PY
 
       - name: Setup Node
@@ -77,16 +79,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and verify canonical v1.0.33 APK
+      - name: Build and verify canonical v1.0.34 APK
         timeout-minutes: 55
         run: bash .github/tablet/build-apk.sh
 
-      - name: Upload v1.0.33 APK
+      - name: Upload v1.0.34 universal APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.33-Tablet
+          name: Hassoun-v1.0.34-Android-Universal
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.33-tablet.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.33-tablet.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.34-android-universal.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.34-android-universal.apk.sha256
           if-no-files-found: error
           retention-days: 30
