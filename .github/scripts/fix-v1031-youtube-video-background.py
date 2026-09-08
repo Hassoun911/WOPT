@@ -29,21 +29,38 @@ if 'const backgroundYouTubeId =' not in page:
     insert = '''  const backgroundYouTubeId = youtubeVideoId(backgroundVideoUrl);\n  const backgroundYouTubeUrl = backgroundYouTubeId ? `https://www.youtube.com/embed/${backgroundYouTubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundYouTubeId}&playsinline=1&rel=0&modestbranding=1` : "";\n'''
     page = page.replace(video_decl, video_decl + insert, 1)
 
+# Direct files continue to use expo-video. YouTube URLs must never be passed to expo-video.
 old_player = '  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl) player.play(); });\n'
 new_player = '  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl && !backgroundYouTubeId) player.play(); });\n'
 if old_player in page:
     page = page.replace(old_player, new_player, 1)
 elif new_player not in page:
-    raise SystemExit('YouTube background patch: background player declaration missing')
+    # tolerate whitespace/format changes from later tablet patches
+    player_pat = re.compile(r'  const backgroundPlayer = useVideoPlayer\(backgroundMode === "video" && backgroundVideoUrl \? backgroundVideoUrl : null, player => \{ player\.loop = true; player\.muted = true; if \(backgroundVideoUrl\) player\.play\(\); \}\);\n')
+    page, n = player_pat.subn(new_player, page, count=1)
+    if n != 1 and new_player not in page:
+        raise SystemExit('YouTube background patch: background player declaration missing')
 
-video_layer = '        {backgroundMode === "video" && backgroundVideoUrl ? <VideoView player={backgroundPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}\n'
-youtube_layer = '''        {backgroundMode === "video" && backgroundYouTubeUrl ? <WebView source={{ uri: backgroundYouTubeUrl }} style={StyleSheet.absoluteFill} javaScriptEnabled allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} scrollEnabled={false} bounces={false} pointerEvents="none" /> : null}\n        {backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? <VideoView player={backgroundPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}\n'''
-if video_layer in page:
-    page = page.replace(video_layer, youtube_layer, 1)
-elif 'backgroundYouTubeUrl ? <WebView' not in page:
-    raise SystemExit('YouTube background patch: background video layer missing')
+# Add the YouTube WebView layer immediately after StatusBar; then make any existing
+# direct VideoView layer skip YouTube URLs. This is deliberately independent of exact
+# formatting/styles used by the final responsive tablet patch.
+youtube_view = '        {backgroundMode === "video" && backgroundYouTubeUrl ? <WebView source={{ uri: backgroundYouTubeUrl }} style={StyleSheet.absoluteFill} javaScriptEnabled allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} scrollEnabled={false} bounces={false} pointerEvents="none" /> : null}\n'
+if youtube_view not in page:
+    status_anchor = '        <StatusBar hidden />\n'
+    if status_anchor not in page:
+        raise SystemExit('YouTube background patch: StatusBar insertion point missing')
+    page = page.replace(status_anchor, status_anchor + youtube_view, 1)
 
-for marker in ['youtubeVideoId(', 'backgroundYouTubeId', 'backgroundYouTubeUrl', 'react-native-webview', 'mediaPlaybackRequiresUserAction={false}']:
+# Find the first background VideoView conditional regardless of spacing or wrapper styles.
+video_pat = re.compile(r'\{backgroundMode === "video" && backgroundVideoUrl(?P<extra>[^?{}]*)\? <VideoView(?P<body>.*?)\/\> : null\}', re.S)
+m = video_pat.search(page)
+if m:
+    replacement = '{backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? <VideoView' + m.group('body') + '/> : null}'
+    page = page[:m.start()] + replacement + page[m.end():]
+elif 'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView' not in page:
+    raise SystemExit('YouTube background patch: direct VideoView layer missing')
+
+for marker in ['youtubeVideoId(', 'backgroundYouTubeId', 'backgroundYouTubeUrl', 'react-native-webview', 'mediaPlaybackRequiresUserAction={false}', 'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView']:
     if marker not in page:
         raise SystemExit(f'YouTube background patch missing marker: {marker}')
 page_path.write_text(page, encoding='utf-8')
@@ -58,4 +75,4 @@ elif new_help not in controller:
     raise SystemExit('YouTube background patch: video URL help text missing')
 controller_path.write_text(controller, encoding='utf-8')
 
-print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V1 applied: YouTube/direct video URL backgrounds supported')
+print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V2 applied: robust YouTube/direct video URL backgrounds supported')
