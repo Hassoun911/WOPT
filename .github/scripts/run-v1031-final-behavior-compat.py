@@ -37,6 +37,16 @@ if page.find('const freezeBeforeMinutes') > page.find('const imminentSeconds'):
     raise SystemExit('v1031 compat: freezeBeforeMinutes still declared after use')
 if page.find('const beatEnabled') > page.find('HASSOUN_TABLET_5MIN_BEAT_V1'):
     raise SystemExit('v1031 compat: beatEnabled still declared after animation use')
+
+# Display clock must use local 12-hour time with AM/PM. Internal prayer math remains 24h.
+old_clock = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now);'
+new_clock = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(now);'
+if old_clock not in page:
+    raise SystemExit('v1031 compat: tablet display clock formatter missing')
+page = page.replace(old_clock, new_clock, 1)
+if 'hour12: true }).format(now);' not in page:
+    raise SystemExit('v1031 compat: 12-hour clock update did not apply')
+
 page_path.write_text(page, encoding='utf-8')
 
-print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order fixed')
+print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order + 12-hour local clock fixed')
