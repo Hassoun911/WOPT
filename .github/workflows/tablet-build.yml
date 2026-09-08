@@ -1,0 +1,92 @@
+name: Build Hassoun v1.0.33 Tablet
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "HASSOUN_CURRENT.md"
+      - "docs/releases/**"
+      - ".github/tablet/**"
+      - ".github/workflows/tablet-build.yml"
+      - ".github/scripts/fix-v1021-*.py"
+      - ".github/scripts/fix-v1022-*.py"
+      - ".github/scripts/fix-v1023-*.py"
+      - ".github/scripts/fix-v1028-*.py"
+      - ".github/scripts/fix-v1029-*.py"
+      - ".github/scripts/fix-v1030-*.py"
+      - ".github/scripts/fix-v1031-*.py"
+      - ".github/scripts/run-v1031-*.py"
+      - ".github/scripts/fix-v1032-*.py"
+      - ".github/scripts/fix-v1033-*.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-tablet-main-v1033
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify canonical build pointer
+        run: |
+          set -euo pipefail
+          test -f HASSOUN_CURRENT.md
+          test -f .github/tablet/manifest.json
+          test -f .github/tablet/apply-current.py
+          test -f .github/tablet/build-apk.sh
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('.github/tablet/manifest.json').read_text())
+          assert m['authoritative_branch']=='main'
+          assert m['current_version']=='1.0.33'
+          assert m['android_version_code']==77
+          assert m['workflow']=='.github/workflows/tablet-build.yml'
+          print('Canonical tablet manifest verified')
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and verify canonical v1.0.33 APK
+        timeout-minutes: 55
+        run: bash .github/tablet/build-apk.sh
+
+      - name: Upload v1.0.33 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.33-Tablet
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.33-tablet.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.33-tablet.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
