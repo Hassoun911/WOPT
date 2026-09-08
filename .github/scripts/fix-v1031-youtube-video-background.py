@@ -1,11 +1,9 @@
 from pathlib import Path
 import re
-import subprocess
 
-# YouTube watch/short/share URLs are web pages, not direct media streams. Install the
-# native WebView used to render YouTube's embeddable player behind the prayer UI.
-subprocess.run(['npx', 'expo', 'install', 'react-native-webview', '--npm'], cwd='mobile', check=True)
-
+# react-native-webview is installed by the workflow before reconstruction. Do not run
+# npm/expo installs from this patch: doing so can prune the optional TypeScript platform
+# binary immediately before typecheck.
 page_path = Path('mobile/src/MasjidDisplayPage.tsx')
 page = page_path.read_text(encoding='utf-8')
 
@@ -29,29 +27,23 @@ if 'const backgroundYouTubeId =' not in page:
     insert = '''  const backgroundYouTubeId = youtubeVideoId(backgroundVideoUrl);\n  const backgroundYouTubeUrl = backgroundYouTubeId ? `https://www.youtube.com/embed/${backgroundYouTubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundYouTubeId}&playsinline=1&rel=0&modestbranding=1` : "";\n'''
     page = page.replace(video_decl, video_decl + insert, 1)
 
-# Direct files continue to use expo-video. YouTube URLs must never be passed to expo-video.
 old_player = '  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl) player.play(); });\n'
 new_player = '  const backgroundPlayer = useVideoPlayer(backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? backgroundVideoUrl : null, player => { player.loop = true; player.muted = true; if (backgroundVideoUrl && !backgroundYouTubeId) player.play(); });\n'
 if old_player in page:
     page = page.replace(old_player, new_player, 1)
 elif new_player not in page:
-    # Replace any equivalent declaration regardless of spacing.
     player_pat = re.compile(r'\s*const backgroundPlayer = useVideoPlayer\([^\n]+\);\n')
     m = player_pat.search(page)
     if not m:
         raise SystemExit('YouTube background patch: background player declaration missing')
     page = page[:m.start()] + '\n' + new_player + page[m.end():]
 
-# Final tablet patches keep changing the exact JSX of the background VideoView. Do not
-# depend on that JSX. Remove any pre-existing background VideoView line(s), then insert
-# one canonical YouTube layer and one canonical direct-video layer after StatusBar.
 page = re.sub(r'^\s*\{[^\n]*backgroundMode[^\n]*<VideoView[^\n]*\}\s*\n?', '', page, flags=re.M)
 status_anchor = '        <StatusBar hidden />\n'
 if status_anchor not in page:
     raise SystemExit('YouTube background patch: StatusBar insertion point missing')
 youtube_view = '        {backgroundMode === "video" && backgroundYouTubeUrl ? <WebView source={{ uri: backgroundYouTubeUrl }} style={StyleSheet.absoluteFill} javaScriptEnabled allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} scrollEnabled={false} bounces={false} pointerEvents="none" /> : null}\n'
 direct_view = '        {backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? <VideoView player={backgroundPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}\n'
-# Remove a previous canonical WebView layer if this script is ever re-run, then insert once.
 page = page.replace(youtube_view, '')
 page = page.replace(direct_view, '')
 page = page.replace(status_anchor, status_anchor + youtube_view + direct_view, 1)
@@ -71,4 +63,4 @@ elif new_help not in controller:
     raise SystemExit('YouTube background patch: video URL help text missing')
 controller_path.write_text(controller, encoding='utf-8')
 
-print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V3 applied: canonical YouTube/direct video layers + URL detection')
+print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V4 applied: no npm side effects + canonical YouTube/direct video layers')
