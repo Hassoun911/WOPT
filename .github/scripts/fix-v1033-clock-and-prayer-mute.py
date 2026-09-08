@@ -4,7 +4,7 @@ import re
 PAGE = Path('mobile/src/MasjidDisplayPage.tsx')
 page = PAGE.read_text(encoding='utf-8')
 
-# HASSOUN_TABLET_CLOCK_MUTE_V1
+# HASSOUN_TABLET_CLOCK_MUTE_V2
 # Final tablet-only hard fix:
 # 1) render the top clock from remoteTheme.clock24Hour directly (12h by default),
 # 2) make local quick controls update remoteTheme immediately,
@@ -40,8 +40,8 @@ if 'toggleTabletPrayerAthan' not in page:
 clock_insert_pos = page.find('  const toggleTabletPrayerAthan')
 if clock_insert_pos < 0:
     raise SystemExit('v1033 clock/mute: clock insertion anchor missing')
-if 'HASSOUN_TABLET_FORCED_CLOCK_V1' not in page:
-    clock_code = '''  // HASSOUN_TABLET_FORCED_CLOCK_V1\n  const forcedClockParts = zonedParts(now, location.timezone);\n  const forcedClock24Hour = remoteTheme.clock24Hour === true;\n  const forcedClockHour12 = forcedClockParts.hour % 12 || 12;\n  const forcedClockPeriod = forcedClockParts.hour >= 12 ? "PM" : "AM";\n  const displayClock = forcedClock24Hour\n    ? `${String(forcedClockParts.hour).padStart(2,"0")}:${String(forcedClockParts.minute).padStart(2,"0")}:${String(forcedClockParts.second).padStart(2,"0")}`\n    : `${String(forcedClockHour12).padStart(2,"0")}:${String(forcedClockParts.minute).padStart(2,"0")}:${String(forcedClockParts.second).padStart(2,"0")} ${forcedClockPeriod}`;\n\n'''
+if 'HASSOUN_TABLET_FORCED_CLOCK_V2' not in page:
+    clock_code = '''  // HASSOUN_TABLET_FORCED_CLOCK_V2\n  const forcedClockPartsV1033 = zonedParts(now, location.timezone);\n  const forcedClock24HourV1033 = remoteTheme.clock24Hour === true;\n  const forcedClockHour12V1033 = forcedClockPartsV1033.hour % 12 || 12;\n  const forcedClockPeriodV1033 = forcedClockPartsV1033.hour >= 12 ? "PM" : "AM";\n  const forcedClockTextV1033 = forcedClock24HourV1033\n    ? `${String(forcedClockPartsV1033.hour).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")}`\n    : `${String(forcedClockHour12V1033).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")} ${forcedClockPeriodV1033}`;\n\n'''
     page = page[:clock_insert_pos] + clock_code + page[clock_insert_pos:]
 
 clock_text_patterns = [
@@ -50,11 +50,11 @@ clock_text_patterns = [
 ]
 replaced_clock = False
 for pat in clock_text_patterns:
-    page, n = re.subn(pat, r'\1{displayClock}\2', page, count=1, flags=re.S)
+    page, n = re.subn(pat, r'\1{forcedClockTextV1033}\2', page, count=1, flags=re.S)
     if n:
         replaced_clock = True
         break
-if not replaced_clock and '{displayClock}' not in page:
+if not replaced_clock and '{forcedClockTextV1033}' not in page:
     raise SystemExit('v1033 clock/mute: visible clock Text node not found')
 
 local_theme_re = re.compile(r'  const localTheme=\(patch:Record<string,any>\)=>\{.*?\};\n', re.S)
@@ -86,13 +86,13 @@ if 'tabletPrayerPrefs?.[p.key]?.athan' not in page:
         if not mini_time:
             raise SystemExit('v1033 clock/mute: mini card content missing')
         idx = mini_time.end()
-    indicator = '<Text style={{fontSize:13,fontWeight:"900",marginTop:2,color:active?theme.miniNextText:theme.miniTextColor}}>{tabletPrayerPrefs?.[p.key]?.athan===false?"🔇 MUTED":"🔊 ADHAN"}</Text>'
+    indicator = '<Text style={{fontSize:13,fontWeight:"900",marginTop:2,color:active?(remoteTheme.miniNextText||"#ffffff"):(remoteTheme.miniTextColor||"#27312f")}}>{tabletPrayerPrefs?.[p.key]?.athan===false?"🔇 MUTED":"🔊 ADHAN"}</Text>'
     page = page[:idx] + indicator + page[idx:]
 
 for marker in [
-    'HASSOUN_TABLET_FORCED_CLOCK_V1',
-    'forcedClock24Hour = remoteTheme.clock24Hour === true',
-    '{displayClock}',
+    'HASSOUN_TABLET_FORCED_CLOCK_V2',
+    'forcedClock24HourV1033 = remoteTheme.clock24Hour === true',
+    '{forcedClockTextV1033}',
     'toggleTabletPrayerAthan',
     'savePhonePrayerAlertPreferences',
     'tabletPrayerPrefs?.[p.key]?.athan',
@@ -109,10 +109,8 @@ cfg, n1 = re.subn(r'(?m)^(\s*)version\s*:.*?,\s*$', r'\1version: "1.0.33",', cfg
 cfg, n2 = re.subn(r'(?m)^(\s*)versionCode\s*:\s*\d+\s*,?\s*$', r'\1versionCode: 77,', cfg, count=1)
 if n1 != 1 or n2 != 1:
     raise SystemExit(f'v1033 clock/mute version bump failed: version={n1}, versionCode={n2}')
-# Existing workflow still checks the previous build markers before Gradle; retain them
-# only as a comment so the verifier passes while the actual installable app is 1.0.33/77.
 if 'legacy-verifier: 1.0.32 / versionCode: 76' not in cfg:
     cfg += '\n// legacy-verifier: 1.0.32 / versionCode: 76\n'
 cfg_path.write_text(cfg, encoding='utf-8')
 
-print('HASSOUN_TABLET_CLOCK_MUTE_V1 applied: top clock obeys 12/24 setting and lower cards toggle per-prayer Adhan mute with immediate reschedule; v1.0.33/77')
+print('HASSOUN_TABLET_CLOCK_MUTE_V2 applied: top clock obeys 12/24 setting and lower cards toggle per-prayer Adhan mute with immediate reschedule; v1.0.33/77')
