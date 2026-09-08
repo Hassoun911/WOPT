@@ -4,13 +4,12 @@ import re
 PAGE = Path('mobile/src/MasjidDisplayPage.tsx')
 page = PAGE.read_text(encoding='utf-8')
 
-# HASSOUN_TABLET_LAYOUT_PERSIST_V2
-# Keep a dedicated tablet-layout backup in AsyncStorage. Android preserves AsyncStorage
-# when a newer APK is installed over the existing app, so this survives normal updates.
-# This patch deliberately does NOT depend on the older SETTINGS_KEY declaration because
-# the reconstructed tablet page has changed that storage implementation across builds.
+# HASSOUN_TABLET_LAYOUT_PERSIST_V3
+# Preserve the FINAL reconstructed tablet theme itself. The native tablet page uses
+# remoteTheme/setRemoteTheme rather than the older settings/setSettings state, so this
+# backup follows the real source of truth and survives a normal APK-over-APK update.
 
-# Ensure useRef is available for the one-time restore gate.
+# Ensure useRef is available for the restore gate.
 m = re.search(r'import \{([^}]*)\} from "react";', page, flags=re.S)
 if not m:
     raise SystemExit('v1032 persistence: React import missing')
@@ -19,57 +18,58 @@ if 'useRef' not in react_names:
     react_names.append('useRef')
 page = page[:m.start()] + 'import { ' + ', '.join(react_names) + ' } from "react";' + page[m.end():]
 
-if 'const LAYOUT_BACKUP_KEY = "hassoun:tablet-layout-backup:v2";' not in page:
-    # Put the key before the component; use a stable nearby declaration when available.
+if 'const LAYOUT_BACKUP_KEY = "hassoun:tablet-layout-backup:v3";' not in page:
     component_anchor = 'export default function MasjidDisplayPage'
     pos = page.find(component_anchor)
     if pos < 0:
         raise SystemExit('v1032 persistence: MasjidDisplayPage component missing')
-    page = page[:pos] + 'const LAYOUT_BACKUP_KEY = "hassoun:tablet-layout-backup:v2"; // HASSOUN_TABLET_LAYOUT_PERSIST_V2\n\n' + page[pos:]
+    page = page[:pos] + 'const LAYOUT_BACKUP_KEY = "hassoun:tablet-layout-backup:v3"; // HASSOUN_TABLET_LAYOUT_PERSIST_V3\n\n' + page[pos:]
 
-# Add a ref beside the prayer-runtime refs/state. This prevents the initial empty/default
-# settings object from overwriting the saved layout before restore finishes.
+# The final native tablet has remoteTheme state after the v1.0.30 sizing patch.
+state_re = re.compile(r'(  const \[remoteTheme, setRemoteTheme\] = useState<Record<string, any>>\([^\n]+\);\n)')
+m = state_re.search(page)
+if not m:
+    raise SystemExit('v1032 persistence: final remoteTheme state missing')
 if 'tabletLayoutBackupReadyRef' not in page:
-    candidates = [
-        '  const exactAlarmTabletPromptRef = useRef(false);\n',
-        '  const beatAnim = useRef(new Animated.Value(1)).current;\n',
-    ]
-    inserted = False
-    for anchor in candidates:
-        if anchor in page:
-            page = page.replace(anchor, anchor + '  const tabletLayoutBackupReadyRef = useRef(false);\n', 1)
-            inserted = True
-            break
-    if not inserted:
-        # Fallback: place immediately after component opening.
-        comp = re.search(r'export default function MasjidDisplayPage\([^)]*\)\s*\{\n', page)
-        if not comp:
-            raise SystemExit('v1032 persistence: component opening missing')
-        page = page[:comp.end()] + '  const tabletLayoutBackupReadyRef = useRef(false);\n' + page[comp.end():]
+    page = page[:m.end()] + '  const tabletLayoutBackupReadyRef = useRef(false);\n' + page[m.end():]
 
-# Restore the backup once, then save every subsequent settings change. Current settings
-# win over backup values, while missing tabletTheme fields are recovered from the backup.
-if 'HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V2' not in page:
-    state_anchor = re.search(r'\n\s*const theme\s*=|\n\s*const remoteTheme\s*=', page)
-    if not state_anchor:
-        # Place before the first existing effect after all state declarations.
-        state_anchor = re.search(r'\n\s*useEffect\(\(\)\s*=>', page)
-    if not state_anchor:
-        raise SystemExit('v1032 persistence: insertion point missing')
-    effect = '''\n  // HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V2\n  useEffect(() => {\n    let alive = true;\n    void AsyncStorage.getItem(LAYOUT_BACKUP_KEY).then(raw => {\n      if (!alive) return;\n      if (raw) {\n        try {\n          const backup = JSON.parse(raw) as Record<string, any>;\n          setSettings(current => ({\n            ...backup,\n            ...current,\n            tabletTheme: {\n              ...(backup.tabletTheme && typeof backup.tabletTheme === "object" ? backup.tabletTheme : {}),\n              ...(current.tabletTheme && typeof current.tabletTheme === "object" ? current.tabletTheme : {}),\n            },\n          }));\n        } catch {}\n      }\n      tabletLayoutBackupReadyRef.current = true;\n    });\n    return () => { alive = false; };\n  }, []);\n\n  useEffect(() => {\n    if (!tabletLayoutBackupReadyRef.current) return;\n    void AsyncStorage.setItem(LAYOUT_BACKUP_KEY, JSON.stringify(settings));\n  }, [settings]);\n'''
-    page = page[:state_anchor.start()] + effect + page[state_anchor.start():]
+# Merge legacy native-tablet saved settings into whatever is already restored instead of
+# replacing the whole theme. This avoids an older/partial record wiping newer fields.
+page = page.replace(
+    '          setRemoteTheme(storedTheme || {});',
+    '          setRemoteTheme(current => ({ ...current, ...(storedTheme || {}) }));',
+    1,
+)
+
+# Likewise, an empty/partial server response must not erase local layout settings.
+page = page.replace(
+    '          setRemoteTheme(incomingTheme);',
+    '          setRemoteTheme(current => Object.keys(incomingTheme).length ? ({ ...current, ...incomingTheme }) : current);',
+    1,
+)
+
+# Restore the independent local theme backup once. Then persist every real remoteTheme
+# change. Backup values are the base; current/default or newly received values win.
+if 'HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V3' not in page:
+    state_pos = page.find('  const tabletLayoutBackupReadyRef = useRef(false);\n')
+    if state_pos < 0:
+        raise SystemExit('v1032 persistence: restore gate missing')
+    state_end = state_pos + len('  const tabletLayoutBackupReadyRef = useRef(false);\n')
+    effect = '''\n  // HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V3\n  useEffect(() => {\n    let alive = true;\n    void AsyncStorage.getItem(LAYOUT_BACKUP_KEY).then(raw => {\n      if (!alive) return;\n      if (raw) {\n        try {\n          const backupTheme = JSON.parse(raw) as Record<string, any>;\n          if (backupTheme && typeof backupTheme === "object") {\n            setRemoteTheme(current => ({ ...backupTheme, ...current }));\n          }\n        } catch {}\n      }\n      tabletLayoutBackupReadyRef.current = true;\n    });\n    return () => { alive = false; };\n  }, []);\n\n  useEffect(() => {\n    if (!tabletLayoutBackupReadyRef.current) return;\n    void AsyncStorage.setItem(LAYOUT_BACKUP_KEY, JSON.stringify(remoteTheme));\n  }, [remoteTheme]);\n'''
+    page = page[:state_end] + effect + page[state_end:]
 
 for marker in [
-    'HASSOUN_TABLET_LAYOUT_PERSIST_V2',
-    'HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V2',
-    'hassoun:tablet-layout-backup:v2',
+    'HASSOUN_TABLET_LAYOUT_PERSIST_V3',
+    'HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V3',
+    'hassoun:tablet-layout-backup:v3',
     'tabletLayoutBackupReadyRef',
-    'backup.tabletTheme',
+    'backupTheme',
+    'setRemoteTheme(current => ({ ...backupTheme, ...current }))',
     'AsyncStorage.getItem(LAYOUT_BACKUP_KEY)',
-    'AsyncStorage.setItem(LAYOUT_BACKUP_KEY, JSON.stringify(settings))',
+    'AsyncStorage.setItem(LAYOUT_BACKUP_KEY, JSON.stringify(remoteTheme))',
 ]:
     if marker not in page:
         raise SystemExit(f'v1032 persistence missing marker: {marker}')
 
 PAGE.write_text(page, encoding='utf-8')
-print('HASSOUN_TABLET_LAYOUT_PERSIST_V2 applied: tablet/iPad layout settings are restored and re-saved independently of legacy storage keys')
+print('HASSOUN_TABLET_LAYOUT_PERSIST_V3 applied: actual final remoteTheme survives normal APK updates without resetting newer layout fields')
