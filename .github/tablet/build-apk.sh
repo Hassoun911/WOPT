@@ -4,12 +4,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-VERSION="1.0.33"
-VERSION_CODE="77"
+VERSION="1.0.34"
+VERSION_CODE="78"
 GOOD="ae1efdf4ac082e6f4bf64d3b08d3bdccb23e8166"
-OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v${VERSION}-tablet.apk"
+OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v${VERSION}-android-universal.apk"
 
-echo "== Hassoun canonical tablet build v${VERSION} (${VERSION_CODE}) =="
+echo "== Hassoun canonical Android universal build v${VERSION} (${VERSION_CODE}) =="
 
 # Reconstruct from the protected last-good source inputs. This deliberately does not
 # replace .github/scripts or .github/tablet, which are the current patch/build logic.
@@ -59,7 +59,6 @@ widget.parent.mkdir(parents=True,exist_ok=True)
 full.resize((512,512),Image.Resampling.LANCZOS).save(widget,'PNG',optimize=True)
 PY
 
-# Protected canonical app fixes.
 python3 .github/scripts/fix-v1021-no-resume-reload.py
 python3 .github/scripts/fix-v1021-native-masjid-display.py
 python3 .github/scripts/fix-v1021-unified-display-menu.py
@@ -69,7 +68,6 @@ python3 .github/scripts/fix-v1023-adhan-refresh-hardfix.py
 python3 .github/scripts/fix-v1028-never-reset-on-background.py
 python3 .github/scripts/fix-v1029-exact-alarm-permission.py
 
-# One canonical entry point for all tablet-specific patches.
 python3 .github/tablet/apply-current.py
 
 python3 - <<'PY'
@@ -93,11 +91,19 @@ page_markers=[
  'HASSOUN_TABLET_PRAYER_PERIOD_TOGGLE_V3','HASSOUN_TABLET_IMMERSIVE_FULLSCREEN_V1',
  'HASSOUN_TABLET_FORCED_CLOCK_V3','forcedClockTextV1033','toggleTabletPrayerAthan',
  'savePhonePrayerAlertPreferences','tabletPrayerPrefs?.[p.key]?.athan',
- 'schedulePrayerNotifications(times, locale, saved'
+ 'HASSOUN_TABLET_AUDIO_MUTE_SAFE_V1','scheduleAndroidPrayerAudio(times, saved, location.timezone)'
 ]
 for marker in page_markers:
     if marker not in page:
         raise SystemExit(f'Missing tablet page invariant: {marker}')
+
+start=page.find('const toggleTabletPrayerAthan')
+end=page.find('}, [tabletPrayerPrefs, times, location.timezone]);', start)
+if start < 0 or end < 0:
+    raise SystemExit('Unable to verify tablet mute handler')
+mute_block=page[start:end]
+if 'schedulePrayerNotifications(' in mute_block:
+    raise SystemExit('Mini-card mute handler must not rebuild reminder notifications')
 
 editor_markers=[
  'MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','MAIN CARD WIDTH','MAIN CARD HEIGHT',
@@ -115,12 +121,12 @@ for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO
         raise SystemExit(f'Missing protected app invariant: {marker}')
 if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest:
     raise SystemExit('SCHEDULE_EXACT_ALARM missing in prayer-audio manifest')
-for marker in ['version: "1.0.33"','versionCode: 77','android.permission.SCHEDULE_EXACT_ALARM']:
+for marker in ['version: "1.0.34"','versionCode: 78','android.permission.SCHEDULE_EXACT_ALARM']:
     if marker not in cfg:
-        raise SystemExit(f'Missing v1.0.33 config marker: {marker}')
+        raise SystemExit(f'Missing v1.0.34 config marker: {marker}')
 if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
     raise SystemExit('Unsupported tablet SDK API survived reconstruction')
-print('HASSOUN_V1033_SOURCE_VERIFIED')
+print('HASSOUN_V1034_SOURCE_VERIFIED')
 PY
 
 cd mobile
@@ -166,4 +172,4 @@ fi
 test -s "$APK"
 cp "$APK" "$OUT"
 sha256sum "$OUT" | tee "$OUT.sha256"
-echo "HASSOUN_V1033_APK_READY=$OUT"
+echo "HASSOUN_V1034_APK_READY=$OUT"
