@@ -56,4 +56,15 @@ if 'hour12: false }).format(now);' in page:
 
 page_path.write_text(page, encoding='utf-8')
 
-print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order + deterministic 12-hour local clock fixed')
+# Add smart YouTube/direct-video URL background support after the final tablet page exists.
+youtube_script = Path('.github/scripts/fix-v1031-youtube-video-background.py')
+if not youtube_script.exists():
+    raise SystemExit('v1031 compat: YouTube background patch missing')
+exec(compile(youtube_script.read_text(encoding='utf-8'), str(youtube_script), 'exec'))
+
+page = page_path.read_text(encoding='utf-8')
+for marker in ['backgroundYouTubeId', 'backgroundYouTubeUrl', 'react-native-webview']:
+    if marker not in page:
+        raise SystemExit(f'v1031 compat: YouTube background marker missing: {marker}')
+
+print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: exact alarms + declaration order + deterministic 12-hour clock + YouTube video backgrounds')
