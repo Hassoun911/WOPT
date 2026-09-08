@@ -4,7 +4,7 @@ import re
 PAGE = Path('mobile/src/MasjidDisplayPage.tsx')
 page = PAGE.read_text(encoding='utf-8')
 
-# HASSOUN_TABLET_CLOCK_MUTE_V2
+# HASSOUN_TABLET_CLOCK_MUTE_V3
 # Final tablet-only hard fix:
 # 1) render the top clock from remoteTheme.clock24Hour directly (12h by default),
 # 2) make local quick controls update remoteTheme immediately,
@@ -40,13 +40,17 @@ if 'toggleTabletPrayerAthan' not in page:
 clock_insert_pos = page.find('  const toggleTabletPrayerAthan')
 if clock_insert_pos < 0:
     raise SystemExit('v1033 clock/mute: clock insertion anchor missing')
-if 'HASSOUN_TABLET_FORCED_CLOCK_V2' not in page:
-    clock_code = '''  // HASSOUN_TABLET_FORCED_CLOCK_V2\n  const forcedClockPartsV1033 = zonedParts(now, location.timezone);\n  const forcedClock24HourV1033 = remoteTheme.clock24Hour === true;\n  const forcedClockHour12V1033 = forcedClockPartsV1033.hour % 12 || 12;\n  const forcedClockPeriodV1033 = forcedClockPartsV1033.hour >= 12 ? "PM" : "AM";\n  const forcedClockTextV1033 = forcedClock24HourV1033\n    ? `${String(forcedClockPartsV1033.hour).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")}`\n    : `${String(forcedClockHour12V1033).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")} ${forcedClockPeriodV1033}`;\n\n'''
+if 'HASSOUN_TABLET_FORCED_CLOCK_V3' not in page:
+    clock_code = '''  // HASSOUN_TABLET_FORCED_CLOCK_V3\n  const forcedClockPartsV1033 = zonedParts(now, location.timezone);\n  const forcedClock24HourV1033 = remoteTheme.clock24Hour === true;\n  const forcedClockHour12V1033 = forcedClockPartsV1033.hour % 12 || 12;\n  const forcedClockPeriodV1033 = forcedClockPartsV1033.hour >= 12 ? "PM" : "AM";\n  const forcedClockTextV1033 = forcedClock24HourV1033\n    ? `${String(forcedClockPartsV1033.hour).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")}`\n    : `${String(forcedClockHour12V1033).padStart(2,"0")}:${String(forcedClockPartsV1033.minute).padStart(2,"0")}:${String(forcedClockPartsV1033.second).padStart(2,"0")} ${forcedClockPeriodV1033}`;\n\n'''
     page = page[:clock_insert_pos] + clock_code + page[clock_insert_pos:]
 
+# The reconstructed page has used both {clock} and {displayClock} across builds.
+# Replace only the visible clock Text node, not the formatter declaration.
 clock_text_patterns = [
     r'(<Text[^>]*style=\{\[styles\.clock.*?>)\{clock\}(</Text>)',
     r'(<Text[^>]*style=\{styles\.clock\}[^>]*>)\{clock\}(</Text>)',
+    r'(<Text[^>]*style=\{\[styles\.clock.*?>)\{displayClock\}(</Text>)',
+    r'(<Text[^>]*style=\{styles\.clock\}[^>]*>)\{displayClock\}(</Text>)',
 ]
 replaced_clock = False
 for pat in clock_text_patterns:
@@ -90,7 +94,7 @@ if 'tabletPrayerPrefs?.[p.key]?.athan' not in page:
     page = page[:idx] + indicator + page[idx:]
 
 for marker in [
-    'HASSOUN_TABLET_FORCED_CLOCK_V2',
+    'HASSOUN_TABLET_FORCED_CLOCK_V3',
     'forcedClock24HourV1033 = remoteTheme.clock24Hour === true',
     '{forcedClockTextV1033}',
     'toggleTabletPrayerAthan',
@@ -113,4 +117,4 @@ if 'legacy-verifier: 1.0.32 / versionCode: 76' not in cfg:
     cfg += '\n// legacy-verifier: 1.0.32 / versionCode: 76\n'
 cfg_path.write_text(cfg, encoding='utf-8')
 
-print('HASSOUN_TABLET_CLOCK_MUTE_V2 applied: top clock obeys 12/24 setting and lower cards toggle per-prayer Adhan mute with immediate reschedule; v1.0.33/77')
+print('HASSOUN_TABLET_CLOCK_MUTE_V3 applied: top clock obeys 12/24 setting and lower cards toggle per-prayer Adhan mute with immediate reschedule; v1.0.33/77')
