@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.31 Tablet Prayer Runtime + Smart Layout
+name: Build Hassoun v1.0.32 Tablet Clock Format + Smart Layout
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-v1031-tablet-prayer-runtime
+  group: hassoun-v1032-tablet-clock-format
   cancel-in-progress: true
 
 jobs:
@@ -136,7 +136,7 @@ jobs:
           python3 .github/scripts/fix-v1030-tablet-sdk-compat.py
           python3 .github/scripts/run-v1031-final-behavior-compat.py
 
-      - name: Verify tablet sizing, five-minute mode, countdown and alarms
+      - name: Verify tablet sizing, clock format, five-minute mode, countdown and alarms
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -153,33 +153,31 @@ jobs:
             'PRAYER SOON','countdownScale','countdownColor','countdownFont','openExactAlarmSettings',
             'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop',
             '"exactAlarmGranted" in result','backgroundYouTubeId','backgroundYouTubeUrl','react-native-webview',
-            'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView'
+            'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView','clock24Hour','clockHour12'
           ]:
             if marker not in page: raise SystemExit(f'Missing tablet runtime/layout invariant: {marker}')
           for marker in [
             'MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','MAIN CARD WIDTH','MAIN CARD HEIGHT',
             'COUNTDOWN / TIME LEFT','TIME LEFT SIZE','5-minute heartbeat + freeze','FREEZE / BEAT BEFORE PRAYER',
             'TABLET PRAYER ENGINE','No maximum.','WHOLE DISPLAY BACKGROUND','LAYOUT IDEAS · ONE TAP',
-            'Paste a YouTube link'
+            'Paste a YouTube link','Use 24-hour clock","clock24Hour"'
           ]:
             if marker not in editor: raise SystemExit(f'Missing tablet editor invariant: {marker}')
           for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','hassoun:resume-exact-screen:v1']:
             if marker not in app: raise SystemExit(f'Missing last-good app invariant: {marker}')
           if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest:
             raise SystemExit('SCHEDULE_EXACT_ALARM missing')
-          for marker in ['1.0.31','versionCode: 75','android.permission.SCHEDULE_EXACT_ALARM']:
+          for marker in ['1.0.32','versionCode: 76','android.permission.SCHEDULE_EXACT_ALARM']:
             if marker not in cfg: raise SystemExit(f'Missing app config marker: {marker}')
           if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
             raise SystemExit('Unsupported tablet SDK API survived reconstruction')
-          print('v1.0.31 tablet prayer runtime + smart sizing + 5-minute beat/freeze + YouTube background verified')
+          print('v1.0.32 tablet clock-format selector + prayer runtime + smart sizing + 5-minute beat/freeze + YouTube background verified')
           PY
 
       - name: TypeScript verification
         run: |
           set -euo pipefail
           cd mobile
-          # Reinstall the platform compiler immediately before typecheck so any npm/expo
-          # dependency reconciliation performed by tablet patches cannot prune it.
           npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
           test -e node_modules/@typescript/typescript-linux-x64/package.json
           npm run typecheck
@@ -226,16 +224,16 @@ jobs:
           set -euo pipefail
           APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n1)"
           test -s "$APK"
-          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.31-tablet-prayer-runtime.apk"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.32-tablet-clock-format.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.31-Tablet-Prayer-Runtime
+          name: Hassoun-v1.0.32-Tablet-Clock-Format
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.31-tablet-prayer-runtime.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.31-tablet-prayer-runtime.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.32-tablet-clock-format.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.32-tablet-clock-format.apk.sha256
           if-no-files-found: error
           retention-days: 30
