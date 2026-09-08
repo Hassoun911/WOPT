@@ -14,6 +14,7 @@ on:
       - ".github/scripts/fix-v1030-layout-presets.py"
       - ".github/scripts/fix-v1030-tablet-prayer-runtime.py"
       - ".github/scripts/fix-v1031-tablet-final-behavior.py"
+      - ".github/scripts/fix-v1031-youtube-video-background.py"
       - ".github/scripts/run-v1031-final-behavior-compat.py"
 
 permissions:
@@ -151,13 +152,15 @@ jobs:
             'requestedHeroBand','requestedMiniBand','HASSOUN_TABLET_5MIN_BEAT_V1','imminentPrayer',
             'PRAYER SOON','countdownScale','countdownColor','countdownFont','openExactAlarmSettings',
             'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop',
-            '"exactAlarmGranted" in result'
+            '"exactAlarmGranted" in result','backgroundYouTubeId','backgroundYouTubeUrl','react-native-webview',
+            'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView'
           ]:
             if marker not in page: raise SystemExit(f'Missing tablet runtime/layout invariant: {marker}')
           for marker in [
             'MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','MAIN CARD WIDTH','MAIN CARD HEIGHT',
             'COUNTDOWN / TIME LEFT','TIME LEFT SIZE','5-minute heartbeat + freeze','FREEZE / BEAT BEFORE PRAYER',
-            'TABLET PRAYER ENGINE','No maximum.','WHOLE DISPLAY BACKGROUND','LAYOUT IDEAS · ONE TAP'
+            'TABLET PRAYER ENGINE','No maximum.','WHOLE DISPLAY BACKGROUND','LAYOUT IDEAS · ONE TAP',
+            'Paste a YouTube link'
           ]:
             if marker not in editor: raise SystemExit(f'Missing tablet editor invariant: {marker}')
           for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','hassoun:resume-exact-screen:v1']:
@@ -168,7 +171,7 @@ jobs:
             if marker not in cfg: raise SystemExit(f'Missing app config marker: {marker}')
           if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
             raise SystemExit('Unsupported tablet SDK API survived reconstruction')
-          print('v1.0.31 tablet prayer runtime + smart sizing + 5-minute beat/freeze verified')
+          print('v1.0.31 tablet prayer runtime + smart sizing + 5-minute beat/freeze + YouTube background verified')
           PY
 
       - name: TypeScript verification
