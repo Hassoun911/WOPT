@@ -42,8 +42,21 @@ The workflow then uploads the APK as a GitHub Actions artifact. APK binaries are
 - Tablet layout/theme is persisted across normal APK upgrades.
 - Paired admin editor resumes to the exact display/editor state after process recreation.
 - Five-minute prayer-soon freeze/heartbeat remains enabled when configured.
-- Tablet prayer notifications/exact alarms are scheduled separately from visual selection.
-- **Tapping a lower/mini prayer card in v1.0.33 toggles that prayer's Adhan mute state, persists it, and re-arms the schedule.** The card shows `🔇 MUTED` or `🔊 ADHAN`.
+- Tablet prayer notifications/exact alarms are intended to self-arm on entering tablet mode, on resume, and periodically while the display stays open.
+
+## Known v1.0.33 regression — tablet Adhan / reminder reliability
+
+Physical-device report: the same universal Android APK works correctly for Adhan and reminder sounds in phone mode, but tablet/iPad display mode is no longer reliably playing Adhan and notification sounds. Earlier tablet builds worked correctly.
+
+The most suspicious regression was introduced by `.github/scripts/fix-v1033-clock-and-prayer-mute.py`. In v1.0.33, tapping a lower prayer card was changed from a visual selection action into a persistent Adhan mute toggle. That handler also calls `schedulePrayerNotifications(...)`, which cancels the existing prayer notification/native Adhan schedule and rebuilds it. This is a new behavior compared with v1.0.32 and can both mute a prayer unexpectedly and disturb reminder timing when cards are tapped.
+
+Until fixed and physically re-tested:
+- treat v1.0.33 tablet prayer audio as a known regression;
+- do not use mini prayer cards as a sound/mute control;
+- restore mini-card taps to visual selection only;
+- keep sound preferences in the dedicated Alerts/settings controls;
+- preserve the tablet self-arm runtime from `fix-v1030-tablet-prayer-runtime.py`;
+- verify 20-minute chime, 10-minute chime, Fajr Adhan, non-Fajr Adhan + dua, exact-alarm resume, and long-running tablet mode on a real Android tablet before calling the next APK fixed.
 
 ## Safety rules
 
