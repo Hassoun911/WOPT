@@ -35,30 +35,26 @@ new_player = '  const backgroundPlayer = useVideoPlayer(backgroundMode === "vide
 if old_player in page:
     page = page.replace(old_player, new_player, 1)
 elif new_player not in page:
-    # tolerate whitespace/format changes from later tablet patches
-    player_pat = re.compile(r'  const backgroundPlayer = useVideoPlayer\(backgroundMode === "video" && backgroundVideoUrl \? backgroundVideoUrl : null, player => \{ player\.loop = true; player\.muted = true; if \(backgroundVideoUrl\) player\.play\(\); \}\);\n')
-    page, n = player_pat.subn(new_player, page, count=1)
-    if n != 1 and new_player not in page:
+    # Replace any equivalent declaration regardless of spacing.
+    player_pat = re.compile(r'\s*const backgroundPlayer = useVideoPlayer\([^\n]+\);\n')
+    m = player_pat.search(page)
+    if not m:
         raise SystemExit('YouTube background patch: background player declaration missing')
+    page = page[:m.start()] + '\n' + new_player + page[m.end():]
 
-# Add the YouTube WebView layer immediately after StatusBar; then make any existing
-# direct VideoView layer skip YouTube URLs. This is deliberately independent of exact
-# formatting/styles used by the final responsive tablet patch.
+# Final tablet patches keep changing the exact JSX of the background VideoView. Do not
+# depend on that JSX. Remove any pre-existing background VideoView line(s), then insert
+# one canonical YouTube layer and one canonical direct-video layer after StatusBar.
+page = re.sub(r'^\s*\{[^\n]*backgroundMode[^\n]*<VideoView[^\n]*\}\s*\n?', '', page, flags=re.M)
+status_anchor = '        <StatusBar hidden />\n'
+if status_anchor not in page:
+    raise SystemExit('YouTube background patch: StatusBar insertion point missing')
 youtube_view = '        {backgroundMode === "video" && backgroundYouTubeUrl ? <WebView source={{ uri: backgroundYouTubeUrl }} style={StyleSheet.absoluteFill} javaScriptEnabled allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} scrollEnabled={false} bounces={false} pointerEvents="none" /> : null}\n'
-if youtube_view not in page:
-    status_anchor = '        <StatusBar hidden />\n'
-    if status_anchor not in page:
-        raise SystemExit('YouTube background patch: StatusBar insertion point missing')
-    page = page.replace(status_anchor, status_anchor + youtube_view, 1)
-
-# Find the first background VideoView conditional regardless of spacing or wrapper styles.
-video_pat = re.compile(r'\{backgroundMode === "video" && backgroundVideoUrl(?P<extra>[^?{}]*)\? <VideoView(?P<body>.*?)\/\> : null\}', re.S)
-m = video_pat.search(page)
-if m:
-    replacement = '{backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? <VideoView' + m.group('body') + '/> : null}'
-    page = page[:m.start()] + replacement + page[m.end():]
-elif 'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView' not in page:
-    raise SystemExit('YouTube background patch: direct VideoView layer missing')
+direct_view = '        {backgroundMode === "video" && backgroundVideoUrl && !backgroundYouTubeId ? <VideoView player={backgroundPlayer} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}\n'
+# Remove a previous canonical WebView layer if this script is ever re-run, then insert once.
+page = page.replace(youtube_view, '')
+page = page.replace(direct_view, '')
+page = page.replace(status_anchor, status_anchor + youtube_view + direct_view, 1)
 
 for marker in ['youtubeVideoId(', 'backgroundYouTubeId', 'backgroundYouTubeUrl', 'react-native-webview', 'mediaPlaybackRequiresUserAction={false}', 'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView']:
     if marker not in page:
@@ -75,4 +71,4 @@ elif new_help not in controller:
     raise SystemExit('YouTube background patch: video URL help text missing')
 controller_path.write_text(controller, encoding='utf-8')
 
-print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V2 applied: robust YouTube/direct video URL backgrounds supported')
+print('HASSOUN_TABLET_YOUTUBE_BACKGROUND_V3 applied: canonical YouTube/direct video layers + URL detection')
