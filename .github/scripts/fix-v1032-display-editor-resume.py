@@ -65,6 +65,7 @@ print('HASSOUN_DISPLAY_EDITOR_RESUME_V1 applied: exact Tablet/iPad admin editor 
 for patch_name in [
     '.github/scripts/fix-v1033-prayer-period-toggle.py',
     '.github/scripts/fix-v1033-tablet-immersive-fullscreen.py',
+    '.github/scripts/fix-v1033-clock-and-prayer-mute.py',
 ]:
     patch = Path(patch_name)
     if not patch.exists():
