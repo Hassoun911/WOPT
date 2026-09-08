@@ -61,7 +61,6 @@ for marker in [
 EDITOR.write_text(editor, encoding='utf-8')
 print('HASSOUN_DISPLAY_EDITOR_RESUME_V1 applied: exact Tablet/iPad admin editor and selected section restore after background/process recreation')
 
-# Apply final tablet-only fixes last so earlier display rewrites cannot undo them.
 for patch_name in [
     '.github/scripts/fix-v1033-prayer-period-toggle.py',
     '.github/scripts/fix-v1033-tablet-immersive-fullscreen.py',
@@ -72,4 +71,4 @@ for patch_name in [
         raise SystemExit(f'Final tablet patch missing: {patch_name}')
     exec(compile(patch.read_text(encoding='utf-8'), str(patch), 'exec'))
 
-# v1.0.33 final verification trigger
+# v1.0.33 final verification trigger 2
