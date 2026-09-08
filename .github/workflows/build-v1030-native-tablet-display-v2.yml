@@ -16,6 +16,8 @@ on:
       - ".github/scripts/fix-v1031-tablet-final-behavior.py"
       - ".github/scripts/fix-v1031-youtube-video-background.py"
       - ".github/scripts/run-v1031-final-behavior-compat.py"
+      - ".github/scripts/fix-v1032-tablet-layout-persistence.py"
+      - ".github/scripts/fix-v1032-display-editor-resume.py"
 
 permissions:
   contents: read
@@ -135,8 +137,10 @@ jobs:
           python3 .github/scripts/fix-v1030-layout-presets.py
           python3 .github/scripts/fix-v1030-tablet-sdk-compat.py
           python3 .github/scripts/run-v1031-final-behavior-compat.py
+          python3 .github/scripts/fix-v1032-tablet-layout-persistence.py
+          python3 .github/scripts/fix-v1032-display-editor-resume.py
 
-      - name: Verify tablet sizing, clock format, five-minute mode, countdown and alarms
+      - name: Verify tablet sizing, clock format, persistence, resume, five-minute mode, countdown and alarms
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -153,14 +157,16 @@ jobs:
             'PRAYER SOON','countdownScale','countdownColor','countdownFont','openExactAlarmSettings',
             'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop',
             '"exactAlarmGranted" in result','backgroundYouTubeId','backgroundYouTubeUrl','react-native-webview',
-            'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView','clock24Hour','clockHour12'
+            'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView','clock24Hour','clockHour12',
+            'HASSOUN_TABLET_LAYOUT_PERSIST_V1','hassoun:tablet-layout-backup:v1','backup.tabletTheme'
           ]:
             if marker not in page: raise SystemExit(f'Missing tablet runtime/layout invariant: {marker}')
           for marker in [
             'MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','MAIN CARD WIDTH','MAIN CARD HEIGHT',
             'COUNTDOWN / TIME LEFT','TIME LEFT SIZE','5-minute heartbeat + freeze','FREEZE / BEAT BEFORE PRAYER',
             'TABLET PRAYER ENGINE','No maximum.','WHOLE DISPLAY BACKGROUND','LAYOUT IDEAS · ONE TAP',
-            'Paste a YouTube link','Use 24-hour clock","clock24Hour"'
+            'Paste a YouTube link','Use 24-hour clock","clock24Hour"',
+            'HASSOUN_DISPLAY_EDITOR_RESUME_V1','hassoun:display-editor-state:v1','restoreSavedDisplayEditor','pairedLoaded'
           ]:
             if marker not in editor: raise SystemExit(f'Missing tablet editor invariant: {marker}')
           for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO_RESET_V4','hassoun:resume-exact-screen:v1']:
@@ -171,7 +177,7 @@ jobs:
             if marker not in cfg: raise SystemExit(f'Missing app config marker: {marker}')
           if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
             raise SystemExit('Unsupported tablet SDK API survived reconstruction')
-          print('v1.0.32 tablet clock-format selector + prayer runtime + smart sizing + 5-minute beat/freeze + YouTube background verified')
+          print('v1.0.32 tablet clock selector + persistent layout + exact admin editor resume + prayer runtime verified')
           PY
 
       - name: TypeScript verification
