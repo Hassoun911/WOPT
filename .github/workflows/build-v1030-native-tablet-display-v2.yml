@@ -65,7 +65,7 @@ jobs:
           set -euo pipefail
           cd mobile
           npm ci --ignore-scripts --no-audit --no-fund
-          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera expo-linear-gradient expo-keep-awake expo-navigation-bar --npm
+          npx expo install expo-image-picker expo-file-system expo-battery expo-brightness expo-document-picker expo-screen-orientation expo-video expo-splash-screen expo-camera expo-linear-gradient expo-keep-awake expo-navigation-bar react-native-webview --npm
           npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
 
       - name: Reconstruct last-good app stack
@@ -178,6 +178,10 @@ jobs:
         run: |
           set -euo pipefail
           cd mobile
+          # Reinstall the platform compiler immediately before typecheck so any npm/expo
+          # dependency reconciliation performed by tablet patches cannot prune it.
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+          test -e node_modules/@typescript/typescript-linux-x64/package.json
           npm run typecheck
 
       - name: Generate Android
