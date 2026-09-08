@@ -14,6 +14,7 @@ on:
       - ".github/scripts/fix-v1030-layout-presets.py"
       - ".github/scripts/fix-v1030-tablet-prayer-runtime.py"
       - ".github/scripts/fix-v1031-tablet-final-behavior.py"
+      - ".github/scripts/run-v1031-final-behavior-compat.py"
 
 permissions:
   contents: read
@@ -132,7 +133,7 @@ jobs:
           python3 .github/scripts/fix-v1030-tablet-smart-ux-v2.py
           python3 .github/scripts/fix-v1030-layout-presets.py
           python3 .github/scripts/fix-v1030-tablet-sdk-compat.py
-          python3 .github/scripts/fix-v1031-tablet-final-behavior.py
+          python3 .github/scripts/run-v1031-final-behavior-compat.py
 
       - name: Verify tablet sizing, five-minute mode, countdown and alarms
         run: |
@@ -149,7 +150,8 @@ jobs:
             'schedulePrayerNotifications(times, locale, preferences','tabletPrayerRuntimeStatus',
             'requestedHeroBand','requestedMiniBand','HASSOUN_TABLET_5MIN_BEAT_V1','imminentPrayer',
             'PRAYER SOON','countdownScale','countdownColor','countdownFont','openExactAlarmSettings',
-            'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop'
+            'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop',
+            '"exactAlarmGranted" in result'
           ]:
             if marker not in page: raise SystemExit(f'Missing tablet runtime/layout invariant: {marker}')
           for marker in [
