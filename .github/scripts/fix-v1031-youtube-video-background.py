@@ -1,5 +1,10 @@
 from pathlib import Path
 import re
+import subprocess
+
+# YouTube watch/short/share URLs are web pages, not direct media streams. Install the
+# native WebView used to render YouTube's embeddable player behind the prayer UI.
+subprocess.run(['npx', 'expo', 'install', 'react-native-webview', '--npm'], cwd='mobile', check=True)
 
 page_path = Path('mobile/src/MasjidDisplayPage.tsx')
 page = page_path.read_text(encoding='utf-8')
