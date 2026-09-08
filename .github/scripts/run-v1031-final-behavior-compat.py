@@ -16,4 +16,27 @@ if old_condition not in source:
 source = source.replace(old_condition, new_condition, 1)
 
 exec(compile(source, str(script_path), 'exec'))
-print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch supported')
+
+# The final behavior patch inserts freeze/beat settings near the theme block, but the
+# reconstructed tablet computes imminent prayer and starts the animation earlier in the
+# component. Move only these dependency-free settings above their first use so TypeScript
+# sees them before use, while leaving color/font declarations in their original location.
+page_path = Path('mobile/src/MasjidDisplayPage.tsx')
+page = page_path.read_text(encoding='utf-8')
+freeze_line = '  const freezeBeforeMinutes = Math.max(1, Number(remoteTheme.freezeBeforeMinutes) || 5);\n'
+beat_line = '  const beatEnabled = remoteTheme.beatBeforePrayer !== false;\n'
+for line in (freeze_line, beat_line):
+    if page.count(line) != 1:
+        raise SystemExit(f'v1031 compat: expected exactly one declaration: {line.strip()}')
+    page = page.replace(line, '', 1)
+anchor = '  const imminentSeconds = secondsUntilPrayer(now, location.timezone, day?.[next]);\n'
+if anchor not in page:
+    raise SystemExit('v1031 compat: imminent prayer anchor missing')
+page = page.replace(anchor, freeze_line + beat_line + anchor, 1)
+if page.find('const freezeBeforeMinutes') > page.find('const imminentSeconds'):
+    raise SystemExit('v1031 compat: freezeBeforeMinutes still declared after use')
+if page.find('const beatEnabled') > page.find('HASSOUN_TABLET_5MIN_BEAT_V1'):
+    raise SystemExit('v1031 compat: beatEnabled still declared after animation use')
+page_path.write_text(page, encoding='utf-8')
+
+print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order fixed')
