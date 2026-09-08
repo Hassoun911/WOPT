@@ -158,8 +158,9 @@ jobs:
             'miniHeight / requestedMiniBand','height:heroAvailableHeight','Animated.loop',
             '"exactAlarmGranted" in result','backgroundYouTubeId','backgroundYouTubeUrl','react-native-webview',
             'backgroundVideoUrl && !backgroundYouTubeId ? <VideoView','clock24Hour','clockHour12',
-            'HASSOUN_TABLET_LAYOUT_PERSIST_V2','HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V2',
-            'hassoun:tablet-layout-backup:v2','tabletLayoutBackupReadyRef','backup.tabletTheme'
+            'HASSOUN_TABLET_LAYOUT_PERSIST_V3','HASSOUN_TABLET_LAYOUT_RESTORE_EFFECT_V3',
+            'hassoun:tablet-layout-backup:v3','tabletLayoutBackupReadyRef','backupTheme',
+            'AsyncStorage.setItem(LAYOUT_BACKUP_KEY, JSON.stringify(remoteTheme))'
           ]:
             if marker not in page: raise SystemExit(f'Missing tablet runtime/layout invariant: {marker}')
           for marker in [
