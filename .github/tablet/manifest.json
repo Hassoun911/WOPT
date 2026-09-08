@@ -1,8 +1,8 @@
 {
   "app": "Hassoun",
   "authoritative_branch": "main",
-  "current_version": "1.0.33",
-  "android_version_code": 77,
+  "current_version": "1.0.34",
+  "android_version_code": 78,
   "protected_physical_last_good": "1.0.29",
   "protected_base_commit": "ae1efdf4ac082e6f4bf64d3b08d3bdccb23e8166",
   "workflow": ".github/workflows/tablet-build.yml",
@@ -26,10 +26,12 @@
     ".github/scripts/fix-v1032-display-editor-resume.py",
     ".github/scripts/fix-v1033-prayer-period-toggle.py",
     ".github/scripts/fix-v1033-tablet-immersive-fullscreen.py",
-    ".github/scripts/fix-v1033-clock-and-prayer-mute.py"
+    ".github/scripts/fix-v1033-clock-and-prayer-mute.py",
+    ".github/scripts/fix-v1034-tablet-audio-mute-safe.py"
   ],
-  "v1033_behavior": {
-    "mini_card_press": "toggles per-prayer Adhan mute, persists preference, and immediately reschedules prayer notifications/exact Adhan",
+  "v1034_behavior": {
+    "mini_card_press": "keeps visual selection plus per-prayer Adhan mute/unmute",
+    "mute_reschedule": "updates only the native exact-Adhan schedule; existing 20m/10m reminder notifications are not canceled or rebuilt",
     "clock": "explicit 12/24-hour renderer",
     "fullscreen": "immersive tablet display",
     "prayer_period": "live AM/PM toggle"
