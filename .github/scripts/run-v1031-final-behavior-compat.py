@@ -38,15 +38,22 @@ if page.find('const freezeBeforeMinutes') > page.find('const imminentSeconds'):
 if page.find('const beatEnabled') > page.find('HASSOUN_TABLET_5MIN_BEAT_V1'):
     raise SystemExit('v1031 compat: beatEnabled still declared after animation use')
 
-# Display clock must use local 12-hour time with AM/PM. Internal prayer math remains 24h.
-old_clock = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now);'
-new_clock = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(now);'
-if old_clock not in page:
+# Force the visible local clock to 12-hour format ourselves. Do not rely on Intl hour12
+# because some Android runtimes/device locales can still render a 24-hour clock.
+intl_clock_24 = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now);'
+intl_clock_12 = 'const clock = new Intl.DateTimeFormat("en-US", { timeZone: location.timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(now);'
+manual_clock = '''const clockParts = zonedParts(now, location.timezone);\n  const clockHour12 = clockParts.hour % 12 || 12;\n  const clockPeriod = clockParts.hour >= 12 ? "PM" : "AM";\n  const clock = `${String(clockHour12).padStart(2, "0")}:${String(clockParts.minute).padStart(2, "0")}:${String(clockParts.second).padStart(2, "0")} ${clockPeriod}`;'''
+if intl_clock_24 in page:
+    page = page.replace(intl_clock_24, manual_clock, 1)
+elif intl_clock_12 in page:
+    page = page.replace(intl_clock_12, manual_clock, 1)
+else:
     raise SystemExit('v1031 compat: tablet display clock formatter missing')
-page = page.replace(old_clock, new_clock, 1)
-if 'hour12: true }).format(now);' not in page:
-    raise SystemExit('v1031 compat: 12-hour clock update did not apply')
+if 'const clockHour12 = clockParts.hour % 12 || 12;' not in page or 'const clockPeriod = clockParts.hour >= 12 ? "PM" : "AM";' not in page:
+    raise SystemExit('v1031 compat: deterministic 12-hour clock update did not apply')
+if 'hour12: false }).format(now);' in page:
+    raise SystemExit('v1031 compat: visible 24-hour clock formatter survived')
 
 page_path.write_text(page, encoding='utf-8')
 
-print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order + 12-hour local clock fixed')
+print('HASSOUN_V1031_FINAL_BEHAVIOR_COMPAT applied: guarded exact-alarm branch + declaration order + deterministic 12-hour local clock fixed')
