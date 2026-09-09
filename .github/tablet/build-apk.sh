@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-VERSION="1.0.34"
-VERSION_CODE="78"
+VERSION="1.0.35"
+VERSION_CODE="79"
 GOOD="ae1efdf4ac082e6f4bf64d3b08d3bdccb23e8166"
 OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v${VERSION}-android-universal.apk"
 
@@ -91,7 +91,8 @@ page_markers=[
  'HASSOUN_TABLET_PRAYER_PERIOD_TOGGLE_V3','HASSOUN_TABLET_IMMERSIVE_FULLSCREEN_V1',
  'HASSOUN_TABLET_FORCED_CLOCK_V3','forcedClockTextV1033','toggleTabletPrayerAthan',
  'savePhonePrayerAlertPreferences','tabletPrayerPrefs?.[p.key]?.athan',
- 'HASSOUN_TABLET_AUDIO_MUTE_SAFE_V1','scheduleAndroidPrayerAudio(times, saved, location.timezone)'
+ 'HASSOUN_TABLET_AUDIO_MUTE_SAFE_V1','scheduleAndroidPrayerAudio(times, saved, location.timezone)',
+ 'HASSOUN_TABLET_CLOCK_FORMAT_CONTROLS_V1','forcedClockShowSecondsV1035','forcedClockSuffixV1035'
 ]
 for marker in page_markers:
     if marker not in page:
@@ -109,7 +110,7 @@ editor_markers=[
  'MAIN GALLERY PRAYER CARD SIZE','LOWER PRAYER CARDS SIZE','MAIN CARD WIDTH','MAIN CARD HEIGHT',
  'COUNTDOWN / TIME LEFT','TIME LEFT SIZE','5-minute heartbeat + freeze','FREEZE / BEAT BEFORE PRAYER',
  'TABLET PRAYER ENGINE','No maximum.','WHOLE DISPLAY BACKGROUND','LAYOUT IDEAS · ONE TAP',
- 'Paste a YouTube link','Use 24-hour clock","clock24Hour"','HASSOUN_DISPLAY_EDITOR_RESUME_V1',
+ 'Paste a YouTube link','24-hour clock","clock24Hour"','HASSOUN_DISPLAY_EDITOR_RESUME_V1',
  'hassoun:display-editor-state:v1','restoreSavedDisplayEditor','pairedLoaded','showPrayerPeriod'
 ]
 for marker in editor_markers:
@@ -121,12 +122,12 @@ for marker in ['HASSOUN_EXACT_ALARM_PERMISSION_V4','HASSOUN_BACKGROUND_RESUME_NO
         raise SystemExit(f'Missing protected app invariant: {marker}')
 if 'android.permission.SCHEDULE_EXACT_ALARM' not in manifest:
     raise SystemExit('SCHEDULE_EXACT_ALARM missing in prayer-audio manifest')
-for marker in ['version: "1.0.34"','versionCode: 78','android.permission.SCHEDULE_EXACT_ALARM']:
+for marker in ['version: "1.0.35"','versionCode: 79','android.permission.SCHEDULE_EXACT_ALARM']:
     if marker not in cfg:
-        raise SystemExit(f'Missing v1.0.34 config marker: {marker}')
+        raise SystemExit(f'Missing v1.0.35 config marker: {marker}')
 if 'setBehaviorAsync' in page or 'StyleSheet.absoluteFillObject' in page:
     raise SystemExit('Unsupported tablet SDK API survived reconstruction')
-print('HASSOUN_V1034_SOURCE_VERIFIED')
+print('HASSOUN_V1035_SOURCE_VERIFIED')
 PY
 
 cd mobile
@@ -172,4 +173,4 @@ fi
 test -s "$APK"
 cp "$APK" "$OUT"
 sha256sum "$OUT" | tee "$OUT.sha256"
-echo "HASSOUN_V1034_APK_READY=$OUT"
+echo "HASSOUN_V1035_APK_READY=$OUT"
