@@ -1,4 +1,4 @@
-name: Build Hassoun v1.0.34 Android Universal
+name: Build Hassoun v1.0.35 Android Universal
 
 on:
   workflow_dispatch:
@@ -21,12 +21,13 @@ on:
       - ".github/scripts/fix-v1032-*.py"
       - ".github/scripts/fix-v1033-*.py"
       - ".github/scripts/fix-v1034-*.py"
+      - ".github/scripts/fix-v1035-*.py"
 
 permissions:
   contents: read
 
 concurrency:
-  group: hassoun-android-universal-main-v1034
+  group: hassoun-android-universal-main-v1035
   cancel-in-progress: true
 
 jobs:
@@ -56,10 +57,11 @@ jobs:
           from pathlib import Path
           m=json.loads(Path('.github/tablet/manifest.json').read_text())
           assert m['authoritative_branch']=='main'
-          assert m['current_version']=='1.0.34'
-          assert m['android_version_code']==78
+          assert m['current_version']=='1.0.35'
+          assert m['android_version_code']==79
           assert m['workflow']=='.github/workflows/tablet-build.yml'
           assert '.github/scripts/fix-v1034-tablet-audio-mute-safe.py' in m['tablet_patch_order']
+          assert '.github/scripts/fix-v1035-clock-format-controls.py' in m['tablet_patch_order']
           print('Canonical Android universal manifest verified')
           PY
 
@@ -79,16 +81,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and verify canonical v1.0.34 APK
+      - name: Build and verify canonical v1.0.35 APK
         timeout-minutes: 55
         run: bash .github/tablet/build-apk.sh
 
-      - name: Upload v1.0.34 universal APK
+      - name: Upload v1.0.35 universal APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hassoun-v1.0.34-Android-Universal
+          name: Hassoun-v1.0.35-Android-Universal
           path: |
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.34-android-universal.apk
-            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.34-android-universal.apk.sha256
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.35-android-universal.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.35-android-universal.apk.sha256
           if-no-files-found: error
           retention-days: 30
