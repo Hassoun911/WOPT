@@ -10,6 +10,7 @@ import "./home-app-match.css";
 import "./fluid-dashboard.css";
 import "./islamic-rich.css";
 import "./home-header-center.css";
+import "./website-desktop-final.css";
 import EmailManageRedirect from "./EmailManageRedirect";
 import NavEnhancer from "./NavEnhancer";
 import WebMasjidTvMenuEnhancer from "./WebMasjidTvMenuEnhancer";
@@ -46,7 +47,6 @@ import WebsiteLogoEnhancer from "./WebsiteLogoEnhancer";
 import WebIslamicVisualEnhancer from "./WebIslamicVisualEnhancer";
 import WebAppNav from "./WebAppNav";
 import RemoteAppControl from "./RemoteAppControl";
-import CompactEmailAdhanSignup from "./CompactEmailAdhanSignup";
 
 const geistSans=Geist({variable:"--font-geist-sans",subsets:["latin"]});
 const geistMono=Geist_Mono({variable:"--font-geist-mono",subsets:["latin"]});
@@ -112,4 +112,4 @@ const tvBootstrap = `(function(){
   if(window.addEventListener){window.addEventListener('focus',updateLocalClock,false);window.addEventListener('pageshow',updateLocalClock,false);}
 })();`;
 
-export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><head><script dangerouslySetInnerHTML={{__html:tvBootstrap}}/></head><body className={`${geistSans.variable} ${geistMono.variable}`}><RemoteAppControl/>{children}<EmailManageRedirect/><NavEnhancer/><WebMasjidTvMenuEnhancer/><LocationPrayerTimesEnhancer/><LocationMovementRefresh/><PrayerAlertAudioEnhancer/><PrayerCardInteractionEnhancer/><ServiceWorkerRegistration/><WebPushRegistration/><QuranUiFixEnhancer/><QuranReferenceLayoutEnhancer/><QuranReferenceControlsEnhancer/><QuranViewModeEnhancer/><QuranTranslationLanguageEnhancer/><QuranVerseMenuEnhancer/><QuranInfoMeaningEnhancer/><QuranHeaderSearchEnhancer/><QuranHomeLinkFixEnhancer/><QuranCleanReadingEnhancer/><QuranCleanToolbarFixEnhancer/><QuranMoreMenuEnhancer/><QuranTapAnchorEnhancer/><QuranPrintedPageEnhancer/><QuranScriptTajweedEnhancer/><QuranPrintedScrollEnhancer/><QuranDesktopScrollInputFix/><QuranIndexEnhancer/><QuranAudioSystem/><QuranGlyphSafetyEnhancer/><QuranContextSurahChooserEnhancer/><QuranPageOrderGuardEnhancer/><QuranSchoolLinkEnhancer/><WebsiteLogoEnhancer/><WebIslamicVisualEnhancer/><CompactEmailAdhanSignup/><WebAppNav/></body></html>}
+export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><head><script dangerouslySetInnerHTML={{__html:tvBootstrap}}/></head><body className={`${geistSans.variable} ${geistMono.variable}`}><RemoteAppControl/>{children}<EmailManageRedirect/><NavEnhancer/><WebMasjidTvMenuEnhancer/><LocationPrayerTimesEnhancer/><LocationMovementRefresh/><PrayerAlertAudioEnhancer/><PrayerCardInteractionEnhancer/><ServiceWorkerRegistration/><WebPushRegistration/><QuranUiFixEnhancer/><QuranReferenceLayoutEnhancer/><QuranReferenceControlsEnhancer/><QuranViewModeEnhancer/><QuranTranslationLanguageEnhancer/><QuranVerseMenuEnhancer/><QuranInfoMeaningEnhancer/><QuranHeaderSearchEnhancer/><QuranHomeLinkFixEnhancer/><QuranCleanReadingEnhancer/><QuranCleanToolbarFixEnhancer/><QuranMoreMenuEnhancer/><QuranTapAnchorEnhancer/><QuranPrintedPageEnhancer/><QuranScriptTajweedEnhancer/><QuranPrintedScrollEnhancer/><QuranDesktopScrollInputFix/><QuranIndexEnhancer/><QuranAudioSystem/><QuranGlyphSafetyEnhancer/><QuranContextSurahChooserEnhancer/><QuranPageOrderGuardEnhancer/><QuranSchoolLinkEnhancer/><WebsiteLogoEnhancer/><WebIslamicVisualEnhancer/><WebAppNav/></body></html>}
