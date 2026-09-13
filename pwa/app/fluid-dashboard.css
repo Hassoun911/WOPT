@@ -41,10 +41,64 @@
     padding: 8px 4px !important;
   }
 
+  /* Desktop header controls: keep icons/text visible instead of empty circles. */
+  .header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .header-actions .language-pill,
+  .header-actions .round-button,
+  .header-actions .install-button {
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #0b5b47 !important;
+    border-color: #0b5b47 !important;
+    background: #fffdf8 !important;
+    box-shadow: none !important;
+  }
+
+  .header-actions .install-button {
+    color: #083f34 !important;
+    background: #61efc3 !important;
+    border-color: #61efc3 !important;
+    font-weight: 900 !important;
+  }
+
+  .header-actions .round-button {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    display: inline-grid !important;
+    place-items: center !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+  }
+
+  .header-actions .round-button svg,
+  .header-actions .language-pill svg {
+    width: 18px !important;
+    height: 18px !important;
+    display: block !important;
+    color: #0b5b47 !important;
+    stroke: currentColor !important;
+    fill: none !important;
+    opacity: 1 !important;
+  }
+
+  .header-actions .round-button svg path,
+  .header-actions .round-button svg circle,
+  .header-actions .round-button svg line,
+  .header-actions .language-pill svg path,
+  .header-actions .language-pill svg circle,
+  .header-actions .language-pill svg line {
+    stroke: #0b5b47 !important;
+    opacity: 1 !important;
+  }
+
   .brand small,
   .hijri-date,
-  .prayer-name span,
-  .daily-meaning,
   .daily-heading > p,
   .notice-card p,
   .verified-date {
@@ -155,10 +209,15 @@
     height: auto !important;
     min-height: 190px !important;
     padding: 18px 14px 16px !important;
+    background: #fffdf8 !important;
+    border: 1px solid #d8e1dc !important;
+    box-shadow: 0 7px 20px rgba(17, 65, 52, .045) !important;
   }
 
   .prayer-card.active {
     padding-bottom: 48px !important;
+    background: linear-gradient(145deg, #075141 0%, #0c6750 100%) !important;
+    border-color: #d9b36b !important;
   }
 
   .prayer-number {
@@ -178,9 +237,18 @@
     font-size: 18px !important;
   }
 
+  /* Arabic prayer labels were nearly invisible on desktop. */
   .prayer-name span {
-    font-size: 12px !important;
-    font-weight: 650 !important;
+    color: #49675f !important;
+    opacity: 1 !important;
+    font-size: 13px !important;
+    font-weight: 750 !important;
+    line-height: 1.35 !important;
+    text-shadow: none !important;
+  }
+
+  .prayer-card.active .prayer-name span {
+    color: #e0efe9 !important;
   }
 
   .prayer-card time {
@@ -210,6 +278,7 @@
   [data-hassoun-email-adhan-signup] input {
     color: #173f35 !important;
     border-color: #b8ccc3 !important;
+    background: #ffffff !important;
   }
 
   [data-hassoun-email-adhan-signup] input::placeholder {
@@ -236,32 +305,48 @@
     gap: 14px !important;
   }
 
+  /* Daily cards are intentionally dark on the website; force readable foregrounds. */
   .daily-card {
     height: auto !important;
-    min-height: 176px !important;
+    min-height: 188px !important;
     padding: 18px !important;
     overflow: hidden !important;
+    background: #123f34 !important;
+    border-color: #2a6254 !important;
+    color: #ffffff !important;
   }
 
   .daily-card-top {
-    font-size: 9px !important;
+    color: #66efd0 !important;
+    font-size: 10px !important;
+  }
+
+  .daily-card-top b,
+  .daily-art-holder {
+    color: #e3bc61 !important;
   }
 
   .daily-arabic {
     min-height: 42px !important;
     margin-top: 15px !important;
-    font-size: 17px !important;
-    line-height: 1.65 !important;
+    color: #fff8e8 !important;
+    opacity: 1 !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    line-height: 1.7 !important;
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: clip !important;
+    text-shadow: none !important;
   }
 
   .daily-meaning {
     min-height: 38px !important;
     margin-top: 8px !important;
+    color: #e4eee9 !important;
+    opacity: 1 !important;
     font-size: 12px !important;
-    line-height: 1.45 !important;
+    line-height: 1.5 !important;
     display: block !important;
     overflow: visible !important;
   }
@@ -269,7 +354,13 @@
   .daily-card a {
     margin-top: 10px !important;
     padding-top: 9px !important;
+    border-top-color: rgba(255,255,255,.18) !important;
+    color: #70efd2 !important;
     font-size: 9px !important;
+  }
+
+  .daily-card a span {
+    color: #dbe8e3 !important;
   }
 
   .notice-card {
