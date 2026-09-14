@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -23,13 +24,24 @@ const items = [
 export default function WebAppNav(){
   const pathname=usePathname();
   const [open,setOpen]=useState(false);
+  const [headerActions,setHeaderActions]=useState<HTMLElement|null>(null);
   const localPath=BASE_PATH&&pathname.startsWith(BASE_PATH)?pathname.slice(BASE_PATH.length)||"/":pathname;
+
+  useEffect(()=>{
+    const placeTrigger=()=>setHeaderActions(document.querySelector<HTMLElement>(".topbar .header-actions"));
+    placeTrigger();
+    const observer=new MutationObserver(placeTrigger);
+    observer.observe(document.body,{childList:true,subtree:true});
+    return ()=>observer.disconnect();
+  },[pathname]);
 
   // Admin is a separate application shell. Never mount the public user menu there.
   if(localPath==="/admin"||localPath.startsWith("/admin/")) return null;
 
+  const trigger=<button className={headerActions?"web-menu-trigger web-menu-trigger-inline":"web-menu-trigger"} type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>;
+
   return <>
-    <button className="web-menu-trigger" type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>
+    {headerActions?createPortal(trigger,headerActions):trigger}
     <div className={open?"web-menu-backdrop open":"web-menu-backdrop"} onClick={()=>setOpen(false)} />
     <aside className={open?"web-slide-menu open":"web-slide-menu"} aria-hidden={!open}>
       <div className="web-slide-head"><div className="web-slide-brand"><img src={appPath(OFFICIAL_LOGO)} alt="Hassoun" data-hassoun-brand="official" style={{width:48,height:48,borderRadius:14,objectFit:"contain",background:"#0b5b47",display:"block",boxShadow:"0 6px 18px rgba(11,91,71,.16)"}}/><div><strong>Hassoun</strong><span>Islamic companion</span></div></div><button type="button" onClick={()=>setOpen(false)} aria-label="Close menu">×</button></div>
