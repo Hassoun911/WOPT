@@ -1,0 +1,41 @@
+{
+  "packageVersion": "1.0",
+  "packageType": "APL_PACKAGE",
+  "publishingInformation": {
+    "schemaVersion": "1.0",
+    "locales": {
+      "en-US": [
+        {
+          "targetViewport": "WIDGET_M",
+          "metadata": {
+            "name": "Hassoun Next Prayer",
+            "description": "Shows the next prayer, prayer time and a live countdown from Hassoun.",
+            "keywords": ["prayer", "salah", "adhan", "Hassoun"],
+            "iconUri": "https://hassoun.app/icon-512.png",
+            "previews": ["https://hassoun.app/icon-512.png"]
+          }
+        }
+      ],
+      "en-CA": [
+        {
+          "targetViewport": "WIDGET_M",
+          "metadata": {
+            "name": "Hassoun Next Prayer",
+            "description": "Shows the next prayer, prayer time and a live countdown from Hassoun.",
+            "keywords": ["prayer", "salah", "adhan", "Hassoun"],
+            "iconUri": "https://hassoun.app/icon-512.png",
+            "previews": ["https://hassoun.app/icon-512.png"]
+          }
+        }
+      ]
+    }
+  },
+  "manifest": {
+    "id": "HassounPrayerWidget",
+    "version": "1.0.0",
+    "installStateChanges": "INFORM",
+    "updateStateChanges": "INFORM",
+    "presentationDefinitions": [{ "url": "presentations/default.tpl" }],
+    "appliesTo": "${viewport.mode == 'HUB'}"
+  }
+}
