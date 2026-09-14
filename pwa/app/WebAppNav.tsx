@@ -12,6 +12,7 @@ const items = [
   ["/?open=month", "📅", "Monthly Prayer Times", "View the full monthly prayer schedule"],
   ["/?open=alerts", "🔔", "Prayer Alerts", "Prayer reminders and browser notifications"],
   ["/?open=settings", "⚙️", "Settings", "Language, appearance and prayer preferences"],
+  ["/voice-assistants/", "🎙️", "Voice Assistants", "Connect Hassoun to Alexa and Google Home"],
   ["/quran/", "۞", "Qur’an", "Read, listen, search and memorize"],
   ["/school/", "🎒", "Qur’an School", "Student, teacher and parent memorization portal"],
   ["/ask-sheikh/", "🕌", "Ask the Sheikh", "Qur’an and Sunnah reference assistant"],
