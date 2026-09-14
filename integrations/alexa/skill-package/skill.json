@@ -9,13 +9,16 @@
       "locales": {
         "en-CA": {
           "name": "Hassoun",
-          "summary": "Ask Hassoun for prayer times, countdowns, Hijri dates and Islamic events.",
-          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. Ask when Maghrib is, how long until Isha, what the next prayer is, today's prayer times, today's Hijri date, or the next Islamic event.",
-          "examplePhrases": [
-            "Alexa, open Hassoun",
-            "Alexa, ask Hassoun when Maghrib is",
-            "Alexa, ask Hassoun how long until Isha"
-          ],
+          "summary": "Prayer times, live countdowns, Hijri dates, Echo Show dashboard and next-prayer widget.",
+          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer.",
+          "examplePhrases": ["Alexa, open Hassoun", "Alexa, ask Hassoun when Maghrib is", "Alexa, ask Hassoun how long until Fajr"],
+          "keywords": ["prayer", "salah", "adhan", "Islam", "Muslim", "Hijri", "Ramadan", "Eid"]
+        },
+        "en-US": {
+          "name": "Hassoun",
+          "summary": "Prayer times, live countdowns, Hijri dates, Echo Show dashboard and next-prayer widget.",
+          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer.",
+          "examplePhrases": ["Alexa, open Hassoun", "Alexa, ask Hassoun when Maghrib is", "Alexa, ask Hassoun how long until Fajr"],
           "keywords": ["prayer", "salah", "adhan", "Islam", "Muslim", "Hijri", "Ramadan", "Eid"]
         }
       }
@@ -23,11 +26,26 @@
     "apis": {
       "custom": {
         "endpoint": {
-          "uri": "arn:aws:lambda:REGION:ACCOUNT_ID:function:hassoun-alexa"
+          "uri": "arn:aws:lambda:us-east-1:036325003024:function:HassounAlexaSkill"
         },
-        "interfaces": []
+        "interfaces": [
+          { "type": "ALEXA_PRESENTATION_APL" },
+          { "type": "ALEXA_DATA_STORE" },
+          {
+            "type": "ALEXA_DATASTORE_PACKAGEMANAGER",
+            "packages": [{ "id": "HassounPrayerWidget" }]
+          },
+          {
+            "type": "ALEXA_EXTENSION",
+            "autoInitializedExtensions": [],
+            "requestedExtensions": [{ "uri": "alexaext:datastore:10" }]
+          }
+        ]
       }
     },
+    "permissions": [
+      { "name": "alexa::alerts:reminders:skill:readwrite" }
+    ],
     "privacyAndCompliance": {
       "allowsPurchases": false,
       "usesPersonalInfo": false,
