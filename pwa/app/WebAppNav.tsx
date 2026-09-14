@@ -38,7 +38,21 @@ export default function WebAppNav(){
   // Admin is a separate application shell. Never mount the public user menu there.
   if(localPath==="/admin"||localPath.startsWith("/admin/")) return null;
 
-  const trigger=<button className={headerActions?"web-menu-trigger web-menu-trigger-inline":"web-menu-trigger"} type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>;
+  const lockIntoHeader=(el:HTMLButtonElement|null)=>{
+    if(!el||!headerActions) return;
+    el.style.setProperty("position","static","important");
+    el.style.setProperty("inset","auto","important");
+    el.style.setProperty("top","auto","important");
+    el.style.setProperty("right","auto","important");
+    el.style.setProperty("bottom","auto","important");
+    el.style.setProperty("left","auto","important");
+    el.style.setProperty("transform","none","important");
+    el.style.setProperty("margin","0","important");
+    el.style.setProperty("align-self","center","important");
+    el.style.setProperty("z-index","auto","important");
+  };
+
+  const trigger=<button ref={lockIntoHeader} className={headerActions?"web-menu-trigger web-menu-trigger-inline":"web-menu-trigger"} type="button" aria-label="Open Hassoun menu" aria-expanded={open} onClick={()=>setOpen(true)}><span>☰</span><b>Menu</b></button>;
 
   return <>
     {headerActions?createPortal(trigger,headerActions):trigger}
