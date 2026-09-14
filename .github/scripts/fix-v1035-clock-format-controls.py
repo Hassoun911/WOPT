@@ -94,10 +94,13 @@ for marker in [
     'HASSOUN_TABLET_CLOCK_FORMAT_CONTROLS_V1',
     'forcedClockShowSecondsV1035',
     'forcedClockSuffixV1035',
-    'Prayer AM / PM',
 ]:
     if marker not in page:
         raise SystemExit(f'v1035 clock controls missing marker: {marker}')
+# The prayer-period feature was renamed/reworked in v1.0.33. Validate the functional
+# marker/state instead of depending on the old visible label "Prayer AM / PM".
+if 'HASSOUN_TABLET_PRAYER_PERIOD_TOGGLE_V3' not in page and 'showPrayerPeriod' not in page:
+    raise SystemExit('v1035 clock controls: prayer-period toggle missing')
 if 'clock24Hour",t("24-hour clock"' not in page and 'HASSOUN_CLOCK_LOCAL_CONTROL_V1' not in page:
     raise SystemExit('v1035 clock controls: local 24-hour control missing after normalization')
 if re.search(r'\["showClockPeriod",\s*t\("Clock AM / PM"', page):
