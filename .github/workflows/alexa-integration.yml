@@ -26,10 +26,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate Alexa JSON files
+      - name: Validate Alexa skill and widget JSON files
         run: |
+          set -euo pipefail
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/skill.json','utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/interactionModels/custom/en-CA.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/interactionModels/custom/en-US.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/manifest.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/presentations/default.tpl','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/documents/document.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/datasources/default.json','utf8'))"
 
       - name: Validate Lambda syntax
         run: node --check integrations/alexa/lambda/index.mjs
@@ -51,14 +57,52 @@ jobs:
           test "$ok" = true
           jq '{location,timezone,dateKey,hijriDate,nextPrayer,nextIslamicEvent}' /tmp/alexa-context.json
 
-      - name: Simulate Alexa launch request
+      - name: Simulate Echo Show launch request
         run: |
           node --input-type=module <<'NODE'
           import { handler } from './integrations/alexa/lambda/index.mjs';
-          const result = await handler({request:{type:'LaunchRequest'}});
-          if (result?.version !== '1.0' || !result?.response?.outputSpeech?.text?.includes('Hassoun')) process.exit(1);
+          const result = await handler({
+            context: {
+              System: {
+                device: { supportedInterfaces: { 'Alexa.Presentation.APL': {} } },
+                user: {},
+                apiEndpoint: 'https://api.amazonalexa.com'
+              }
+            },
+            request: { type: 'LaunchRequest' }
+          });
+          const directive = result?.response?.directives?.[0];
+          if (result?.version !== '1.0') process.exit(1);
+          if (!result?.response?.outputSpeech?.text?.includes('Hassoun')) process.exit(1);
+          if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
+          if (!directive?.datasources?.payload?.nextPrayer?.name) process.exit(1);
           console.log(result.response.outputSpeech.text);
+          console.log('Echo Show APL:', directive.datasources.payload.nextPrayer.name, directive.datasources.payload.nextPrayer.displayTime);
           NODE
+
+      - name: Simulate natural Fajar countdown phrase
+        run: |
+          node --input-type=module <<'NODE'
+          import { handler } from './integrations/alexa/lambda/index.mjs';
+          const result = await handler({
+            context: { System: { device: { supportedInterfaces: {} }, user: {}, apiEndpoint: 'https://api.amazonalexa.com' } },
+            request: {
+              type: 'IntentRequest',
+              intent: { name: 'TimeUntilPrayerIntent', slots: { PrayerName: { value: 'fajar' } } }
+            }
+          });
+          const speech = result?.response?.outputSpeech?.text || '';
+          if (!speech.startsWith('Fajr is ')) process.exit(1);
+          console.log(speech);
+          NODE
+
+      - name: Verify widget package references
+        run: |
+          set -euo pipefail
+          grep -q 'HassounPrayerWidget' integrations/alexa/skill-package/skill.json
+          grep -q 'alexaext:datastore:10' integrations/alexa/skill-package/skill.json
+          grep -q 'HassounPrayerData' integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/documents/document.json
+          grep -q 'interactionMode' integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/documents/document.json
 
       - name: Package Lambda
         run: |
