@@ -30,6 +30,7 @@ const sections = [
     label: "CONTROL",
     items: [
       ["/admin/control/", "🎛️", "App Control"],
+      ["/admin/prayer-schedule/", "🕌", "Prayer Schedule"],
       ["/admin/reports/", "📊", "Reports"],
     ],
   },
