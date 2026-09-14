@@ -1,0 +1,82 @@
+name: Validate Hassoun Alexa Integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "integrations/alexa/**"
+      - "push-server/src/alexaData.ts"
+      - "push-server/scripts/apply-native-fcm-routing.mjs"
+      - ".github/workflows/alexa-integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate Alexa JSON files
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/skill.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/interactionModels/custom/en-CA.json','utf8'))"
+
+      - name: Validate Lambda syntax
+        run: node --check integrations/alexa/lambda/index.mjs
+
+      - name: Smoke test live Hassoun Alexa data endpoint
+        run: |
+          set -euo pipefail
+          url="https://wopt-prayer-push.wopt-windsor.workers.dev/voice/alexa/context"
+          ok=false
+          for attempt in $(seq 1 12); do
+            code="$(curl -sS -o /tmp/alexa-context.json -w '%{http_code}' "$url" || true)"
+            if [ "$code" = "200" ] && jq -e '.ok == true and .location == "Windsor, Ontario" and (.prayers.maghrib.displayTime | type == "string") and (.nextPrayer.name | type == "string") and (.hijriDate | type == "string")' /tmp/alexa-context.json >/dev/null; then
+              ok=true
+              break
+            fi
+            echo "Waiting for Alexa endpoint (${attempt}/12), HTTP ${code}"
+            sleep 5
+          done
+          test "$ok" = true
+          jq '{location,timezone,dateKey,hijriDate,nextPrayer,nextIslamicEvent}' /tmp/alexa-context.json
+
+      - name: Simulate Alexa launch request
+        run: |
+          node --input-type=module <<'NODE'
+          import { handler } from './integrations/alexa/lambda/index.mjs';
+          const result = await handler({request:{type:'LaunchRequest'}});
+          if (result?.version !== '1.0' || !result?.response?.outputSpeech?.text?.includes('Hassoun')) process.exit(1);
+          console.log(result.response.outputSpeech.text);
+          NODE
+
+      - name: Package Lambda
+        run: |
+          mkdir -p artifacts/lambda
+          cp integrations/alexa/lambda/index.mjs artifacts/lambda/index.mjs
+          cd artifacts/lambda
+          zip -r ../hassoun-alexa-lambda.zip .
+
+      - name: Package Alexa skill files
+        run: |
+          cd integrations/alexa/skill-package
+          zip -r ../../../artifacts/hassoun-alexa-skill-package.zip .
+
+      - name: Upload Alexa packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: hassoun-alexa-integration
+          path: |
+            artifacts/hassoun-alexa-lambda.zip
+            artifacts/hassoun-alexa-skill-package.zip
+          retention-days: 30
