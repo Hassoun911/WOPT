@@ -59,6 +59,9 @@ jobs:
       - name: Apply robust schedule text decoding and fallback
         run: node scripts/fix-schedule-text-decoding.mjs
 
+      - name: Apply final Alexa voice routing
+        run: node scripts/apply-alexa-routing.mjs
+
       - name: Normalize generated TypeScript compatibility
         run: |
           node <<'NODE'
@@ -153,6 +156,15 @@ jobs:
             sleep 2
           done
           test "$config_ok" = true
+
+          alexa_ok=false
+          for attempt in $(seq 1 10); do
+            alexa_code="$(curl -sS -o /tmp/alexa.json -w '%{http_code}' "${PUSH_WORKER_URL}/voice/alexa/context")"
+            if [ "$alexa_code" = "200" ] && jq -e '.ok == true and .location == "Windsor, Ontario"' /tmp/alexa.json >/dev/null; then alexa_ok=true; break; fi
+            echo "Waiting for Alexa route (${attempt}/10): HTTP ${alexa_code}"
+            sleep 2
+          done
+          test "$alexa_ok" = true
 
           file_code="$(curl -sS -o /tmp/schedule-file-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-import" -H 'Content-Type: application/json' --data '{}')"
           text_code="$(curl -sS -o /tmp/schedule-text-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-text" -H 'Content-Type: application/json' --data '{}')"
