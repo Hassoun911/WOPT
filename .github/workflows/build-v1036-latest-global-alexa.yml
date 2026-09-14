@@ -1,0 +1,182 @@
+name: Build Hassoun v1.0.36 Latest Global + Alexa
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-v1036-latest-global-alexa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-v1036-latest-global-alexa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preserve latest mobile/global/Alexa source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hassoun-latest/mobile/src /tmp/hassoun-latest/scripts
+          cp mobile/src/prayerData.ts /tmp/hassoun-latest/mobile/src/prayerData.ts
+          cp mobile/src/locationUsage.ts /tmp/hassoun-latest/mobile/src/locationUsage.ts
+          cp mobile/src/VoiceAssistantsPage.tsx /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx
+          cp scripts/apply-voice-assistants.py /tmp/hassoun-latest/scripts/apply-voice-assistants.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Reconstruct proven v1.0.35 universal base
+        timeout-minutes: 60
+        run: bash .github/tablet/build-apk.sh
+
+      - name: Overlay latest global prayer and Alexa mobile changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/hassoun-latest/mobile/src/prayerData.ts mobile/src/prayerData.ts
+          cp /tmp/hassoun-latest/mobile/src/locationUsage.ts mobile/src/locationUsage.ts
+          cp /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx mobile/src/VoiceAssistantsPage.tsx
+          cp /tmp/hassoun-latest/scripts/apply-voice-assistants.py scripts/apply-voice-assistants.py
+          python3 scripts/apply-voice-assistants.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('mobile/app.config.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('version: "1.0.35"','version: "1.0.36"')
+          s=s.replace('versionCode: 79','versionCode: 80')
+          if 'version: "1.0.36"' not in s or 'versionCode: 80' not in s:
+              raise SystemExit('Unable to bump v1.0.36 / versionCode 80')
+          p.write_text(s,encoding='utf-8')
+          print('Latest source overlay + v1.0.36 applied')
+          PY
+
+      - name: Verify latest features before rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          prayer=Path('mobile/src/prayerData.ts').read_text(encoding='utf-8')
+          loc=Path('mobile/src/locationUsage.ts').read_text(encoding='utf-8')
+          voice=Path('mobile/src/VoiceAssistantsPage.tsx').read_text(encoding='utf-8')
+          settings=Path('mobile/src/SettingsHub.tsx').read_text(encoding='utf-8')
+          cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
+          for marker in ['local_calculation','calculateLocalWindow','refreshRemoteInBackground','recordPrayerLocationUsage']:
+              if marker not in prayer:
+                  raise SystemExit(f'Missing latest prayer marker: {marker}')
+          if 'LOCATION_USAGE_URL' not in loc:
+              raise SystemExit('Location usage reporter missing')
+          if 'Amazon Alexa' not in voice:
+              raise SystemExit('Alexa page missing')
+          if 'VoiceAssistantsPage' not in settings or 'voiceAssistants' not in settings:
+              raise SystemExit('Alexa settings route missing')
+          for marker in ['version: "1.0.36"','versionCode: 80']:
+              if marker not in cfg:
+                  raise SystemExit(f'Missing version marker: {marker}')
+          print('HASSOUN_V1036_LATEST_FEATURES_VERIFIED')
+          PY
+
+      - name: TypeScript verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+          npx tsc --noEmit
+
+      - name: Regenerate Android with latest source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Restore Android task retention and exact alarms
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('mobile/android/app/src/main/AndroidManifest.xml')
+          ns='http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android',ns)
+          tree=ET.parse(p)
+          root=tree.getroot(); app=root.find('application')
+          perms={x.attrib.get(f'{{{ns}}}name') for x in root.findall('uses-permission')}
+          if 'android.permission.SCHEDULE_EXACT_ALARM' not in perms:
+              raise SystemExit('Generated SCHEDULE_EXACT_ALARM missing')
+          if app is not None:
+              banner=Path('mobile/android/app/src/main/res/drawable/hassoun_widget_logo.png')
+              if banner.exists(): app.set(f'{{{ns}}}banner','@drawable/hassoun_widget_logo')
+              main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{ns}}}name','').endswith('MainActivity')),None)
+              if main is not None:
+                  for k,v in {'screenOrientation':'unspecified','launchMode':'singleTask','alwaysRetainTaskState':'true','clearTaskOnLaunch':'false','finishOnTaskLaunch':'false','noHistory':'false','documentLaunchMode':'never'}.items():
+                      main.set(f'{{{ns}}}{k}',v)
+          tree.write(p,encoding='utf-8',xml_declaration=True)
+          print('Android manifest verified for v1.0.36')
+          PY
+
+      - name: Build latest release APK
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name latest APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' ! -name 'Hassoun-v*.apk' | head -n1)"
+          test -s "$APK"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.36-latest-global-alexa.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          unzip -l "$OUT" > /tmp/v1036-apk.txt
+          grep -E 'assets/(index\.android\.bundle|.*\.bundle)' /tmp/v1036-apk.txt >/dev/null || true
+          echo "HASSOUN_V1036_APK_READY=$OUT"
+
+      - name: Upload v1.0.36 latest APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.36-Latest-Global-Alexa
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.36-latest-global-alexa.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.36-latest-global-alexa.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
