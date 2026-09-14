@@ -21,6 +21,19 @@ index = index.replace(registerPattern, `async function registerExpo(request:Requ
   await env.DB.prepare(\`INSERT INTO subscriptions (installation_id, provider, platform, locale, address, app_version, notify_twenty, notify_ten, notify_athan, native_token, native_token_type) VALUES (?, 'expo', ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(provider, address) DO UPDATE SET installation_id=excluded.installation_id,platform=excluded.platform,locale=excluded.locale,app_version=excluded.app_version,notify_twenty=excluded.notify_twenty,notify_ten=excluded.notify_ten,notify_athan=excluded.notify_athan,native_token=excluded.native_token,native_token_type=excluded.native_token_type,enabled=1,updated_at=CURRENT_TIMESTAMP\`).bind(body.installationId,platform,locale,token,body.appVersion??null,prayerPushEnabled,prayerPushEnabled,prayerPushEnabled,nativeToken,nativeTokenType).run();
   return json({ok:true,nativePushRegistered:Boolean(nativeToken)});
 }`);
+
+// Add Hassoun's public Alexa data endpoint to the deployed Worker.
+if (!index.includes('import { getAlexaContext } from "./alexaData";')) {
+  index = 'import { getAlexaContext } from "./alexaData";\n' + index;
+}
+if (!index.includes('url.pathname==="/voice/alexa/context"')) {
+  index = replaceOnce(
+    index,
+    'if(request.method==="GET"&&url.pathname==="/health")response=json({ok:true,service:"wopt-prayer-push"});',
+    'if(request.method==="GET"&&url.pathname==="/voice/alexa/context")response=await getAlexaContext(request,env);else if(request.method==="GET"&&url.pathname==="/health")response=json({ok:true,service:"wopt-prayer-push"});',
+    'Alexa public data route'
+  );
+}
 fs.writeFileSync(indexPath, index);
 
 // Add the Firebase secret to the Worker env type.
@@ -85,4 +98,4 @@ admin = replaceOnce(
 );
 fs.writeFileSync(adminPath, admin);
 
-console.log('Applied native FCM token persistence and direct Android FCM routing');
+console.log('Applied native FCM token persistence, direct Android FCM routing, and Alexa data route');
