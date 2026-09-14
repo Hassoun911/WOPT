@@ -38,12 +38,12 @@ export default function CompactEmailAdhanSignup() {
 
   useEffect(() => {
     if (pathname !== "/" && pathname !== "") return;
-    const prayerSection = document.querySelector<HTMLElement>(".prayer-section");
-    if (!prayerSection || document.querySelector("[data-hassoun-email-adhan-signup]")) return;
+    const appShell = document.querySelector<HTMLElement>(".app-shell");
+    if (!appShell || document.querySelector("[data-hassoun-email-adhan-signup]")) return;
 
     const section = document.createElement("section");
     section.dataset.hassounEmailAdhanSignup = "true";
-    section.style.cssText = "margin:14px auto 2px;max-width:980px;padding:0 18px;box-sizing:border-box";
+    section.style.cssText = "margin:18px auto 2px;max-width:980px;padding:0 18px;box-sizing:border-box";
     section.innerHTML = `
       <div style="background:#edf5f1;border:1px solid #d5e4dd;border-radius:18px;padding:13px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 5px 16px rgba(14,79,62,.05)">
         <div style="width:38px;height:38px;flex:0 0 38px;border-radius:12px;background:#0b5b47;color:#fff;display:grid;place-items:center;font-size:20px">🔔</div>
@@ -58,7 +58,9 @@ export default function CompactEmailAdhanSignup() {
       </div>
       <p data-email-status style="display:none;margin:6px 10px 0;color:#557169;font-size:10px"></p>`;
 
-    prayerSection.insertAdjacentElement("afterend", section);
+    // Keep the signup as the final homepage section instead of placing it between
+    // Prayer Times and Daily Islamic Light.
+    appShell.appendChild(section);
     const form = section.querySelector<HTMLFormElement>("[data-email-form]");
     const input = section.querySelector<HTMLInputElement>("[data-email]");
     const button = form?.querySelector<HTMLButtonElement>("button");
