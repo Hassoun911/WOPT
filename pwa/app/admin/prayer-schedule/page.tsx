@@ -48,6 +48,7 @@ export default function PrayerScheduleAdminPage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [dirty, setDirty] = useState(false);
   const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) || "" : "";
 
   async function call(path: string, init: RequestInit = {}) {
@@ -57,7 +58,7 @@ export default function PrayerScheduleAdminPage() {
   async function load(target = month) {
     if (!token) { location.replace("/admin/"); return; }
     setBusy("load"); setMessage("");
-    try { const data = await call(`/admin/prayer-schedule?month=${encodeURIComponent(target)}`) as Status; setStatus(data); setRows(data.prayerTimes || {}); }
+    try { const data = await call(`/admin/prayer-schedule?month=${encodeURIComponent(target)}`) as Status; setStatus(data); setRows(data.prayerTimes || {}); setDirty(false); }
     catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load schedule"); }
     finally { setBusy(""); }
   }
@@ -66,32 +67,57 @@ export default function PrayerScheduleAdminPage() {
   const dates = useMemo(() => Object.keys(rows).sort(), [rows]);
   const rowCount = dates.length;
   const selectedInfo = useMemo(() => status?.yearOverview?.find((x) => x.month === month) || null, [status, month]);
+  const needsPublish = selectedInfo?.status === "pulled" || dirty;
+  const canApproveExisting = Boolean(selectedInfo?.onFile) && selectedInfo?.status === "not-approved" && !dirty;
 
   async function preview() {
     setBusy("preview"); setMessage("");
     try {
       const data = await call("/admin/prayer-schedule", { method: "POST", body: JSON.stringify({ action: "preview", month }) });
-      setRows(data.prayerTimes || {}); setMessage(`Pulled ${Object.keys(data.prayerTimes || {}).length} days from Al-Hijra. This month is now marked Pulled — review. Publish it when you approve the times.`);
+      setRows(data.prayerTimes || {}); setDirty(false);
+      setMessage(`Pulled ${Object.keys(data.prayerTimes || {}).length} days from Al-Hijra. This month is now marked Pulled — review. Publish it when you approve the times.`);
       await load(month);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to pull Al-Hijra schedule"); }
     finally { setBusy(""); }
   }
-  async function publish() {
+
+  async function approveOrPublish() {
+    if (canApproveExisting) {
+      if (!confirm(`Approve the existing ${month} prayer times already stored in the official Hassoun Windsor JSON?`)) return;
+      setBusy("approve"); setMessage("");
+      try {
+        await call("/admin/prayer-schedule", { method: "POST", body: JSON.stringify({ action: "approve_current", month }) });
+        setMessage(`Approved ${month}. This month is now marked Approved.`);
+        await load(month);
+      } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to approve month"); }
+      finally { setBusy(""); }
+      return;
+    }
+
+    if (!status?.githubPublishingConfigured) {
+      setMessage("This month has pulled or edited times that are not yet in the official JSON. Add GITHUB_SCHEDULE_TOKEN before publishing these changes. Existing JSON months can still be approved without GitHub publishing.");
+      return;
+    }
+
     if (!confirm(`Approve and publish ${month} to the official Hassoun Windsor JSON?`)) return;
     setBusy("publish"); setMessage("");
     try {
       const data = await call("/admin/prayer-schedule", { method: "POST", body: JSON.stringify({ action: "publish", month, prayerTimes: rows }) });
-      setMessage(`Approved and published ${month}${data.commit?.sha ? ` • commit ${String(data.commit.sha).slice(0, 10)}` : ""}. Hassoun services will pick it up automatically.`); await load(month);
+      setMessage(`Approved and published ${month}${data.commit?.sha ? ` • commit ${String(data.commit.sha).slice(0, 10)}` : ""}. Hassoun services will pick it up automatically.`);
+      await load(month);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to publish schedule"); }
     finally { setBusy(""); }
   }
+
   async function setAuto(enabled: boolean) {
     setBusy("auto"); setMessage("");
     try { const data = await call("/admin/prayer-schedule", { method: "POST", body: JSON.stringify({ action: "set_auto", enabled }) }); setStatus((s) => s ? { ...s, autoSync: data.autoSync } : s); setMessage(enabled ? "Automatic monthly sync is enabled." : "Automatic monthly sync is off."); }
     catch (error) { setMessage(error instanceof Error ? error.message : "Unable to change auto sync"); }
     finally { setBusy(""); }
   }
-  function edit(date: string, prayer: Prayer, value: string) { setRows((old) => ({ ...old, [date]: { ...old[date], [prayer]: value } })); }
+  function edit(date: string, prayer: Prayer, value: string) { setDirty(true); setRows((old) => ({ ...old, [date]: { ...old[date], [prayer]: value } })); }
+
+  const actionLabel = busy === "approve" ? "Approving…" : busy === "publish" ? "Publishing…" : canApproveExisting ? "Approve existing month" : "Approve & Publish to Hassoun JSON";
 
   return (
     <main style={s.page}>
@@ -119,8 +145,9 @@ export default function PrayerScheduleAdminPage() {
       {message ? <div style={s.message}>{message}</div> : null}
 
       <section style={s.tableCard}>
-        <div style={s.tableHead}><div><div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}><div style={s.cardTitle}>{month} prayer times</div><span style={{...s.selectedBadge,...statusStyle(selectedInfo)}}>{statusLabel(selectedInfo)}</span></div><div style={s.help}>{rowCount} days loaded • times are 24-hour Windsor local time</div></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button disabled={Boolean(busy)} onClick={() => void load(month)} style={s.secondary}>Reload current</button><button disabled={Boolean(busy) || !rowCount} onClick={() => void publish()} style={s.publish}>{busy === "publish" ? "Publishing…" : "Approve & Publish to Hassoun JSON"}</button></div></div>
-        {!status?.githubPublishingConfigured ? <div style={s.warning}><strong>One-time setup required:</strong> add the Cloudflare Worker secret <code>GITHUB_SCHEDULE_TOKEN</code> with write access to this repository. The admin page can already preview and edit the timetable; publishing and auto-sync will work once that secret is added.</div> : null}
+        <div style={s.tableHead}><div><div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}><div style={s.cardTitle}>{month} prayer times</div><span style={{...s.selectedBadge,...statusStyle(selectedInfo)}}>{statusLabel(selectedInfo)}</span></div><div style={s.help}>{rowCount} days loaded • times are 24-hour Windsor local time{dirty ? " • unsaved edits" : ""}</div></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button disabled={Boolean(busy)} onClick={() => void load(month)} style={s.secondary}>Reload current</button><button disabled={Boolean(busy) || !rowCount || selectedInfo?.status === "approved" && !dirty} onClick={() => void approveOrPublish()} style={s.publish}>{actionLabel}</button></div></div>
+        {!status?.githubPublishingConfigured ? <div style={s.warning}><strong>GitHub publishing is not configured yet.</strong> Months already stored in the official JSON can still be approved here. Only pulled changes or manual edits require the <code>GITHUB_SCHEDULE_TOKEN</code> before they can be published.</div> : null}
+        {needsPublish && !status?.githubPublishingConfigured ? <div style={s.warning}><strong>Publish required:</strong> this month contains pulled or edited data that has not been written to the official JSON yet.</div> : null}
         <div style={{overflowX:"auto"}}><table style={s.table}><thead><tr><th style={s.th}>Date</th>{PRAYERS.map((p) => <th key={p} style={s.th}>{labelPrayer(p)}</th>)}</tr></thead><tbody>{dates.map((date) => <tr key={date}><td style={s.dateCell}>{date}</td>{PRAYERS.map((p) => <td key={p} style={s.td}><input aria-label={`${date} ${p}`} value={rows[date]?.[p] || ""} onChange={(e) => edit(date, p, e.target.value)} style={s.timeInput} /></td>)}</tr>)}</tbody></table></div>
       </section>
     </main>
