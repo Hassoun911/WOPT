@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/build-v1036-latest-global-alexa.yml"
+      - ".github/scripts/fix-v1035-clock-format-controls.py"
 
 permissions:
   contents: read
