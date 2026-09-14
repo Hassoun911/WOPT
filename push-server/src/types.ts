@@ -56,4 +56,9 @@ export interface Env {
   VAPID_SUBJECT: string;
   EXPO_ACCESS_TOKEN?: string;
   FIREBASE_SERVICE_ACCOUNT_JSON?: string;
+  ATHANPLUS_MONTHLY_URL?: string;
+  GITHUB_SCHEDULE_TOKEN?: string;
+  GITHUB_SCHEDULE_OWNER?: string;
+  GITHUB_SCHEDULE_REPO?: string;
+  GITHUB_SCHEDULE_PATH?: string;
 }
