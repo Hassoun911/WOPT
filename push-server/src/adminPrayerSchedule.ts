@@ -72,6 +72,10 @@ function validateMonthData(monthKey: string, value: unknown): PrayerTimes {
   return out;
 }
 
+function monthFromSchedule(schedule: PrayerFile, monthKey: string) {
+  return Object.fromEntries(Object.entries(schedule.prayer_times).filter(([key]) => key.startsWith(`${monthKey}-`)));
+}
+
 function encodeBase64(text: string) { const bytes = new TextEncoder().encode(text); let binary = ""; const chunk = 0x8000; for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk)); return btoa(binary); }
 
 async function publishToGitHub(env: Env, schedule: Record<string, unknown>, monthKey: string) {
@@ -106,7 +110,7 @@ export async function handleAdminPrayerSchedule(request: Request, env: Env, url:
   try {
     if (request.method === "GET") {
       const month = url.searchParams.get("month") || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit" }).format(new Date());
-      const schedule = await currentSchedule(env); const monthTimes = Object.fromEntries(Object.entries(schedule.prayer_times).filter(([key]) => key.startsWith(`${month}-`)));
+      const schedule = await currentSchedule(env); const monthTimes = monthFromSchedule(schedule, month);
       const autoSync = await getSetting(env, "prayer_schedule_auto_sync", false); const lastAuto = await getSetting(env, "prayer_schedule_last_auto", null as null | Record<string, unknown>); const monthStates = await getSetting<MonthStates>(env, "prayer_schedule_month_states", {});
       const year = Number(month.slice(0, 4)) || new Date().getUTCFullYear();
       return json({ ok: true, month, prayerTimes: monthTimes, sourceUrl: env.ATHANPLUS_MONTHLY_URL || DEFAULT_SOURCE, scheduleUrl: env.SCHEDULE_URL, autoSync, lastAuto, githubPublishingConfigured: Boolean(env.GITHUB_SCHEDULE_TOKEN), selectedMonthState: monthStates[month] || null, yearOverview: yearOverview(schedule, monthStates, year) }, 200, request, env);
@@ -114,17 +118,27 @@ export async function handleAdminPrayerSchedule(request: Request, env: Env, url:
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, request, env);
     const body = await request.json() as Record<string, unknown>; const action = typeof body.action === "string" ? body.action : ""; const month = typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month) ? body.month : new Date().toISOString().slice(0, 7);
     if (action === "preview") {
-      const pulled = await fetchSourceMonth(env, month); await updateMonthState(env, month, { status: "pulled", at: new Date().toISOString(), source: "Al-Hijra AthanPlus" }, auth.admin.id);
-      return json({ ok: true, month, sourceUrl: pulled.sourceUrl, prayerTimes: pulled.prayerTimes, monthState: { status: "pulled", at: new Date().toISOString(), source: "Al-Hijra AthanPlus" } }, 200, request, env);
+      const pulled = await fetchSourceMonth(env, month); const at = new Date().toISOString();
+      await updateMonthState(env, month, { status: "pulled", at, source: "Al-Hijra AthanPlus" }, auth.admin.id);
+      return json({ ok: true, month, sourceUrl: pulled.sourceUrl, prayerTimes: pulled.prayerTimes, monthState: { status: "pulled", at, source: "Al-Hijra AthanPlus" } }, 200, request, env);
+    }
+    if (action === "approve_current") {
+      const schedule = await currentSchedule(env);
+      const currentMonth = monthFromSchedule(schedule, month);
+      validateMonthData(month, currentMonth);
+      const at = new Date().toISOString();
+      await updateMonthState(env, month, { status: "approved", at, source: "existing-official-json", commitSha: null }, auth.admin.id);
+      return json({ ok: true, month, approved: true, published: false, monthState: { status: "approved", at, source: "existing-official-json", commitSha: null } }, 200, request, env);
     }
     if (action === "set_auto") { const enabled = body.enabled === true; await setSetting(env, "prayer_schedule_auto_sync", enabled, auth.admin.id); return json({ ok: true, autoSync: enabled }, 200, request, env); }
     if (action === "publish") {
       const monthData = body.prayerTimes ? validateMonthData(month, body.prayerTimes) : (await fetchSourceMonth(env, month)).prayerTimes;
       const schedule = await currentSchedule(env) as Record<string, unknown> & { prayer_times: PrayerTimes }; schedule.prayer_times = { ...schedule.prayer_times, ...monthData };
       const metadata = schedule.metadata && typeof schedule.metadata === "object" ? schedule.metadata as Record<string, unknown> : {}; schedule.metadata = { ...metadata, last_updated: new Date().toISOString(), monthly_source: env.ATHANPLUS_MONTHLY_URL || DEFAULT_SOURCE };
-      const commit = await publishToGitHub(env, schedule, month); await setSetting(env, "prayer_schedule_last_publish", { month, at: new Date().toISOString(), commitSha: commit?.sha || null, source: "admin" }, auth.admin.id);
-      await updateMonthState(env, month, { status: "approved", at: new Date().toISOString(), source: "admin", commitSha: commit?.sha || null }, auth.admin.id);
-      return json({ ok: true, month, commit }, 200, request, env);
+      const commit = await publishToGitHub(env, schedule, month); const at = new Date().toISOString();
+      await setSetting(env, "prayer_schedule_last_publish", { month, at, commitSha: commit?.sha || null, source: "admin" }, auth.admin.id);
+      await updateMonthState(env, month, { status: "approved", at, source: "admin", commitSha: commit?.sha || null }, auth.admin.id);
+      return json({ ok: true, month, approved: true, published: true, commit }, 200, request, env);
     }
     return json({ error: "Unknown action" }, 400, request, env);
   } catch (error) { return json({ error: error instanceof Error ? error.message : "Prayer schedule request failed" }, 500, request, env); }
