@@ -1,5 +1,5 @@
 failure
-validated_commit=cadc01cc0afbf40441efdd3e282f367258ff73e9
+validated_commit=b5491e6887aa6d1e47fc8834e0921b42c35e6886
 App.tsx(38,43): error TS2307: Cannot find module './src/localPrayerTimes' or its corresponding type declarations.
 src/ConnectDisplayPage.tsx(2,28): error TS2307: Cannot find module 'expo-camera' or its corresponding type declarations.
 src/ConnectDisplayPage.tsx(40,2362): error TS7031: Binding element 'data' implicitly has an 'any' type.
