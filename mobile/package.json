@@ -4,16 +4,17 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
+    "voice-assistants:apply": "python3 ../scripts/apply-voice-assistants.py",
     "quran:data": "node scripts/fetch-quran-data.mjs",
-    "prestart": "npm run quran:data",
+    "prestart": "npm run voice-assistants:apply && npm run quran:data",
     "start": "expo start --dev-client",
-    "preandroid": "npm run quran:data",
+    "preandroid": "npm run voice-assistants:apply && npm run quran:data",
     "android": "expo run:android",
-    "preios": "npm run quran:data",
+    "preios": "npm run voice-assistants:apply && npm run quran:data",
     "ios": "expo run:ios",
-    "pretypecheck": "npm run quran:data",
+    "pretypecheck": "npm run voice-assistants:apply && npm run quran:data",
     "typecheck": "tsc --noEmit",
-    "eas-build-post-install": "npm run quran:data"
+    "eas-build-post-install": "npm run voice-assistants:apply && npm run quran:data"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
