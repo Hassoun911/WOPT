@@ -1,6 +1,7 @@
 import app from "./index";
 import { getAlexaContext } from "./alexaData";
 import { autoSyncPrayerSchedule, handleAdminPrayerSchedule } from "./adminPrayerSchedule";
+import { handleLocationUsage } from "./locationUsage";
 import type { Env } from "./types";
 
 const handler: ExportedHandler<Env> = {
@@ -23,6 +24,12 @@ const handler: ExportedHandler<Env> = {
         if (!url.searchParams.has("location")) url.searchParams.set("location", "Windsor, Ontario");
       }
       return getAlexaContext(new Request(url.toString(), request), env);
+    }
+
+    // Anonymous/coarse location coverage. This stores only 0.1-degree buckets
+    // and aggregate usage counts; it never stores a device ID, email or IP.
+    if (url.pathname === "/location-usage" || url.pathname === "/admin/location-usage") {
+      return handleLocationUsage(request, env);
     }
 
     // Prayer schedule admin is also routed here so it stays available even if
