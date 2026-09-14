@@ -13,7 +13,16 @@ const handler: ExportedHandler<Env> = {
     // Alexa Lambda receive a 404. Intercept it here before delegating every
     // other request to the existing Worker.
     if (request.method === "GET" && url.pathname === "/voice/alexa/context") {
-      return getAlexaContext(request, env);
+      // Existing Alexa installs still call this route with no location profile.
+      // Preserve Windsor as the legacy default, while allowing linked Hassoun
+      // accounts/devices to pass their own latitude, longitude and timezone.
+      if (!url.searchParams.has("latitude") && !url.searchParams.has("longitude")) {
+        url.searchParams.set("latitude", "42.3149");
+        url.searchParams.set("longitude", "-83.0364");
+        url.searchParams.set("timezone", "America/Toronto");
+        if (!url.searchParams.has("location")) url.searchParams.set("location", "Windsor, Ontario");
+      }
+      return getAlexaContext(new Request(url.toString(), request), env);
     }
 
     // Prayer schedule admin is also routed here so it stays available even if
