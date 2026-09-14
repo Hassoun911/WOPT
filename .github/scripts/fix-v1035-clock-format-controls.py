@@ -44,34 +44,13 @@ page = re.sub(
     count=1,
 )
 
-# If the generated setup no longer exposes the historical quick-control array, inject
-# one explicit clock-format row at the top of the setup ScrollView. This anchor is part
-# of the base native tablet setup and survives the later layout/runtime patches.
-if 'clock24Hour",t("24-hour clock"' not in page and 'HASSOUN_CLOCK_LOCAL_CONTROL_V1' not in page:
-    scroll_anchors = [
-        '<ScrollView contentContainerStyle={styles.sheetBody}>',
-        '<ScrollView contentContainerStyle={[styles.sheetBody',
-    ]
-    insert_at = -1
-    anchor_len = 0
-    for anchor in scroll_anchors:
-        pos = page.find(anchor)
-        if pos >= 0:
-            # For the bracketed variant, only use the exact simple anchor; otherwise fall through to regex.
-            if anchor.endswith('>'):
-                insert_at = pos + len(anchor)
-                anchor_len = len(anchor)
-                break
-    if insert_at < 0:
-        m = re.search(r'<ScrollView[^>]*contentContainerStyle=\{[^}]*styles\.sheetBody[^}]*\}[^>]*>', page)
-        if m:
-            insert_at = m.end()
-    if insert_at < 0:
-        raise SystemExit('v1035 clock controls: setup ScrollView anchor missing')
-    local_control = '''\n<View style={{marginBottom:12,padding:12,borderRadius:14,backgroundColor:"rgba(255,255,255,.08)",flexDirection:"row",alignItems:"center",justifyContent:"space-between"}}>{/* HASSOUN_CLOCK_LOCAL_CONTROL_V1 */}<View style={{flex:1,paddingRight:12}}><Text style={{color:"#ffffff",fontWeight:"900",fontSize:16}}>{t("24-hour clock","نظام 24 ساعة")}</Text><Text style={{color:"rgba(255,255,255,.72)",fontSize:12,marginTop:2}}>{remoteTheme.clock24Hour===true?t("24-hour time · no AM/PM","وقت 24 ساعة · بدون AM/PM"):t("12-hour time · AM/PM","وقت 12 ساعة · AM/PM")}</Text></View><Switch value={remoteTheme.clock24Hour===true} onValueChange={v=>localTheme({clock24Hour:v})}/></View>'''
-    page = page[:insert_at] + local_control + page[insert_at:]
+# Do not inject a new Switch/localTheme control into MasjidDisplayPage here.
+# Some generated tablet variants do not import Switch or define localTheme in the
+# setup scope. The paired ConnectDisplayPage admin already owns the clock-format
+# control, while MasjidDisplayPage consumes remoteTheme.clock24Hour at runtime.
 
-# If the generic quick-control array is present, make its clock switch default OFF.
+# If a generic quick-control array already exists in a compatible generated page,
+# make its clock switch default OFF without creating any new dependencies.
 if 'clock24Hour",t("24-hour clock"' in page:
     generic_patterns = [
         '<Switch value={theme[String(k)]!==false} onValueChange={v=>localTheme({[String(k)]:v})}/>',
@@ -101,8 +80,6 @@ for marker in [
 # marker/state instead of depending on the old visible label "Prayer AM / PM".
 if 'HASSOUN_TABLET_PRAYER_PERIOD_TOGGLE_V3' not in page and 'showPrayerPeriod' not in page:
     raise SystemExit('v1035 clock controls: prayer-period toggle missing')
-if 'clock24Hour",t("24-hour clock"' not in page and 'HASSOUN_CLOCK_LOCAL_CONTROL_V1' not in page:
-    raise SystemExit('v1035 clock controls: local 24-hour control missing after normalization')
 if re.search(r'\["showClockPeriod",\s*t\("Clock AM / PM"', page):
     raise SystemExit('v1035 clock controls: obsolete local Clock AM/PM control survived')
 
