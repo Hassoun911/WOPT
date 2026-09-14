@@ -79,7 +79,6 @@
     white-space: nowrap !important;
   }
 
-  /* Location line is injected by WebsiteLogoEnhancer. Keep it in its own row below the prayer name. */
   [data-hassoun-current-location="true"] {
     position: relative !important;
     z-index: 3 !important;
@@ -247,7 +246,6 @@
   }
 }
 
-/* Short desktop/laptop screens: compress the dashboard further instead of enabling page scrolling. */
 @media (min-width: 821px) and (max-height: 850px) {
   .topbar { height: 58px !important; min-height: 58px !important; }
   .dashboard { margin-top: 6px !important; }
@@ -273,7 +271,6 @@
   .notice-card { display: none !important; }
 }
 
-/* Phones keep the dedicated mobile layout and normal vertical scrolling. */
 @media (max-width: 820px) {
   html, body {
     height: auto !important;
@@ -329,5 +326,11 @@
   .next-card-head .live-clock strong {
     position: relative !important;
     z-index: 9 !important;
+  }
+
+  /* Desktop active prayer card already shows NEXT + prayer time in its bottom strip.
+     Hide the extra live countdown badge so it cannot overlap the time. */
+  .prayer-grid .prayer-card.active .wopt-card-countdown {
+    display: none !important;
   }
 }
