@@ -1,6 +1,6 @@
 games_backend=ready
 worker=https://wopt-prayer-push.wopt-windsor.workers.dev
 verified_game=wordrace
-verified_room_code=H39LFY
-verified_at=2026-09-14T01:30:04Z
-source_commit=57b7c13b085a5b0c5b26ba010dc32859eab71af8
+verified_room_code=3SDPPV
+verified_at=2026-09-14T01:35:12Z
+source_commit=8ba0de70ebdb022c306023bd6062c6b1ada9be40
