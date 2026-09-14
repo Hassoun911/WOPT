@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["CA", "US"],
+      "distributionMode": "PUBLIC",
+      "category": "RELIGION_AND_SPIRITUALITY",
+      "locales": {
+        "en-CA": {
+          "name": "Hassoun",
+          "summary": "Ask Hassoun for prayer times, countdowns, Hijri dates and Islamic events.",
+          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. Ask when Maghrib is, how long until Isha, what the next prayer is, today's prayer times, today's Hijri date, or the next Islamic event.",
+          "examplePhrases": [
+            "Alexa, open Hassoun",
+            "Alexa, ask Hassoun when Maghrib is",
+            "Alexa, ask Hassoun how long until Isha"
+          ],
+          "keywords": ["prayer", "salah", "adhan", "Islam", "Muslim", "Hijri", "Ramadan", "Eid"]
+        }
+      }
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:REGION:ACCOUNT_ID:function:hassoun-alexa"
+        },
+        "interfaces": []
+      }
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    }
+  }
+}
