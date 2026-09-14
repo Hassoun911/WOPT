@@ -1,0 +1,95 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "hassoun",
+      "intents": [
+        {
+          "name": "NextPrayerIntent",
+          "samples": [
+            "what is the next prayer",
+            "what's the next prayer",
+            "which prayer is next",
+            "tell me the next prayer",
+            "when is the next prayer"
+          ],
+          "slots": []
+        },
+        {
+          "name": "PrayerTimeIntent",
+          "samples": [
+            "what time is {PrayerName}",
+            "when is {PrayerName}",
+            "tell me the time for {PrayerName}",
+            "what is the time of {PrayerName}",
+            "give me {PrayerName} time"
+          ],
+          "slots": [
+            { "name": "PrayerName", "type": "PRAYER_NAME" }
+          ]
+        },
+        {
+          "name": "TimeUntilPrayerIntent",
+          "samples": [
+            "how long until {PrayerName}",
+            "how much time until {PrayerName}",
+            "how many minutes until {PrayerName}",
+            "what is the countdown to {PrayerName}",
+            "how long before {PrayerName}"
+          ],
+          "slots": [
+            { "name": "PrayerName", "type": "PRAYER_NAME" }
+          ]
+        },
+        {
+          "name": "TodayPrayerTimesIntent",
+          "samples": [
+            "what are today's prayer times",
+            "give me today's prayer times",
+            "tell me all prayer times today",
+            "what are the prayer times",
+            "read today's salah times"
+          ],
+          "slots": []
+        },
+        {
+          "name": "NextIslamicEventIntent",
+          "samples": [
+            "what is the next Islamic holiday",
+            "what is the next Islamic event",
+            "when is the next Islamic holiday",
+            "what Islamic event is next",
+            "when is the next Muslim holiday"
+          ],
+          "slots": []
+        },
+        {
+          "name": "IslamicDateIntent",
+          "samples": [
+            "what is today's Hijri date",
+            "what is the Islamic date today",
+            "tell me today's Hijri date",
+            "what day is it in the Islamic calendar",
+            "give me the Hijri date"
+          ],
+          "slots": []
+        },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] }
+      ],
+      "types": [
+        {
+          "name": "PRAYER_NAME",
+          "values": [
+            { "name": { "value": "Fajr", "synonyms": ["fajer", "fajir", "morning prayer"] } },
+            { "name": { "value": "Dhuhr", "synonyms": ["Zuhr", "Zuhur", "Dhur", "noon prayer"] } },
+            { "name": { "value": "Asr", "synonyms": ["Aser", "afternoon prayer"] } },
+            { "name": { "value": "Maghrib", "synonyms": ["Magrib", "sunset prayer"] } },
+            { "name": { "value": "Isha", "synonyms": ["Esha", "night prayer"] } }
+          ]
+        }
+      ]
+    }
+  }
+}
