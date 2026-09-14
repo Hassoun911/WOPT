@@ -334,3 +334,57 @@
     display: none !important;
   }
 }
+
+/* Hard desktop overlap guard: reserve the right side of the hero card for Local Time. */
+@media (min-width: 821px) {
+  .next-prayer-card .next-card-head {
+    position: relative !important;
+    display: block !important;
+    min-height: 76px !important;
+    padding-right: 205px !important;
+    box-sizing: border-box !important;
+  }
+
+  .next-prayer-card .next-card-head > div:first-child {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .next-prayer-card .next-card-head h2 {
+    display: block !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .next-prayer-card .next-card-head [data-hassoun-current-location="true"] {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .next-prayer-card .next-card-head .live-clock {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
+    z-index: 20 !important;
+  }
+
+  /* Never allow the injected active-card live countdown to sit over the NEXT strip. */
+  .prayer-grid .prayer-card .wopt-card-countdown,
+  .prayer-grid .prayer-card.active .wopt-card-countdown {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
