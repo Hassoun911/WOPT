@@ -4,12 +4,15 @@ const WIDGET_NAMESPACE = "HassounPrayer";
 const WIDGET_KEY = "main";
 const REMINDER_PERMISSION = "alexa::alerts:reminders:skill:readwrite";
 
+// IMPORTANT: With APL 1.3+ the mainTemplate parameter should match the datasource key.
+// This avoids the legacy `payload` root mapping that caused all dynamic Hassoun values
+// to render blank in the Alexa simulator even though the datasource JSON was present.
 const HASSOUN_DASHBOARD = {
   type: "APL",
   version: "2024.3",
   theme: "light",
   mainTemplate: {
-    parameters: ["payload"],
+    parameters: ["hassounData"],
     items: [
       {
         type: "Frame",
@@ -70,9 +73,9 @@ const HASSOUN_DASHBOARD = {
                   type: "Container",
                   alignItems: "end",
                   items: [
-                    { type: "Text", text: "${payload.properties.location}", fontSize: "19dp", fontWeight: 600, color: "#153F37" },
-                    { type: "Text", text: "${payload.properties.dateLabel}", fontSize: "16dp", color: "#60766F" },
-                    { type: "Text", text: "${payload.properties.hijriDate}", fontSize: "16dp", color: "#0B6B58" }
+                    { type: "Text", text: "${hassounData.location}", fontSize: "19dp", fontWeight: 600, color: "#153F37" },
+                    { type: "Text", text: "${hassounData.dateLabel}", fontSize: "16dp", color: "#60766F" },
+                    { type: "Text", text: "${hassounData.hijriDate}", fontSize: "16dp", color: "#0B6B58" }
                   ]
                 }
               ]
@@ -101,20 +104,20 @@ const HASSOUN_DASHBOARD = {
                     justifyContent: "center",
                     items: [
                       { type: "Text", text: "NEXT PRAYER", fontSize: "18dp", fontWeight: 600, color: "#CFEADF", letterSpacing: 2 },
-                      { type: "Text", text: "${payload.properties.nextPrayer.name}", fontSize: "64dp", fontWeight: 700, color: "#FFFFFF", paddingTop: "4dp" },
+                      { type: "Text", text: "${hassounData.nextPrayer.name}", fontSize: "64dp", fontWeight: 700, color: "#FFFFFF", paddingTop: "4dp" },
                       {
                         type: "Container",
                         direction: "row",
                         alignItems: "end",
                         paddingTop: "2dp",
                         items: [
-                          { type: "Text", text: "${payload.properties.nextPrayer.displayTime}", fontSize: "31dp", fontWeight: 600, color: "#EAF7F1" },
-                          { type: "Text", text: "  •  ${payload.properties.nextPrayer.timeUntil}", fontSize: "25dp", color: "#D7EEE6", paddingBottom: "2dp" }
+                          { type: "Text", text: "${hassounData.nextPrayer.displayTime}", fontSize: "31dp", fontWeight: 600, color: "#EAF7F1" },
+                          { type: "Text", text: "  •  ${hassounData.nextPrayer.timeUntil}", fontSize: "25dp", color: "#D7EEE6", paddingBottom: "2dp" }
                         ]
                       },
                       { type: "Frame", width: "100%", height: "1dp", backgroundColor: "#72A99B", marginTop: "20dp" },
                       { type: "Text", text: "Countdown to Adhan", fontSize: "17dp", color: "#CFEADF", paddingTop: "16dp" },
-                      { type: "Text", text: "${payload.properties.nextPrayer.timeUntil}", fontSize: "44dp", fontWeight: 700, color: "#FFFFFF", paddingTop: "2dp" }
+                      { type: "Text", text: "${hassounData.nextPrayer.timeUntil}", fontSize: "44dp", fontWeight: 700, color: "#FFFFFF", paddingTop: "2dp" }
                     ]
                   }
                 },
@@ -137,8 +140,8 @@ const HASSOUN_DASHBOARD = {
                         paddingBottom: "22dp",
                         items: [
                           { type: "Text", text: "TODAY", fontSize: "17dp", fontWeight: 700, color: "#0B6B58" },
-                          { type: "Text", text: "${payload.properties.dateLabel}", fontSize: "24dp", fontWeight: 600, color: "#173F37", paddingTop: "8dp" },
-                          { type: "Text", text: "${payload.properties.hijriDate}", fontSize: "18dp", color: "#60766F", paddingTop: "6dp" }
+                          { type: "Text", text: "${hassounData.dateLabel}", fontSize: "24dp", fontWeight: 600, color: "#173F37", paddingTop: "8dp" },
+                          { type: "Text", text: "${hassounData.hijriDate}", fontSize: "18dp", color: "#60766F", paddingTop: "6dp" }
                         ]
                       }
                     },
@@ -157,8 +160,8 @@ const HASSOUN_DASHBOARD = {
                         paddingBottom: "22dp",
                         items: [
                           { type: "Text", text: "NEXT ISLAMIC EVENT", fontSize: "16dp", fontWeight: 700, color: "#9A6A08" },
-                          { type: "Text", text: "${payload.properties.eventName}", fontSize: "25dp", fontWeight: 700, color: "#4C3916", paddingTop: "10dp" },
-                          { type: "Text", text: "${payload.properties.eventWhen}", fontSize: "18dp", color: "#705A2C", paddingTop: "7dp" }
+                          { type: "Text", text: "${hassounData.eventName}", fontSize: "25dp", fontWeight: 700, color: "#4C3916", paddingTop: "10dp" },
+                          { type: "Text", text: "${hassounData.eventWhen}", fontSize: "18dp", color: "#705A2C", paddingTop: "7dp" }
                         ]
                       }
                     }
@@ -174,11 +177,11 @@ const HASSOUN_DASHBOARD = {
               justifyContent: "spaceBetween",
               marginTop: "18dp",
               items: [
-                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "FAJR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${payload.properties.prayers.fajr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
-                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "DHUHR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${payload.properties.prayers.dhuhr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
-                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "ASR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${payload.properties.prayers.asr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
-                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "MAGHRIB", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${payload.properties.prayers.maghrib.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
-                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "ISHA", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${payload.properties.prayers.isha.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } }
+                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "FAJR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${hassounData.prayers.fajr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
+                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "DHUHR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${hassounData.prayers.dhuhr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
+                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "ASR", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${hassounData.prayers.asr.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
+                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "MAGHRIB", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${hassounData.prayers.maghrib.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } },
+                { type: "Frame", width: "18.4%", height: "116dp", borderRadius: "20dp", backgroundColor: "#FFFFFF", item: { type: "Container", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", items: [{ type: "Text", text: "ISHA", fontSize: "16dp", fontWeight: 700, color: "#60766F" }, { type: "Text", text: "${hassounData.prayers.isha.displayTime}", fontSize: "24dp", fontWeight: 700, color: "#0B6B58", paddingTop: "7dp" }] } }
               ]
             }
           ]
@@ -240,11 +243,18 @@ function targetEpoch(item) {
 
 function dashboardData(data) {
   const next = data.nextPrayer || { name: "Prayer", displayTime: "--", minutesUntil: 0, timeUntil: "" };
+  const prayers = data.prayers || {};
   return {
     location: data.location || "Windsor, Ontario",
     dateLabel: dateSpeech(data.dateKey),
     hijriDate: data.hijriDate || "",
-    prayers: data.prayers || {},
+    prayers: {
+      fajr: prayers.fajr || { displayTime: "--" },
+      dhuhr: prayers.dhuhr || { displayTime: "--" },
+      asr: prayers.asr || { displayTime: "--" },
+      maghrib: prayers.maghrib || { displayTime: "--" },
+      isha: prayers.isha || { displayTime: "--" }
+    },
     nextPrayer: {
       ...next,
       targetEpochMs: targetEpoch(next),
@@ -262,7 +272,7 @@ function dashboardDirective(data) {
     type: "Alexa.Presentation.APL.RenderDocument",
     token: `hassoun-dashboard-${Date.now()}`,
     document: HASSOUN_DASHBOARD,
-    datasources: { payload: { type: "object", properties: dashboardData(data) } }
+    datasources: { hassounData: dashboardData(data) }
   };
 }
 
@@ -381,9 +391,7 @@ export const handler = async (event) => {
       await refreshWidget(event, data).catch((error) => console.warn("Widget initial sync failed", error?.message || error));
       return alexaResponse("", true);
     }
-    if (requestType === "Alexa.DataStore.PackageManager.UsagesRemoved" || requestType === "Alexa.DataStore.PackageManager.InstallationError" || requestType === "Alexa.DataStore.Error") {
-      return alexaResponse("", true);
-    }
+    if (requestType === "Alexa.DataStore.PackageManager.UsagesRemoved" || requestType === "Alexa.DataStore.PackageManager.InstallationError" || requestType === "Alexa.DataStore.Error") return alexaResponse("", true);
     if (requestType === "Alexa.Presentation.APL.UserEvent") return dataAndVisual(event, "Here is the Hassoun prayer dashboard.", true);
     if (requestType === "LaunchRequest") return dataAndVisual(event, "Assalamu alaikum. Here is today's Hassoun prayer dashboard.", true);
     if (requestType === "SessionEndedRequest") return alexaResponse("", true);
