@@ -288,3 +288,46 @@
     overflow: visible !important;
   }
 }
+
+/* Keep next-prayer title/location in a separate desktop column from Local Time. */
+@media (min-width: 821px) {
+  .next-card-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    column-gap: 24px !important;
+    width: 100% !important;
+  }
+
+  .next-card-head > div:first-child {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    padding-right: 8px !important;
+  }
+
+  .next-card-head h2 {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .next-card-head .live-clock {
+    position: relative !important;
+    z-index: 8 !important;
+    min-width: 174px !important;
+    width: max-content !important;
+    max-width: 210px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    border: 1px solid rgba(219, 181, 94, .5) !important;
+    border-radius: 14px !important;
+    background: rgba(7, 68, 54, .72) !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+  }
+
+  .next-card-head .live-clock span,
+  .next-card-head .live-clock strong {
+    position: relative !important;
+    z-index: 9 !important;
+  }
+}
