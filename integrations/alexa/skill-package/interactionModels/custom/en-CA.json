@@ -34,7 +34,11 @@
             "how much time until {PrayerName}",
             "how many minutes until {PrayerName}",
             "what is the countdown to {PrayerName}",
-            "how long before {PrayerName}"
+            "how long before {PrayerName}",
+            "how much time left for {PrayerName}",
+            "how much time is left for {PrayerName}",
+            "how much longer until {PrayerName}",
+            "time left for {PrayerName}"
           ],
           "slots": [
             { "name": "PrayerName", "type": "PRAYER_NAME" }
@@ -48,6 +52,30 @@
             "tell me all prayer times today",
             "what are the prayer times",
             "read today's salah times"
+          ],
+          "slots": []
+        },
+        {
+          "name": "ShowDashboardIntent",
+          "samples": [
+            "show the prayer dashboard",
+            "show prayer times",
+            "show Hassoun dashboard",
+            "show me the prayer screen",
+            "open the prayer dashboard"
+          ],
+          "slots": []
+        },
+        {
+          "name": "SetNextPrayerAlertsIntent",
+          "samples": [
+            "remind me before the next prayer",
+            "set prayer reminders",
+            "set reminders for the next prayer",
+            "alert me ten and five minutes before the next prayer",
+            "remind me ten minutes before the next prayer",
+            "remind me five minutes before the next prayer",
+            "remind me at the next prayer"
           ],
           "slots": []
         },
@@ -82,7 +110,7 @@
         {
           "name": "PRAYER_NAME",
           "values": [
-            { "name": { "value": "Fajr", "synonyms": ["fajer", "fajir", "morning prayer"] } },
+            { "name": { "value": "Fajr", "synonyms": ["fajer", "fajir", "fajar", "fajjar", "morning prayer"] } },
             { "name": { "value": "Dhuhr", "synonyms": ["Zuhr", "Zuhur", "Dhur", "noon prayer"] } },
             { "name": { "value": "Asr", "synonyms": ["Aser", "afternoon prayer"] } },
             { "name": { "value": "Maghrib", "synonyms": ["Magrib", "sunset prayer"] } },
