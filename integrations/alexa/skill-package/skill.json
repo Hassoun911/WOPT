@@ -6,18 +6,19 @@
       "distributionCountries": ["CA", "US"],
       "distributionMode": "PUBLIC",
       "category": "RELIGION_AND_SPIRITUALITY",
+      "testingInstructions": "Enable Hassoun, say 'Alexa, open Hassoun', then try 'Alexa, ask Hassoun when Maghrib is'. Grant Reminders only when testing requested prayer reminders. If account linking is enabled, sign in with a Hassoun email and the one-time verification code.",
       "locales": {
         "en-CA": {
           "name": "Hassoun",
           "summary": "Prayer times, live countdowns, Hijri dates, Echo Show dashboard and next-prayer widget.",
-          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer.",
+          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer. Optional account linking lets you use saved prayer locations and assign different Hassoun locations to linked Echo devices.",
           "examplePhrases": ["Alexa, open Hassoun", "Alexa, ask Hassoun when Maghrib is", "Alexa, ask Hassoun how long until Fajr"],
           "keywords": ["prayer", "salah", "adhan", "Islam", "Muslim", "Hijri", "Ramadan", "Eid"]
         },
         "en-US": {
           "name": "Hassoun",
           "summary": "Prayer times, live countdowns, Hijri dates, Echo Show dashboard and next-prayer widget.",
-          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer.",
+          "description": "Hassoun is an Islamic companion for prayer times and Islamic dates. On screen devices, open Hassoun for a prayer dashboard with a live countdown. Install the Hassoun Next Prayer widget for glanceable next-prayer information. You can also ask Hassoun to set reminders for the next prayer. Optional account linking lets you use saved prayer locations and assign different Hassoun locations to linked Echo devices.",
           "examplePhrases": ["Alexa, open Hassoun", "Alexa, ask Hassoun when Maghrib is", "Alexa, ask Hassoun how long until Fajr"],
           "keywords": ["prayer", "salah", "adhan", "Islam", "Muslim", "Hijri", "Ramadan", "Eid"]
         }
@@ -48,10 +49,20 @@
     ],
     "privacyAndCompliance": {
       "allowsPurchases": false,
-      "usesPersonalInfo": false,
+      "usesPersonalInfo": true,
       "isChildDirected": false,
       "isExportCompliant": true,
-      "containsAds": false
+      "containsAds": false,
+      "locales": {
+        "en-CA": {
+          "privacyPolicyUrl": "https://hassoun.app/privacy/",
+          "termsOfUseUrl": "https://hassoun.app/terms/"
+        },
+        "en-US": {
+          "privacyPolicyUrl": "https://hassoun.app/privacy/",
+          "termsOfUseUrl": "https://hassoun.app/terms/"
+        }
+      }
     }
   }
 }
