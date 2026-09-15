@@ -38,7 +38,7 @@ const prayerTileBlock = `const prayerTile = (key, label, arabic, icon) => ({
         ]
       },
       { type: "Text", text: arabic, fontSize: "19dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\`, paddingTop: "1dp" },
-      { type: "Text", text: '${hassounData.prayers.' + key + '.displayTime}', fontSize: "23dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\`, paddingTop: "2dp" }
+      { type: "Text", text: '\${hassounData.prayers.' + key + '.displayTime}', fontSize: "23dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\`, paddingTop: "2dp" }
     ]
   }
 });`;
