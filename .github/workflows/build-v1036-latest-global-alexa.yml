@@ -8,6 +8,10 @@ on:
     paths:
       - ".github/workflows/build-v1036-latest-global-alexa.yml"
       - ".github/scripts/fix-v1035-clock-format-controls.py"
+      - "scripts/apply-voice-assistants.py"
+      - "mobile/src/prayerData.ts"
+      - "mobile/src/locationUsage.ts"
+      - "mobile/src/VoiceAssistantsPage.tsx"
 
 permissions:
   contents: read
