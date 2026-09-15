@@ -2,28 +2,34 @@ import app from "./index";
 import { getAlexaContext } from "./alexaData";
 import { autoSyncPrayerSchedule, handleAdminPrayerSchedule } from "./adminPrayerSchedule";
 import { handleLocationUsage } from "./locationUsage";
+import { applyLinkedAlexaLocation, handleVoiceAccounts } from "./voiceAccounts";
 import type { Env } from "./types";
 
 const handler: ExportedHandler<Env> = {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Hassoun voice-account/OAuth endpoints. These power passwordless account
+    // linking plus saved prayer locations and per-Echo location assignments.
+    if (url.pathname.startsWith("/oauth/alexa/") || url.pathname.startsWith("/voice/account")) {
+      const response = await handleVoiceAccounts(request, env);
+      if (response) return response;
+    }
+
     // Keep the Alexa voice endpoint permanent at the Worker entry point.
-    // Several legacy deployment workflows deploy the Worker without running
-    // the route-patching scripts, which could remove this route and make the
-    // Alexa Lambda receive a 404. Intercept it here before delegating every
-    // other request to the existing Worker.
     if (request.method === "GET" && url.pathname === "/voice/alexa/context") {
-      // Existing Alexa installs still call this route with no location profile.
-      // Preserve Windsor as the legacy default, while allowing linked Hassoun
-      // accounts/devices to pass their own latitude, longitude and timezone.
-      if (!url.searchParams.has("latitude") && !url.searchParams.has("longitude")) {
-        url.searchParams.set("latitude", "42.3149");
-        url.searchParams.set("longitude", "-83.0364");
-        url.searchParams.set("timezone", "America/Toronto");
-        if (!url.searchParams.has("location")) url.searchParams.set("location", "Windsor, Ontario");
+      // If Alexa provided a linked Hassoun access token, resolve the saved
+      // per-device location first. Unlinked/legacy installs keep Windsor as a
+      // backward-compatible default until the customer links an account.
+      const linkedRequest = await applyLinkedAlexaLocation(request, env);
+      const linkedUrl = new URL(linkedRequest.url);
+      if (!linkedUrl.searchParams.has("latitude") && !linkedUrl.searchParams.has("longitude")) {
+        linkedUrl.searchParams.set("latitude", "42.3149");
+        linkedUrl.searchParams.set("longitude", "-83.0364");
+        linkedUrl.searchParams.set("timezone", "America/Toronto");
+        if (!linkedUrl.searchParams.has("location")) linkedUrl.searchParams.set("location", "Windsor, Ontario");
       }
-      return getAlexaContext(new Request(url.toString(), request), env);
+      return getAlexaContext(new Request(linkedUrl.toString(), linkedRequest), env);
     }
 
     // Anonymous/coarse location coverage. This stores only 0.1-degree buckets
