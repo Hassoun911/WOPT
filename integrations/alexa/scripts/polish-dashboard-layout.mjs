@@ -11,37 +11,39 @@ function replaceOnce(from, to, label) {
 const tileStart = text.indexOf('const prayerTile = ');
 const tileEnd = text.indexOf('\n\nconst HASSOUN_DASHBOARD', tileStart);
 if (tileStart < 0 || tileEnd < 0) throw new Error('Dashboard design anchor missing (prayer tiles)');
-const prayerTileBlock = `const prayerTile = (key, label, arabic, icon) => ({
-  type: "Frame",
-  width: "18.4%",
-  height: "106dp",
-  borderRadius: "18dp",
-  backgroundColor: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#12836F' : '#FFFDF8'}\`,
-  item: {
-    type: "Container",
-    width: "100%",
-    height: "100%",
-    paddingLeft: "14dp",
-    paddingRight: "14dp",
-    paddingTop: "10dp",
-    paddingBottom: "10dp",
-    justifyContent: "center",
-    items: [
-      {
-        type: "Container",
-        direction: "row",
-        justifyContent: "spaceBetween",
-        alignItems: "center",
-        items: [
-          { type: "Text", text: label, fontSize: "18dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\` },
-          { type: "Text", text: icon, fontSize: "22dp", color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#F4E7A7' : '#C99532'}\` }
-        ]
-      },
-      { type: "Text", text: arabic, fontSize: "19dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\`, paddingTop: "1dp" },
-      { type: "Text", text: '\${hassounData.prayers.' + key + '.displayTime}', fontSize: "23dp", fontWeight: 700, color: \`\${hassounData.nextPrayer.prayer == '\${key}' ? '#FFFFFF' : '#173F37'}\`, paddingTop: "2dp" }
-    ]
-  }
-});`;
+const prayerTileBlock = [
+  'const prayerTile = (key, label, arabic, icon) => ({',
+  '  type: "Frame",',
+  '  width: "18.4%",',
+  '  height: "106dp",',
+  '  borderRadius: "18dp",',
+  "  backgroundColor: `\\${hassounData.nextPrayer.prayer == '${key}' ? '#12836F' : '#FFFDF8'}`,",
+  '  item: {',
+  '    type: "Container",',
+  '    width: "100%",',
+  '    height: "100%",',
+  '    paddingLeft: "14dp",',
+  '    paddingRight: "14dp",',
+  '    paddingTop: "10dp",',
+  '    paddingBottom: "10dp",',
+  '    justifyContent: "center",',
+  '    items: [',
+  '      {',
+  '        type: "Container",',
+  '        direction: "row",',
+  '        justifyContent: "spaceBetween",',
+  '        alignItems: "center",',
+  '        items: [',
+  "          { type: \"Text\", text: label, fontSize: \"18dp\", fontWeight: 700, color: `\\${hassounData.nextPrayer.prayer == '${key}' ? '#FFFFFF' : '#173F37'}` },",
+  "          { type: \"Text\", text: icon, fontSize: \"22dp\", color: `\\${hassounData.nextPrayer.prayer == '${key}' ? '#F4E7A7' : '#C99532'}` }",
+  '        ]',
+  '      },',
+  "      { type: \"Text\", text: arabic, fontSize: \"19dp\", fontWeight: 700, color: `\\${hassounData.nextPrayer.prayer == '${key}' ? '#FFFFFF' : '#173F37'}`, paddingTop: \"1dp\" },",
+  "      { type: \"Text\", text: `\\${hassounData.prayers.${key}.displayTime}`, fontSize: \"23dp\", fontWeight: 700, color: `\\${hassounData.nextPrayer.prayer == '${key}' ? '#FFFFFF' : '#173F37'}`, paddingTop: \"2dp\" }",
+  '    ]',
+  '  }',
+  '});'
+].join('\n');
 text = text.slice(0, tileStart) + prayerTileBlock + text.slice(tileEnd);
 
 replaceOnce('backgroundColor: "#F5F1E7",', 'backgroundColor: "#F8F3E9",', 'background');
