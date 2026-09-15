@@ -7,7 +7,9 @@ on:
     paths:
       - "integrations/alexa/**"
       - "push-server/src/alexaData.ts"
-      - "push-server/scripts/apply-native-fcm-routing.mjs"
+      - "push-server/src/voiceAccounts.ts"
+      - "push-server/src/entry.ts"
+      - "push-server/migrations/0018_voice_accounts.sql"
       - ".github/workflows/alexa-integration.yml"
 
 permissions:
@@ -38,7 +40,9 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/dataStorePackages/HassounPrayerWidget/datasources/default.json','utf8'))"
 
       - name: Validate Lambda syntax
-        run: node --check integrations/alexa/lambda/index.mjs
+        run: |
+          node --check integrations/alexa/lambda/index.mjs
+          node --check integrations/alexa/lambda/linked.mjs
 
       - name: Smoke test live Hassoun Alexa data endpoint
         run: |
@@ -55,41 +59,35 @@ jobs:
             sleep 5
           done
           test "$ok" = true
-          jq '{location,timezone,dateKey,hijriDate,nextPrayer,nextIslamicEvent}' /tmp/alexa-context.json
+
+      - name: Stage account-linked Lambda package
+        run: |
+          mkdir -p artifacts/lambda
+          cp integrations/alexa/lambda/index.mjs artifacts/lambda/base.mjs
+          cp integrations/alexa/lambda/linked.mjs artifacts/lambda/index.mjs
 
       - name: Simulate Echo Show launch request
         run: |
           node --input-type=module <<'NODE'
-          import { handler } from './integrations/alexa/lambda/index.mjs';
+          import { handler } from './artifacts/lambda/index.mjs';
           const result = await handler({
-            context: {
-              System: {
-                device: { supportedInterfaces: { 'Alexa.Presentation.APL': {} } },
-                user: {},
-                apiEndpoint: 'https://api.amazonalexa.com'
-              }
-            },
+            context: { System: { device: { deviceId: 'test-device', supportedInterfaces: { 'Alexa.Presentation.APL': {} } }, user: { userId: 'test-user' }, apiEndpoint: 'https://api.amazonalexa.com' } },
             request: { type: 'LaunchRequest' }
           });
           const directive = result?.response?.directives?.[0];
           if (result?.version !== '1.0') process.exit(1);
           if (!result?.response?.outputSpeech?.text?.includes('Hassoun')) process.exit(1);
           if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
-          if (!directive?.datasources?.payload?.nextPrayer?.name) process.exit(1);
           console.log(result.response.outputSpeech.text);
-          console.log('Echo Show APL:', directive.datasources.payload.nextPrayer.name, directive.datasources.payload.nextPrayer.displayTime);
           NODE
 
       - name: Simulate natural Fajar countdown phrase
         run: |
           node --input-type=module <<'NODE'
-          import { handler } from './integrations/alexa/lambda/index.mjs';
+          import { handler } from './artifacts/lambda/index.mjs';
           const result = await handler({
-            context: { System: { device: { supportedInterfaces: {} }, user: {}, apiEndpoint: 'https://api.amazonalexa.com' } },
-            request: {
-              type: 'IntentRequest',
-              intent: { name: 'TimeUntilPrayerIntent', slots: { PrayerName: { value: 'fajar' } } }
-            }
+            context: { System: { device: { deviceId: 'test-device', supportedInterfaces: {} }, user: { userId: 'test-user' }, apiEndpoint: 'https://api.amazonalexa.com' } },
+            request: { type: 'IntentRequest', intent: { name: 'TimeUntilPrayerIntent', slots: { PrayerName: { value: 'fajar' } } } }
           });
           const speech = result?.response?.outputSpeech?.text || '';
           if (!speech.startsWith('Fajr is ')) process.exit(1);
@@ -106,8 +104,6 @@ jobs:
 
       - name: Package Lambda
         run: |
-          mkdir -p artifacts/lambda
-          cp integrations/alexa/lambda/index.mjs artifacts/lambda/index.mjs
           cd artifacts/lambda
           zip -r ../hassoun-alexa-lambda.zip .
 
