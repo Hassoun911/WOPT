@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Polish Echo Show dashboard layout
+        run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
+
       - name: Validate Alexa skill and widget JSON files
         run: |
           set -euo pipefail
