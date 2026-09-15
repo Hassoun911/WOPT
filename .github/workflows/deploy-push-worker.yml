@@ -1,4 +1,4 @@
-# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, and native Android FCM
+# Deploy Hassoun Worker with prayer alerts, support, multiplayer games, native Android FCM, and Alexa account linking
 name: Deploy Hassoun Push Worker
 
 on:
@@ -68,14 +68,11 @@ jobs:
           const fs = require('fs');
           const p = 'src/masjidDisplays.ts';
           let s = fs.readFileSync(p, 'utf8');
-
           const oldBlob = 'blob:new Blob([bytes],{type:mimeType||"application/octet-stream"})';
           const newBlob = 'blob:new Blob([bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer],{type:mimeType||"application/octet-stream"})';
           if (s.includes(oldBlob)) s = s.replace(oldBlob, newBlob);
-
           s = s.replace(/prayerClock\(vals\[(\d)\],/g, "prayerClock(vals[$1]||'',");
           s = s.replace(/\/SUNSET\/i\.test\(vals\[(\d)\]\)/g, "/SUNSET/i.test(vals[$1]||'')");
-
           fs.writeFileSync(p, s);
           console.log('Normalized generated Worker TypeScript compatibility.');
           NODE
@@ -98,20 +95,11 @@ jobs:
             echo "Workers subdomain already configured: ${current}.workers.dev"
             exit 0
           fi
-
           for candidate in wopt-windsor wopt-f8834317 windsor-prayer-f8834317; do
-            response="$(curl -sS -X PUT \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              --data "{\"subdomain\":\"${candidate}\"}" \
-              "$api")"
-            if [ "$(printf '%s' "$response" | jq -r '.success // false')" = "true" ]; then
-              echo "Workers subdomain created: ${candidate}.workers.dev"
-              exit 0
-            fi
+            response="$(curl -sS -X PUT -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" --data "{\"subdomain\":\"${candidate}\"}" "$api")"
+            if [ "$(printf '%s' "$response" | jq -r '.success // false')" = "true" ]; then echo "Workers subdomain created: ${candidate}.workers.dev"; exit 0; fi
           done
-          echo "Unable to create a workers.dev subdomain"
-          exit 1
+          echo "Unable to create a workers.dev subdomain"; exit 1
 
       - name: Deploy Worker
         run: npx wrangler deploy
@@ -126,6 +114,7 @@ jobs:
           ADMIN_BOOTSTRAP_KEY: ${{ secrets.ADMIN_BOOTSTRAP_KEY }}
           EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          ALEXA_ACCOUNT_LINK_CLIENT_SECRET: ${{ secrets.ALEXA_ACCOUNT_LINK_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           put_required_secret() { name="$1"; value="$2"; test -n "$value"; printf '%s' "$value" | npx wrangler secret put "$name"; }
@@ -138,8 +127,9 @@ jobs:
           put_optional_secret ADMIN_BOOTSTRAP_KEY "$ADMIN_BOOTSTRAP_KEY"
           put_optional_secret EXPO_ACCESS_TOKEN "$EXPO_ACCESS_TOKEN"
           put_optional_secret FIREBASE_SERVICE_ACCOUNT_JSON "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          put_optional_secret ALEXA_ACCOUNT_LINK_CLIENT_SECRET "$ALEXA_ACCOUNT_LINK_CLIENT_SECRET"
 
-      - name: Smoke test Worker and prayer schedule AI routes
+      - name: Smoke test Worker, Alexa linking and prayer schedule AI routes
         run: |
           set -euo pipefail
           health_ok=false
@@ -152,8 +142,7 @@ jobs:
           config_ok=false
           for attempt in $(seq 1 15); do
             if curl -fsS "${PUSH_WORKER_URL}/config" -o /tmp/config.json && jq -e '.vapidPublicKey | type == "string" and length > 40' /tmp/config.json >/dev/null && jq -e '.emailSignup == true and .automaticLocation == true' /tmp/config.json >/dev/null; then config_ok=true; break; fi
-            echo "Waiting for latest Worker config to propagate (${attempt}/15)…"
-            sleep 2
+            echo "Waiting for latest Worker config to propagate (${attempt}/15)…"; sleep 2
           done
           test "$config_ok" = true
 
@@ -161,19 +150,20 @@ jobs:
           for attempt in $(seq 1 10); do
             alexa_code="$(curl -sS -o /tmp/alexa.json -w '%{http_code}' "${PUSH_WORKER_URL}/voice/alexa/context")"
             if [ "$alexa_code" = "200" ] && jq -e '.ok == true and .location == "Windsor, Ontario"' /tmp/alexa.json >/dev/null; then alexa_ok=true; break; fi
-            echo "Waiting for Alexa route (${attempt}/10): HTTP ${alexa_code}"
-            sleep 2
+            echo "Waiting for Alexa route (${attempt}/10): HTTP ${alexa_code}"; sleep 2
           done
           test "$alexa_ok" = true
 
+          link_code="$(curl -sS -o /tmp/alexa-link.html -w '%{http_code}' "${PUSH_WORKER_URL}/oauth/alexa/authorize?client_id=hassoun-alexa&redirect_uri=https%3A%2F%2Fpitangui.amazon.com%2Fapi%2Fskill%2Flink%2Fsmoke&state=smoke")"
+          test "$link_code" = "200"
+          grep -q "Link your Hassoun profile" /tmp/alexa-link.html
+
           file_code="$(curl -sS -o /tmp/schedule-file-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-import" -H 'Content-Type: application/json' --data '{}')"
           text_code="$(curl -sS -o /tmp/schedule-text-route.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/masjid-displays/ai/schedule-text" -H 'Content-Type: application/json' --data '{}')"
-          test "$file_code" != "404"
-          test "$text_code" != "404"
+          test "$file_code" != "404"; test "$text_code" != "404"
           echo "Schedule AI routes are live: file=${file_code}, text=${text_code}"
 
-          player_id="smoke_$(date +%s)_$RANDOM"
-          games_ok=false
+          player_id="smoke_$(date +%s)_$RANDOM"; games_ok=false
           for attempt in $(seq 1 10); do
             http_code="$(curl -sS -o /tmp/game-room.json -w '%{http_code}' -X POST "${PUSH_WORKER_URL}/games/rooms" -H 'Content-Type: application/json' --data "{\"playerId\":\"${player_id}\",\"playerName\":\"Smoke Test\",\"gameType\":\"wordrace\",\"category\":\"general\"}")"
             if [ "$http_code" = "200" ] && jq -e '.room.code | type == "string" and length == 6' /tmp/game-room.json >/dev/null && jq -e '.room.gameType == "wordrace" and .room.category == "general"' /tmp/game-room.json >/dev/null; then games_ok=true; break; fi
