@@ -9,6 +9,7 @@ on:
       - ".github/workflows/build-v1036-latest-global-alexa.yml"
       - ".github/scripts/fix-v1035-clock-format-controls.py"
       - "scripts/apply-voice-assistants.py"
+      - "mobile/scripts/apply-location-usage-telemetry.mjs"
       - "mobile/src/prayerData.ts"
       - "mobile/src/locationUsage.ts"
       - "mobile/src/VoiceAssistantsPage.tsx"
@@ -39,10 +40,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/hassoun-latest/mobile/src /tmp/hassoun-latest/scripts
+          mkdir -p /tmp/hassoun-latest/mobile/src /tmp/hassoun-latest/mobile/scripts /tmp/hassoun-latest/scripts
           cp mobile/src/prayerData.ts /tmp/hassoun-latest/mobile/src/prayerData.ts
           cp mobile/src/locationUsage.ts /tmp/hassoun-latest/mobile/src/locationUsage.ts
           cp mobile/src/VoiceAssistantsPage.tsx /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx
+          cp mobile/scripts/apply-location-usage-telemetry.mjs /tmp/hassoun-latest/mobile/scripts/apply-location-usage-telemetry.mjs
           cp scripts/apply-voice-assistants.py /tmp/hassoun-latest/scripts/apply-voice-assistants.py
 
       - name: Setup Node
@@ -72,7 +74,10 @@ jobs:
           cp /tmp/hassoun-latest/mobile/src/prayerData.ts mobile/src/prayerData.ts
           cp /tmp/hassoun-latest/mobile/src/locationUsage.ts mobile/src/locationUsage.ts
           cp /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx mobile/src/VoiceAssistantsPage.tsx
+          mkdir -p mobile/scripts
+          cp /tmp/hassoun-latest/mobile/scripts/apply-location-usage-telemetry.mjs mobile/scripts/apply-location-usage-telemetry.mjs
           cp /tmp/hassoun-latest/scripts/apply-voice-assistants.py scripts/apply-voice-assistants.py
+          node mobile/scripts/apply-location-usage-telemetry.mjs
           python3 scripts/apply-voice-assistants.py
           python3 - <<'PY'
           from pathlib import Path
