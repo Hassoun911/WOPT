@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path(__file__).resolve().parents[1] / "mobile" / "src" / "SettingsHub.tsx"
 text = path.read_text(encoding="utf-8")
@@ -10,12 +11,15 @@ if voice_import not in text:
         raise SystemExit("SettingsHub BrandMark import anchor missing")
     text = text.replace(import_anchor, import_anchor + voice_import, 1)
 
-old_type = 'type SettingsPage = "root" | "about" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets";'
-new_type = 'type SettingsPage = "root" | "about" | "contact" | "privacy" | "terms" | "data" | "permissions" | "widgets" | "voiceAssistants";'
-if old_type in text:
-    text = text.replace(old_type, new_type, 1)
-elif '"voiceAssistants"' not in text.split("type SettingsPage", 1)[1].split(";", 1)[0]:
+# Keep this patch resilient as SettingsHub gains new pages (for example "guide").
+# Add voiceAssistants to whatever SettingsPage string-union currently exists rather
+# than requiring one historical exact union literal.
+type_match = re.search(r'type\s+SettingsPage\s*=\s*([^;]+);', text)
+if not type_match:
     raise SystemExit("SettingsHub page union anchor missing")
+if '"voiceAssistants"' not in type_match.group(1):
+    replacement = type_match.group(0)[:-1].rstrip() + ' | "voiceAssistants";'
+    text = text[:type_match.start()] + replacement + text[type_match.end():]
 
 row_anchor = '        <Row emoji="🔔" title={t("Prayer & Adhan alerts", "تنبيهات الصلاة والأذان")} text={t("Notification, Adhan and email alert controls", "التحكم بالتنبيهات والأذان وتنبيهات البريد")} onPress={onOpenAlerts} />\n'
 voice_row = '        <Row emoji="🎙️" title={t("Voice Assistants", "المساعدات الصوتية")} text={t("Connect Hassoun to Alexa and Google Home", "اربط Hassoun مع Alexa وGoogle Home")} onPress={() => setPage("voiceAssistants")} />\n'
