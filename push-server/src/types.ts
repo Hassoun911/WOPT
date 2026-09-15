@@ -61,4 +61,6 @@ export interface Env {
   GITHUB_SCHEDULE_OWNER?: string;
   GITHUB_SCHEDULE_REPO?: string;
   GITHUB_SCHEDULE_PATH?: string;
+  ALEXA_ACCOUNT_LINK_CLIENT_ID?: string;
+  ALEXA_ACCOUNT_LINK_CLIENT_SECRET?: string;
 }
