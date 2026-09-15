@@ -18,9 +18,33 @@ function voiceCors(request: Request, env: Env, response: Response) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+async function alexaDashboardArtwork(): Promise<Response> {
+  const source = "https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/dashboard-bg.b64";
+  const upstream = await fetch(source, { cf: { cacheTtl: 86400, cacheEverything: true } as never });
+  if (!upstream.ok) return new Response("Alexa dashboard artwork unavailable", { status: 502 });
+  const encoded = (await upstream.text()).trim();
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
+}
+
 const handler: ExportedHandler<Env> = {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Public HTTPS artwork endpoint for Alexa APL. APL image components do not
+    // reliably render data: URLs, so serve the approved dashboard as image/jpeg.
+    if (request.method === "GET" && url.pathname === "/voice/alexa/dashboard.jpg") {
+      return alexaDashboardArtwork();
+    }
 
     // Hassoun voice-account/OAuth endpoints. These power passwordless account
     // linking plus saved prayer locations and per-Echo location assignments.
