@@ -1,48 +1,72 @@
 # Hassoun Alexa integration
 
-Hassoun supports voice Q&A, an Echo Show prayer dashboard, a Next Prayer widget, and explicit next-prayer reminders. The Alexa skill is working in development/testing. Amazon publication/certification and optional Hassoun account linking are separate remaining steps.
+Hassoun supports voice Q&A, an Echo Show prayer dashboard, a Next Prayer widget, explicit next-prayer reminders, optional Hassoun account linking, saved prayer locations, and per-Echo location assignment.
 
 ## Current status
 
-### Working now in development/testing
+### Working in code / development testing
 
 - Worker endpoint: `GET /voice/alexa/context`
-- Lambda handler: `integrations/alexa/lambda/index.mjs`
+- Passwordless Hassoun voice profiles with email verification
+- Alexa OAuth authorization-code + refresh-token service
+- Saved prayer locations
+- Per-Echo location assignment after an Echo checks in through a linked account
+- Privacy-safe hashed Alexa user/device identifiers
 - English (US) and English (Canada) interaction models
 - Prayer-time voice questions and natural variants such as `fajar`
-- Echo Show APL dashboard shown when the user says **Alexa, open Hassoun**
-- Live next-prayer countdown on the full-screen dashboard
+- Echo Show APL prayer dashboard and live countdown
 - Five prayer cards, Hijri date, location and next Islamic event
-- Focused visual countdown during the final five minutes
-- `IT IS TIME TO PRAY` state when the countdown reaches zero while the dashboard is open
-- Hassoun Next Prayer widget package for compatible Echo Show devices
-- Widget tap launches the full Hassoun dashboard
-- Widget stores upcoming prayer occurrences so it can advance the displayed next prayer using device time without polling every second
-- Explicit 10-minute, 5-minute and prayer-time reminders for the next prayer when the user asks Hassoun to set them
+- Hassoun Next Prayer widget package
+- Explicit 10-minute, 5-minute and prayer-time reminders when requested
 
-### Still required for public/advanced setup
+### Amazon-side steps still required
 
-- Amazon skill certification/publication before the skill is public for everyone
-- Hassoun account linking if we want saved Hassoun profiles to follow the user into Alexa
-- Per-Echo device location/profile assignment
-- Production smart-home/routine capability for TV muting, speaker volume, lights and state restoration
-- Google Home integration is separate and is not live yet
-
-Account linking is **not required** for the current development-skill voice Q&A and Echo Show experience. It becomes important when Hassoun needs to know which saved Hassoun profile/location belongs to which Alexa user or Echo device.
+- Configure Alexa Account Linking with the Hassoun OAuth URLs below
+- Upload/deploy the latest packaged Lambda ZIP so access tokens and Echo IDs reach Hassoun
+- Add widget Data Store credentials to Lambda if widget refresh is required
+- Submit/certify the skill before public availability
+- Smart Adhan TV/speaker/light routines require a separately approved Alexa smart-home/routine capability
 
 ## Architecture
 
-`Alexa -> AWS Lambda -> Hassoun Worker -> Hassoun prayer context`
+`Alexa -> linked Lambda wrapper -> Hassoun Worker -> linked account/Echo location -> prayer context`
 
-The Lambda reads from:
+Unlinked legacy requests continue to use Windsor for backward compatibility. Linked requests use the Echo's assigned Hassoun location; if an Echo has no explicit assignment, Hassoun uses that account's default saved location.
 
-`https://wopt-prayer-push.wopt-windsor.workers.dev/voice/alexa/context`
+## Hassoun account-linking service
 
-Set `HASSOUN_API_BASE` in Lambda only if the Worker URL changes.
+Authorization URL:
 
-The Worker supports location-aware prayer context when latitude/longitude/profile information is supplied. Alexa requests that do not yet supply a Hassoun profile/location continue to use the legacy Windsor default for compatibility. Do not describe Alexa as automatically worldwide per device until the account/device-location layer is connected.
+`https://wopt-prayer-push.wopt-windsor.workers.dev/oauth/alexa/authorize`
 
-## Current production Lambda
+Token URL:
+
+`https://wopt-prayer-push.wopt-windsor.workers.dev/oauth/alexa/token`
+
+Client ID:
+
+`hassoun-alexa`
+
+Scope:
+
+`voice_profile`
+
+Grant type: Authorization Code. Client authentication: HTTP Basic. Hassoun issues one-hour access tokens and rotating refresh tokens.
+
+Create one strong random account-linking client secret. Store the SAME value in:
+
+1. GitHub Actions repository secret `ALEXA_ACCOUNT_LINK_CLIENT_SECRET` (the Worker deploy workflow installs it as a Cloudflare Worker secret), and
+2. Alexa Developer Console > Build > Account Linking > Client Secret.
+
+Never commit or paste this secret into source code, issue comments, screenshots, or chat.
+
+Hassoun's login flow is passwordless: the customer enters an email, receives a six-digit code through the existing Resend configuration, then Alexa receives an authorization code and exchanges it for Hassoun access/refresh tokens.
+
+The customer can manage saved prayer locations and Echo assignments at:
+
+`https://hassoun.app/voice-assistants/`
+
+## Lambda deployment
 
 Function name: `HassounAlexaSkill`
 
@@ -52,142 +76,111 @@ ARN:
 
 Runtime: Node.js 24.x.
 
-The Lambda has no npm dependencies. Replace the deployed `index.mjs` with the latest `integrations/alexa/lambda/index.mjs`, then click **Deploy** in AWS Lambda whenever the Lambda source changes.
+Do not upload only the raw repository `index.mjs` anymore. Download the `hassoun-alexa-integration` Actions artifact and upload `hassoun-alexa-lambda.zip` to Lambda. The ZIP contains:
+
+- `index.mjs` — linked-request wrapper
+- `base.mjs` — the proven voice/APL/widget/reminder handler
+
+The wrapper forwards Alexa's linked access token and privacy-safe user/device identifiers to Hassoun for location resolution.
 
 ### Lambda environment variables for widget updates
 
-The full-screen dashboard does not require additional credentials. The home-screen widget Data Store sync does.
+The account-linked prayer context itself does not use the widget client credentials. Fresh Alexa Data Store widget writes do.
 
-Add these Lambda environment variables using the Alexa skill's client credentials:
+Add the Alexa skill client credentials to Lambda as:
 
 - `ALEXA_SKILL_CLIENT_ID`
 - `ALEXA_SKILL_CLIENT_SECRET`
 
-The Lambda exchanges those credentials for a Login with Amazon access token with scope `alexa::datastore`, then writes the user's Hassoun prayer snapshot to the Alexa Data Store.
+These are Alexa skill service credentials and are **different** from `ALEXA_ACCOUNT_LINK_CLIENT_SECRET`.
 
-If these variables are not configured, voice Q&A and the full-screen APL dashboard still work, but the widget cannot receive fresh prayer data from the skill service.
-
-Do not put these credentials in GitHub or chat. Store them only in the Lambda environment/secrets configuration.
-
-## Alexa Developer Console setup
+## Alexa Developer Console
 
 Skill ID:
 
 `amzn1.ask.skill.fc9c1fb4-ddd2-4f27-b71f-a205d6a6b55c`
 
-In **Build > Interaction Model > JSON Editor**, use the current locale model:
+### Account Linking
 
-- English (US): `skill-package/interactionModels/custom/en-US.json`
-- English (Canada): `skill-package/interactionModels/custom/en-CA.json`
+Use:
 
-Save and build the model after updating it.
+- Authorization Grant Type: **Auth Code Grant**
+- Authorization URI: `https://wopt-prayer-push.wopt-windsor.workers.dev/oauth/alexa/authorize`
+- Access Token URI: `https://wopt-prayer-push.wopt-windsor.workers.dev/oauth/alexa/token`
+- Client ID: `hassoun-alexa`
+- Client Secret: the protected value shared with the Worker
+- Client Authentication Scheme: **HTTP Basic**
+- Scope: `voice_profile`
 
-In **Build > Interfaces**, enable and save:
+Use the Alexa redirect URLs shown by the Developer Console. The Hassoun OAuth service accepts Amazon's North America, Europe and Far East skill-link redirect hosts.
+
+### Interaction model and interfaces
+
+In Build > Interaction Model > JSON Editor, use:
+
+- `skill-package/interactionModels/custom/en-US.json`
+- `skill-package/interactionModels/custom/en-CA.json`
+
+Enable:
 
 - Alexa Presentation Language
 - Data Store
 - Data Store Packages
 - APL Data Store Extension
+- Reminders permission
 
-The manifest template in `skill-package/skill.json` contains:
+Privacy policy:
 
-- `ALEXA_PRESENTATION_APL`
-- `ALEXA_DATA_STORE`
-- `ALEXA_DATASTORE_PACKAGEMANAGER`
-- `ALEXA_EXTENSION` requesting `alexaext:datastore:10`
+`https://hassoun.app/privacy/`
 
-In **Build > Permissions**, enable **Reminders**. The manifest requests:
+Terms:
 
-`alexa::alerts:reminders:skill:readwrite`
+`https://hassoun.app/terms/`
 
-Users still must grant the permission on their own Alexa account. Hassoun only creates the three reminders after a direct user request to set next-prayer reminders.
+## Per-Echo prayer locations
 
-## What the owner still needs to do
+After account linking is enabled and the latest Lambda ZIP is deployed:
 
-1. Keep the Alexa Developer Console skill in Development while testing the current Hassoun experience.
-2. When ready for public use, complete the Amazon **Distribution / Privacy / Certification / Submission** flow and submit the skill for certification.
-3. If the Next Prayer widget should receive fresh Data Store updates, add `ALEXA_SKILL_CLIENT_ID` and `ALEXA_SKILL_CLIENT_SECRET` to the AWS Lambda environment using the Alexa skill's client credentials.
-4. When Hassoun account linking is implemented, configure the Alexa **Account Linking** section with the Hassoun OAuth authorization/token endpoints and client credentials. Do not configure placeholder URLs.
-5. Smart Adhan TV/speaker/light automations require their own approved smart-home/routine capability; they are not part of the current working custom skill.
+1. Link the Alexa skill to a Hassoun email profile.
+2. Open Hassoun once on each Echo. The Echo will register itself using hashed Alexa identifiers.
+3. Open `https://hassoun.app/voice-assistants/` and sign in with the same email code flow.
+4. Add locations such as Home, Office or Parents.
+5. Assign each detected Echo to a saved location.
 
-## Echo Show full-screen experience
+Future prayer questions from that Echo use its selected coordinates, timezone, calculation method and madhab. If no explicit device assignment exists, the account default location is used.
 
-On a device that supports `Alexa.Presentation.APL`, saying:
+## Echo Show experience
 
-**Alexa, open Hassoun**
+Say **Alexa, open Hassoun** to show the Hassoun prayer dashboard on supported APL devices. It includes the current linked/default location, Gregorian/Hijri dates, next prayer, live countdown, five prayer cards and next Islamic event.
 
-returns an `Alexa.Presentation.APL.RenderDocument` directive and displays:
+## Next Prayer widget
 
-- Hassoun branding
-- current configured/default location
-- Gregorian date
-- Hijri date
-- next prayer name
-- next prayer time
-- live countdown
-- Fajr, Dhuhr, Asr, Maghrib and Isha cards
-- next Islamic event
-
-The countdown uses the APL `utcTime` value on the device, so it continues to tick on screen after the Lambda response is returned.
-
-## Hassoun Next Prayer widget
-
-Widget package:
+The widget package is under:
 
 `skill-package/dataStorePackages/HassounPrayerWidget/`
 
-The widget uses the Data Store namespace/key:
+Namespace/key:
 
 - Namespace: `HassounPrayer`
 - Key: `main`
 
-The Lambda sends an ordered list of upcoming prayer occurrences. The widget compares each target time with device `utcTime`, so after one prayer passes it can automatically show the next stored prayer without needing a per-second server update.
-
-Tapping the widget sends a standard widget `SendEvent` and opens the full Hassoun dashboard.
-
-On Echo Show 15 the widget can remain in the Widget Panel. Other compatible Echo Show devices expose widgets through their supported widget surfaces/shortcuts.
-
-### Widget Gallery artwork before certification
-
-The package currently uses the Hassoun app icon as development placeholder artwork. Before Amazon certification, replace it with dedicated widget assets that meet Amazon's Widget Gallery image dimensions and artwork rules, including the required widget icon and preview image.
+The Lambda sends upcoming prayer occurrences to Alexa Data Store when the Alexa skill service credentials are configured.
 
 ## Prayer reminders
 
-The intent `SetNextPrayerAlertsIntent` supports phrases such as:
+`SetNextPrayerAlertsIntent` creates reminders only after a direct user request. Hassoun attempts 10 minutes before, 5 minutes before and prayer time, skipping times already passed. Users must grant Alexa Reminders permission.
 
-- Alexa, ask Hassoun to set prayer reminders.
-- Alexa, ask Hassoun to remind me before the next prayer.
-- Alexa, ask Hassoun to alert me ten and five minutes before the next prayer.
+## Smart Adhan automations
 
-For the current next prayer, Hassoun attempts to create:
+TV muting, speaker-volume changes, lights and automatic state restoration are not part of the ordinary custom-skill prayer flow. They require an Amazon-approved smart-home/routine capability. Keep these features labeled as planned until the Amazon-side capability is approved and configured.
 
-- 10 minutes before
-- 5 minutes before
-- at the prayer time
+## Google Home
 
-If a reminder time has already passed, that reminder is skipped. Alexa permission is requested if the user has not granted Reminders access.
-
-These are explicit reminders created after the user asks. They are not yet a background enrollment that silently schedules every prayer every day.
-
-## Voice examples
-
-- Alexa, open Hassoun.
-- Alexa, ask Hassoun what the next prayer is.
-- Alexa, ask Hassoun when Maghrib is.
-- Alexa, ask Hassoun how long until Isha.
-- Alexa, ask Hassoun how much time is left for Fajar.
-- Alexa, ask Hassoun for today's prayer times.
-- Alexa, ask Hassoun what today's Hijri date is.
-- Alexa, ask Hassoun what the next Islamic holiday is.
-- Alexa, ask Hassoun to show the prayer dashboard.
-
-## Smart-home Adhan automations
-
-The prayer dashboard/widget/reminder work is separate from smart-home control. Muting a TV, lowering a speaker, changing lights, or restoring their previous state at Adhan requires an Alexa smart-home/routine integration or an approved routine trigger. Do not present those actions as live until the Amazon-side smart-home capability is configured and approved.
+Google Home remains a separate future integration and is not live.
 
 ## Packaging and validation
 
-`.github/workflows/alexa-integration.yml` validates both interaction models, the Lambda syntax, the widget package JSON/TPL, the live Hassoun Worker endpoint, an Echo Show launch response, and the natural `fajar` countdown phrase. It then packages:
+`.github/workflows/alexa-integration.yml` validates the interaction models, Lambda files, widget package, live Hassoun Worker endpoint, Echo Show launch response and a natural Fajar countdown request. It packages:
 
 - `hassoun-alexa-lambda.zip`
 - `hassoun-alexa-skill-package.zip`
