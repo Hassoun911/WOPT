@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 const lambdaPath = 'integrations/alexa/lambda/index.mjs';
 let text = fs.readFileSync(lambdaPath, 'utf8');
-const bg = fs.readFileSync('integrations/alexa/assets/dashboard-bg.b64', 'utf8').trim();
+const DASHBOARD_ARTWORK_URL = 'https://wopt-prayer-push.wopt-windsor.workers.dev/voice/alexa/dashboard.jpg';
 
 const start = text.indexOf('const prayerTile = ');
 const end = text.indexOf('\nfunction supportsAPL', start);
@@ -41,7 +41,10 @@ const apl = {
     items: [{
       type: 'Container', width: '960dp', height: '600dp',
       items: [
-        { type: 'Image', position: 'absolute', left: '0dp', top: '0dp', width: '960dp', height: '600dp', source: `data:image/jpeg;base64,${bg}`, scale: 'best-fill', align: 'center' },
+        {
+          type: 'Image', position: 'absolute', left: '0dp', top: '0dp', width: '960dp', height: '600dp',
+          source: DASHBOARD_ARTWORK_URL, scale: 'best-fill', align: 'center'
+        },
 
         // Header live values on the exact approved artwork.
         T('⌖', 631, 46, 20, 18, '#0B5F58', 700, { textAlign: 'center' }),
@@ -85,4 +88,4 @@ if (!text.includes('weatherTemp:')) {
 }
 
 fs.writeFileSync(lambdaPath, text);
-console.log('Applied exact approved Alexa artwork with live overlays at 960x600dp.');
+console.log('Applied exact approved Alexa artwork from HTTPS endpoint with live overlays at 960x600dp.');
