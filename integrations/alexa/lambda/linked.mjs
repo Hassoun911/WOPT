@@ -1,4 +1,4 @@
-import { handler as baseHandler } from "./index.mjs";
+import { handler as baseHandler } from "./base.mjs";
 
 const API_BASE = (process.env.HASSOUN_API_BASE || "https://wopt-prayer-push.wopt-windsor.workers.dev").replace(/\/$/, "");
 
