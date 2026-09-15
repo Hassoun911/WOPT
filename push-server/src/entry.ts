@@ -5,6 +5,19 @@ import { handleLocationUsage } from "./locationUsage";
 import { applyLinkedAlexaLocation, handleVoiceAccounts } from "./voiceAccounts";
 import type { Env } from "./types";
 
+function voiceCors(request: Request, env: Env, response: Response) {
+  const origin = request.headers.get("origin");
+  const allowed = env.ALLOWED_WEB_ORIGIN || "https://hassoun.app";
+  const headers = new Headers(response.headers);
+  if (origin && (origin === allowed || origin === "https://hassoun.app")) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Vary", "Origin");
+  }
+  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 const handler: ExportedHandler<Env> = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -12,8 +25,9 @@ const handler: ExportedHandler<Env> = {
     // Hassoun voice-account/OAuth endpoints. These power passwordless account
     // linking plus saved prayer locations and per-Echo location assignments.
     if (url.pathname.startsWith("/oauth/alexa/") || url.pathname.startsWith("/voice/account")) {
+      if (request.method === "OPTIONS") return voiceCors(request, env, new Response(null, { status: 204 }));
       const response = await handleVoiceAccounts(request, env);
-      if (response) return response;
+      if (response) return voiceCors(request, env, response);
     }
 
     // Keep the Alexa voice endpoint permanent at the Worker entry point.
