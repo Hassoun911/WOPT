@@ -14,7 +14,6 @@ const apl={
   mainTemplate:{parameters:['hassounData'],items:[{
     type:'Container',width:'960dp',height:'600dp',items:[
       {type:'Image',position:'absolute',left:'0dp',top:'0dp',width:'960dp',height:'600dp',source:BG_URL,scale:'best-fill',align:'center'},
-      // Live values only; static artwork comes from the exact approved PNG.
       T('${hassounData.location}',640,39,190,18,'#0C555E',700),
       T('${hassounData.dateLabel}',640,66,210,13,'#9AA7A4',500),
       T('${hassounData.hijriDate}',640,87,210,13,'#10BCA8',600),
