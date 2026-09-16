@@ -40,7 +40,8 @@ jobs:
           import base64
           from pathlib import Path
           text = Path('/tmp/dashboard.b64').read_text(encoding='utf-8').strip()
-          data = base64.b64decode(text, validate=True)
+          text += '=' * ((4 - len(text) % 4) % 4)
+          data = base64.b64decode(text, validate=False)
           assert data[:2] == b'\xff\xd8' and data[-2:] == b'\xff\xd9'
           assert len(data) > 20000
           Path('integrations/alexa/assets/dashboard-bg.jpg').write_bytes(data)
