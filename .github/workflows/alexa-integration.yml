@@ -26,6 +26,52 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Validate canonical Alexa dashboard PNG
+        shell: bash
+        run: |
+          set -euo pipefail
+          p='integrations/alexa/assets/alexa-dashboard-approved-960x600 (1).png'
+          test -s "$p"
+          test "$(file -b --mime-type "$p")" = "image/png"
+          python3 - "$p" <<'PY'
+          import sys, struct, zlib, binascii
+          p=sys.argv[1]
+          data=open(p,'rb').read()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n'
+          off=8; w=h=None; idat=[]; saw_iend=False
+          while off < len(data):
+              assert off+12 <= len(data)
+              n=struct.unpack('>I', data[off:off+4])[0]
+              typ=data[off+4:off+8]
+              chunk=data[off+8:off+8+n]
+              crc=struct.unpack('>I', data[off+8+n:off+12+n])[0]
+              assert (binascii.crc32(typ+chunk) & 0xffffffff) == crc
+              if typ == b'IHDR':
+                  w,h=struct.unpack('>II',chunk[:8])
+              elif typ == b'IDAT':
+                  idat.append(chunk)
+              elif typ == b'IEND':
+                  saw_iend=True
+                  break
+              off += 12+n
+          assert (w,h) == (960,600), (w,h)
+          assert idat and saw_iend
+          zlib.decompress(b''.join(idat))
+          print('PNG validated:', w, h, len(data), 'bytes')
+          PY
+
+      - name: Verify public Alexa dashboard image URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600%20(1).png?v=20260916-2'
+          code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
+          test "$code" = "200"
+          test "$(file -b --mime-type /tmp/alexa-bg.png)" = "image/png"
+          cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600 (1).png' /tmp/alexa-bg.png
+          echo 'Public PNG returned HTTP 200, image/png, and exact committed bytes.'
+
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
       - name: Validate Alexa skill JSON
@@ -59,9 +105,9 @@ jobs:
           if (result?.version !== '1.0') process.exit(1);
           if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
           const doc = JSON.stringify(directive.document || {});
-          if (doc.includes('dashboard-bg.jpg')) process.exit(1);
-          if (!doc.includes('Closer to what matters.')) process.exit(1);
-          console.log(result.response.outputSpeech.text);
+          if (!doc.includes('alexa-dashboard-approved-960x600%20(1).png')) process.exit(1);
+          if (doc.includes('dashboard-bg.jpg') || doc.includes('data:image')) process.exit(1);
+          console.log('APL launch uses canonical PNG background.');
           NODE
       - name: Package Lambda
         run: |
