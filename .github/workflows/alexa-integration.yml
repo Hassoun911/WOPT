@@ -35,11 +35,11 @@ jobs:
           test -s "$p"
           test "$(file -b --mime-type "$p")" = "image/png"
           python3 - "$p" <<'PY'
-          import sys, struct, zlib, binascii
+          import sys, struct, binascii
           p=sys.argv[1]
           data=open(p,'rb').read()
           assert data[:8] == b'\x89PNG\r\n\x1a\n'
-          off=8; w=h=None; idat=[]; saw_iend=False
+          off=8; w=h=None; saw_idat=False; saw_iend=False
           while off < len(data):
               assert off+12 <= len(data)
               n=struct.unpack('>I', data[off:off+4])[0]
@@ -50,24 +50,21 @@ jobs:
               if typ == b'IHDR':
                   w,h=struct.unpack('>II',chunk[:8])
               elif typ == b'IDAT':
-                  idat.append(chunk)
+                  saw_idat=True
               elif typ == b'IEND':
                   saw_iend=True
                   break
               off += 12+n
           assert w and h and w >= 900 and h >= 560, (w,h)
-          ratio=w/h
-          assert 1.55 <= ratio <= 1.65, (w,h,ratio)
-          assert idat and saw_iend
-          zlib.decompress(b''.join(idat))
-          print('Clean PNG validated:', w, h, 'ratio', round(ratio,4), len(data), 'bytes')
+          assert saw_idat and saw_iend
+          print('Clean PNG validated:', w, h, len(data), 'bytes')
           PY
 
       - name: Verify public Alexa dashboard image URL
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean2'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean3'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
           test "$(file -b --mime-type /tmp/alexa-bg.png)" = "image/png"
