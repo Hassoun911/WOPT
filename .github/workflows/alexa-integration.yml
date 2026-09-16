@@ -13,7 +13,7 @@ on:
       - ".github/workflows/alexa-integration.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -27,6 +27,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Publish approved Alexa dashboard JPG
+        run: |
+          set -euo pipefail
+          base64 -d integrations/alexa/assets/dashboard-bg.b64 > integrations/alexa/assets/dashboard-bg.jpg
+          file integrations/alexa/assets/dashboard-bg.jpg
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('integrations/alexa/assets/dashboard-bg.jpg')
+          data=p.read_bytes()
+          assert data[:2] == b'\xff\xd8' and data[-2:] == b'\xff\xd9'
+          print('dashboard JPG bytes:', len(data))
+          PY
+          if git diff --quiet -- integrations/alexa/assets/dashboard-bg.jpg; then
+            echo "dashboard-bg.jpg already current"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add integrations/alexa/assets/dashboard-bg.jpg
+            git commit -m "Publish approved Alexa dashboard JPG"
+            git push
+          fi
 
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
@@ -59,6 +81,23 @@ jobs:
               break
             fi
             echo "Waiting for Alexa endpoint (${attempt}/12), HTTP ${code}"
+            sleep 5
+          done
+          test "$ok" = true
+
+      - name: Verify dashboard image is publicly reachable
+        run: |
+          set -euo pipefail
+          url="https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/dashboard-bg.jpg?run=${GITHUB_RUN_ID}"
+          ok=false
+          for attempt in $(seq 1 12); do
+            code="$(curl -L -sS -o /tmp/dashboard.jpg -w '%{http_code}' "$url" || true)"
+            ctype="$(file -b --mime-type /tmp/dashboard.jpg 2>/dev/null || true)"
+            if [ "$code" = "200" ] && [ "$ctype" = "image/jpeg" ]; then
+              ok=true
+              break
+            fi
+            echo "Waiting for public dashboard JPG (${attempt}/12), HTTP ${code}, type ${ctype}"
             sleep 5
           done
           test "$ok" = true
