@@ -33,7 +33,6 @@ jobs:
           set -euo pipefail
           p='integrations/alexa/assets/alexa-dashboard-approved-960x600.png'
           test -s "$p"
-          test "$(file -b --mime-type "$p")" = "image/png"
           python3 - "$p" <<'PY'
           import sys, struct, binascii
           p=sys.argv[1]
@@ -64,12 +63,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean3'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean4'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
-          test "$(file -b --mime-type /tmp/alexa-bg.png)" = "image/png"
+          python3 - <<'PY'
+          data=open('/tmp/alexa-bg.png','rb').read()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n'
+          print('Public PNG signature OK:', len(data), 'bytes')
+          PY
           cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
-          echo 'Public clean PNG returned HTTP 200, image/png, and exact committed bytes.'
+          echo 'Public clean PNG returned HTTP 200 and exact committed bytes.'
 
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
