@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 const lambdaPath = 'integrations/alexa/lambda/index.mjs';
 let text = fs.readFileSync(lambdaPath, 'utf8');
-const DASHBOARD_ARTWORK_URL = 'https://wopt-prayer-push.wopt-windsor.workers.dev/voice/alexa/dashboard.jpg?v=20260915-2147';
+const DASHBOARD_ARTWORK_URL = 'https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/dashboard-bg.jpg?v=20260915-2150';
 
 const start = text.indexOf('const prayerTile = ');
 const end = text.indexOf('\nfunction supportsAPL', start);
@@ -88,4 +88,4 @@ if (!text.includes('weatherTemp:')) {
 }
 
 fs.writeFileSync(lambdaPath, text);
-console.log('Applied exact approved Alexa artwork from HTTPS endpoint with cache-busted live overlays at 960x600dp.');
+console.log('Applied exact approved Alexa artwork from GitHub CDN with live overlays at 960x600dp.');
