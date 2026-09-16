@@ -10,18 +10,18 @@ const BG_URL = 'https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrati
 const T=(textValue,left,top,width,size,color='#FFFFFF',weight=700,extra={})=>({type:'Text',position:'absolute',left:`${left}dp`,top:`${top}dp`,width:`${width}dp`,text:textValue,fontSize:`${size}dp`,fontWeight:weight,color,maxLines:1,...extra});
 
 const prayerMeta={
-  fajr:{x:55,en:'Fajr',ar:'الفجر',color:'#FFFFFF'},
-  dhuhr:{x:235,en:'Dhuhr',ar:'الظهر',color:'#0D5960'},
-  asr:{x:407,en:'Asr',ar:'العصر',color:'#0D5960'},
-  maghrib:{x:576,en:'Maghrib',ar:'المغرب',color:'#0D5960'},
-  isha:{x:744,en:'Isha',ar:'العشاء',color:'#0D5960'}
+  fajr:{x:60,en:'Fajr',ar:'الفجر',color:'#FFFFFF'},
+  dhuhr:{x:245,en:'Dhuhr',ar:'الظهر',color:'#0D5960'},
+  asr:{x:417,en:'Asr',ar:'العصر',color:'#0D5960'},
+  maghrib:{x:588,en:'Maghrib',ar:'المغرب',color:'#0D5960'},
+  isha:{x:752,en:'Isha',ar:'العشاء',color:'#0D5960'}
 };
 const prayerItems=[];
 for(const key of ['fajr','dhuhr','asr','maghrib','isha']){
   const p=prayerMeta[key];
-  prayerItems.push(T(p.en,p.x,414,120,18,p.color,700));
-  prayerItems.push(T(p.ar,p.x,443,120,15,p.color,600));
-  prayerItems.push(T(`\${hassounData.prayers.${key}.displayTime}`,p.x,475,130,19,p.color,700));
+  prayerItems.push(T(p.en,p.x,423,116,17,p.color,700));
+  prayerItems.push(T(p.ar,p.x,449,116,14,p.color,600));
+  prayerItems.push(T(`\${hassounData.prayers.${key}.displayTime}`,p.x,481,124,18,p.color,700));
 }
 
 const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['hassounData'],items:[{type:'Container',width:'960dp',height:'600dp',items:[
@@ -34,8 +34,8 @@ const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['
   T('${hassounData.nextPrayer.name}',78,165,285,42,'#FFFFFF',700),
   T('${hassounData.nextPrayer.arabicName}',78,215,240,25,'#FFFFFF',700),
   T('${hassounData.nextPrayer.displayTime}',78,258,220,27,'#FFFFFF',700),
-  T('${hassounData.nextPrayer.timeUntil}',118,322,245,17,'#FFFFFF',700),
-  T('until Adhan',118,344,150,12,'#FFFFFF',500),
+  T('${hassounData.nextPrayer.timeUntil}',125,320,230,16,'#FFFFFF',700),
+  T('until Adhan',125,342,150,12,'#FFFFFF',500),
 
   T('${hassounData.dateLabel}',587,157,285,18,'#0D5960',700),
   T('${hassounData.hijriDate}',587,184,250,14,'#12B6A2',500),
@@ -51,4 +51,4 @@ text=text.slice(0,start)+dashboardCode+text.slice(end+1);
 text=text.replace('return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));','return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));');
 if(!text.includes('arabicName: ({ fajr: "الفجر"')) text=text.replace('nextPrayer: {\n      ...next,','nextPrayer: {\n      ...next,\n      arabicName: ({ fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" })[next.prayer] || "الصلاة",');
 fs.writeFileSync(lambdaPath,text);
-console.log('Applied clean uploaded Alexa dashboard background with live text only.');
+console.log('Applied final alignment polish to clean Alexa dashboard background.');
