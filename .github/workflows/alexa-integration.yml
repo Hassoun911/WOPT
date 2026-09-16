@@ -27,11 +27,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate canonical Alexa dashboard PNG
+      - name: Validate clean Alexa dashboard PNG
         shell: bash
         run: |
           set -euo pipefail
-          p='integrations/alexa/assets/alexa-dashboard-approved-960x600.png'
+          p='integrations/alexa/assets/ChatGPT Image Sep 15, 2026, 11_39_29 PM.png'
           test -s "$p"
           python3 - "$p" <<'PY'
           import sys, struct
@@ -49,20 +49,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean6'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/ChatGPT%20Image%20Sep%2015%2C%202026%2C%2011_39_29%20PM.png?v=20260916-clean-final'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
-          python3 - <<'PY'
-          import struct
-          data=open('/tmp/alexa-bg.png','rb').read()
-          assert len(data) > 100000
-          assert data[:8] == b'\x89PNG\r\n\x1a\n'
-          assert data[12:16] == b'IHDR'
-          w,h=struct.unpack('>II', data[16:24])
-          assert w >= 900 and h >= 560
-          print('Public PNG validated:', w, h, len(data), 'bytes')
-          PY
-          cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
+          cmp -s 'integrations/alexa/assets/ChatGPT Image Sep 15, 2026, 11_39_29 PM.png' /tmp/alexa-bg.png
           echo 'Public clean PNG returned HTTP 200 and exact committed bytes.'
 
       - name: Polish Echo Show dashboard layout
@@ -98,10 +88,10 @@ jobs:
           if (result?.version !== '1.0') process.exit(1);
           if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
           const doc = JSON.stringify(directive.document || {});
-          if (!doc.includes('alexa-dashboard-approved-960x600.png')) process.exit(1);
+          if (!doc.includes('ChatGPT%20Image%20Sep%2015%2C%202026%2C%2011_39_29%20PM.png')) process.exit(1);
           if (doc.includes('dashboard-bg.jpg') || doc.includes('data:image')) process.exit(1);
           if (doc.includes('backgroundColor')) process.exit(1);
-          console.log('APL launch uses clean PNG background with live text only.');
+          console.log('APL launch uses clean uploaded PNG background with live text only.');
           NODE
       - name: Package Lambda
         run: |
