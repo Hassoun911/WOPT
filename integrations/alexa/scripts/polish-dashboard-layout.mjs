@@ -6,7 +6,7 @@ const start = text.indexOf('const prayerTile = ');
 const end = text.indexOf('\nfunction supportsAPL', start);
 if (start < 0 || end < 0) throw new Error('Alexa dashboard section not found');
 
-const BG_URL = 'https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600%20(1).png?raw=1';
+const BG_URL = 'https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600%20(1).png?v=20260916-1';
 const T=(textValue,left,top,width,size,color='#FFFFFF',weight=700,extra={})=>({type:'Text',position:'absolute',left:`${left}dp`,top:`${top}dp`,width:`${width}dp`,text:textValue,fontSize:`${size}dp`,fontWeight:weight,color,maxLines:1,...extra});
 
 const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['hassounData'],items:[{type:'Container',width:'960dp',height:'600dp',items:[
