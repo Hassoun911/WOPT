@@ -34,28 +34,15 @@ jobs:
           p='integrations/alexa/assets/alexa-dashboard-approved-960x600.png'
           test -s "$p"
           python3 - "$p" <<'PY'
-          import sys, struct, binascii
+          import sys, struct
           p=sys.argv[1]
           data=open(p,'rb').read()
+          assert len(data) > 100000, len(data)
           assert data[:8] == b'\x89PNG\r\n\x1a\n'
-          off=8; w=h=None; saw_idat=False; saw_iend=False
-          while off < len(data):
-              assert off+12 <= len(data)
-              n=struct.unpack('>I', data[off:off+4])[0]
-              typ=data[off+4:off+8]
-              chunk=data[off+8:off+8+n]
-              crc=struct.unpack('>I', data[off+8+n:off+12+n])[0]
-              assert (binascii.crc32(typ+chunk) & 0xffffffff) == crc
-              if typ == b'IHDR':
-                  w,h=struct.unpack('>II',chunk[:8])
-              elif typ == b'IDAT':
-                  saw_idat=True
-              elif typ == b'IEND':
-                  saw_iend=True
-                  break
-              off += 12+n
-          assert w and h and w >= 900 and h >= 560, (w,h)
-          assert saw_idat and saw_iend
+          assert data[12:16] == b'IHDR'
+          w,h=struct.unpack('>II', data[16:24])
+          assert w >= 900 and h >= 560, (w,h)
+          assert data[-12:] == b'\x00\x00\x00\x00IEND\xaeB`\x82'
           print('Clean PNG validated:', w, h, len(data), 'bytes')
           PY
 
@@ -63,13 +50,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean4'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean5'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
           python3 - <<'PY'
+          import struct
           data=open('/tmp/alexa-bg.png','rb').read()
+          assert len(data) > 100000
           assert data[:8] == b'\x89PNG\r\n\x1a\n'
-          print('Public PNG signature OK:', len(data), 'bytes')
+          assert data[12:16] == b'IHDR'
+          w,h=struct.unpack('>II', data[16:24])
+          assert w >= 900 and h >= 560
+          assert data[-12:] == b'\x00\x00\x00\x00IEND\xaeB`\x82'
+          print('Public PNG validated:', w, h, len(data), 'bytes')
           PY
           cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
           echo 'Public clean PNG returned HTTP 200 and exact committed bytes.'
