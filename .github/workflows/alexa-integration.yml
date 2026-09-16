@@ -40,7 +40,7 @@ jobs:
           assert data[:2] == b'\xff\xd8' and data[-2:] == b'\xff\xd9'
           print('dashboard JPG bytes:', len(data))
           PY
-          if git diff --quiet -- integrations/alexa/assets/dashboard-bg.jpg; then
+          if [ -z "$(git status --porcelain -- integrations/alexa/assets/dashboard-bg.jpg)" ]; then
             echo "dashboard-bg.jpg already current"
           else
             git config user.name "github-actions[bot]"
