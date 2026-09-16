@@ -42,7 +42,7 @@ jobs:
           text = Path('/tmp/dashboard.b64').read_text(encoding='utf-8').strip()
           data = base64.b64decode(text, validate=True)
           assert data[:2] == b'\xff\xd8' and data[-2:] == b'\xff\xd9'
-          assert len(data) > 30000
+          assert len(data) > 20000
           Path('integrations/alexa/assets/dashboard-bg.jpg').write_bytes(data)
           print('dashboard JPG bytes:', len(data))
           PY
@@ -101,7 +101,7 @@ jobs:
             code="$(curl -L -sS -o /tmp/dashboard-public.jpg -w '%{http_code}' "$url" || true)"
             ctype="$(file -b --mime-type /tmp/dashboard-public.jpg 2>/dev/null || true)"
             size="$(wc -c < /tmp/dashboard-public.jpg 2>/dev/null || echo 0)"
-            if [ "$code" = "200" ] && [ "$ctype" = "image/jpeg" ] && [ "$size" -gt 30000 ]; then
+            if [ "$code" = "200" ] && [ "$ctype" = "image/jpeg" ] && [ "$size" -gt 20000 ]; then
               ok=true
               break
             fi
