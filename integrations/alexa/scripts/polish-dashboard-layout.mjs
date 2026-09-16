@@ -14,14 +14,14 @@ const prayerMeta={
   dhuhr:{x:247,en:'Dhuhr',ar:'الظهر',color:'#0D5960'},
   asr:{x:419,en:'Asr',ar:'العصر',color:'#0D5960'},
   maghrib:{x:590,en:'Maghrib',ar:'المغرب',color:'#0D5960'},
-  isha:{x:754,en:'Isha',ar:'العشاء',color:'#0D5960'}
+  isha:{x:770,en:'Isha',ar:'العشاء',color:'#0D5960'}
 };
 const prayerItems=[];
 for(const key of ['fajr','dhuhr','asr','maghrib','isha']){
   const p=prayerMeta[key];
   prayerItems.push(T(p.en,p.x,426,112,17,p.color,700));
   prayerItems.push(T(p.ar,p.x,452,112,14,p.color,600));
-  prayerItems.push(T(`\${hassounData.prayers.${key}.displayTime}`,p.x,486,122,18,p.color,700));
+  prayerItems.push(T(`\${hassounData.prayers.${key}.displayTime}`,p.x,486,112,18,p.color,700));
 }
 
 const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['hassounData'],items:[{type:'Container',width:'960dp',height:'600dp',items:[
@@ -51,4 +51,4 @@ text=text.slice(0,start)+dashboardCode+text.slice(end+1);
 text=text.replace('return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));','return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));');
 if(!text.includes('arabicName: ({ fajr: "الفجر"')) text=text.replace('nextPrayer: {\n      ...next,','nextPrayer: {\n      ...next,\n      arabicName: ({ fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" })[next.prayer] || "الصلاة",');
 fs.writeFileSync(lambdaPath,text);
-console.log('Applied final exact-position polish to clean Alexa dashboard.');
+console.log('Moved Isha text fully inside its bottom prayer card.');
