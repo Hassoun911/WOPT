@@ -20,3 +20,7 @@ The two advance reminders use the same approved four-second chime. On Android, t
 6. Deploy the Worker and set its URL as `EXPO_PUBLIC_PUSH_API_URL` in the mobile app.
 
 The cron runs every minute in UTC, but each event is calculated from the Windsor schedule timezone, including daylight-saving transitions.
+
+## Alexa account-linking deployment
+
+A fresh Worker deployment is required after rotating `ALEXA_ACCOUNT_LINK_CLIENT_SECRET` so the new secret is installed in Cloudflare before live account-link testing.
