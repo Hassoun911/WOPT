@@ -22,22 +22,74 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Verify committed approved dashboard image
+        run: |
+          set -euo pipefail
+          image="integrations/alexa/assets/dashboard-template-960x600.jpg"
+          test -s "$image"
+          test "$(file -b --mime-type "$image")" = "image/jpeg"
+          python -m pip install --quiet pillow
+          python - <<'PY'
+          from PIL import Image
+          path = 'integrations/alexa/assets/dashboard-template-960x600.jpg'
+          with Image.open(path) as im:
+              im.verify()
+          with Image.open(path) as im:
+              assert im.size == (960, 600), im.size
+              assert im.format == 'JPEG', im.format
+          print('Local dashboard image verified: 960x600 JPEG')
+          PY
+
+      - name: Verify dashboard image is publicly reachable and decodable
+        run: |
+          set -euo pipefail
+          url="https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/dashboard-template-960x600.jpg?v=${GITHUB_SHA}"
+          ok=false
+          for attempt in $(seq 1 12); do
+            rm -f /tmp/dashboard-public.jpg /tmp/dashboard-headers.txt
+            code="$(curl -L -sS -D /tmp/dashboard-headers.txt -o /tmp/dashboard-public.jpg -w '%{http_code}' "$url" || true)"
+            if [ "$code" = "200" ] && grep -iq '^content-type: image/jpeg' /tmp/dashboard-headers.txt; then
+              if python - <<'PY'
+          from PIL import Image
+          path = '/tmp/dashboard-public.jpg'
+          with Image.open(path) as im:
+              im.verify()
+          with Image.open(path) as im:
+              assert im.size == (960, 600), im.size
+              assert im.format == 'JPEG', im.format
+          print('Public dashboard image verified: HTTP 200, image/jpeg, 960x600, decodes successfully')
+          PY
+              then
+                ok=true
+                break
+              fi
+            fi
+            echo "Waiting for public dashboard image (${attempt}/12), HTTP ${code}"
+            sleep 5
+          done
+          test "$ok" = true
+
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
+
       - name: Validate Alexa skill JSON
         run: |
           set -euo pipefail
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/skill.json','utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/interactionModels/custom/en-CA.json','utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('integrations/alexa/skill-package/interactionModels/custom/en-US.json','utf8'))"
+
       - name: Validate Lambda syntax
         run: |
           node --check integrations/alexa/lambda/index.mjs
           node --check integrations/alexa/lambda/linked.mjs
+
       - name: Smoke test live Hassoun Alexa data endpoint
         run: |
           set -euo pipefail
@@ -45,32 +97,43 @@ jobs:
           code="$(curl -sS -o /tmp/alexa-context.json -w '%{http_code}' "$url" || true)"
           test "$code" = "200"
           jq -e '.ok == true and .location == "Windsor, Ontario" and (.prayers.maghrib.displayTime | type == "string") and (.nextPrayer.name | type == "string") and (.hijriDate | type == "string")' /tmp/alexa-context.json >/dev/null
+
       - name: Stage account-linked Lambda package
         run: |
           mkdir -p artifacts/lambda
           cp integrations/alexa/lambda/index.mjs artifacts/lambda/base.mjs
           cp integrations/alexa/lambda/linked.mjs artifacts/lambda/index.mjs
+
       - name: Simulate Echo Show launch request
         run: |
           node --input-type=module <<'NODE'
           import { handler } from './artifacts/lambda/index.mjs';
-          const result = await handler({context:{System:{device:{deviceId:'test-device',supportedInterfaces:{'Alexa.Presentation.APL':{}}},user:{userId:'test-user'},apiEndpoint:'https://api.amazonalexa.com'}},request:{type:'LaunchRequest'}});
+          const result = await handler({
+            context: { System: { device: { deviceId: 'test-device', supportedInterfaces: { 'Alexa.Presentation.APL': {} } }, user: { userId: 'test-user' }, apiEndpoint: 'https://api.amazonalexa.com' } },
+            request: { type: 'LaunchRequest' }
+          });
           const directive = result?.response?.directives?.[0];
           if (result?.version !== '1.0') process.exit(1);
           if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
           const doc = JSON.stringify(directive.document || {});
-          if (doc.includes('dashboard-bg.jpg')) process.exit(1);
-          if (!doc.includes('Closer to what matters.')) process.exit(1);
+          if (!doc.includes('dashboard-template-960x600.jpg')) process.exit(1);
+          if (!doc.includes('raw.githubusercontent.com/Hassoun911/WOPT/main')) process.exit(1);
+          if (!doc.includes('Image')) process.exit(1);
+          if (doc.includes('data:image/')) process.exit(1);
+          if (doc.includes('dashboard-bg.b64')) process.exit(1);
           console.log(result.response.outputSpeech.text);
           NODE
+
       - name: Package Lambda
         run: |
           cd artifacts/lambda
           zip -r ../hassoun-alexa-lambda.zip .
+
       - name: Package Alexa skill files
         run: |
           cd integrations/alexa/skill-package
           zip -r ../../../artifacts/hassoun-alexa-skill-package.zip .
+
       - name: Upload Alexa packages
         uses: actions/upload-artifact@v4
         with:
