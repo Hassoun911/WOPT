@@ -27,9 +27,10 @@ for(const key of ['fajr','dhuhr','asr','maghrib','isha']){
 const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['hassounData'],items:[{type:'Container',width:'960dp',height:'600dp',items:[
   {type:'Image',position:'absolute',left:'0dp',top:'0dp',width:'960dp',height:'600dp',source:BG_URL,scale:'best-fill',align:'center'},
 
-  T('${hassounData.location}',626,68,220,18,'#0C555E',700),
-  T('${hassounData.dateLabel}',626,94,230,13,'#8A9996',500),
-  T('${hassounData.hijriDate}',626,116,230,13,'#10BCA8',600),
+  // Dynamic user/device prayer location — intentionally more prominent.
+  T('${hassounData.location}',626,53,270,22,'#0C555E',700),
+  T('${hassounData.dateLabel}',626,84,250,13,'#8A9996',600),
+  T('${hassounData.hijriDate}',626,106,250,13,'#10BCA8',700),
 
   T('${hassounData.nextPrayer.name}',78,166,285,42,'#FFFFFF',700),
   T('${hassounData.nextPrayer.arabicName}',78,217,240,25,'#FFFFFF',700),
@@ -49,6 +50,7 @@ const apl={type:'APL',version:'2024.3',theme:'light',mainTemplate:{parameters:['
 const dashboardCode=`const HASSOUN_DASHBOARD = ${JSON.stringify(apl,null,2)};\n`;
 text=text.slice(0,start)+dashboardCode+text.slice(end+1);
 text=text.replace('return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));','return new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(`${dateKey}T12:00:00Z`));');
+text=text.replace('location: data.location || "Windsor, Ontario",','location: data.city || data.location || "Prayer location",');
 if(!text.includes('arabicName: ({ fajr: "الفجر"')) text=text.replace('nextPrayer: {\n      ...next,','nextPrayer: {\n      ...next,\n      arabicName: ({ fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" })[next.prayer] || "الصلاة",');
 fs.writeFileSync(lambdaPath,text);
-console.log('Moved Isha text fully inside its bottom prayer card.');
+console.log('Raised and enlarged dynamic Alexa city header; removed Windsor-only dashboard fallback.');
