@@ -13,7 +13,7 @@ on:
       - ".github/workflows/alexa-integration.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -28,19 +28,38 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate approved Alexa dashboard JPG
+      - name: Rebuild approved Alexa dashboard JPG
         run: |
           set -euo pipefail
-          test -s integrations/alexa/assets/dashboard-bg.jpg
-          test "$(file -b --mime-type integrations/alexa/assets/dashboard-bg.jpg)" = "image/jpeg"
+          cat integrations/alexa/assets/dashboard-bg.part0 \
+              integrations/alexa/assets/dashboard-bg.part1 \
+              integrations/alexa/assets/dashboard-bg.part2 \
+              integrations/alexa/assets/dashboard-bg.part3 \
+              integrations/alexa/assets/dashboard-bg.part4 > /tmp/dashboard.b64
           python - <<'PY'
+          import base64
           from pathlib import Path
-          p=Path('integrations/alexa/assets/dashboard-bg.jpg')
-          data=p.read_bytes()
+          text = Path('/tmp/dashboard.b64').read_text(encoding='utf-8').strip()
+          data = base64.b64decode(text, validate=True)
           assert data[:2] == b'\xff\xd8' and data[-2:] == b'\xff\xd9'
           assert len(data) > 30000
+          Path('integrations/alexa/assets/dashboard-bg.jpg').write_bytes(data)
           print('dashboard JPG bytes:', len(data))
           PY
+          test "$(file -b --mime-type integrations/alexa/assets/dashboard-bg.jpg)" = "image/jpeg"
+
+      - name: Publish corrected dashboard JPG when changed
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain -- integrations/alexa/assets/dashboard-bg.jpg)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add integrations/alexa/assets/dashboard-bg.jpg
+            git commit -m "Publish corrected approved Alexa dashboard JPG"
+            git push
+          else
+            echo "dashboard-bg.jpg already correct"
+          fi
 
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
@@ -79,9 +98,9 @@ jobs:
           url="https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/dashboard-bg.jpg?v=20260916-approved1"
           ok=false
           for attempt in $(seq 1 12); do
-            code="$(curl -L -sS -o /tmp/dashboard.jpg -w '%{http_code}' "$url" || true)"
-            ctype="$(file -b --mime-type /tmp/dashboard.jpg 2>/dev/null || true)"
-            size="$(wc -c < /tmp/dashboard.jpg 2>/dev/null || echo 0)"
+            code="$(curl -L -sS -o /tmp/dashboard-public.jpg -w '%{http_code}' "$url" || true)"
+            ctype="$(file -b --mime-type /tmp/dashboard-public.jpg 2>/dev/null || true)"
+            size="$(wc -c < /tmp/dashboard-public.jpg 2>/dev/null || echo 0)"
             if [ "$code" = "200" ] && [ "$ctype" = "image/jpeg" ] && [ "$size" -gt 30000 ]; then
               ok=true
               break
