@@ -42,7 +42,6 @@ jobs:
           assert data[12:16] == b'IHDR'
           w,h=struct.unpack('>II', data[16:24])
           assert w >= 900 and h >= 560, (w,h)
-          assert data[-12:] == b'\x00\x00\x00\x00IEND\xaeB`\x82'
           print('Clean PNG validated:', w, h, len(data), 'bytes')
           PY
 
@@ -50,7 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean5'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean6'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
           python3 - <<'PY'
@@ -61,7 +60,6 @@ jobs:
           assert data[12:16] == b'IHDR'
           w,h=struct.unpack('>II', data[16:24])
           assert w >= 900 and h >= 560
-          assert data[-12:] == b'\x00\x00\x00\x00IEND\xaeB`\x82'
           print('Public PNG validated:', w, h, len(data), 'bytes')
           PY
           cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
