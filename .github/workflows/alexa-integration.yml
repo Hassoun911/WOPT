@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          p='integrations/alexa/assets/alexa-dashboard-approved-960x600 (1).png'
+          p='integrations/alexa/assets/alexa-dashboard-approved-960x600.png'
           test -s "$p"
           test "$(file -b --mime-type "$p")" = "image/png"
           python3 - "$p" <<'PY'
@@ -65,11 +65,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600%20(1).png?v=20260916-2'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-3'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
           test "$(file -b --mime-type /tmp/alexa-bg.png)" = "image/png"
-          cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600 (1).png' /tmp/alexa-bg.png
+          cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
           echo 'Public PNG returned HTTP 200, image/png, and exact committed bytes.'
 
       - name: Polish Echo Show dashboard layout
@@ -105,7 +105,7 @@ jobs:
           if (result?.version !== '1.0') process.exit(1);
           if (directive?.type !== 'Alexa.Presentation.APL.RenderDocument') process.exit(1);
           const doc = JSON.stringify(directive.document || {});
-          if (!doc.includes('alexa-dashboard-approved-960x600%20(1).png')) process.exit(1);
+          if (!doc.includes('alexa-dashboard-approved-960x600.png')) process.exit(1);
           if (doc.includes('dashboard-bg.jpg') || doc.includes('data:image')) process.exit(1);
           console.log('APL launch uses canonical PNG background.');
           NODE
