@@ -55,22 +55,23 @@ jobs:
                   saw_iend=True
                   break
               off += 12+n
-          assert (w,h) == (960,600), (w,h)
+          assert (w,h) == (1586,992), (w,h)
+          assert abs((w/h) - 1.6) < 0.01, (w,h)
           assert idat and saw_iend
           zlib.decompress(b''.join(idat))
-          print('PNG validated:', w, h, len(data), 'bytes')
+          print('Clean PNG validated:', w, h, len(data), 'bytes')
           PY
 
       - name: Verify public Alexa dashboard image URL
         shell: bash
         run: |
           set -euo pipefail
-          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-3'
+          url='https://raw.githubusercontent.com/Hassoun911/WOPT/main/integrations/alexa/assets/alexa-dashboard-approved-960x600.png?v=20260916-clean1'
           code="$(curl -L -sS -o /tmp/alexa-bg.png -w '%{http_code}' "$url")"
           test "$code" = "200"
           test "$(file -b --mime-type /tmp/alexa-bg.png)" = "image/png"
           cmp -s 'integrations/alexa/assets/alexa-dashboard-approved-960x600.png' /tmp/alexa-bg.png
-          echo 'Public PNG returned HTTP 200, image/png, and exact committed bytes.'
+          echo 'Public clean PNG returned HTTP 200, image/png, and exact committed bytes.'
 
       - name: Polish Echo Show dashboard layout
         run: node integrations/alexa/scripts/polish-dashboard-layout.mjs
@@ -107,7 +108,8 @@ jobs:
           const doc = JSON.stringify(directive.document || {});
           if (!doc.includes('alexa-dashboard-approved-960x600.png')) process.exit(1);
           if (doc.includes('dashboard-bg.jpg') || doc.includes('data:image')) process.exit(1);
-          console.log('APL launch uses canonical PNG background.');
+          if (doc.includes('backgroundColor')) process.exit(1);
+          console.log('APL launch uses clean PNG background with live text only.');
           NODE
       - name: Package Lambda
         run: |
