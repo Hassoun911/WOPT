@@ -166,7 +166,10 @@ jobs:
 
       - name: Type-check patched iOS source
         working-directory: ios
-        run: npm run typecheck
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2
+          npm run typecheck
 
       - name: Validate Expo iOS bundle
         working-directory: ios
