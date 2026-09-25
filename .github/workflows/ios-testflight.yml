@@ -1,4 +1,4 @@
-name: Build and Submit Hassoun iOS v1.0.12 Synced Parity
+name: Build and Submit Hassoun iOS v1.0.36 Global Location + Athan
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hassoun-ios-testflight-v1012-synced
+  group: hassoun-ios-testflight-v1036-global-athan
   cancel-in-progress: true
 
 jobs:
@@ -22,8 +22,8 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
       EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
-      IOS_APP_VERSION: "1.0.12"
-      IOS_BUILD_NUMBER: "2026082702"
+      IOS_APP_VERSION: "1.0.36"
+      IOS_BUILD_NUMBER: "2026092401"
       NODE_ENV: production
 
     steps:
@@ -33,9 +33,13 @@ jobs:
           ref: release/ios-current
           fetch-depth: 0
 
-      - name: Apply iOS alert toggle fix
+      - name: Apply proven iOS alert toggle fix
         working-directory: ios
         run: node scripts/apply-ios-alert-toggle-fix.mjs
+
+      - name: Apply global GPS and iOS Athan fixes
+        working-directory: ios
+        run: python3 scripts/apply-ios-location-athan-fix.py
 
       - name: Restore proven iOS native configuration
         working-directory: ios
@@ -76,13 +80,13 @@ jobs:
         working-directory: ios
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Validate and repair PNG assets for iOS
+      - name: Validate assets and install audio tooling
         working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update -y >/dev/null
-          sudo apt-get install -y python3-pil pngcheck >/dev/null
+          sudo apt-get install -y python3-pil pngcheck ffmpeg >/dev/null
 
           damaged=0
           while IFS= read -r -d '' file; do
@@ -112,28 +116,39 @@ jobs:
           pngcheck -q assets/notification-icon.png
           pngcheck -q assets/hassoun-logo.png
 
-      - name: Verify synchronized Android-parity features and iOS alert fix
+      - name: Generate Apple-compliant Athan notification sounds
         working-directory: ios
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'version: "1.0.12"' app.config.ts
-          grep -q 'buildNumber: "2026082702"' app.config.ts
+          bash scripts/prepare-ios-athan-sounds.sh
+          test -s assets/hassoun_fajr_athan.wav
+          test -s assets/hassoun_athan.wav
+
+      - name: Verify iOS 1.0.36 global location and Athan fixes
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.36"' app.config.ts
+          grep -q 'buildNumber: "2026092401"' app.config.ts
           grep -q 'HomePrayerPanel' App.tsx
           grep -q 'QiblaDirectionScreen' App.tsx
           grep -q 'SystemMessageTicker' AppWithEmail.tsx
           grep -q 'registerDeviceForServerPush' AppWithEmail.tsx
-          grep -q 'wordrace' src/MultiplayerGames.tsx
-          grep -q 'wordpuzzle' src/MultiplayerGames.tsx
-          grep -q 'Every game has a finish line' src/QuizGamesHub.tsx
-          grep -q 'bookmarks' src/quran/QuranV3.tsx
-          grep -q 'pages' src/quran/QuranV3.tsx
           grep -q 'masterAlertBusy' App.tsx
           grep -q 'Linking.openSettings' App.tsx
-          grep -q 'Platform.OS === "android"' App.tsx
           grep -q 'accessibilityRole="switch"' App.tsx
-          grep -q 'activeTimeZone = prayerLocation.timezone' App.tsx
-          grep -q 'locationLabel: activeLocationLabel' App.tsx
+          grep -q 'loadPrayerTimes({ forceLocation: true })' App.tsx
+          grep -q 'scheduleIosTestAdhan' App.tsx
+          grep -q 'https://api.aladhan.com/v1/calendar/' src/prayerData.ts
+          grep -q 'Location.Accuracy.High' src/prayerData.ts
+          grep -q 'source: "local_calculation"' src/prayerData.ts
+          grep -q 'hassoun_fajr_athan.wav' src/notifications.ts
+          grep -q 'hassoun_athan.wav' src/notifications.ts
+          grep -q 'shouldPlaySound: true' src/notifications.ts
+          grep -q 'hassoun_fajr_athan.wav' app.config.ts
+          grep -q 'hassoun_athan.wav' app.config.ts
           grep -q 'createAudioPlaylist' modules/quran-audio/index.ts
           grep -q 'setAudioModeAsync' modules/quran-audio/index.ts
           grep -q 'playsInSilentMode: true' modules/quran-audio/index.ts
@@ -149,11 +164,17 @@ jobs:
           fi
           grep -q '6804563934' eas.json
 
+      - name: Type-check patched iOS source
+        working-directory: ios
+        run: npm run typecheck
+
       - name: Validate Expo iOS bundle
         working-directory: ios
         run: |
           set -euo pipefail
           npx expo config --type public > /tmp/hassoun-ios-config.json
+          grep -q 'hassoun_fajr_athan.wav' /tmp/hassoun-ios-config.json
+          grep -q 'hassoun_athan.wav' /tmp/hassoun-ios-config.json
           npx expo export --platform ios --output-dir /tmp/hassoun-ios-export
           test -d /tmp/hassoun-ios-export
 
@@ -164,9 +185,12 @@ jobs:
           rm -rf ios
           npx expo prebuild --platform ios --clean --no-install
           test -f ios/Podfile
+          find ios -type f \( -name 'hassoun_fajr_athan.wav' -o -name 'hassoun_athan.wav' \) -print | tee /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_fajr_athan.wav' /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_athan.wav' /tmp/ios-athan-assets.txt
           rm -rf ios
 
-      - name: Build signed iOS 1.0.12 and submit to TestFlight
+      - name: Build signed iOS 1.0.36 and submit to TestFlight
         working-directory: ios
         env:
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
@@ -177,5 +201,5 @@ jobs:
             --profile production \
             --auto-submit-with-profile production \
             --non-interactive \
-            --message "Hassoun iOS v1.0.12 build 2026082702 alert toggle fix dynamic location" \
+            --message "Hassoun iOS v1.0.36 build 2026092401 global GPS + Lebanon location + iOS Athan sound" \
             --wait
