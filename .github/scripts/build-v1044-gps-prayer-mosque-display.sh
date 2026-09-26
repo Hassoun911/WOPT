@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reuse the proven v1.0.43 reconstruction/build pipeline, insert the v1.0.44
-# behavior patch before verification/TypeScript/prebuild, and bump the artifact.
+# Reuse the proven v1.0.43 reconstruction/build pipeline, first apply its
+# trusted-mosque TypeScript source fix, then insert the v1.0.44 behavior patch
+# before verification/TypeScript/prebuild and bump the artifact.
+python3 .github/scripts/fix-v1043-build-typing-source.py
+
 python3 - <<'PY'
 from pathlib import Path
 
