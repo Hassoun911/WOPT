@@ -1,0 +1,88 @@
+name: Build Hassoun Android v1.0.44 Play Store AAB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-v1044-play-store-aab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-android-v1044-play-store-aab
+  cancel-in-progress: true
+
+jobs:
+  build-play-store-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Reconstruct and verify Android v1.0.44 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1044-build-source.py
+          bash .github/scripts/build-v1044-gps-prayer-mosque-display.sh
+
+      - name: Force local Android store version for EAS
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('eas.json')
+          data=json.loads(p.read_text())
+          data.setdefault('cli', {})['appVersionSource']='local'
+          data.setdefault('build', {}).setdefault('production', {})['autoIncrement']=False
+          p.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          grep -q 'version: "1.0.44"' app.config.ts
+          grep -q 'versionCode: 88' app.config.ts
+          echo HASSOUN_ANDROID_STORE_VERSION_VERIFIED
+
+      - name: Verify Expo account
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_TOKEN:-}"
+          npx --yes eas-cli@latest whoami
+
+      - name: Build signed Play Store AAB
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --message "Hassoun Android v1.0.44 Play Store AAB - GPS prayer source + mosque display + background resume fixes" \
+            --wait
