@@ -83,14 +83,16 @@ jobs:
         run: |
           set -euo pipefail
           npm install expo-audio@~57.0.5 --save --ignore-scripts --no-audit --no-fund
-          npx expo install expo-camera expo-linear-gradient expo-screen-orientation expo-widgets @expo/ui --npm
-          # @expo/ui declares react-dom as an optional peer. On a fresh EAS worker npm
-          # otherwise selects react-dom 19.3.x, which requires React 19.3.x and conflicts
-          # with this Expo SDK project's React 19.2.3. Pin react-dom to the matching React.
-          npm install react-dom@19.2.3 --save-exact --ignore-scripts --no-audit --no-fund
-          # Mirror the clean install that EAS performs so dependency conflicts fail here
-          # before another paid cloud build is submitted.
+          npx expo install expo-camera expo-linear-gradient expo-screen-orientation --npm
+          # Do not let `expo install` float the widget stack to the newest 57.x patch.
+          # Later @expo/ui 57.x releases reference newer ExpoSwiftUI APIs than the
+          # expo-modules-core bundled with this Expo 57.0.12 app, which causes Xcode
+          # errors such as ContentOriginRegistry / setContentOrigin not found.
+          # This pair is known to work together on SDK 57 / React Native 0.86.2.
+          npm install expo-widgets@57.0.7 @expo/ui@57.0.8 react-dom@19.2.3 --save-exact --ignore-scripts --no-audit --no-fund
+          # Mirror the clean dependency install EAS performs before submitting a paid build.
           npm ci --include=dev --ignore-scripts --no-audit --no-fund
+          npm ls expo-widgets @expo/ui expo-modules-core react react-dom
 
       - name: Validate and repair assets
         working-directory: ios
