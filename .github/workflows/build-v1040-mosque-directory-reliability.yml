@@ -1,0 +1,239 @@
+name: Build Hassoun Android v1.0.40 Mosque Directory Reliability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-v1040-mosque-directory-reliability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-android-v1040-mosque-directory-reliability
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preserve latest global prayer and voice-assistant source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hassoun-latest/mobile/src /tmp/hassoun-latest/mobile/scripts /tmp/hassoun-latest/scripts
+          cp mobile/src/prayerData.ts /tmp/hassoun-latest/mobile/src/prayerData.ts
+          cp mobile/src/locationUsage.ts /tmp/hassoun-latest/mobile/src/locationUsage.ts
+          cp mobile/src/VoiceAssistantsPage.tsx /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx
+          cp mobile/scripts/apply-location-usage-telemetry.mjs /tmp/hassoun-latest/mobile/scripts/apply-location-usage-telemetry.mjs
+          cp scripts/apply-voice-assistants.py /tmp/hassoun-latest/scripts/apply-voice-assistants.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Reconstruct proven universal Android feature stack
+        timeout-minutes: 60
+        run: bash .github/tablet/build-apk.sh
+
+      - name: Overlay latest global prayer and voice source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/hassoun-latest/mobile/src/prayerData.ts mobile/src/prayerData.ts
+          cp /tmp/hassoun-latest/mobile/src/locationUsage.ts mobile/src/locationUsage.ts
+          cp /tmp/hassoun-latest/mobile/src/VoiceAssistantsPage.tsx mobile/src/VoiceAssistantsPage.tsx
+          mkdir -p mobile/scripts
+          cp /tmp/hassoun-latest/mobile/scripts/apply-location-usage-telemetry.mjs mobile/scripts/apply-location-usage-telemetry.mjs
+          cp /tmp/hassoun-latest/scripts/apply-voice-assistants.py scripts/apply-voice-assistants.py
+          node mobile/scripts/apply-location-usage-telemetry.mjs
+          python3 scripts/apply-voice-assistants.py
+
+      - name: Apply GPS-first and mosque prayer source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1037-gps-mosque-source.py
+
+      - name: Apply Mosques Near Me page
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1039-mosques-near-me.py
+
+      - name: Apply v1.0.40 mosque directory reliability fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1040-mosque-directory-reliability.py
+
+      - name: Apply complete Android Permissions control center
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/fix-v1038-permissions-control-center.py
+          python3 .github/scripts/fix-v1038-permissions-location-services.py
+
+      - name: Bump Android v1.0.40
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('mobile/app.config.ts')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'version:\s*(?:process\.env\.EXPO_APP_VERSION\s*\|\|\s*)?"[^"]+"', 'version: "1.0.40"', s, count=1)
+          s=re.sub(r'versionCode:\s*\d+', 'versionCode: 84', s, count=1)
+          if 'version: "1.0.40"' not in s or 'versionCode: 84' not in s:
+              raise SystemExit('Unable to bump Android v1.0.40 / versionCode 84')
+          p.write_text(s,encoding='utf-8')
+          print('Android v1.0.40 / versionCode 84 applied')
+          PY
+
+      - name: Verify v1.0.40 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          prayer=Path('mobile/src/prayerData.ts').read_text(encoding='utf-8')
+          page=Path('mobile/src/PrayerCalculationSettingsPage.tsx').read_text(encoding='utf-8')
+          mosques=Path('mobile/src/NearbyMosquesPage.tsx').read_text(encoding='utf-8')
+          permissions=Path('mobile/src/PermissionsStatusPage.tsx').read_text(encoding='utf-8')
+          cfg=Path('mobile/app.config.ts').read_text(encoding='utf-8')
+
+          for marker in ['locationRequiredFallback','shouldUseOfficialWindsor','preferences.locationMode === "mosque"','return refreshed']:
+              if marker not in prayer: raise SystemExit(f'Missing prayer marker: {marker}')
+          if 'windsorFallback()' in prayer:
+              raise SystemExit('Unsafe Windsor fallback survived v1.0.40')
+          for marker in ['Mosques Near Me','mosquesNearMeCard','setMosquesOpen(true)']:
+              if marker not in page: raise SystemExit(f'Missing Mosques Near Me navigation marker: {marker}')
+          for marker in [
+              'Mosques Near Me',
+              'overpass-api.de/api/interpreter',
+              'overpass.kumi.systems/api/interpreter',
+              'MOSQUE_DIRECTORY_UNAVAILABLE',
+              'radiusMeters = 30000',
+              'islamic centre',
+              'bounded: "1"',
+              'providerSucceeded',
+              'chooseMosque',
+              'Use my GPS location'
+          ]:
+              if marker not in mosques: raise SystemExit(f'Missing v1.0.40 mosque marker: {marker}')
+          for marker in ['Location.hasServicesEnabledAsync()','Notifications.getPermissionsAsync()','PermissionsAndroid.PERMISSIONS.CAMERA','PermissionsAndroid.PERMISSIONS.RECORD_AUDIO','Manage / Disable','Turn on Location Services']:
+              if marker not in permissions: raise SystemExit(f'Missing permissions marker: {marker}')
+          for marker in ['version: "1.0.40"','versionCode: 84','android.permission.ACCESS_FINE_LOCATION','android.permission.CAMERA','android.permission.RECORD_AUDIO']:
+              if marker not in cfg: raise SystemExit(f'Missing config marker: {marker}')
+          print('HASSOUN_ANDROID_V1040_SOURCE_VERIFIED')
+          PY
+
+      - name: TypeScript verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          npm install --no-save --include=optional @typescript/typescript-linux-x64@7.0.2
+          npx tsc --noEmit
+
+      - name: Regenerate Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Restore Android task retention and verify permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('mobile/android/app/src/main/AndroidManifest.xml')
+          ns='http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android',ns)
+          tree=ET.parse(p)
+          root=tree.getroot(); app=root.find('application')
+          perms={x.attrib.get(f'{{{ns}}}name') for x in root.findall('uses-permission')}
+          required={
+            'android.permission.POST_NOTIFICATIONS',
+            'android.permission.SCHEDULE_EXACT_ALARM',
+            'android.permission.ACCESS_COARSE_LOCATION',
+            'android.permission.ACCESS_FINE_LOCATION',
+            'android.permission.CAMERA',
+            'android.permission.RECORD_AUDIO',
+            'android.permission.RECEIVE_BOOT_COMPLETED',
+            'android.permission.WAKE_LOCK',
+            'android.permission.VIBRATE',
+          }
+          missing=sorted(required-perms)
+          if missing: raise SystemExit(f'Generated Android permissions missing: {missing}')
+          if 'android.permission.USE_EXACT_ALARM' in perms:
+              raise SystemExit('USE_EXACT_ALARM must not be present')
+          if app is not None:
+              banner=Path('mobile/android/app/src/main/res/drawable/hassoun_widget_logo.png')
+              if banner.exists(): app.set(f'{{{ns}}}banner','@drawable/hassoun_widget_logo')
+              main=next((a for a in app.findall('activity') if a.attrib.get(f'{{{ns}}}name','').endswith('MainActivity')),None)
+              if main is not None:
+                  for k,v in {'screenOrientation':'unspecified','launchMode':'singleTask','alwaysRetainTaskState':'true','clearTaskOnLaunch':'false','finishOnTaskLaunch':'false','noHistory':'false','documentLaunchMode':'never'}.items():
+                      main.set(f'{{{ns}}}{k}',v)
+          tree.write(p,encoding='utf-8',xml_declaration=True)
+          print('Android manifest and permission set verified for v1.0.40')
+          PY
+
+      - name: Build v1.0.40 release APK
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew clean assembleRelease --no-daemon --max-workers=2 --stacktrace
+
+      - name: Verify and name v1.0.40 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find mobile/android/app/build/outputs/apk/release -name '*.apk' ! -name 'Hassoun-v*.apk' | head -n1)"
+          test -s "$APK"
+          OUT="mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.40-mosque-directory-reliability.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          echo "HASSOUN_V1040_APK_READY=$OUT"
+
+      - name: Upload v1.0.40 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.40-Mosque-Directory-Reliability
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.40-mosque-directory-reliability.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.40-mosque-directory-reliability.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
