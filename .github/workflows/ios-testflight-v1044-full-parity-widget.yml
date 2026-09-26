@@ -50,6 +50,12 @@ jobs:
           python3 scripts/apply-ios-v1037-prayer-permissions.py
           python3 scripts/fix-ios-v1037-subscription.py
           python3 scripts/apply-ios-v1038-parity.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply-ios-v1044-full-parity.py')
+          s=p.read_text(encoding='utf-8').replace(",'Open']", "]")
+          p.write_text(s,encoding='utf-8')
+          PY
           python3 scripts/apply-ios-v1044-full-parity.py
           python3 - <<'PY'
           from pathlib import Path
