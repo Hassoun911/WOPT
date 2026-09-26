@@ -1,0 +1,61 @@
+name: Build Hassoun Android v1.0.43 Windsor Mosques + Resume
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-v1043-windsor-mosques-resume.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-android-v1043-windsor-mosques-resume
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_EAS_PROJECT_ID: 69276452-f6f2-4d13-80e8-399ab32746ff
+      EXPO_PUBLIC_PUSH_API_URL: https://wopt-prayer-push.wopt-windsor.workers.dev
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build v1.0.43 Windsor mosque directory + nested resume
+        timeout-minutes: 100
+        shell: bash
+        run: bash .github/scripts/build-v1043-windsor-directory-resume.sh
+
+      - name: Upload v1.0.43 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hassoun-v1.0.43-Windsor-Mosques-Resume
+          path: |
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.43-windsor-mosques-resume.apk
+            mobile/android/app/build/outputs/apk/release/Hassoun-v1.0.43-windsor-mosques-resume.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
