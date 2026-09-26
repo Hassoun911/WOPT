@@ -1,0 +1,198 @@
+name: Build and Submit Hassoun iOS v1.0.37 Prayer Source + Permissions Rerun
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ios-testflight-v1037-rerun.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-ios-testflight-v1037-prayer-permissions-rerun
+  cancel-in-progress: true
+
+jobs:
+  build-ios-testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      IOS_APP_VERSION: "1.0.37"
+      IOS_BUILD_NUMBER: "2026092501"
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout synchronized dedicated iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: release/ios-current
+          fetch-depth: 0
+
+      - name: Apply proven iOS alert toggle fix
+        working-directory: ios
+        run: node scripts/apply-ios-alert-toggle-fix.mjs
+
+      - name: Apply global GPS and iOS Athan fixes
+        working-directory: ios
+        run: python3 scripts/apply-ios-location-athan-fix.py
+
+      - name: Apply v1.0.37 prayer source and permission controls
+        working-directory: ios
+        run: python3 scripts/apply-ios-v1037-prayer-permissions.py
+
+      - name: Apply v1.0.37 TypeScript cleanup fix
+        working-directory: ios
+        run: python3 scripts/fix-ios-v1037-subscription.py
+
+      - name: Restore proven iOS native configuration
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path('app.config.ts')
+          s = p.read_text()
+          s = re.sub(r'version:\s*"[^"]+"', f'version: "{os.environ["IOS_APP_VERSION"]}"', s, count=1)
+          s = re.sub(r'buildNumber:\s*"[^"]+"', f'buildNumber: "{os.environ["IOS_BUILD_NUMBER"]}"', s, count=1)
+          s = s.replace('    "expo-audio",\n', '')
+          p.write_text(s)
+          PY
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ios/package-lock.json
+
+      - name: Verify Expo credentials
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_TOKEN:-}"
+          npx --yes eas-cli@latest whoami
+
+      - name: Pin proven Expo Audio dependency
+        working-directory: ios
+        run: npm install expo-audio@~57.0.5 --save --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install exact dependencies
+        working-directory: ios
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate assets and install audio tooling
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y python3-pil pngcheck ffmpeg >/dev/null
+          while IFS= read -r -d '' file; do
+            if ! pngcheck -q "$file"; then
+              python3 - "$file" <<'PY'
+          import sys
+          from pathlib import Path
+          from PIL import Image, ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
+          path = Path(sys.argv[1])
+          with Image.open(path) as src:
+              src.load(); img = src.convert('RGBA')
+          tmp = path.with_suffix('.ios-fixed.png')
+          img.save(tmp, format='PNG', optimize=True); tmp.replace(path)
+          PY
+              pngcheck -q "$file"
+            fi
+          done < <(find assets -type f -name '*.png' -print0)
+
+      - name: Generate Apple-compliant Athan notification sounds
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/prepare-ios-athan-sounds.sh
+          test -s assets/hassoun_fajr_athan.wav
+          test -s assets/hassoun_athan.wav
+
+      - name: Verify iOS v1.0.37 source
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.37"' app.config.ts
+          grep -q 'buildNumber: "2026092501"' app.config.ts
+          grep -q 'loadPrayerTimes({ forceLocation: true })' App.tsx
+          grep -q 'subscribePrayerCalculationChanges' App.tsx
+          grep -q 'https://api.aladhan.com/v1/calendar/' src/prayerData.ts
+          grep -q 'shouldUseOfficialWindsor' src/prayerData.ts
+          grep -q 'prefs.scheduleSource !== "calculated"' src/prayerData.ts
+          grep -q 'locationRequiredFallback' src/prayerData.ts
+          grep -q 'return refreshed' src/prayerData.ts
+          grep -q 'PrayerLocationMode = "gps" | "mosque"' src/prayerCalculationSettings.ts
+          grep -q 'return () => { listeners.delete(listener); };' src/prayerCalculationSettings.ts
+          grep -q 'Nearby Mosques / Prayer Location' src/PrayerCalculationSettingsPage.tsx
+          grep -q 'Use my GPS location' src/NearbyMosquesPage.tsx
+          grep -q 'nominatim.openstreetmap.org/search' src/NearbyMosquesPage.tsx
+          grep -q 'getRecordingPermissionsAsync' src/PermissionsStatusPage.tsx
+          grep -q 'Notifications.getPermissionsAsync' src/PermissionsStatusPage.tsx
+          grep -q 'Location.getForegroundPermissionsAsync' src/PermissionsStatusPage.tsx
+          grep -q 'Manage / Disable in iPhone Settings' src/PermissionsStatusPage.tsx
+          grep -q 'PrayerCalculationSettingsPage' src/SettingsHub.tsx
+          grep -q 'PermissionsStatusPage' src/SettingsHub.tsx
+          grep -q 'hassoun_fajr_athan.wav' src/notifications.ts
+          grep -q 'hassoun_athan.wav' src/notifications.ts
+          grep -q 'shouldPlaySound: true' src/notifications.ts
+          if grep -q 'function windsorFallback' src/prayerData.ts; then exit 1; fi
+          grep -q '6804563934' eas.json
+          echo HASSOUN_IOS_V1037_SOURCE_VERIFIED
+
+      - name: Type-check patched iOS source
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+          npm run typecheck
+
+      - name: Validate Expo iOS bundle
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          npx expo config --type public > /tmp/hassoun-ios-config.json
+          grep -q 'hassoun_fajr_athan.wav' /tmp/hassoun-ios-config.json
+          grep -q 'hassoun_athan.wav' /tmp/hassoun-ios-config.json
+          npx expo export --platform ios --output-dir /tmp/hassoun-ios-export
+          test -d /tmp/hassoun-ios-export
+
+      - name: Validate iOS native generation before EAS
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          rm -rf ios
+          npx expo prebuild --platform ios --clean --no-install
+          test -f ios/Podfile
+          find ios -type f \( -name 'hassoun_fajr_athan.wav' -o -name 'hassoun_athan.wav' \) -print | tee /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_fajr_athan.wav' /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_athan.wav' /tmp/ios-athan-assets.txt
+          rm -rf ios
+
+      - name: Build signed iOS v1.0.37 and submit to TestFlight
+        working-directory: ios
+        env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --auto-submit-with-profile production \
+            --non-interactive \
+            --message "Hassoun iOS v1.0.37 build 2026092501 GPS-first prayer source + nearby mosques + permissions" \
+            --wait
