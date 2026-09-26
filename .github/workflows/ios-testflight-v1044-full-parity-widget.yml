@@ -1,0 +1,201 @@
+name: Build and Submit Hassoun iOS v1.0.44 Full Parity + Widget
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ios-testflight-v1044-full-parity-widget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hassoun-ios-testflight-v1044-full-parity-widget
+  cancel-in-progress: true
+
+jobs:
+  build-ios-testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.EXPO_PUBLIC_EAS_PROJECT_ID || '69276452-f6f2-4d13-80e8-399ab32746ff' }}
+      EXPO_PUBLIC_PUSH_API_URL: ${{ vars.EXPO_PUBLIC_PUSH_API_URL || 'https://wopt-prayer-push.wopt-windsor.workers.dev' }}
+      IOS_APP_VERSION: "1.0.44"
+      IOS_BUILD_NUMBER: "2026092601"
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: release/ios-current
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ios/package-lock.json
+
+      - name: Apply iOS feature stack through v1.0.44
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/apply-ios-alert-toggle-fix.mjs
+          python3 scripts/apply-ios-location-athan-fix.py
+          python3 scripts/apply-ios-v1037-prayer-permissions.py
+          python3 scripts/fix-ios-v1037-subscription.py
+          python3 scripts/apply-ios-v1038-parity.py
+          python3 scripts/apply-ios-v1044-full-parity.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,re
+          p=Path('app.config.ts'); s=p.read_text()
+          s=re.sub(r'version:\s*"[^"]+"',f'version: "{os.environ["IOS_APP_VERSION"]}"',s,count=1)
+          s=re.sub(r'buildNumber:\s*"[^"]+"',f'buildNumber: "{os.environ["IOS_BUILD_NUMBER"]}"',s,count=1)
+          s=s.replace('    "expo-audio",\n','')
+          p.write_text(s)
+          PY
+
+      - name: Verify Expo credentials
+        working-directory: ios
+        run: |
+          test -n "${EXPO_TOKEN:-}"
+          npx --yes eas-cli@latest whoami
+
+      - name: Install base project
+        working-directory: ios
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install iOS parity and WidgetKit dependencies
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install expo-audio@~57.0.5 --save --ignore-scripts --no-audit --no-fund
+          npx expo install expo-camera expo-linear-gradient expo-screen-orientation expo-widgets @expo/ui --npm
+
+      - name: Validate and repair assets
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y python3-pil pngcheck ffmpeg >/dev/null
+          while IFS= read -r -d '' file; do
+            if ! pngcheck -q "$file"; then
+              python3 - "$file" <<'PY'
+          import sys
+          from pathlib import Path
+          from PIL import Image,ImageFile
+          ImageFile.LOAD_TRUNCATED_IMAGES=True
+          p=Path(sys.argv[1])
+          with Image.open(p) as src:
+              src.load(); img=src.convert('RGBA')
+          tmp=p.with_suffix('.ios-fixed.png'); img.save(tmp,'PNG',optimize=True); tmp.replace(p)
+          PY
+              pngcheck -q "$file"
+            fi
+          done < <(find assets -type f -name '*.png' -print0)
+          bash scripts/prepare-ios-athan-sounds.sh
+          test -s assets/hassoun_fajr_athan.wav
+          test -s assets/hassoun_athan.wav
+
+      - name: Verify Android page and feature parity markers
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'version: "1.0.44"' app.config.ts
+          grep -q 'buildNumber: "2026092601"' app.config.ts
+          grep -q 'supportsTablet: true' app.config.ts
+          grep -q 'NSCameraUsageDescription' app.config.ts
+          grep -q 'VoiceAssistantsPage' src/SettingsHub.tsx
+          grep -q 'title={t("Displays"' src/SettingsHub.tsx
+          grep -q 'ConnectDisplayPage' src/SettingsHub.tsx
+          grep -q 'MasjidDisplayPage' src/SettingsHub.tsx
+          grep -q 'PermissionsStatusPage' src/SettingsHub.tsx
+          grep -q 'PrayerCalculationSettingsPage' src/SettingsHub.tsx
+          grep -q 'hassoun:settings-nested-route:v1' src/SettingsHub.tsx
+          grep -q 'DailyIslamicCards' App.tsx
+          grep -q 'RefreshControl' App.tsx
+          grep -q 'hassoun:last-active-tab:v2' App.tsx
+          grep -q 'HASSOUN_IOS_NEAREST_MOSQUE_V1044' App.tsx
+          grep -q 'Open with Maps' App.tsx
+          grep -q 'Clipboard.setStringAsync' App.tsx
+          grep -q 'locationLabel: activeLocationLabel' App.tsx
+          grep -q 'officialWindsorAvailable' src/prayerData.ts
+          grep -q 'Automatic by GPS' src/PrayerCalculationSettingsPage.tsx
+          grep -q 'Choosing a mosque never changes prayer times' src/PrayerCalculationSettingsPage.tsx
+          grep -q 'Mosques Near Me' src/NearbyMosquesPage.tsx
+          grep -q 'WINDSOR_TRUSTED_MOSQUES' src/NearbyMosquesPage.tsx
+          grep -q 'Windsor Mosque' src/NearbyMosquesPage.tsx
+          grep -q 'Tarbiyah Centre' src/NearbyMosquesPage.tsx
+          grep -q 'West Musallah Windsor' src/NearbyMosquesPage.tsx
+          grep -q 'Rose City Islamic Centre' src/NearbyMosquesPage.tsx
+          grep -q 'MASJID AT-TAQWA' src/NearbyMosquesPage.tsx
+          grep -q 'Masjid Noor-ul-Islam' src/NearbyMosquesPage.tsx
+          grep -q 'ALBER Mosque' src/NearbyMosquesPage.tsx
+          grep -q 'Al-Hijra Academy' src/NearbyMosquesPage.tsx
+          grep -q 'Show nearest mosque on Home' src/NearbyMosquesPage.tsx
+          grep -q 'expo-widgets' app.config.ts
+          grep -q 'HassounPrayerWidget' app.config.ts
+          grep -q 'accessoryRectangular' app.config.ts
+          grep -q 'createWidget' src/HassounPrayerWidget.tsx
+          grep -q 'updateTimeline' modules/hassoun-widget/index.ts
+          grep -q 'scheduleIosTestAdhan' App.tsx
+          grep -q 'hassoun_fajr_athan.wav' src/notifications.ts
+          grep -q 'hassoun_athan.wav' src/notifications.ts
+          grep -q '6804563934' eas.json
+          if grep -q 'function windsorFallback' src/prayerData.ts; then exit 1; fi
+          echo HASSOUN_IOS_V1044_PARITY_SOURCE_VERIFIED
+
+      - name: Type-check iOS v1.0.44
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock @typescript/typescript-linux-x64@7.0.2 expo-font
+          npm run typecheck
+
+      - name: Validate Expo bundle and native WidgetKit generation
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo config --type public > /tmp/hassoun-ios-v1044-config.json
+          grep -q 'HassounPrayerWidget' /tmp/hassoun-ios-v1044-config.json
+          grep -q 'ca.wopt.windsorprayertimes.widgets' /tmp/hassoun-ios-v1044-config.json
+          grep -q 'hassoun_fajr_athan.wav' /tmp/hassoun-ios-v1044-config.json
+          grep -q 'hassoun_athan.wav' /tmp/hassoun-ios-v1044-config.json
+          npx expo export --platform ios --output-dir /tmp/hassoun-ios-v1044-export
+          test -d /tmp/hassoun-ios-v1044-export
+          rm -rf ios
+          npx expo prebuild --platform ios --clean --no-install
+          test -f ios/Podfile
+          grep -R -q 'HassounPrayerWidget' ios
+          grep -R -q 'ExpoWidgets' ios
+          find ios -type f \( -name 'hassoun_fajr_athan.wav' -o -name 'hassoun_athan.wav' \) -print | tee /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_fajr_athan.wav' /tmp/ios-athan-assets.txt
+          grep -q 'hassoun_athan.wav' /tmp/ios-athan-assets.txt
+          rm -rf ios
+          echo HASSOUN_IOS_V1044_NATIVE_WIDGET_VERIFIED
+
+      - name: Build signed iOS v1.0.44 and submit to TestFlight
+        working-directory: ios
+        env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --auto-submit-with-profile production \
+            --non-interactive \
+            --message "Hassoun iOS v1.0.44 full Android parity + GPS-only prayer source + Mosques Near Me + nearest mosque Home card + native iOS widgets" \
+            --wait
