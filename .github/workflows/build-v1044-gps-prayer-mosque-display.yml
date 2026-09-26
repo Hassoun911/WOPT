@@ -45,6 +45,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Patch v1.0.44 current mosque copy targets
+        shell: bash
+        run: python3 .github/scripts/fix-v1044-build-source.py
+
       - name: Build v1.0.44 GPS prayer + mosque display
         timeout-minutes: 100
         shell: bash
