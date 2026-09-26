@@ -84,15 +84,19 @@ jobs:
           set -euo pipefail
           npm install expo-audio@~57.0.5 --save --ignore-scripts --no-audit --no-fund
           npx expo install expo-camera expo-linear-gradient expo-screen-orientation --npm
-          # Do not let `expo install` float the widget stack to the newest 57.x patch.
-          # Later @expo/ui 57.x releases reference newer ExpoSwiftUI APIs than the
-          # expo-modules-core bundled with this Expo 57.0.12 app, which causes Xcode
-          # errors such as ContentOriginRegistry / setContentOrigin not found.
-          # This pair is known to work together on SDK 57 / React Native 0.86.2.
-          npm install expo-widgets@57.0.7 @expo/ui@57.0.8 react-dom@19.2.3 --save-exact --ignore-scripts --no-audit --no-fund
+          # babel-preset-expo 57.0.6 requires expo-widgets ^57.0.8, so 57.0.7 is
+          # rejected by npm. Keep the widget and UI packages pinned together at 57.0.8
+          # instead of floating to later 57.x releases that need newer ExpoSwiftUI APIs.
+          npm install expo-widgets@57.0.8 @expo/ui@57.0.8 react-dom@19.2.3 --save-exact --ignore-scripts --no-audit --no-fund
           # Mirror the clean dependency install EAS performs before submitting a paid build.
           npm ci --include=dev --ignore-scripts --no-audit --no-fund
           npm ls expo-widgets @expo/ui expo-modules-core react react-dom
+          # Guard against the later @expo/ui API that caused the previous Xcode failure.
+          if grep -R -E -q 'ContentOriginRegistry|setContentOrigin|clearContentOrigin' node_modules/@expo/ui/ios; then
+            echo "Incompatible @expo/ui: references ContentOriginRegistry APIs not present in this Expo 57.0.12 core"
+            exit 1
+          fi
+          echo HASSOUN_IOS_WIDGET_DEPENDENCIES_COMPATIBLE
 
       - name: Validate and repair assets
         working-directory: ios
