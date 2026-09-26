@@ -84,6 +84,13 @@ jobs:
           set -euo pipefail
           npm install expo-audio@~57.0.5 --save --ignore-scripts --no-audit --no-fund
           npx expo install expo-camera expo-linear-gradient expo-screen-orientation expo-widgets @expo/ui --npm
+          # @expo/ui declares react-dom as an optional peer. On a fresh EAS worker npm
+          # otherwise selects react-dom 19.3.x, which requires React 19.3.x and conflicts
+          # with this Expo SDK project's React 19.2.3. Pin react-dom to the matching React.
+          npm install react-dom@19.2.3 --save-exact --ignore-scripts --no-audit --no-fund
+          # Mirror the clean install that EAS performs so dependency conflicts fail here
+          # before another paid cloud build is submitted.
+          npm ci --include=dev --ignore-scripts --no-audit --no-fund
 
       - name: Validate and repair assets
         working-directory: ios
