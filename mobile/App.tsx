@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,7 +39,7 @@ import { loadLocationPrayerContext } from "./src/localPrayerTimes";
 import PrayerAlertPreferenceGrid from "./src/PrayerAlertPreferenceGrid";
 import { registerDeviceForServerPush } from "./src/push";
 import Quran from "./src/quran/Quran";
-import { addDateDays, dateKeyInZone, formatPrayerTime, localToDateInZone } from "./src/time";
+import { addDateDays, dateKeyInZone, formatPrayerTime, localToDateInZone, partsInZone } from "./src/time";
 import { PRAYER_KEYS, type PrayerKey, type PrayerTimes } from "./src/types";
 
 type AppTab = "home" | "quran" | "quiz" | "alerts" | "events" | "qibla" | "more";
@@ -114,6 +114,10 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
   const [locationLabel, setLocationLabel] = useState("Windsor, Ontario");
   const [prayerTimeZone, setPrayerTimeZone] = useState(WINDSOR_TIME_ZONE);
   const [sourceLabel, setSourceLabel] = useState("Saved official Windsor schedule");
+  // Detect DST, device timezone and local prayer-day changes while the app stays open.
+  const lastClockSignature = useRef<string | null>(null);
+  const clockRefreshRunning = useRef(false);
+
 
   const todayKey = dateKeyInZone(now, prayerTimeZone);
   const today = prayerTimes[todayKey];
@@ -190,6 +194,48 @@ export default function App({ onOpenEmailAlerts }: AppProps) {
     });
     return () => subscription.remove();
   }, [alertsEnabled, locale, phoneAlertPreferences, prayerTimeZone, refreshPrayerLocation]);
+
+  useEffect(() => {
+    // A wall-clock offset may change while the device remains in the foreground.
+    // Polling once a minute avoids unnecessary GPS/network work every second.
+    const checkClock = () => {
+      const instant = new Date();
+      const parts = partsInZone(instant, prayerTimeZone);
+      const zonedAsUTC = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+      const zoneOffsetMinutes = Math.round((zonedAsUTC - instant.getTime()) / 60000);
+      const signature = [
+        dateKeyInZone(instant, prayerTimeZone),
+        prayerTimeZone,
+        zoneOffsetMinutes,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+        instant.getTimezoneOffset()
+      ].join("|");
+      if (lastClockSignature.current === null) {
+        lastClockSignature.current = signature;
+        return;
+      }
+      if (signature === lastClockSignature.current || clockRefreshRunning.current) return;
+      clockRefreshRunning.current = true;
+      void refreshPrayerLocation(true).then(async context => {
+        lastClockSignature.current = signature;
+        setNow(new Date());
+        if (alertsEnabled) {
+          const result = await schedulePrayerNotifications(
+            context.prayerTimes, locale, phoneAlertPreferences, context.locationLabel, context.timezone
+          );
+          setScheduledCount(result.count);
+          await scheduleIslamicEventReminders(
+            dateKeyInZone(new Date(), context.timezone), locale, context.timezone
+          ).catch(() => undefined);
+        }
+      }).catch(() => {
+        // Retain the previous signature so the next poll can retry.
+      }).finally(() => { clockRefreshRunning.current = false; });
+    };
+    checkClock();
+    const timer = setInterval(checkClock, 60_000);
+    return () => clearInterval(timer);
+  }, [prayerTimeZone, refreshPrayerLocation, alertsEnabled, locale, phoneAlertPreferences]);
 
   const toggleLocale = async () => {
     const nextLocale = locale === "en" ? "ar" : "en";
